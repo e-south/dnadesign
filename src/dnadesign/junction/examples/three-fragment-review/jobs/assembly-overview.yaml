@@ -1,0 +1,25 @@
+version: 4
+contract:
+  kind: three_way_junction_review_render_v1
+bundle:
+  path: .tmp/assembly-overview
+input:
+  kind: json
+  path: .tmp/design-bundle/views/three_way_junction_review.v1.json
+  adapter:
+    kind: three_way_junction_review_v1
+  alphabet: DNA
+render:
+  renderer: junction_three_way_assembly
+  options:
+    view: overview
+  style:
+    preset: null
+    overrides: {}
+outputs:
+  - kind: images
+    dir: images
+    fmt: svg
+run:
+  strict: true
+  fail_on_skips: true

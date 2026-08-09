@@ -40,6 +40,7 @@ class RunReport:
     missing_selection_keys: list[str] = field(default_factory=list)
     outputs: dict[str, str] = field(default_factory=dict)
     output_metrics: dict[str, dict[str, int | float | str]] = field(default_factory=dict)
+    render_spec: dict[str, Any] = field(default_factory=dict)
     _source_evidence: dict[str, CapturedSource] = field(default_factory=dict, init=False, repr=False)
 
     def note_skip_row(self, reason: str) -> None:
@@ -63,6 +64,7 @@ class RunReport:
             "missing_selection_keys": list(self.missing_selection_keys),
             "outputs": dict(self.outputs),
             "output_metrics": {key: dict(value) for key, value in self.output_metrics.items()},
+            "render_spec": dict(self.render_spec),
         }
 
     def to_json(self) -> str:
@@ -150,6 +152,7 @@ class RunReport:
             },
             "outputs": portable_outputs,
             "output_metrics": self.output_metrics,
+            "render_spec": self.render_spec,
             "artifact_inventory": {
                 "scope": "all_published_regular_files_except_this_manifest",
                 "artifacts": artifacts,

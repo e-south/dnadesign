@@ -204,7 +204,7 @@ def _review_job(
         "bundle": {"path": "review-render"},
         "input": input_config,
         "render": {
-            "renderer": "three_way_junction_review",
+            "renderer": "junction_three_way_assembly",
             "style": {"preset": None, "overrides": {}},
         },
         "outputs": [{"kind": "images", "dir": "images", "fmt": "svg"}],

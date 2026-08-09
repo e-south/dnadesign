@@ -9,14 +9,14 @@ last_verified: 2026-08-09
 # `junction` documentation
 
 Start with a complete request: exact linear DNA targets, which targets must be
-designed together, recovery primers, bounded search settings, and order
-labels. `junction` does not guess those choices from a bare sequence.
+designed together, recovery primers, bounded search settings, and order labels.
+`junction` does not infer these choices from a bare sequence.
 
-[![Expanded nucleotide audit for a three-fragment request](assets/three-fragment-review.svg)](assets/three-fragment-review.svg)
+[![Base-level three-way-junction detail](assets/junction-detail.svg)](assets/junction-detail.svg)
 
-The review image follows one target from exact order strands through annealed
-fragment pairs and three-way-junction interfaces to the recovered duplex. It
-does not predict whether those steps will work in the laboratory.
+Review images are separate and opt in. The fragment-pairing map, target-scale
+assembly map, and selected junction details all read the same verified review
+record. They do not predict whether the design will work in the laboratory.
 
 ## Learn
 
@@ -24,8 +24,9 @@ does not predict whether those steps will work in the laboratory.
   target-to-oligo process and separates software checks from laboratory
   evidence.
 - [Getting started](getting-started.md) builds one synthetic gene-scale example.
-- The checked-in [three-fragment review request](../examples/three-fragment-review/request.yaml)
-  provides the compact expanded image above.
+- The checked-in [three-fragment request](../examples/three-fragment-review/request.yaml)
+  and [review jobs](../examples/three-fragment-review/jobs/) generate the three
+  review views described in the inspection guide.
 
 ## Use
 

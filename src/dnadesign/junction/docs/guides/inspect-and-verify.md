@@ -22,7 +22,7 @@ packet. Review the evidence in this order.
 | Which seeds, budgets, scores, and evaluation counts were used? | `plan.json` → `assembly_groups[].search` |
 | Which compact checks passed or remain unresolved? | `checks.json` |
 | Which complete strands and primers would be ordered? | `orders/oligos.tsv` |
-| What can be shown in one target-centered review view? | `views/three_way_junction_review.v1.json` |
+| What typed evidence can drive optional review plots? | `views/three_way_junction_review.v1.json` |
 | Have files changed or stopped reproducing? | `manifest.json` plus `junction verify` |
 
 `checks.json` should always retain an assembly-group-scoped
@@ -68,20 +68,44 @@ retain every rejected candidate or a full rejection trace.
 
 ## Create optional review images
 
-BaseRender can render each neutral review record as a nucleotide-level audit.
+BaseRender can render each neutral review record as separate, selected views.
 Follow the [BaseRender integration](../../../baserender/docs/integrations/junction.md).
 Use a new BaseRender output directory beside the source bundle; never add
 images inside the verified source bundle.
 
-The image follows four evidence stages: complete fragment-oligo orders,
-annealed fragment pairs, each `t/t*` and `b/b*` interface, and the exact
-recovered duplex. It also shows complete recovery-primer orders. Light gray
-edges mark aligned Watson–Crick pairs. Requests with at most three fragments
-expand every annealed pair when each fits one nucleotide row. Larger requests
-collapse that duplicated stage while retaining every exact order strand,
-junction pair, and recovered-product base. Search receipts and software checks
-stay in the JSON files. The image does not add thermodynamic or experimental
+Use the fragment map to check expected strand pairing, the target overview to
+locate all interfaces, and junction details to inspect selected `t/t*`,
+`b/b*`, nick, and strand-end geometry. Light gray edges mark declared
+Watson–Crick pairs. Large requests require explicit fragment or junction
+selection before a detailed figure is allocated. Search receipts, primers,
+order rows, and software checks remain in their owning JSON or TSV artifacts;
+the plots do not duplicate them. A plot adds no thermodynamic or experimental
 evidence and is not part of the `junction` plan identity.
+
+### Expected fragment pairing
+
+[![Expected pairing for three selected fragments](../assets/annealed-fragments.svg)](../assets/annealed-fragments.svg)
+
+This view keeps the two orderable strands antiparallel and marks only the
+pairing declared by the verified record. The unpaired barcode and toehold arms
+remain visible instead of being flattened into a target-only sequence row.
+
+### Target-scale assembly map
+
+[![Three-way interfaces across one target](../assets/assembly-overview.svg)](../assets/assembly-overview.svg)
+
+This symbolic view answers where the interfaces occur. It omits nucleotide
+letters on purpose; use it to choose a junction for detailed review.
+
+### Selected junction details
+
+[![Base-level details for two selected three-way junctions](../assets/junction-detail.svg)](../assets/junction-detail.svg)
+
+This is the decisive geometry check. Each selected interface has a horizontal
+target helix, a perpendicular antiparallel barcode helix, barcode-arm 3′/5′
+polarity, break marks on cropped target flanks, the complement-strand nick,
+and source-derived Watson–Crick edges. The view is a deterministic sequence
+schematic, not a folding simulation.
 
 ## Review before any order or experiment
 

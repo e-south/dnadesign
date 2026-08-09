@@ -6,105 +6,100 @@ status: active
 last_verified: 2026-08-09
 ---
 
-# junction review integration
+# Review a junction design with BaseRender
 
 **Type:** route
+
 **Plane:** downstream-tool
+
 **Owner-boundary:** baserender
-**Entry artifact:** verified junction `views/three_way_junction_review.v1.json` plus an explicit BaseRender `RenderJobV4` job
-**Exit artifact:** create-only BaseRender review bundle containing per-target images and its render manifest
-**Use when:** you want one optional nucleotide-level review image per selected target
-**Input:** `views/three_way_junction_review.v1.json` from a verified junction bundle
-**Output:** a separate private BaseRender bundle
-Use BaseRender to make optional review images from a junction design.
-junction plans and verifies the sequences. BaseRender reads the saved review
-records and draws them; it does not recompute the design or change the source
-bundle.
 
-## What the image shows
+**Entry artifact:** verified Junction `views/three_way_junction_review.v1.json` and an explicit render job
+**Exit artifact:** create-only BaseRender review bundle
 
-The shared `dnadesign.contracts.visual.ThreeWayJunctionReviewV1` model defines
-each JSON row. Its exact `contract_kind` is
-`three_way_junction_review_v1`; unknown fields fail validation.
+Use this route after `junction verify` when you need a visual check of selected
+targets, fragments, or three-way interfaces. `junction` owns the design and its
+evidence. BaseRender only draws the saved record and publishes a separate,
+create-only review bundle.
 
-Each image is one base-pair audit. It shows:
+| Input | `views/three_way_junction_review.v1.json` from a verified `junction` bundle |
+| --- | --- |
+| Adapter | `three_way_junction_review_v1` |
+| Render contract | `three_way_junction_review_render_v1` |
+| Output | Private BaseRender bundle with one SVG per selected target and a manifest |
 
-1. every fragment-oligo order in the submitted 5′→3′ orientation;
-2. the annealed fragment pairs, including unpaired barcode and toehold arms;
-3. every `t/t*` and `b/b*` interface with light gray Watson-Crick pairing edges;
-4. the exact recovered duplex, including declared primer extensions; and
-5. both recovery-primer orders.
+The review JSON contains complete sequences and is treated as private. Output
+directories use mode `0700`; files use mode `0600`.
 
-Sequences wrap into exact, fixed-width rows; they are not shortened to
-previews. For up to three fragments, BaseRender expands every annealed pair when
-each pair fits one nucleotide row. Larger targets use a compact annealed-stage
-note because the exact sequences already appear in the order, interface, and
-recovered-product sections. Long content makes a taller image. BaseRender
-rejects a render before figure allocation if the requested canvas would exceed
-its memory or dimension limit. Search counts and check receipts remain in the
-review JSON and source bundle because they are not sequence geometry.
+## Choose the view that answers the question
 
-The contract keeps primer mechanics separate:
+| Question | Renderer | Options |
+| --- | --- | --- |
+| Which fragment oligos are expected to pair? | `junction_annealed_fragments` | Optional `fragment_ids`; required when a target has more than 18 fragments. |
+| Where are all three-way interfaces on the target? | `junction_three_way_assembly` | `view: overview` |
+| Does a specific interface have the expected three-arm geometry? | `junction_three_way_assembly` | `view: junction_detail` and one to eight `junction_ids` |
 
-- `binding_sequence_5to3` is the target-binding portion;
-- `five_prime_extension_5to3` is an uninterpreted extension and may be empty;
-- `order_sequence_5to3` must equal extension plus binding sequence;
-- `target_binding_span` records the checked terminal target match.
+Target selection uses BaseRender's normal selection CSV. Fragment and junction
+selection belongs in `render.options`; it is not visual style. Unknown options,
+unknown IDs, duplicate IDs, and unsafe canvas sizes fail before figure
+allocation.
 
-The contract checks every barcode-bearing and complement sequence against the
-target domains and adjacent junctions. It also records the extension-aware top
-and bottom recovery products and requires them to be reverse complements.
-Every check names either a `target` or an `assembly_group` as its subject.
+The fragment map prints exact bases, strand ends, junction spans, and declared
+Watson–Crick edges. The target overview is intentionally symbolic. The junction
+detail uses a horizontal target helix, a perpendicular barcode helix, and an
+explicit complement-strand nick. It shows `t/t*` and `b/b*` on one shared
+three-arm node rather than as unrelated duplex rows.
 
-The same file supports target-specific and universal recovery. A primer may
-carry a reviewed 5-prime extension for later Type IIS work, but BaseRender does
-not infer an enzyme, cut geometry, or cloning plan.
+These are sequence-derived schematics. They do not claim predicted secondary
+structure, thermodynamic stability, successful annealing or ligation, PCR
+performance, yield, fidelity, or experimental validation.
 
-`thermodynamic_screening` is restricted to `not_run`. String-distance search
-receipts are not thermodynamic or experimental validation.
-
-## Verify the design first
-
-BaseRender validates the review records, but it does not read the junction
-manifest or establish where the JSON came from. Verify the source bundle before
-rendering:
+## Verify the source first
 
 ```bash
 uv run junction verify review-root/verified-design --format json
 ```
 
-## Create a separate review bundle
+BaseRender validates the typed review rows, but it does not verify the source
+bundle's manifest. Keep that step explicit.
 
-Keep the job file, verified source bundle, and review destination under one
-review directory. Save the job as `review-root/review.job.yaml`:
+## Example: selected junction details
+
+Keep the job, source bundle, and output under one review root:
 
 ```text
 review-root/
-├── review.job.yaml
+├── detail.job.yaml
 ├── verified-design/
 │   └── views/
 │       └── three_way_junction_review.v1.json
 └── reviews/
 ```
 
-Paths are resolved relative to the job file. Point the input at the review JSON
-in the junction bundle, and choose a new output directory beside, not inside,
-the source bundle:
-
 ```yaml
 version: 4
 contract:
   kind: three_way_junction_review_render_v1
 bundle:
-  path: reviews/design-v1
+  path: reviews/junction-detail
 input:
   kind: json
   path: verified-design/views/three_way_junction_review.v1.json
   adapter:
     kind: three_way_junction_review_v1
   alphabet: DNA
+selection:
+  path: selected-targets.csv
+  match_on: id
+  column: target_id
+  on_missing: error
 render:
-  renderer: three_way_junction_review
+  renderer: junction_three_way_assembly
+  options:
+    view: junction_detail
+    junction_ids:
+      - target-a:junction-0001
+      - target-a:junction-0002
   style:
     preset: null
     overrides: {}
@@ -117,57 +112,58 @@ run:
   fail_on_skips: true
 ```
 
-Run through the stable API or CLI:
+`selected-targets.csv` contains one target ID:
 
-```python
-import dnadesign.baserender as baserender
-
-job = baserender.validate_job("review-root/review.job.yaml")
-report = baserender.run_job(job)
+```csv
+target_id
+target-a
 ```
+
+Validate, then run:
 
 ```bash
-uv run baserender job validate review-root/review.job.yaml
-uv run baserender job run review-root/review.job.yaml
+uv run baserender job validate review-root/detail.job.yaml
+uv run baserender job run review-root/detail.job.yaml
 ```
 
-The review records contain complete DNA sequences. BaseRender therefore creates
-directories with mode `0700` and files with `0600`. It installs `bundle.path`
-atomically and fails if that path already exists. The input JSON and the
-junction bundle remain unchanged.
+The job writes a new bundle atomically and fails if `bundle.path` already
+exists. It never edits the `junction` bundle. The adapter supports image
+directories only; video and a combined single-file output are rejected.
 
-The JSON file has one row per target, so `dir: images` writes one target-named
-image per row. Filename collisions receive deterministic numeric suffixes.
-BaseRender rejects review JSON or an optional selection CSV above 64 MiB. It
-also accepts at most 2,000 review rows, 2,000 selection rows, and 10,000,000
-target bases. These checks run on the complete source before `input.limit` or a
-selection narrows the rendered rows. Filtering cannot make an oversized source
-acceptable, and there is no direct BaseRender route for a source above these
-limits.
+The checked-in [three-fragment example](../../../junction/examples/three-fragment-review/)
+contains separate jobs for the fragment map, assembly overview, and junction
+details.
 
-This adapter writes per-target images only. It rejects video and
-`outputs[].path`. Do not edit or split the verified source file in place.
+## Contract limits
 
-## Literature and visual design
+The shared `dnadesign.contracts.visual.ThreeWayJunctionReviewV1` model validates
+target reconstruction, fragment order, adjacent junction identities, `t/t*`
+and `b/b*` complements, recovery-primer evidence, and document-wide search
+receipts. Unknown fields fail validation. `thermodynamic_screening` is fixed at
+`not_run` because the current Junction search is string based.
 
-The review terms follow the three-way-junction and pooled-recovery concepts
-described by Robinson *et al.* in
+BaseRender rejects review JSON or a selection CSV above 64 MiB. A job accepts
+at most 2,000 review rows, 2,000 selection rows, and 10,000,000 target bases.
+The complete source is checked before `input.limit` or selection is applied.
+
+## Method and attribution
+
+The terms follow the three-way-junction and pooled-recovery methods described
+by Robinson *et al.* in
 [the Sidewinder paper](https://doi.org/10.1038/s41586-025-10006-0) and
 [the pooled extension](https://doi.org/10.64898/2026.05.01.722326).
-The nucleotide map is an original QA view. It exposes target geometry,
-assignments, strand orders, and declared recovery primers without copying the
-papers' figures or claiming their experimental results.
+The BaseRender views use an original QA layout; they do not reproduce the
+papers' figures or transfer the papers' experimental results to a generated
+design.
 
-For the method mapping and implementation limits, use junction's
-[method reference](../../../junction/docs/reference/method-v1.md) and
-[sources and scope](../../../junction/docs/reference/sources.md).
+See Junction's [method reference](../../../junction/docs/reference/method-v1.md)
+and [sources and scope](../../../junction/docs/reference/sources.md) for the
+implementation boundary and unresolved validation gaps.
 
-## Code boundaries
+## Ownership
 
-- Tools that write these records may import `dnadesign.contracts.visual`.
-- Code that renders them uses `dnadesign.baserender`; it does not import
-  the private `dnadesign.baserender.src.*` package.
-- Study names, objectives, rankings, and campaign state do not belong in this
-  contract.
-- The review image is advisory. It is not part of junction plan identity,
+- Junction emits the neutral, typed review evidence.
+- BaseRender owns deterministic plotting and its output manifest.
+- Studies own interpretation, rankings, objectives, and campaign state.
+- Review images are advisory. They are not part of Junction plan identity,
   offline verification, ordering, or laboratory validation.

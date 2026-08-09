@@ -110,6 +110,7 @@ def _job_to_mapping(parsed: RenderJobV4) -> dict[str, Any]:
         },
         "render": {
             "renderer": parsed.render.renderer,
+            "options": dict(parsed.render.options),
             "style": {
                 "preset": parsed.render.style_preset,
                 "overrides": dict(parsed.render.style_overrides),

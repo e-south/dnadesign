@@ -11,7 +11,9 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dataclasses import replace
+import hashlib
+import json
+from dataclasses import asdict, replace
 from itertools import islice
 from pathlib import Path
 from typing import Iterable, Iterator
@@ -41,6 +43,22 @@ from ..reporting import RunReport
 from ..runtime import initialize_runtime
 
 _BundlePublication = CreateOnlyDirectoryPublication
+
+
+def _render_spec(job: RenderJobV4, style) -> dict[str, object]:
+    """Return the portable choices needed to identify one render."""
+
+    style_payload = asdict(style)
+    style_bytes = json.dumps(style_payload, sort_keys=True, separators=(",", ":")).encode()
+    return {
+        "schema": "dnadesign.baserender.render_spec.v1",
+        "contract_kind": job.contract.kind,
+        "adapter_kind": job.input.adapter.kind,
+        "alphabet": str(job.input.alphabet),
+        "renderer": job.render.renderer,
+        "options": dict(job.render.options),
+        "style_sha256": hashlib.sha256(style_bytes).hexdigest(),
+    }
 
 
 def _output_destination(output: ImagesOutputCfg | VideoOutputCfg) -> Path:
@@ -209,6 +227,7 @@ def run_render_job(
     _validate_input_envelope(job, source_content=report.source_content("input"), envelope=envelope)
 
     style = resolve_style(preset=job.render.style_preset, overrides=job.render.style_overrides)
+    report.render_spec = _render_spec(job, style)
     from ..render import Palette
 
     palette = Palette(style.palette)
@@ -262,13 +281,15 @@ def run_render_job(
             planned_frame_count = planned_video_frame_count(materialized, output=vid_output)
             effective_frames_per_record = effective_video_frames_per_record(materialized, output=vid_output)
             if isinstance(img_output, ImagesOutputCfg):
-                write_images(
-                    materialized,
-                    output=img_output,
-                    renderer_name=job.render.renderer,
-                    style=style,
-                    palette=palette,
-                )
+                image_kwargs = {
+                    "output": img_output,
+                    "renderer_name": job.render.renderer,
+                    "style": style,
+                    "palette": palette,
+                }
+                if job.render.options:
+                    image_kwargs["renderer_options"] = job.render.options
+                write_images(materialized, **image_kwargs)
                 original_images = output_kind(original_job, "images")
                 assert isinstance(original_images, ImagesOutputCfg)
                 final_images = _output_destination(original_images).resolve()
@@ -293,13 +314,15 @@ def run_render_job(
             from ..outputs import write_images
 
             materialized = records
-            write_images(
-                materialized,
-                output=img_output,
-                renderer_name=job.render.renderer,
-                style=style,
-                palette=palette,
-            )
+            image_kwargs = {
+                "output": img_output,
+                "renderer_name": job.render.renderer,
+                "style": style,
+                "palette": palette,
+            }
+            if job.render.options:
+                image_kwargs["renderer_options"] = job.render.options
+            write_images(materialized, **image_kwargs)
             report.yielded_records = len(materialized)
             original_images = output_kind(original_job, "images")
             assert isinstance(original_images, ImagesOutputCfg)

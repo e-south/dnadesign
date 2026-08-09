@@ -108,6 +108,7 @@ def _render_record_grid_figure_local(
     palette: Palette,
     ncols: int,
     max_rows: int | None = None,
+    renderer_options: Mapping[str, object] | None = None,
 ):
     import matplotlib.pyplot as plt
     from matplotlib.lines import Line2D
@@ -127,7 +128,13 @@ def _render_record_grid_figure_local(
         )
     panel_images: list[object] = []
     for record in records:
-        panel = render_record(record, renderer_name=renderer_name, style=style, palette=palette)
+        panel = render_record(
+            record,
+            renderer_name=renderer_name,
+            style=style,
+            palette=palette,
+            renderer_options=renderer_options,
+        )
         panel_images.append(_figure_rgba(panel))
         plt.close(panel)
 
@@ -185,6 +192,7 @@ def write_images(
     renderer_name: str,
     style: Style,
     palette: Palette,
+    renderer_options: Mapping[str, object] | None = None,
 ) -> Path:
     import matplotlib.pyplot as plt
 
@@ -197,6 +205,7 @@ def write_images(
             renderer_name=renderer_name,
             style=style,
             palette=palette,
+            renderer_options=renderer_options,
         )
     )
     validate_records_output_policy(
@@ -209,7 +218,13 @@ def write_images(
         out_path = output.path.resolve()
         out_path.parent.mkdir(parents=True, exist_ok=True)
         if len(materialized) == 1:
-            fig = render_record(materialized[0], renderer_name=renderer_name, style=style, palette=palette)
+            fig = render_record(
+                materialized[0],
+                renderer_name=renderer_name,
+                style=style,
+                palette=palette,
+                renderer_options=renderer_options,
+            )
         else:
             fig = _render_record_grid_figure_local(
                 materialized,
@@ -218,6 +233,7 @@ def write_images(
                 palette=palette,
                 ncols=_grid_ncols_for_records(materialized, default_ncols=1),
                 max_rows=_grid_max_rows_for_records(materialized),
+                renderer_options=renderer_options,
             )
         fig.patch.set_facecolor("white")
         fig.patch.set_alpha(1.0)
@@ -235,7 +251,13 @@ def write_images(
         name = _unique_stem(stem, used)
         out_path = out_dir / f"{name}.{output.fmt}"
 
-        fig = render_record(record, renderer_name=renderer_name, style=style, palette=palette)
+        fig = render_record(
+            record,
+            renderer_name=renderer_name,
+            style=style,
+            palette=palette,
+            renderer_options=renderer_options,
+        )
         fig.patch.set_facecolor("white")
         fig.patch.set_alpha(1.0)
         _save_figure(fig, out_path=out_path, fmt=output.fmt)

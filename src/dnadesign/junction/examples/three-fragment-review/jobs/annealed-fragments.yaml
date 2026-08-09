@@ -2,8 +2,7 @@ version: 4
 contract:
   kind: three_way_junction_review_render_v1
 bundle:
-  # BaseRender publishes create-only output relative to this job file.
-  path: .tmp/review-bundle
+  path: .tmp/annealed-fragments
 input:
   kind: json
   path: .tmp/design-bundle/views/three_way_junction_review.v1.json
@@ -11,7 +10,7 @@ input:
     kind: three_way_junction_review_v1
   alphabet: DNA
 render:
-  renderer: three_way_junction_review
+  renderer: junction_annealed_fragments
   style:
     preset: null
     overrides: {}

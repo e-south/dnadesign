@@ -1,0 +1,28 @@
+version: 4
+contract:
+  kind: three_way_junction_review_render_v1
+bundle:
+  path: .tmp/junction-detail
+input:
+  kind: json
+  path: .tmp/design-bundle/views/three_way_junction_review.v1.json
+  adapter:
+    kind: three_way_junction_review_v1
+  alphabet: DNA
+render:
+  renderer: junction_three_way_assembly
+  options:
+    view: junction_detail
+    junction_ids:
+      - synthetic-three-fragment-target:junction-0001
+      - synthetic-three-fragment-target:junction-0002
+  style:
+    preset: null
+    overrides: {}
+outputs:
+  - kind: images
+    dir: images
+    fmt: svg
+run:
+  strict: true
+  fail_on_skips: true

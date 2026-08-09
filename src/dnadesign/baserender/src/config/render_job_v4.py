@@ -95,6 +95,7 @@ class RenderCfg:
     renderer: str
     style_preset: str | Path | None
     style_overrides: Mapping[str, Any]
+    options: Mapping[str, Any]
 
 
 @dataclass(frozen=True)
@@ -627,7 +628,7 @@ def _parse_selection(job_path: Path, raw: Any, *, allowed_roots: tuple[Path, ...
 
 def _parse_render(raw: Any) -> RenderCfg:
     data = require_mapping(raw, "render")
-    reject_unknown_keys(data, {"renderer", "style"}, "render")
+    reject_unknown_keys(data, {"renderer", "style", "options"}, "render")
 
     renderer = str(data.get("renderer", "")).strip()
     require_one_of(
@@ -651,7 +652,18 @@ def _parse_render(raw: Any) -> RenderCfg:
     if not isinstance(overrides_raw, Mapping):
         raise SchemaError("render.style.overrides must be a mapping")
 
-    return RenderCfg(renderer=renderer, style_preset=style_preset, style_overrides=dict(overrides_raw))
+    options_raw = data.get("options", {})
+    if options_raw is None:
+        options_raw = {}
+    if not isinstance(options_raw, Mapping):
+        raise SchemaError("render.options must be a mapping")
+
+    return RenderCfg(
+        renderer=renderer,
+        style_preset=style_preset,
+        style_overrides=dict(overrides_raw),
+        options=dict(options_raw),
+    )
 
 
 def _resolve_output_dir(

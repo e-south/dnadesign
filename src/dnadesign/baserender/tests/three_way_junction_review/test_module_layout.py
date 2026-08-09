@@ -14,15 +14,14 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from dnadesign.baserender.src.render import three_way_junction_review
+from dnadesign.baserender.src.render import junction_review_common
 
-_ROOT = Path(three_way_junction_review.__file__).parent
+_ROOT = Path(junction_review_common.__file__).parent
 _MODULE_BUDGETS = {
-    "junction_annealed_review.py": 150,
-    "junction_nucleotide_drawing.py": 240,
-    "junction_pairing_layout.py": 130,
-    "junction_review_sections.py": 230,
-    "three_way_junction_review.py": 180,
+    "junction_review_common.py": 190,
+    "junction_annealed_fragments.py": 300,
+    "junction_three_way_assembly.py": 240,
+    "junction_three_way_detail.py": 260,
 }
 
 
