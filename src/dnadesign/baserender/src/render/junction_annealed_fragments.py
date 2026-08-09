@@ -38,6 +38,7 @@ from .junction_review_common import (
     validate_figure_size,
 )
 from .palette import Palette
+from .sequence_preview import bounded_svg_gid
 
 _RENDERER = "junction_annealed_fragments"
 _MAX_FRAGMENTS = 18
@@ -164,7 +165,7 @@ def _draw_fragment(axis, review: ThreeWayJunctionReviewV1, *, index: int, y: flo
         for base in range(paired_start, paired_start + paired_length)
     ]
     pairs = LineCollection(pair_segments, colors=PAIR, linewidths=0.42, zorder=1)
-    pairs.set_gid(f"junction-annealed:{fragment.fragment_id}:watson-crick")
+    pairs.set_gid(bounded_svg_gid(f"junction-annealed:{fragment.fragment_id}:watson-crick"))
     axis.add_collection(pairs)
     draw_base_run(
         axis,

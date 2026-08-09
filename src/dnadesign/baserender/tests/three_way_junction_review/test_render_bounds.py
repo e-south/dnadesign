@@ -12,6 +12,8 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+import io
+import xml.etree.ElementTree as ET
 
 import matplotlib.pyplot as plt
 import pytest
@@ -21,7 +23,7 @@ import dnadesign.baserender as baserender
 from dnadesign.baserender.src.outputs.names import _safe_stem
 from dnadesign.baserender.src.render import junction_three_way_assembly as assembly_renderer
 from dnadesign.baserender.src.render.junction_review_common import draw_base_run
-from dnadesign.baserender.src.render.sequence_preview import bounded_sequence_preview
+from dnadesign.baserender.src.render.sequence_preview import bounded_sequence_preview, bounded_svg_gid
 
 from .fixtures import (
     _adapt_payload,
@@ -29,6 +31,7 @@ from .fixtures import (
     _payload_with_large_display_scalars,
     _payload_with_long_junction_sequences,
     _payload_with_many_junctions,
+    _rename_target_geometry,
 )
 
 
@@ -94,11 +97,34 @@ def test_base_gids_hash_an_unbounded_identifier_once() -> None:
         gids = tuple(str(artist.get_gid()) for artist in artists)
         prefixes = {gid.split(":base:", 1)[0] for gid in gids}
 
-        assert prefixes == {f"junction-gid-sha256-{hashlib.sha256(long_prefix.encode()).hexdigest()[:20]}"}
+        assert prefixes == {bounded_svg_gid(long_prefix)}
         assert all(len(gid) < 80 for gid in gids)
         assert all(long_prefix not in gid for gid in gids)
     finally:
         plt.close(figure)
+
+
+@pytest.mark.parametrize("unsafe_id", ["target-" + ("x" * 100_000), "target-\x00invalid"])
+def test_exported_review_svgs_bound_and_escape_all_identifier_derived_gids(unsafe_id: str) -> None:
+    payload = _payload()
+    _rename_target_geometry(payload, target_id=unsafe_id)
+    junction_id = payload["geometry"]["junctions"][0]["junction_id"]  # type: ignore[index]
+    renderers = (
+        ("junction_annealed_fragments", None),
+        ("junction_three_way_assembly", {"view": "junction_detail", "junction_ids": [junction_id]}),
+    )
+
+    for renderer, options in renderers:
+        figure = baserender.render(_adapt_payload(payload), renderer=renderer, options=options)
+        try:
+            buffer = io.BytesIO()
+            figure.savefig(buffer, format="svg", metadata={"Date": None})
+            svg = buffer.getvalue()
+            ET.fromstring(svg)
+            assert unsafe_id.encode("utf-8") not in svg
+            assert len(svg) < 150_000
+        finally:
+            plt.close(figure)
 
 
 def test_overview_bounds_identifiers_and_omits_search_scalars() -> None:

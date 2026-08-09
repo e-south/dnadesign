@@ -12,18 +12,27 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass
 
 _DEFAULT_VISIBLE_BASES = 12
 _DIGEST_PREFIX_LENGTH = 12
 _HASH_CHUNK_CHARS = 4_096
+_MAX_SVG_GID_CHARS = 96
+_SVG_GID_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_.:-]*\Z", flags=re.ASCII)
 
 
-def _sha256_prefix(text: str, *, encoding: str, errors: str = "strict") -> str:
+def _sha256_prefix(
+    text: str,
+    *,
+    encoding: str,
+    errors: str = "strict",
+    digest_chars: int = _DIGEST_PREFIX_LENGTH,
+) -> str:
     digest = hashlib.sha256()
     for start in range(0, len(text), _HASH_CHUNK_CHARS):
         digest.update(text[start : start + _HASH_CHUNK_CHARS].encode(encoding, errors=errors))
-    return digest.hexdigest()[:_DIGEST_PREFIX_LENGTH]
+    return digest.hexdigest()[:digest_chars]
 
 
 def _escaped_edge(text: str, *, visible_chars: int, from_end: bool) -> str:
@@ -79,6 +88,15 @@ def bounded_text_preview(text: str, *, visible_chars: int = 12, exact_limit: int
     return TextPreview(preview=preview, length_chars=len(text), sha256_prefix=digest, abbreviated=True)
 
 
+def bounded_svg_gid(value: str) -> str:
+    """Return one XML-safe, bounded, deterministic SVG element identifier."""
+
+    if len(value) <= _MAX_SVG_GID_CHARS and _SVG_GID_PATTERN.fullmatch(value):
+        return value
+    digest = _sha256_prefix(value, encoding="utf-8", errors="surrogatepass", digest_chars=20)
+    return f"baserender-gid-sha256-{digest}"
+
+
 def bounded_sequence_preview(
     sequence: str,
     *,
@@ -101,4 +119,4 @@ def bounded_sequence_preview(
     return SequencePreview(preview=preview, length_nt=len(sequence), sha256_prefix=digest)
 
 
-__all__ = ["SequencePreview", "TextPreview", "bounded_sequence_preview", "bounded_text_preview"]
+__all__ = ["SequencePreview", "TextPreview", "bounded_sequence_preview", "bounded_svg_gid", "bounded_text_preview"]

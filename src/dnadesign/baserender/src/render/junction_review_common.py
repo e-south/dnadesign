@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import hashlib
 import math
 from typing import Mapping, Sequence
 
@@ -22,7 +21,7 @@ from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
 from ..config import Style
 from ..core import Record, RenderingError, SchemaError
 from ..core.pydantic_validation import format_validation_error
-from .sequence_preview import bounded_text_preview
+from .sequence_preview import bounded_svg_gid, bounded_text_preview
 
 INK = "#172033"
 MUTED = "#667085"
@@ -44,7 +43,6 @@ MAX_DPI = 600
 MAX_FIGURE_SCALE = 4.0
 MAX_CANVAS_DIMENSION_PX = 16_384
 MAX_CANVAS_RGBA_BYTES = 64 * 1024 * 1024
-MAX_GID_PREFIX_CHARS = 96
 
 
 def review_from_record(record: Record) -> ThreeWayJunctionReviewV1:
@@ -70,13 +68,6 @@ def safe_identifier(value: str) -> str:
     return preview.preview
 
 
-def bounded_gid_prefix(value: str) -> str:
-    """Keep ordinary SVG identifiers readable without repeating unbounded input."""
-    if len(value) <= MAX_GID_PREFIX_CHARS:
-        return value
-    return f"junction-gid-sha256-{hashlib.sha256(value.encode('utf-8')).hexdigest()[:20]}"
-
-
 def junction_color(index: int) -> str:
     return JUNCTION_COLORS[index % len(JUNCTION_COLORS)]
 
@@ -95,7 +86,7 @@ def draw_base_run(
 ) -> tuple[object, ...]:
     """Draw bases at explicit centers shared with pairing geometry."""
 
-    safe_gid_prefix = bounded_gid_prefix(gid_prefix)
+    safe_gid_prefix = bounded_svg_gid(gid_prefix)
     artists: list[object] = []
     for index, base in enumerate(sequence):
         artist = axis.text(

@@ -18,19 +18,20 @@ from matplotlib.patches import Rectangle
 from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
 
 from .junction_review_common import INK, MUTED, PAIR, draw_base_run, junction_color, safe_identifier
+from .sequence_preview import bounded_svg_gid
 
 _CONTEXT_BASES = 6
 
 
 def _add_backbone(axis, xs, ys, *, gid: str, color: str = INK) -> None:
     line = Line2D(xs, ys, color=color, linewidth=1.1, solid_capstyle="round", zorder=2)
-    line.set_gid(gid)
+    line.set_gid(bounded_svg_gid(gid))
     axis.add_line(line)
 
 
 def _add_pairs(axis, segments, *, gid: str) -> None:
     collection = LineCollection(segments, colors=PAIR, linewidths=0.55, zorder=1)
-    collection.set_gid(gid)
+    collection.set_gid(bounded_svg_gid(gid))
     axis.add_collection(collection)
 
 
@@ -42,7 +43,7 @@ def _add_break(axis, *, x: float, y: float, gid: str) -> None:
         ys = (y - 0.045, y + 0.045)
         axis.add_line(Line2D(xs, ys, color="white", linewidth=3.2, zorder=4))
         mark = Line2D(xs, ys, color=INK, linewidth=0.9, zorder=5)
-        mark.set_gid(f"{gid}:{index}")
+        mark.set_gid(bounded_svg_gid(f"{gid}:{index}"))
         axis.add_line(mark)
 
 
@@ -76,7 +77,7 @@ def draw_junction_detail(axis, review: ThreeWayJunctionReviewV1, index: int) -> 
     right_bottom = right_context.translate(str.maketrans("ACGT", "TGCA"))
     color = junction_color(index)
 
-    axis.set_gid(f"junction-three-way-assembly:{junction.junction_id}:detail")
+    axis.set_gid(bounded_svg_gid(f"junction-three-way-assembly:{junction.junction_id}:detail"))
     axis.set_xlim(-1, 1)
     axis.set_ylim(-1, 1)
     axis.axis("off")
@@ -221,7 +222,7 @@ def draw_junction_detail(axis, review: ThreeWayJunctionReviewV1, index: int) -> 
         color="#111827",
         linewidth=1.1,
     )
-    nick.set_gid(f"junction:{junction.junction_id}:nick")
+    nick.set_gid(bounded_svg_gid(f"junction:{junction.junction_id}:nick"))
     axis.add_line(nick)
     axis.text(toehold_x, bottom_y - 0.14, "nick", fontsize=5.2, color=MUTED, ha="center", va="top")
     axis.text((toehold_x + node_x) / 2, top_y + 0.09, f"t{index + 1}", fontsize=5.5, color=color, ha="center")
