@@ -20,6 +20,7 @@ from matplotlib.collections import LineCollection
 import dnadesign.baserender as baserender
 from dnadesign.baserender.src.outputs.names import _safe_stem
 from dnadesign.baserender.src.render import junction_three_way_assembly as assembly_renderer
+from dnadesign.baserender.src.render.junction_review_common import draw_base_run
 from dnadesign.baserender.src.render.sequence_preview import bounded_sequence_preview
 
 from .fixtures import (
@@ -74,6 +75,30 @@ def test_bounded_sequence_preview_has_a_fixed_sequence_text_budget() -> None:
     assert preview.preview == "ACGTAC…GTACGT"
     assert preview.sha256_prefix == hashlib.sha256(sequence.encode()).hexdigest()[:12]
     assert sequence not in preview.label("bind")
+
+
+def test_base_gids_hash_an_unbounded_identifier_once() -> None:
+    figure, axis = plt.subplots()
+    try:
+        long_prefix = f"junction:{'x' * 10_000}:top"
+        artists = draw_base_run(
+            axis,
+            "ACGT" * 8,
+            start_x=0,
+            start_y=0,
+            delta_x=1,
+            delta_y=0,
+            gid_prefix=long_prefix,
+            fontsize=5,
+        )
+        gids = tuple(str(artist.get_gid()) for artist in artists)
+        prefixes = {gid.split(":base:", 1)[0] for gid in gids}
+
+        assert prefixes == {f"junction-gid-sha256-{hashlib.sha256(long_prefix.encode()).hexdigest()[:20]}"}
+        assert all(len(gid) < 80 for gid in gids)
+        assert all(long_prefix not in gid for gid in gids)
+    finally:
+        plt.close(figure)
 
 
 def test_overview_bounds_identifiers_and_omits_search_scalars() -> None:
