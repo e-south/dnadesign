@@ -30,7 +30,7 @@ _FIGURE_WIDTH = 15.2
 
 
 def _figure_height(fragment_count: int) -> float:
-    return 1.45 + 0.88 * fragment_count
+    return 1.65 + 1.10 * fragment_count
 
 
 @dataclass(frozen=True)

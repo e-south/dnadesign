@@ -196,7 +196,7 @@ def test_direct_surface_accepts_adapter_supported_renderer() -> None:
     figure = baserender.render(record, renderer="junction_three_way_assembly")
     try:
         assert len(figure.axes) == 1
-        assert figure.axes[0].get_gid() == "junction-three-way-assembly:overview"
+        assert figure.axes[0].get_gid() == "junction-three-way-assembly:assembly"
     finally:
         plt.close(figure)
 

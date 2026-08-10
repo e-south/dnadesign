@@ -11,13 +11,34 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from functools import cache
 from typing import Sequence
 
+from matplotlib.collections import PathCollection
+from matplotlib.font_manager import FontProperties
 from matplotlib.lines import Line2D
-from matplotlib.patches import FancyBboxPatch, Rectangle
+from matplotlib.patches import Rectangle
+from matplotlib.textpath import TextPath
+from matplotlib.transforms import Affine2D, IdentityTransform
 
 from ..sequence_preview import bounded_svg_gid
 from .foundation import DOMAIN, INK, STRAND_EDGE
+
+_DNA_BASES = "ACGT"
+
+
+@cache
+def _centered_base_glyph(base: str):
+    if base not in _DNA_BASES:
+        raise ValueError(f"unsupported DNA base {base!r}")
+    raw = TextPath((0, 0), base, prop=FontProperties(family="monospace"), size=1.0)
+    bounds = raw.get_extents()
+    return raw.transformed(
+        Affine2D().translate(
+            -bounds.x0 - bounds.width / 2,
+            -bounds.y0 - bounds.height / 2,
+        )
+    )
 
 
 def draw_segmented_strand(
@@ -36,15 +57,12 @@ def draw_segmented_strand(
     if length < 1:
         raise ValueError("segmented strand length must be positive")
     width = base_step * length
-    rounding = min(height / 2, width / 2)
-    body = FancyBboxPatch(
+    body = Rectangle(
         (start_x, center_y - height / 2),
         width,
         height,
-        boxstyle=f"round,pad=0,rounding_size={rounding}",
         facecolor=DOMAIN,
-        edgecolor=STRAND_EDGE,
-        linewidth=0.7,
+        edgecolor="none",
         zorder=0,
     )
     body.set_gid(bounded_svg_gid(f"{gid_prefix}:body"))
@@ -63,14 +81,13 @@ def draw_segmented_strand(
         segment.set_clip_path(body)
         segment.set_gid(bounded_svg_gid(f"{gid_prefix}:segment:{index}"))
         axis.add_patch(segment)
-    outline = FancyBboxPatch(
+    outline = Rectangle(
         (start_x, center_y - height / 2),
         width,
         height,
-        boxstyle=f"round,pad=0,rounding_size={rounding}",
         facecolor="none",
         edgecolor=STRAND_EDGE,
-        linewidth=0.7,
+        linewidth=0.55,
         zorder=0.4,
     )
     outline.set_gid(bounded_svg_gid(f"{gid_prefix}:outline"))
@@ -87,14 +104,14 @@ def draw_molecular_path(
     linewidth: float = 9.0,
     zorder: float = 0.3,
 ) -> None:
-    """Draw one contiguous molecular path with rounded termini and corners."""
+    """Draw one contiguous molecular path with square termini and rounded bends."""
 
     line = Line2D(
         xs,
         ys,
         color=color,
         linewidth=linewidth,
-        solid_capstyle="round",
+        solid_capstyle="butt",
         solid_joinstyle="round",
         zorder=zorder,
     )
@@ -131,5 +148,56 @@ def draw_base_run(
             zorder=3,
         )
         artist.set_gid(f"{safe_gid_prefix}:base:{index}:{base}")
+        artists.append(artist)
+    return tuple(artists)
+
+
+def draw_compact_base_run(
+    axis,
+    sequence: str,
+    *,
+    start_x: float,
+    start_y: float,
+    delta_x: float,
+    delta_y: float,
+    gid_prefix: str,
+    fontsize: float,
+    color: str = INK,
+) -> tuple[PathCollection, ...]:
+    """Draw a long exact sequence with four bounded vector collections.
+
+    One collection per nucleotide avoids allocating a Matplotlib text artist
+    for every product base. Collection offsets remain the authoritative base
+    centers, so Watson-Crick guides use the same coordinates.
+    """
+
+    invalid = sorted(set(sequence) - set(_DNA_BASES))
+    if invalid:
+        raise ValueError(f"base run contains unsupported DNA symbols: {invalid}")
+    safe_gid_prefix = bounded_svg_gid(gid_prefix)
+    artists: list[PathCollection] = []
+    for base in _DNA_BASES:
+        offsets = [
+            (
+                start_x + (index + 0.5) * delta_x,
+                start_y + (index + 0.5) * delta_y,
+            )
+            for index, symbol in enumerate(sequence)
+            if symbol == base
+        ]
+        if not offsets:
+            continue
+        artist = PathCollection(
+            [_centered_base_glyph(base)],
+            sizes=[fontsize**2],
+            offsets=offsets,
+            transOffset=axis.transData,
+            facecolors=color,
+            edgecolors="none",
+            zorder=3,
+        )
+        artist.set_transform(IdentityTransform())
+        artist.set_gid(f"{safe_gid_prefix}:glyph:{base}")
+        axis.add_collection(artist)
         artists.append(artist)
     return tuple(artists)
