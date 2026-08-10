@@ -4,7 +4,7 @@ title: junction sources and scope
 type: reference
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-08-10
 ---
 
 # Sources and scope
@@ -37,6 +37,14 @@ barcode/coding oligo roles, ligation, recovery, and experimental validation.
 The preprint describes pooled oligos, a three-stage string-design procedure,
 construct-specific and universal recovery experiments, and downstream
 hierarchical assembly.
+
+The Nature methods report effective ligation when the nick was about six bases
+or farther from the barcode helix and standardize the reported experiments on
+10-base toeholds. They use individually synthesized oligos with a 120-base
+maximum in that study. The pooled preprint uses `t = 10` by default and states
+`L = 96`, `b = 22`, and `R = 15`, while also defining the exact strand
+composition. Those values motivate the checked-in examples; they are not a
+supplier-independent manufacturing profile.
 
 ## What is implemented
 

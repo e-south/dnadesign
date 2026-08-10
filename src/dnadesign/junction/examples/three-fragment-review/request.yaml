@@ -29,8 +29,9 @@ targets:
   - id: synthetic-three-fragment-target
     assembly_group_id: compact-review-example
 
-    # Exact synthetic 170 bp target with no asserted biological meaning.
-    sequence: TCATTCTAGGCTAGCTGAGTGCGCTATAAGCGTAGAACTACTACATCACATCCGCTACGCTCTCACCGTAGAGGGACTAGGGTCTATCAGATGATGCTTAGCGGAATAAGGTACAGGTATAATCCGAAACGCTTTGAATTTTGGGGACGCCTGATTAACGTAGTCTGATG
+    # Exact synthetic 200 bp target with no asserted biological meaning. This
+    # length gives the three fragment pairs a less skewed ordering envelope.
+    sequence: TCATTCTAGGCTAGCTGAGTGCGCTATAAGCGTAGAACTACTACATCACATCCGCTACGCTCTCACCGTAGAGGGACTAGGGTCTATCAGATGATGCTTAGCGGAATAAGGTACAGGTATAATCCGAAACGCTTTGAATTTTGGGGACGCCTGATTAACGTAGTCTGATGAACGCCTCTAGCTCACCTTGGATTGACAGG
 
     recovery_primers:
       # Junction validates caller-supplied primers; it does not design them.
@@ -39,7 +40,7 @@ targets:
         binding_sequence: TCATTCTAGGCTAGCTGAGT
         five_prime_extension: ""
       reverse:
-        binding_sequence: CATCAGACTACGTTAATCAG
+        binding_sequence: CCTGTCAATCCAAGGTGAGC
         five_prime_extension: ""
 
 order_policy:
@@ -50,7 +51,7 @@ order_policy:
   primer_purification: review-required
   complement_end_preparation: vendor_5_prime_phosphate
 
-  # This example remains within the paper-scale 96 nt nominal geometry while
-  # allowing terminal fragments to vary under the selected loci.
+  # Hard synthesis bounds apply to every emitted fragment oligo. They are
+  # vendor-neutral inputs, not inferred purchasing recommendations.
   minimum_fragment_oligo_length: 45
   max_oligo_length: 110
