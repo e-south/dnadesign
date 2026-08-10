@@ -22,7 +22,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dnadesign.junction import api as api_module
-from dnadesign.junction import preflight
+from dnadesign.junction import preflight, render_sequence_dissimilarity_svg
 from dnadesign.junction.cli import app
 from dnadesign.junction.contracts.request import MAX_REQUEST_BYTES, MAX_REQUEST_IDENTIFIER_BYTES, parse_request
 from dnadesign.junction.errors import JunctionBundleError, JunctionConfigError, JunctionDesignError
@@ -61,6 +61,20 @@ def test_preflight_api_creates_no_durable_artifacts(tmp_path: Path) -> None:
     assert result.validation_scope == "string_only"
     assert result.to_mapping()["validation_scope"] == "string_only"
     assert before == after == [Path("request.json")]
+
+
+def test_sequence_comparison_svg_is_public_deterministic_and_write_free(tmp_path: Path) -> None:
+    request = _request_file(tmp_path)
+    planned = api_module.plan(request)
+    group_id = planned.assembly_groups[0].assembly_group_id
+    before = sorted(path.relative_to(tmp_path) for path in tmp_path.rglob("*"))
+
+    first = render_sequence_dissimilarity_svg(planned, assembly_group_id=group_id)
+    second = render_sequence_dissimilarity_svg(planned, assembly_group_id=group_id)
+
+    assert first == second
+    assert first.startswith(b"<?xml")
+    assert sorted(path.relative_to(tmp_path) for path in tmp_path.rglob("*")) == before
 
 
 def _boundary_request_file(tmp_path: Path, *, target_length: int) -> Path:
@@ -130,6 +144,7 @@ def test_cli_exposes_one_canonical_lifecycle() -> None:
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
+    assert "request" in result.stdout
     assert "preflight" in result.stdout
     assert "plan" in result.stdout
     assert "build" in result.stdout

@@ -51,18 +51,40 @@ def test_publish_and_verify_complete_create_only_bundle(tmp_path: Path) -> None:
     assert published.path == destination.absolute()
     assert verified.status == "verified"
     assert verified.plan_id == plan.plan_id
-    assert verified.artifact_count == 5
+    assert verified.artifact_count == 9
     manifest = json.loads((destination / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["schema"] == "dnadesign.junction.bundle.v1"
-    assert set(manifest["artifacts"]) == {"checks", "orders", "plan", "request", "review"}
+    assert manifest["schema"] == "dnadesign.junction.bundle.v2"
+    assert set(manifest["artifacts"]) == {
+        "checks",
+        "expected_products",
+        "orders",
+        "order_sequences",
+        "plan",
+        "request",
+        "review",
+        "sequence_dissimilarity",
+        "targets",
+    }
+    assert {path.relative_to(destination).as_posix() for path in destination.rglob("*") if path.is_file()} == {
+        "manifest.json",
+        *ARTIFACT_PATHS.values(),
+    }
     assert (
         (destination / "orders" / "oligos.tsv")
         .read_text(encoding="utf-8")
         .startswith("order_id\ttarget_ids\tassembly_group_id")
     )
+    assert (destination / "sequences" / "targets.fasta").read_text().startswith(f">{plan.targets[0].target_id} ")
+    assert (destination / "sequences" / "oligos.fasta").read_text().startswith(">")
+    assert "molecule=expected_pcr_product" in (destination / "sequences" / "expected_pcr_products.fasta").read_text()
     review_rows = json.loads((destination / "views" / "three_way_junction_review.v1.json").read_text())
     assert [row["target"]["target_id"] for row in review_rows] == [target.target_id for target in plan.targets]
     assert {row["search"]["thermodynamic_screening"] for row in review_rows} == {"not_run"}
+    dissimilarity_rows = json.loads((destination / "views" / "junction_sequence_dissimilarity.v1.json").read_text())
+    assert [row["assembly_group_id"] for row in dissimilarity_rows] == [
+        group.assembly_group_id for group in plan.assembly_groups
+    ]
+    assert {row["thermodynamic_screening"] for row in dissimilarity_rows} == {"not_run"}
 
 
 def test_build_runs_one_design_and_one_post_install_semantic_replay(

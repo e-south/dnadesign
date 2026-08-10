@@ -101,12 +101,12 @@ def _verify_bundle(
         )
         required_fields = {"schema", "plan_id", "request_sha256", "artifacts"}
         if set(manifest) != required_fields:
-            raise JunctionBundleError("junction manifest fields do not match the v1 contract.")
+            raise JunctionBundleError("junction manifest fields do not match the v2 contract.")
         if manifest["schema"] != BUNDLE_SCHEMA:
             raise JunctionBundleError(f"junction manifest schema must be {BUNDLE_SCHEMA!r}.")
         artifacts = manifest["artifacts"]
         if not isinstance(artifacts, dict) or set(artifacts) != set(ARTIFACT_PATHS):
-            raise JunctionBundleError("junction manifest must declare the complete v1 artifact set.")
+            raise JunctionBundleError("junction manifest must declare the complete v2 artifact set.")
 
         identities: dict[str, dict[str, object]] = {}
         request_content: bytes | None = None
@@ -166,7 +166,7 @@ def _verify_bundle(
                     del expected
         else:
             if set(staged_expectation.artifacts) != set(ARTIFACT_PATHS):
-                raise JunctionBundleError("Expected junction artifacts do not match the v1 artifact set.")
+                raise JunctionBundleError("Expected junction artifacts do not match the v2 artifact set.")
             for key, expected in staged_expectation.artifacts.items():
                 if identities[key] != expected.to_mapping():
                     raise JunctionBundleError(f"Bundle artifact '{key}' does not match the {expectation_label}.")

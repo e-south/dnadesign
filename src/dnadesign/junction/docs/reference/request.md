@@ -105,7 +105,7 @@ prefix; the reverse must match the reverse complement of the target suffix.
 The v2 request permits one recovery mode per assembly group. Universal mode
 requires one identical complete pair across the group. Target-specific mode
 rejects a pair that exactly resolves another declared target in the group.
-These are string checks and an output rule, not primer design or PCR
+These are string checks and an output rule, not primer optimization or PCR
 validation.
 
 ## Order-policy fields

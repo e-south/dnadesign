@@ -88,7 +88,16 @@ def test_realized_payloads_do_not_exceed_pre_search_projection(raw: dict[str, ob
 
     projection = project_artifact_bytes(request, predicted_loci_by_target=predicted_loci)
 
-    assert set(projection) == {"plan", "checks", "orders", "review"}
+    assert set(projection) == {
+        "plan",
+        "checks",
+        "orders",
+        "targets",
+        "order_sequences",
+        "expected_products",
+        "review",
+        "sequence_dissimilarity",
+    }
     for key, projected_bytes in projection.items():
         payload = render_artifact_bytes(key, request, plan)
         try:

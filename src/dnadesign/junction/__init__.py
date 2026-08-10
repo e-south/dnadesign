@@ -15,7 +15,19 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .api import PlanSummary, build, plan, preflight, verify  # noqa: F401
+    from .api import (  # noqa: F401
+        PlanSummary,
+        SequenceRecord,
+        build,
+        load_sequence_records,
+        plan,
+        plot_sequence_dissimilarity,
+        preflight,
+        render_sequence_dissimilarity_svg,
+        request_from_sequences,
+        sequence_record,
+        verify,
+    )
     from .contracts.plan import JunctionPlan  # noqa: F401
     from .contracts.request import (  # noqa: F401
         ComplementEndPreparation,
@@ -26,6 +38,7 @@ if TYPE_CHECKING:
         RecoveryPrimerMode,
         RecoveryPrimerPair,
         Target,
+        load_request,
         parse_request,
     )
     from .errors import (  # noqa: F401
@@ -46,6 +59,7 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "PublishedJunctionBundle": (".publication", "PublishedJunctionBundle"),
     "RecoveryPrimerMode": (".contracts.request", "RecoveryPrimerMode"),
     "RecoveryPrimerPair": (".contracts.request", "RecoveryPrimerPair"),
+    "SequenceRecord": (".api", "SequenceRecord"),
     "Target": (".contracts.request", "Target"),
     "JunctionBundleError": (".errors", "JunctionBundleError"),
     "JunctionConfigError": (".errors", "JunctionConfigError"),
@@ -54,9 +68,15 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "JunctionPlan": (".contracts.plan", "JunctionPlan"),
     "JunctionRequest": (".contracts.request", "JunctionRequest"),
     "build": (".api", "build"),
+    "load_request": (".contracts.request", "load_request"),
+    "load_sequence_records": (".api", "load_sequence_records"),
     "parse_request": (".contracts.request", "parse_request"),
     "plan": (".api", "plan"),
+    "plot_sequence_dissimilarity": (".api", "plot_sequence_dissimilarity"),
     "preflight": (".api", "preflight"),
+    "render_sequence_dissimilarity_svg": (".api", "render_sequence_dissimilarity_svg"),
+    "request_from_sequences": (".api", "request_from_sequences"),
+    "sequence_record": (".api", "sequence_record"),
     "verify": (".api", "verify"),
 }
 

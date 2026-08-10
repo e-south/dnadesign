@@ -16,7 +16,7 @@ from typing import Any
 
 from dnadesign.junction.contracts.identity import sha256_bytes
 
-BUNDLE_SCHEMA = "dnadesign.junction.bundle.v1"
+BUNDLE_SCHEMA = "dnadesign.junction.bundle.v2"
 
 
 @dataclass(frozen=True, slots=True)

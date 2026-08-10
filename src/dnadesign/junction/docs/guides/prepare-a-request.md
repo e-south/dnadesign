@@ -15,12 +15,36 @@ A complete request supplies five things:
 1. the v2 request-schema identifier and one deterministic seed;
 2. a planning profile;
 3. exact linear DNA targets;
-4. caller-chosen recovery primers; and
+4. explicit recovery-primer strings; and
 5. vendor-neutral order labels and an oligo-length ceiling.
 
 Start from the complete [tutorial request](../getting-started.md), then replace
 every demonstration value deliberately. The [request contract](../reference/request.md)
 lists the exact fields and limits.
+
+## Start from a sequence file
+
+Use the request compiler when targets already exist as raw DNA, one text file,
+or FASTA:
+
+```bash
+uv run junction request \
+  --base-request reviewed-request.yaml \
+  --input targets.fasta \
+  --primer-binding-length 20 \
+  > request.json
+```
+
+The base request supplies the seed, planning profile, and order policy;
+its targets are replaced. FASTA record IDs become target IDs and all records
+enter the declared assembly group. Use separate commands or edit the canonical
+request when targets require different groups, extensions, or primer policies.
+
+For one literal target, replace `--input targets.fasta` with
+`--sequence ACGT... --target-id target-a`. Text and FASTA input is read without
+following symlinks, bounded by the request-size ceiling, uppercased, and stripped
+of whitespace. Empty sequences, ambiguity codes, malformed FASTA, and duplicate
+IDs fail before planning.
 
 ## Choose assembly groups
 
@@ -171,9 +195,9 @@ F1, F2, and F3. A first, internal, or last fragment carries a different
 combination of target, toehold, and barcode sequence, so equally sized target
 domains do not produce equally sized orders. `junction` keeps sequence
 separation as the search objective and does not hide a second length-balancing
-score inside it. Use the published order table and BaseRender subtitle to
-review the minimum, maximum, and median. If the spread is unsuitable, revise
-the target length or declared geometry and rerun the complete search.
+score inside it. Use the order table and the per-fragment length labels in the
+annealing view to review the resulting spread. If it is unsuitable, revise the
+target length or declared geometry and rerun the complete search.
 
 Supplier limits change, and product lines from one supplier can have different
 windows. As of 2026-08-10, representative official specifications are:

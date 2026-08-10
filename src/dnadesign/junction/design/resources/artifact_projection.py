@@ -23,8 +23,11 @@ _PLAN_TARGET_SLACK = 16_384
 _PLAN_LOCUS_SLACK = 12_288
 _CHECK_SLACK = 1_536
 _ORDER_ROW_SLACK = 1_024
+_FASTA_RECORD_SLACK = 512
 _REVIEW_TARGET_SLACK = 20_480
 _REVIEW_LOCUS_SLACK = 10_240
+_DISSIMILARITY_GROUP_SLACK = 8_192
+_DISSIMILARITY_LOCUS_SLACK = 2_048
 
 
 def _bytes(value: str) -> int:
@@ -61,7 +64,11 @@ def project_artifact_bytes(
     plan = _JSON_DOCUMENT_SLACK
     checks = _JSON_DOCUMENT_SLACK
     orders = _JSON_DOCUMENT_SLACK
+    targets = _JSON_DOCUMENT_SLACK
+    order_sequences = _JSON_DOCUMENT_SLACK
+    expected_products = _JSON_DOCUMENT_SLACK
     review = _JSON_DOCUMENT_SLACK
+    sequence_dissimilarity = _JSON_DOCUMENT_SLACK
 
     for target in request.targets:
         target_id_bytes = _bytes(target.id)
@@ -101,6 +108,13 @@ def project_artifact_bytes(
             + 2 * primer_order_bytes
             + order_rows * (_ORDER_ROW_SLACK + 8 * target_id_bytes + 4 * assembly_group_id_bytes + policy_bytes)
         )
+        targets += sequence_bytes + _FASTA_RECORD_SLACK + 8 * identity_bytes
+        order_sequences += (
+            paired_strand_bytes
+            + 2 * primer_order_bytes
+            + order_rows * (_FASTA_RECORD_SLACK + 8 * target_id_bytes + 4 * assembly_group_id_bytes)
+        )
+        expected_products += sequence_bytes + primer_extension_bytes + _FASTA_RECORD_SLACK + 8 * identity_bytes
 
         # Review rows repeat exact target/recovery/strand sequences, junction
         # geometry, search evidence, and the target plus assembly-group checks.
@@ -113,27 +127,53 @@ def project_artifact_bytes(
             + loci
             * (_REVIEW_LOCUS_SLACK + 48 * identity_bytes + 32 * (profile.toehold_length + profile.barcode_length))
         )
+        sequence_dissimilarity += loci * (
+            _DISSIMILARITY_LOCUS_SLACK + 32 * identity_bytes + 16 * (profile.toehold_length + profile.barcode_length)
+        )
 
     for assembly_group_id in assembly_group_ids:
         assembly_group_id_bytes = _bytes(assembly_group_id)
         plan += _PLAN_ASSEMBLY_GROUP_SLACK + 32 * assembly_group_id_bytes
         checks += 2 * (_CHECK_SLACK + 16 * assembly_group_id_bytes)
+        sequence_dissimilarity += _DISSIMILARITY_GROUP_SLACK + 32 * assembly_group_id_bytes
 
     return {
         "plan": plan,
         "checks": checks,
         "orders": orders,
+        "targets": targets,
+        "order_sequences": order_sequences,
+        "expected_products": expected_products,
         "review": review,
+        "sequence_dissimilarity": sequence_dissimilarity,
     }
 
 
 def guard_artifact_projection(projected_bytes: Mapping[str, int]) -> None:
     """Reject any design whose publication would exceed verifier ceilings."""
 
-    expected = {"plan", "checks", "orders", "review"}
+    expected = {
+        "plan",
+        "checks",
+        "orders",
+        "targets",
+        "order_sequences",
+        "expected_products",
+        "review",
+        "sequence_dissimilarity",
+    }
     if set(projected_bytes) != expected:
         raise JunctionDesignError("Artifact projection does not cover the complete planned artifact set.")
-    for artifact in ("plan", "checks", "orders", "review"):
+    for artifact in (
+        "plan",
+        "checks",
+        "orders",
+        "targets",
+        "order_sequences",
+        "expected_products",
+        "review",
+        "sequence_dissimilarity",
+    ):
         projected = projected_bytes[artifact]
         limit = ARTIFACT_BYTE_LIMITS[artifact]
         if projected > limit:

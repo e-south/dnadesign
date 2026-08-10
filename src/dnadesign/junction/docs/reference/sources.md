@@ -72,9 +72,9 @@ specify either complete preparation route or generate a reaction protocol.
   tested experiments, not to arbitrary `junction` output.
 - The tool does not implement thermodynamic screening, including the
   NUPACK-guided and NUPACK-inspired approaches described by the sources.
-- It also does not implement automatic primer design, buffer equalization,
-  Type IIS payload removal, degenerate library compilation, laboratory
-  execution, supplier submission, or purchasing.
+- It also does not optimize primers, equalize buffers, perform Type IIS
+  payload removal, compile degenerate libraries, run laboratory
+  protocols, submit supplier orders, or purchase materials.
 - A shared `universal` primer declaration does not reproduce the preprint's
   complete universal-recovery and hierarchical-assembly architecture.
 - The preprint reports that PCR can favor shorter products and can therefore
@@ -86,9 +86,9 @@ specify either complete preparation route or generate a reaction protocol.
 
 Optional BaseRender images are original QA views derived from the neutral
 review record. They follow the papers' conceptual order—separate oligos,
-three-way association, and recovered duplex—while using a different layout for
-software review. They do not reproduce paper figures or add experimental
-evidence.
+three-way association, and the expected PCR duplex—while using a different
+layout for software review. They do not reproduce paper figures or add
+experimental evidence.
 
 Before laboratory or commercial use, review the primary papers, their
 supplementary materials and licenses, the relevant software licenses,

@@ -26,11 +26,11 @@ planning:
   barcode_max_homopolymer: 3
 
 targets:
-  - id: synthetic-three-fragment-target
+  - id: three-fragment-target
     assembly_group_id: compact-review-example
 
-    # Exact synthetic 200 bp target with no asserted biological meaning. This
-    # length gives the three fragment pairs a less skewed ordering envelope.
+    # Exact 200 bp documentation target. This length keeps the three fragment
+    # pairs within a realistic ordering envelope.
     sequence: TCATTCTAGGCTAGCTGAGTGCGCTATAAGCGTAGAACTACTACATCACATCCGCTACGCTCTCACCGTAGAGGGACTAGGGTCTATCAGATGATGCTTAGCGGAATAAGGTACAGGTATAATCCGAAACGCTTTGAATTTTGGGGACGCCTGATTAACGTAGTCTGATGAACGCCTCTAGCTCACCTTGGATTGACAGG
 
     recovery_primers:
