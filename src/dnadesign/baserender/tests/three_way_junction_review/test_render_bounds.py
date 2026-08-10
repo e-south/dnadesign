@@ -203,16 +203,16 @@ def test_annealed_map_requires_fragment_selection_before_large_allocation() -> N
         plt.close(figure)
 
 
-def test_overview_rejects_excessive_fragments_before_figure_allocation(
+def test_assembly_view_rejects_excessive_fragments_before_figure_allocation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     record = _adapt_payload(_payload_with_many_junctions(junction_count=256))
 
     def fail_if_allocated(*_args: object, **_kwargs: object) -> None:
-        raise AssertionError("oversized overview must reject before figure allocation")
+        raise AssertionError("oversized assembly view must reject before figure allocation")
 
     monkeypatch.setattr(assembly_renderer.plt, "subplots", fail_if_allocated)
-    with pytest.raises(baserender.SchemaError, match="contains 257 fragments; the overview limit is 256"):
+    with pytest.raises(baserender.SchemaError, match="contains 257 fragments; the assembly-view limit is 64"):
         baserender.render(record, renderer="junction_three_way_assembly")
 
 

@@ -25,11 +25,15 @@ _MODULE_BUDGETS = {
 _SUPPORT_BUDGETS = {
     "__init__.py": 20,
     "annealed_panel.py": 300,
+    "assembly_geometry.py": 80,
+    "assembly_panel.py": 130,
+    "assembly_stages.py": 200,
     "detail_geometry.py": 100,
     "detail_primitives.py": 80,
     "foundation.py": 180,
-    "overview_panel.py": 200,
-    "primitives.py": 160,
+    "fragment_geometry.py": 120,
+    "primitives.py": 230,
+    "product_panel.py": 180,
 }
 
 

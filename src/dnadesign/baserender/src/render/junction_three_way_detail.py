@@ -56,7 +56,7 @@ def draw_junction_detail(axis, review: ThreeWayJunctionReviewV1, index: int) -> 
     left_length = len(left_context) + len(toehold)
     horizontal_span = max(left_length, len(right_context), 1)
     stem_top = STEM_START_Y + len(junction.barcode)
-    base_fontsize = max(5.0, min(8.4, 180 / max(horizontal_span, len(junction.barcode), 1)))
+    base_fontsize = max(6.4, min(11.0, 240 / max(horizontal_span, len(junction.barcode), 1)))
 
     axis.set_gid(bounded_svg_gid(f"junction-three-way-assembly:{junction.junction_id}:detail"))
     axis.set_xlim(-horizontal_span - 2.5, horizontal_span + 2.5)
@@ -66,15 +66,16 @@ def draw_junction_detail(axis, review: ThreeWayJunctionReviewV1, index: int) -> 
 
     local_id = display_junction_id(junction.junction_id)
     axis.text(
-        -horizontal_span - 2.1,
+        0.0,
         stem_top + 4.2,
         (
             f"{local_id} joins F{left_fragment.index + 1:02d} to F{right_fragment.index + 1:02d} "
             f"at target bp {junction.toehold_span.start + 1}–{junction.toehold_span.end}"
         ),
-        fontsize=9.5,
+        fontsize=11.5,
         fontweight="semibold",
         color=INK,
+        ha="center",
         va="top",
     )
 
@@ -238,12 +239,12 @@ def draw_junction_detail(axis, review: ThreeWayJunctionReviewV1, index: int) -> 
     add_pairs(axis, barcode_pairs, gid=f"junction:{junction.junction_id}:barcode-pairs")
 
     add_nick(axis, x=toehold_x, y=BOTTOM_Y, gid=f"junction:{junction.junction_id}:nick")
-    axis.text(toehold_x, BOTTOM_Y - 1.0, "nick", fontsize=7.0, color=MUTED, ha="center", va="top")
+    axis.text(toehold_x, BOTTOM_Y - 1.0, "nick", fontsize=9.0, color=MUTED, ha="center", va="top")
     axis.text(
         (toehold_x + STEM_LEFT_X) / 2,
         TOP_Y + 1.0,
         f"t{index + 1}",
-        fontsize=7.5,
+        fontsize=9.5,
         color=TOEHOLD_DARK,
         ha="center",
     )
@@ -251,7 +252,7 @@ def draw_junction_detail(axis, review: ThreeWayJunctionReviewV1, index: int) -> 
         toehold_x / 2,
         BOTTOM_Y - 0.9,
         f"t{index + 1}*",
-        fontsize=7.5,
+        fontsize=9.5,
         color=TOEHOLD_DARK,
         ha="center",
         va="top",
@@ -260,7 +261,7 @@ def draw_junction_detail(axis, review: ThreeWayJunctionReviewV1, index: int) -> 
         STEM_LEFT_X - 1.0,
         stem_top - 0.2,
         f"b{index + 1}",
-        fontsize=7.5,
+        fontsize=9.5,
         color=BARCODE_DARK,
         ha="right",
     )
@@ -268,24 +269,24 @@ def draw_junction_detail(axis, review: ThreeWayJunctionReviewV1, index: int) -> 
         STEM_RIGHT_X + 1.0,
         stem_top - 0.2,
         f"b{index + 1}*",
-        fontsize=7.5,
+        fontsize=9.5,
         color=BARCODE_DARK,
         ha="left",
     )
-    axis.text(STEM_LEFT_X, stem_top + 0.8, "3′", fontsize=7.5, color=MUTED, ha="center", va="bottom")
-    axis.text(STEM_RIGHT_X, stem_top + 0.8, "5′", fontsize=7.5, color=MUTED, ha="center", va="bottom")
+    axis.text(STEM_LEFT_X, stem_top + 0.8, "3′", fontsize=9.5, color=MUTED, ha="center", va="bottom")
+    axis.text(STEM_RIGHT_X, stem_top + 0.8, "5′", fontsize=9.5, color=MUTED, ha="center", va="bottom")
 
     if geometry.left_is_terminal:
-        axis.text(left_x - 0.8, TOP_Y, "5′", fontsize=7.5, color=MUTED, ha="right", va="center")
-        axis.text(left_x - 0.8, BOTTOM_Y, "3′", fontsize=7.5, color=MUTED, ha="right", va="center")
+        axis.text(left_x - 0.8, TOP_Y, "5′", fontsize=9.5, color=MUTED, ha="right", va="center")
+        axis.text(left_x - 0.8, BOTTOM_Y, "3′", fontsize=9.5, color=MUTED, ha="right", va="center")
     else:
         add_break(axis, x=left_x, y=TOP_Y, gid=f"junction:{junction.junction_id}:left-top-break")
         add_break(axis, x=left_x, y=BOTTOM_Y, gid=f"junction:{junction.junction_id}:left-bottom-break")
 
     right_label_x = len(right_context) + 0.8
     if geometry.right_is_terminal:
-        axis.text(right_label_x, TOP_Y, "3′", fontsize=7.5, color=MUTED, va="center")
-        axis.text(right_label_x, BOTTOM_Y, "5′", fontsize=7.5, color=MUTED, va="center")
+        axis.text(right_label_x, TOP_Y, "3′", fontsize=9.5, color=MUTED, va="center")
+        axis.text(right_label_x, BOTTOM_Y, "5′", fontsize=9.5, color=MUTED, va="center")
     else:
         add_break(
             axis,

@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/baserender/src/render/junction_three_way_assembly.py
 
-Registered overview and selected-detail renderer for Junction assemblies.
+Registered assembly-process and selected-detail renderer for Junction designs.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -24,6 +24,12 @@ from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
 
 from ..config import Style
 from ..core import Record, SchemaError
+from .junction_review.assembly_geometry import (
+    MAX_ASSEMBLY_FRAGMENTS,
+    MAX_RECOVERED_DUPLEX_BASES,
+    assembly_figure_height,
+)
+from .junction_review.assembly_panel import draw_assembly_process
 from .junction_review.detail_geometry import junction_detail_base_glyph_count
 from .junction_review.foundation import (
     INK,
@@ -34,7 +40,6 @@ from .junction_review.foundation import (
     selected_ids,
     validate_figure_size,
 )
-from .junction_review.overview_panel import draw_overview
 from .junction_three_way_detail import draw_junction_detail
 from .palette import Palette
 
@@ -42,7 +47,6 @@ _RENDERER = "junction_three_way_assembly"
 _FIGURE_WIDTH = 15.2
 _MAX_DETAIL_JUNCTIONS = 8
 _MAX_DETAIL_BASE_GLYPHS_PER_JUNCTION = 512
-_MAX_OVERVIEW_FRAGMENTS = 256
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,11 +59,11 @@ def _resolve_options(
     review: ThreeWayJunctionReviewV1,
     options: Mapping[str, object] | None,
 ) -> AssemblyOptions:
-    view = "overview" if options is None else str(options.get("view", "overview")).strip()
-    if view not in {"overview", "junction_detail"}:
-        raise SchemaError(f"{_RENDERER} render.options.view must be 'overview' or 'junction_detail'")
+    view = "assembly" if options is None else str(options.get("view", "assembly")).strip()
+    if view not in {"assembly", "junction_detail"}:
+        raise SchemaError(f"{_RENDERER} render.options.view must be 'assembly' or 'junction_detail'")
     available = tuple(junction.junction_id for junction in review.geometry.junctions)
-    if view == "overview":
+    if view == "assembly":
         if options is not None and options.get("junction_ids") is not None:
             raise SchemaError(f"{_RENDERER} render.options.junction_ids is only valid for junction_detail")
         return AssemblyOptions(view=view, junction_indices=())
@@ -75,8 +79,9 @@ def _resolve_options(
     return AssemblyOptions(view=view, junction_indices=tuple(by_id[junction_id] for junction_id in selected))
 
 
-def _overview_size(style: Style) -> tuple[float, float]:
-    return validate_figure_size(style, renderer=_RENDERER, width=_FIGURE_WIDTH, height=4.8)
+def _assembly_size(style: Style, review: ThreeWayJunctionReviewV1) -> tuple[float, float]:
+    height = assembly_figure_height(len(review.recovery.extended_top_sequence_5to3))
+    return validate_figure_size(style, renderer=_RENDERER, width=_FIGURE_WIDTH, height=height)
 
 
 def _detail_size(style: Style, count: int) -> tuple[float, float]:
@@ -101,18 +106,24 @@ def _validate_detail_workload(review: ThreeWayJunctionReviewV1, indices: tuple[i
             )
 
 
-def _validate_overview_workload(review: ThreeWayJunctionReviewV1) -> None:
-    count = len(review.geometry.fragments)
-    if count > _MAX_OVERVIEW_FRAGMENTS:
+def _validate_assembly_workload(review: ThreeWayJunctionReviewV1) -> None:
+    product_length = len(review.recovery.extended_top_sequence_5to3)
+    if product_length > MAX_RECOVERED_DUPLEX_BASES:
         raise SchemaError(
-            f"{_RENDERER} target {review.target.target_id!r} contains {count} fragments; "
-            f"the overview limit is {_MAX_OVERVIEW_FRAGMENTS}"
+            f"{_RENDERER} target {review.target.target_id!r} has a {product_length} bp expected product; "
+            f"the recovered-duplex limit is {MAX_RECOVERED_DUPLEX_BASES} bp"
+        )
+    fragment_count = len(review.geometry.fragments)
+    if fragment_count > MAX_ASSEMBLY_FRAGMENTS:
+        raise SchemaError(
+            f"{_RENDERER} target {review.target.target_id!r} contains {fragment_count} fragments; "
+            f"the assembly-view limit is {MAX_ASSEMBLY_FRAGMENTS}"
         )
 
 
 @dataclass(frozen=True)
 class JunctionThreeWayAssemblyRenderer:
-    """Render a target overview or explicitly selected nucleotide-level 3WJs."""
+    """Render an assembly process or explicitly selected nucleotide-level 3WJs."""
 
     def preflight(
         self,
@@ -124,9 +135,9 @@ class JunctionThreeWayAssemblyRenderer:
         _ = palette
         review = review_from_record(record)
         resolved = _resolve_options(review, options)
-        if resolved.view == "overview":
-            _validate_overview_workload(review)
-            _overview_size(style)
+        if resolved.view == "assembly":
+            _validate_assembly_workload(review)
+            _assembly_size(style, review)
         else:
             _validate_detail_workload(review, resolved.junction_indices)
             _detail_size(style, len(resolved.junction_indices))
@@ -141,10 +152,11 @@ class JunctionThreeWayAssemblyRenderer:
         _ = palette
         review = review_from_record(record)
         resolved = _resolve_options(review, options)
-        if resolved.view == "overview":
-            _validate_overview_workload(review)
-            figure, axis = plt.subplots(figsize=_overview_size(style), dpi=style.dpi)
-            draw_overview(axis, review)
+        if resolved.view == "assembly":
+            _validate_assembly_workload(review)
+            size = _assembly_size(style, review)
+            figure, axis = plt.subplots(figsize=size, dpi=style.dpi)
+            draw_assembly_process(axis, review, height=size[1])
             figure.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01)
             return figure
 
@@ -165,17 +177,17 @@ class JunctionThreeWayAssemblyRenderer:
                 f"{'junction shows' if count == 1 else 'junctions show'} "
                 "the expected local annealing geometry"
             ),
-            x=0.02,
+            x=0.5,
             y=0.995,
-            ha="left",
+            ha="center",
             va="top",
-            fontsize=15.0,
+            fontsize=17.0,
             fontweight="semibold",
             color=INK,
         )
         lengths = fragment_order_lengths(review)
         figure.text(
-            0.02,
+            0.5,
             0.95,
             (
                 f"The {len(review.target.sequence_5to3)} bp target uses "
@@ -183,9 +195,9 @@ class JunctionThreeWayAssemblyRenderer:
                 f"{len(review.geometry.junctions[0].barcode)} nt barcodes; fragment oligos span "
                 f"{length_summary(lengths)}"
             ),
-            fontsize=9.0,
+            fontsize=10.5,
             color=MUTED,
-            ha="left",
+            ha="center",
             va="top",
         )
         for axis, index in zip(axes.flat, resolved.junction_indices, strict=False):
@@ -193,11 +205,12 @@ class JunctionThreeWayAssemblyRenderer:
         for axis in tuple(axes.flat)[count:]:
             axis.axis("off")
         figure.text(
-            0.02,
+            0.5,
             0.012,
             "Exact sequence mapping does not establish folding, ligation, yield, or experimental success",
-            fontsize=8.0,
+            fontsize=9.0,
             color=MUTED,
+            ha="center",
             va="bottom",
         )
         figure.subplots_adjust(left=0.012, right=0.992, top=0.91, bottom=0.045, wspace=0.02, hspace=0.08)

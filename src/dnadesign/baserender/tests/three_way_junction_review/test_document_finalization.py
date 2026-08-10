@@ -314,7 +314,7 @@ def test_checked_in_junction_figures_match_the_demo_jobs(tmp_path: Path) -> None
     assert max(fragment_lengths) - min(fragment_lengths) <= 50
 
     with matplotlib.rc_context(rc=matplotlib.rcParamsDefault):
-        for name in ("annealed-fragments", "assembly-overview", "junction-detail"):
+        for name in ("annealed-fragments", "assembly-process", "junction-detail"):
             job_mapping = yaml.safe_load((example_root / "jobs" / f"{name}.yaml").read_text(encoding="utf-8"))
             report = baserender.run_job(job_mapping, caller_root=tmp_path)
             [generated] = Path(report.outputs["images_dir"]).glob("*.svg")

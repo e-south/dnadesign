@@ -122,19 +122,19 @@ def test_review_image_stems_are_collision_safe_on_case_insensitive_filesystems()
     assert _unique_stem("target-a", used) == "target-a_2"
 
 
-def test_assembly_overview_is_a_separate_target_scale_view() -> None:
+def test_assembly_process_is_a_separate_target_scale_view() -> None:
     record = _adapt_payload(_payload())
 
     figure = baserender.render(record, renderer="junction_three_way_assembly")
     try:
-        assert [axis.get_gid() for axis in figure.axes] == ["junction-three-way-assembly:overview"]
+        assert [axis.get_gid() for axis in figure.axes] == ["junction-three-way-assembly:assembly"]
         text = "\n".join(item.get_text() for axis in figure.axes for item in axis.texts)
         assert "target-01" in text
-        assert "1 three-way junction links 2 fragments" in text
+        assert "The oligos remain separate before annealing" in text
+        assert "The plan specifies an annealed pre-ligation state" in text
+        assert "The expected PCR product is a recovered duplex" in text
         assert "junction-01" in text
-        assert "bp 11–14" in text
-        assert "opens an exact nucleotide-level view" in text
-        assert "does not establish assembly success" in text
+        assert "does not establish annealing, ligation, amplification, or yield" in text
     finally:
         plt.close(figure)
 
