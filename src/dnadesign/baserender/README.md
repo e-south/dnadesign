@@ -1,9 +1,9 @@
 ![baserender banner](assets/baserender-banner.svg)
 
-`baserender` renders schema-backed sequence visuals from explicit job files or
-the stable `dnadesign.baserender` API. It is the linear/component evidence
-renderer for producer-owned contracts; it does not solve biological designs or
-own secondary-structure layout.
+`baserender` turns typed sequence and declared-topology records into
+deterministic images. It owns reusable nucleotide layout, annotation, styling,
+and image publication. The producing tool still owns metric calculation,
+ranking, scientific interpretation, and workflow-specific plots.
 
 ## Documentation
 

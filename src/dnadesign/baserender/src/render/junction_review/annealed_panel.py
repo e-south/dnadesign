@@ -28,8 +28,6 @@ from .foundation import (
     PAIR,
     TOEHOLD,
     TOEHOLD_DARK,
-    fragment_order_lengths,
-    length_summary,
     safe_identifier,
     selected_ids,
 )
@@ -38,6 +36,15 @@ from .primitives import draw_base_run, draw_segmented_strand
 
 MAX_FRAGMENTS = 18
 MAX_ROW_BASES = 140
+ROW_STEP = 1.18
+VERTICAL_MARGIN = 0.75
+ANNOTATION_FONTSIZE = 12.5
+
+
+def annealed_figure_height(fragment_count: int) -> float:
+    """Return a canvas height with stable row and title clearance."""
+
+    return VERTICAL_MARGIN + ROW_STEP * fragment_count
 
 
 def fragment_selection(
@@ -87,7 +94,7 @@ def _draw_span_labels(axis, *, spans, start_x: float, base_step: float, y: float
             label,
             ha="center",
             va="bottom" if above else "top",
-            fontsize=8.6,
+            fontsize=ANNOTATION_FONTSIZE,
             color=_component_text_color(color),
         )
 
@@ -176,17 +183,40 @@ def _draw_fragment(
         gid_prefix=f"junction-annealed:{fragment.fragment_id}:bottom",
         fontsize=fontsize,
     )
-    axis.text(top_start - 0.008, top_y, "5′", ha="right", va="center", fontsize=9.0, color=MUTED)
+    axis.text(
+        top_start - 0.008,
+        top_y,
+        "5′",
+        ha="right",
+        va="center",
+        fontsize=ANNOTATION_FONTSIZE,
+        color=MUTED,
+    )
     axis.text(
         top_start + len(strand.barcode_bearing_sequence_5to3) * base_step + 0.004,
         top_y,
         "3′",
         va="center",
-        fontsize=9.0,
+        fontsize=ANNOTATION_FONTSIZE,
         color=MUTED,
     )
-    axis.text(bottom_start - 0.008, bottom_y, "3′", ha="right", va="center", fontsize=9.0, color=MUTED)
-    axis.text(bottom_start + len(bottom) * base_step + 0.004, bottom_y, "5′", va="center", fontsize=9.0, color=MUTED)
+    axis.text(
+        bottom_start - 0.008,
+        bottom_y,
+        "3′",
+        ha="right",
+        va="center",
+        fontsize=ANNOTATION_FONTSIZE,
+        color=MUTED,
+    )
+    axis.text(
+        bottom_start + len(bottom) * base_step + 0.004,
+        bottom_y,
+        "5′",
+        va="center",
+        fontsize=ANNOTATION_FONTSIZE,
+        color=MUTED,
+    )
     axis.text(
         0.015,
         y - 0.02,
@@ -197,8 +227,7 @@ def _draw_fragment(
         ),
         ha="left",
         va="center",
-        fontsize=9.2,
-        fontweight="semibold",
+        fontsize=ANNOTATION_FONTSIZE,
         color=INK,
     )
 
@@ -211,7 +240,7 @@ def draw_annealed_panel(axis, review: ThreeWayJunctionReviewV1, indices: tuple[i
     rows = tuple(fragment_pair_geometry(review, index) for index in indices)
     maximum_width = max(row.width for row in rows)
     base_step = 0.76 / maximum_width
-    base_fontsize = min(10.5, max(7.0, 1_020 / maximum_width))
+    base_fontsize = min(11.5, max(8.0, 1_100 / maximum_width))
     count = len(indices)
     axis.text(
         0.5,
@@ -220,35 +249,13 @@ def draw_annealed_panel(axis, review: ThreeWayJunctionReviewV1, indices: tuple[i
             f"{count} {'fragment pair shows' if count == 1 else 'fragment pairs show'} "
             f"the expected annealing for {safe_identifier(review.target.target_id)}"
         ),
-        fontsize=17.0,
+        fontsize=20.0,
         fontweight="semibold",
         color=INK,
         ha="center",
         va="top",
     )
-    lengths = fragment_order_lengths(review, indices)
-    axis.text(
-        0.5,
-        height - 0.48,
-        (
-            f"The {len(review.target.sequence_5to3)} bp target contributes "
-            f"{len(lengths)} fragment oligos spanning {length_summary(lengths)}"
-        ),
-        fontsize=10.5,
-        color=MUTED,
-        ha="center",
-        va="top",
-    )
-    axis.text(
-        0.5,
-        height - 0.76,
-        "Vertical guides align exact target-derived bases; exposed barcode and toehold arms remain unpaired",
-        fontsize=9.0,
-        color=MUTED,
-        ha="center",
-        va="top",
-    )
-    y = height - 1.20
+    y = height - VERTICAL_MARGIN
     for index, geometry in zip(indices, rows, strict=True):
         _draw_fragment(
             axis,
@@ -259,13 +266,4 @@ def draw_annealed_panel(axis, review: ThreeWayJunctionReviewV1, indices: tuple[i
             maximum_width=maximum_width,
             fontsize=base_fontsize,
         )
-        y -= 1.10
-    axis.text(
-        0.5,
-        0.07,
-        "Expected sequence geometry; no experimental measurements are shown",
-        fontsize=9.0,
-        color=MUTED,
-        ha="center",
-        va="bottom",
-    )
+        y -= ROW_STEP

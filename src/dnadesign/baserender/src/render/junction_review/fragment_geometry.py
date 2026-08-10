@@ -19,7 +19,7 @@ from dnadesign.contracts.visual.three_way_junction_review_v1 import (
     ThreeWayJunctionReviewV1,
 )
 
-from .foundation import BARCODE, DOMAIN, TOEHOLD
+from .foundation import BARCODE, DOMAIN, PRIMER_BINDING_SITE, TOEHOLD
 
 ComponentSpan = tuple[int, int, str, str]
 
@@ -64,6 +64,19 @@ def fragment_pair_geometry(review: ThreeWayJunctionReviewV1, index: int) -> Frag
         bottom_spans.append((0, len(previous.toehold), TOEHOLD, f"t{index}*"))
     top_spans.append((top_domain_start, top_domain_start + domain_length, DOMAIN, "target"))
     bottom_spans.append((bottom_domain_start, bottom_domain_start + domain_length, DOMAIN, "target"))
+    for primer in (review.recovery.forward, review.recovery.reverse):
+        overlap_start = max(fragment.domain_span.start, primer.target_binding_span.start)
+        overlap_end = min(fragment.domain_span.end, primer.target_binding_span.end)
+        if overlap_start < overlap_end:
+            relative_start = overlap_start - fragment.domain_span.start
+            relative_end = overlap_end - fragment.domain_span.start
+            label = f"{primer.direction} primer-binding site"
+            top_spans.append(
+                (top_domain_start + relative_start, top_domain_start + relative_end, PRIMER_BINDING_SITE, label)
+            )
+            bottom_spans.append(
+                (bottom_domain_start + relative_start, bottom_domain_start + relative_end, PRIMER_BINDING_SITE, label)
+            )
     if following is not None:
         start = top_domain_start + domain_length
         top_spans.extend(

@@ -238,8 +238,9 @@ def test_renderer_options_reject_non_string_keys() -> None:
     ("style_overrides", "message"),
     [
         ({"dpi": 10**12}, "style.dpi exceeds the renderer limit"),
+        ({"figure_scale": 0.5}, "style.figure_scale must be at least 1"),
         ({"figure_scale": 10**12}, "style.figure_scale exceeds the renderer limit"),
-        ({"dpi": 300, "figure_scale": 2.0}, "canvas exceeds the 64 MiB RGBA allocation limit"),
+        ({"dpi": 300, "figure_scale": 3.0}, "canvas exceeds the 128 MiB RGBA allocation limit"),
     ],
 )
 def test_unsafe_canvas_styles_reject_before_figure_allocation(

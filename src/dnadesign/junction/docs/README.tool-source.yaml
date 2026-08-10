@@ -1,7 +1,7 @@
 schema_version: 1
 catalog_order: 14
 tool: junction
-summary: Plans three-way-junction oligos from exact DNA targets and verifies each saved bundle.
+summary: Turns DNA sequences from text, FASTA, or a request into checked oligo plans for three-way-junction assembly.
 keywords:
   - three-way junction
   - oligo planning
@@ -11,16 +11,16 @@ keywords:
 routes:
   - id: how-it-works
     path: explanation/how-junction-works.md
-    summary: Learn the physical idea, software model, vocabulary, and evidence limits.
+    summary: Follow the strands from exact targets to the expected PCR duplex.
   - id: getting-started
     path: getting-started.md
-    summary: Build and verify one synthetic gene-scale example.
+    summary: Build and verify one gene-scale example.
   - id: prepare-a-request
     path: guides/prepare-a-request.md
     summary: Declare exact targets, assembly groups, primers, search policy, and order labels.
   - id: inspect-and-verify
     path: guides/inspect-and-verify.md
-    summary: Map review questions to bundle files and verify an existing design.
+    summary: Find exact sequences and checks, then verify an existing bundle.
   - id: scale
     path: guides/scale.md
     summary: Understand resource limits and tested software scenarios.

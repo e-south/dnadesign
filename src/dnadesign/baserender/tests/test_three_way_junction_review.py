@@ -130,12 +130,13 @@ def test_assembly_process_is_a_separate_target_scale_view() -> None:
         assert [axis.get_gid() for axis in figure.axes] == ["junction-three-way-assembly:assembly"]
         text = "\n".join(item.get_text() for axis in figure.axes for item in axis.texts)
         assert "target-01" in text
-        assert "from oligos to the expected PCR duplex" in text
-        assert "The oligos remain separate before annealing" in text
-        assert "Annealing forms the modeled pre-ligation junctions" in text
-        assert "The expected PCR product is a recovered duplex" in text
+        assert "from target sequence to the expected PCR duplex" in text
+        assert "The oligos remain separate before annealing" not in text
+        assert "Fragment oligos encode the target" in text
+        assert "Annealing forms pre-ligation junctions" in text
+        assert "PCR yields the expected linear duplex" in text
         assert "junction-01" in text
-        assert "Expected sequence geometry; no experimental measurements are shown" in text
+        assert "Expected sequence geometry" not in text
     finally:
         plt.close(figure)
 
@@ -154,7 +155,7 @@ def test_annealed_fragment_map_draws_every_declared_domain_pair() -> None:
         assert "2 fragment pairs show the expected annealing" in text
         assert "F01" in text
         assert "F02" in text
-        assert "Expected sequence geometry; no experimental measurements are shown" in text
+        assert "Expected sequence geometry" not in text
         top_steps: set[float] = set()
         for fragment in payload["geometry"]["fragments"]:
             top_bases = _base_artists(
@@ -286,16 +287,20 @@ def test_junction_detail_draws_one_shared_three_arm_node_and_nick() -> None:
         plt.close(figure)
 
 
-def test_junction_detail_requires_an_explicit_bounded_selection() -> None:
-    record = _adapt_payload(_payload_with_many_junctions(junction_count=9))
-    with pytest.raises(baserender.SchemaError, match="requires render.options.junction_ids"):
-        baserender.render(record, renderer="junction_three_way_assembly", options={"view": "junction_detail"})
-    junction_ids = [f"junction-{index + 1:02d}" for index in range(9)]
-    with pytest.raises(baserender.SchemaError, match="accepts at most 8 selected junction_ids"):
+def test_junction_detail_defaults_to_all_and_requires_a_subset_above_the_grid_limit() -> None:
+    record = _adapt_payload(_payload_with_many_junctions(junction_count=12))
+    figure = baserender.render(record, renderer="junction_three_way_assembly", options={"view": "junction_detail"})
+    try:
+        assert figure.texts[0].get_text() == "All 12 three-way junctions show the expected local annealing geometry"
+    finally:
+        plt.close(figure)
+
+    oversized = _adapt_payload(_payload_with_many_junctions(junction_count=13))
+    with pytest.raises(baserender.SchemaError, match="has 13 junctions.*must choose at most 12"):
         baserender.render(
-            record,
+            oversized,
             renderer="junction_three_way_assembly",
-            options={"view": "junction_detail", "junction_ids": junction_ids},
+            options={"view": "junction_detail"},
         )
 
 

@@ -19,20 +19,23 @@ from dnadesign.baserender.src.render import junction_annealed_fragments
 _ROOT = Path(junction_annealed_fragments.__file__).parent
 _MODULE_BUDGETS = {
     "junction_annealed_fragments.py": 100,
-    "junction_three_way_assembly.py": 230,
+    "junction_three_way_assembly.py": 240,
     "junction_three_way_detail.py": 320,
 }
 _SUPPORT_BUDGETS = {
     "__init__.py": 20,
     "annealed_panel.py": 300,
-    "assembly_geometry.py": 80,
+    "assembly_geometry.py": 160,
     "assembly_panel.py": 130,
-    "assembly_stages.py": 200,
+    "assembly_stages.py": 160,
     "detail_geometry.py": 100,
     "detail_primitives.py": 80,
     "foundation.py": 180,
     "fragment_geometry.py": 120,
+    "input_panel.py": 120,
     "primitives.py": 230,
+    "preligation_junction.py": 160,
+    "preligation_panel.py": 230,
     "product_panel.py": 180,
 }
 

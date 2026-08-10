@@ -12,7 +12,6 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import math
-import statistics
 from typing import Mapping, Sequence
 
 from pydantic import ValidationError
@@ -33,12 +32,16 @@ TOEHOLD = "#F3D6A1"
 TOEHOLD_DARK = "#8A5A00"
 BARCODE = "#A9D8D5"
 BARCODE_DARK = "#1F6F70"
-PRIMER = "#DED5EB"
-PRIMER_DARK = "#6D4C82"
+PRIMER_BINDING_SITE = "#DED5EB"
+PRIMER_BINDING_SITE_DARK = "#6D4C82"
+PRIMER_EXTENSION = "#DCE5EC"
 STRAND_EDGE = "#B3BCC8"
 BACKGROUND = "#FFFFFF"
+MOLECULAR_ANNOTATION_FONTSIZE = 14.0
+STAGE_TITLE_FONTSIZE = 17.0
 
 MAX_DPI = 600
+MIN_FIGURE_SCALE = 1.0
 MAX_FIGURE_SCALE = 4.0
 MAX_CANVAS_DIMENSION_PX = 16_384
 MAX_CANVAS_RGBA_BYTES = 64 * 1024 * 1024
@@ -73,38 +76,13 @@ def display_junction_id(value: str) -> str:
     return safe_identifier(value.rsplit(":", 1)[-1])
 
 
-def fragment_order_lengths(
-    review: ThreeWayJunctionReviewV1,
-    indices: Sequence[int] | None = None,
-) -> tuple[int, ...]:
-    """Return actual emitted fragment-strand lengths for a selected view."""
-
-    selected = range(len(review.strands)) if indices is None else indices
-    return tuple(
-        length
-        for index in selected
-        for length in (
-            len(review.strands[index].barcode_bearing_sequence_5to3),
-            len(review.strands[index].complement_sequence_5to3),
-        )
-    )
-
-
-def length_summary(lengths: Sequence[int]) -> str:
-    """Describe a non-empty set of physical oligo lengths concisely."""
-
-    if not lengths:
-        raise ValueError("oligo length summary requires at least one length")
-    median = statistics.median(lengths)
-    return f"{min(lengths)}–{max(lengths)} nt with median {median:g} nt"
-
-
 def validate_figure_size(
     style: Style,
     *,
     renderer: str,
     width: float,
     height: float,
+    max_rgba_bytes: int = MAX_CANVAS_RGBA_BYTES,
 ) -> tuple[float, float]:
     """Validate figure dimensions before Matplotlib allocates a canvas."""
 
@@ -117,14 +95,17 @@ def validate_figure_size(
         raise SchemaError(f"{renderer} style.dpi exceeds the renderer limit")
     if not math.isfinite(scale) or scale > MAX_FIGURE_SCALE:
         raise SchemaError(f"{renderer} style.figure_scale exceeds the renderer limit")
+    if scale < MIN_FIGURE_SCALE:
+        raise SchemaError(f"{renderer} style.figure_scale must be at least {MIN_FIGURE_SCALE:g}")
     figure_width = width * scale
     figure_height = height * scale
     width_px = math.ceil(figure_width * dpi)
     height_px = math.ceil(figure_height * dpi)
     if max(width_px, height_px) > MAX_CANVAS_DIMENSION_PX:
         raise SchemaError(f"{renderer} canvas dimension exceeds the renderer limit")
-    if width_px * height_px * 4 > MAX_CANVAS_RGBA_BYTES:
-        raise SchemaError(f"{renderer} canvas exceeds the 64 MiB RGBA allocation limit")
+    if width_px * height_px * 4 > max_rgba_bytes:
+        limit_mib = max_rgba_bytes // (1024 * 1024)
+        raise SchemaError(f"{renderer} canvas exceeds the {limit_mib} MiB RGBA allocation limit")
     return figure_width, figure_height
 
 

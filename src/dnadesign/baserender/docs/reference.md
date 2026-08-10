@@ -29,7 +29,8 @@ Invariants:
 - explicit schemas at job, record, and style boundaries
 - fail-fast validation on unknown keys and invalid values
 - no silent fallback behavior for contract errors
-- tool-agnostic render core; tool-specific semantics stay in adapters/transforms
+- tool-agnostic render core; adapters may translate producer records, but metric
+  calculation and scientific interpretation stay with the producer
 
 ## Operator Lifecycle
 
@@ -156,8 +157,9 @@ Renderer families:
   - draws exact selected fragment strands, junction spans, and declared Watson–Crick edges
   - requires explicit `fragment_ids` when a target has more than 18 fragments
 - `junction_three_way_assembly`
-  - draws either the separate-oligo-to-recovered-duplex process or one to eight explicitly selected nucleotide-level three-way junctions
-  - accepts at most 64 fragments and a 1,024 bp expected recovered duplex in the process view
+  - draws either the target-to-PCR process or a grid containing all nucleotide-level three-way junctions
+  - accepts at most 64 fragments and a 1,024 bp expected PCR duplex in the process view
+  - shows up to 12 junctions by default; larger targets require an explicit subset
   - rejects a selected detail above 512 base glyphs before figure allocation
   - reports thermodynamic screening as `not_run`; it does not infer folding or experimental outcomes
 
@@ -310,6 +312,12 @@ Add a renderer:
 1. Implement the renderer in `src/render/`.
 2. Register one `RendererDescriptor` in `src/render/renderer.py`.
 3. Add render-path tests and, when relevant, update the integration docs that map upstream contract kinds to the renderer family.
+
+Renderer admission rule:
+- BaseRender owns reusable nucleotide, annotation, and declared-topology grammars.
+- A renderer draws facts already present in its input record; it does not compute a producer's score, distance, ranking, or scientific interpretation.
+- Statistical diagnostics stay with the tool that owns their metric. A producer-specific adapter may translate a typed record into a reusable BaseRender grammar, but it may not turn BaseRender into that producer's analysis layer.
+- Add a new core renderer only when the visual grammar is useful beyond one workflow or cannot be expressed through an existing record/effect contract. Otherwise, keep it in the producing tool.
 
 Add a render contract descriptor:
 1. Add one `RenderContractDescriptor` in `src/config/job_contracts.py`.

@@ -20,6 +20,20 @@ from .foundation import INK, PAIR
 from .primitives import draw_molecular_path
 
 
+def add_annotation(
+    axis,
+    x: float,
+    y: float,
+    text: str,
+    *,
+    fontsize: float,
+    color: str,
+    ha: str = "center",
+    va: str = "baseline",
+) -> None:
+    axis.text(x, y, text, fontsize=fontsize, color=color, ha=ha, va=va)
+
+
 def add_pairs(axis, segments, *, gid: str) -> None:
     collection = LineCollection(segments, colors=PAIR, linewidths=0.8, zorder=1)
     collection.set_gid(bounded_svg_gid(gid))

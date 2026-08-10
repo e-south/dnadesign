@@ -13,9 +13,6 @@ render:
   renderer: junction_three_way_assembly
   options:
     view: junction_detail
-    junction_ids:
-      - synthetic-three-fragment-target:junction-0001
-      - synthetic-three-fragment-target:junction-0002
   style:
     preset: null
     overrides: {}

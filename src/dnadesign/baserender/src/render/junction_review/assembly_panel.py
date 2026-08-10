@@ -14,106 +14,91 @@ from __future__ import annotations
 from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
 
 from ..sequence_preview import bounded_svg_gid
-from .assembly_stages import draw_orders_stage, draw_three_way_stage
-from .foundation import INK, MUTED, fragment_order_lengths, length_summary, safe_identifier
-from .product_panel import draw_recovered_product
+from .assembly_geometry import AssemblyLayout
+from .assembly_stages import draw_orders_stage
+from .foundation import INK, MUTED, STAGE_TITLE_FONTSIZE, safe_identifier
+from .input_panel import draw_input_target
+from .preligation_panel import draw_preligation_stage
+from .product_panel import draw_expected_pcr_product
 
 
 def _stage_title(axis, y: float, text: str, *, gid: str) -> None:
-    artist = axis.text(0.5, y, text, fontsize=13.5, fontweight="semibold", color=INK, ha="center", va="center")
+    artist = axis.text(0.5, y, text, fontsize=STAGE_TITLE_FONTSIZE, color=INK, ha="center", va="center")
     artist.set_gid(bounded_svg_gid(gid))
 
 
-def _transition(axis, y: float, text: str, *, gid: str) -> None:
-    artist = axis.text(0.5, y, text, fontsize=9.5, color=MUTED, ha="center", va="center")
+def _transition(axis, y: float, *, gid: str) -> None:
+    artist = axis.text(0.5, y, "↓", fontsize=20.0, color=MUTED, ha="center", va="center")
     artist.set_gid(bounded_svg_gid(gid))
 
 
-def draw_assembly_process(axis, review: ThreeWayJunctionReviewV1, *, height: float) -> None:
-    """Draw separate oligos, the expected 3WJ state, and the exact recovered duplex."""
+def draw_assembly_process(axis, review: ThreeWayJunctionReviewV1, *, layout: AssemblyLayout) -> None:
+    """Draw the submitted target, oligos, expected 3WJ state, and PCR duplex."""
 
     axis.set_gid("junction-three-way-assembly:assembly")
     axis.set_xlim(0, 1)
-    axis.set_ylim(0, height)
+    axis.set_ylim(0, layout.height)
     axis.axis("off")
     target_id = safe_identifier(review.target.target_id)
-    lengths = fragment_order_lengths(review)
-    axis.text(
+    title = axis.text(
         0.5,
-        height - 0.10,
-        f"The plan traces {target_id} from oligos to the expected PCR duplex",
-        fontsize=17.0,
+        layout.title_y,
+        f"The plan traces {target_id} from target sequence to the expected PCR duplex",
+        fontsize=20.0,
         fontweight="semibold",
         color=INK,
         ha="center",
         va="top",
     )
-    axis.text(
-        0.5,
-        height - 0.45,
-        (
-            f"The {len(review.target.sequence_5to3):,} bp target uses {len(review.geometry.fragments)} fragments and "
-            f"{len(review.geometry.junctions)} junctions; its fragment oligos span {length_summary(lengths)}"
-        ),
-        fontsize=10.5,
-        color=MUTED,
-        ha="center",
-        va="top",
+    title.set_gid(bounded_svg_gid("junction-three-way-assembly:title"))
+    _stage_title(
+        axis,
+        layout.input_title_y,
+        "Input target sequence",
+        gid="junction-three-way-assembly:input:title",
     )
-    axis.text(
-        0.5,
-        height - 0.72,
-        (
-            "Gray marks target sequence, amber marks toeholds, teal marks external barcodes, "
-            "and lavender marks primer extensions"
-        ),
-        fontsize=9.0,
-        color=MUTED,
-        ha="center",
-        va="top",
+    draw_input_target(axis, review, y=layout.input_first_y, layout=layout)
+    _transition(
+        axis,
+        layout.fragmentation_transition_y,
+        gid="junction-three-way-assembly:transition:fragmentation",
     )
     _stage_title(
         axis,
-        height - 1.05,
-        "The oligos remain separate before annealing",
+        layout.orders_title_y,
+        "Fragment oligos encode the target",
         gid="junction-three-way-assembly:orders:title",
     )
-    draw_orders_stage(axis, review, y=height - 1.47)
+    draw_orders_stage(axis, review, y=layout.orders_first_y, layout=layout)
     _transition(
         axis,
-        height - 2.10,
-        "↓  modeled annealing",
+        layout.annealing_transition_y,
         gid="junction-three-way-assembly:transition:annealing",
     )
     _stage_title(
         axis,
-        height - 2.38,
-        "Annealing forms the modeled pre-ligation junctions",
+        layout.preligation_title_y,
+        "Annealing forms pre-ligation junctions",
         gid="junction-three-way-assembly:three-way:title",
     )
-    draw_three_way_stage(axis, review, y=height - 3.13)
+    draw_preligation_stage(
+        axis,
+        review,
+        first_y=layout.preligation_first_y,
+        layout=layout,
+    )
     _transition(
         axis,
-        height - 3.68,
-        "↓  modeled ligation and PCR recovery",
+        layout.recovery_transition_y,
         gid="junction-three-way-assembly:transition:recovery",
     )
     _stage_title(
         axis,
-        height - 3.98,
-        "The expected PCR product is a recovered duplex",
+        layout.product_title_y,
+        "PCR yields the expected linear duplex",
         gid="junction-three-way-assembly:product:title",
     )
-    draw_recovered_product(axis, review, first_y=height - 4.43)
-    axis.text(
-        0.5,
-        0.08,
-        "Expected sequence geometry; no experimental measurements are shown",
-        fontsize=9.0,
-        color=MUTED,
-        ha="center",
-        va="bottom",
-    )
+    draw_expected_pcr_product(axis, review, first_y=layout.product_first_y, layout=layout)
 
 
 __all__ = ["draw_assembly_process"]
