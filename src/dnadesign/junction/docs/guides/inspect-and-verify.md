@@ -5,7 +5,7 @@ type: guide
 audience: reviewers of an existing junction design
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-08-10
 ---
 
 # Inspect and verify a bundle
@@ -73,7 +73,7 @@ Follow the [BaseRender integration](../../../baserender/docs/integrations/juncti
 Use a new BaseRender output directory beside the source bundle; never add
 images inside the verified source bundle.
 
-Use the fragment map to check expected strand pairing, the target overview to
+Use the fragment map to check expected strand annealing, the target overview to
 locate all interfaces, and junction details to inspect selected `t/t*`,
 `b/b*`, nick, and strand-end geometry. Light gray edges mark declared
 Watson–Crick pairs. Large requests require explicit fragment or junction
@@ -82,20 +82,23 @@ order rows, and software checks remain in their owning JSON or TSV artifacts;
 the plots do not duplicate them. A plot adds no thermodynamic or experimental
 evidence and is not part of the `junction` plan identity.
 
-### Expected fragment pairing
+### Expected fragment annealing
 
-[![Expected pairing for three selected fragments](../assets/annealed-fragments.svg)](../assets/annealed-fragments.svg)
+[![Expected annealing for three selected fragment pairs](../assets/annealed-fragments.svg)](../assets/annealed-fragments.svg)
 
-This view keeps the two orderable strands antiparallel and marks only the
-pairing declared by the verified record. The unpaired barcode and toehold arms
-remain visible instead of being flattened into a target-only sequence row.
+This view gives every nucleotide the same physical spacing, keeps the two
+orderable strands antiparallel, and marks only the pairing declared by the
+verified record. Rounded outer edges show each contiguous order; categorical
+fills identify its target, toehold, and barcode spans. The unpaired barcode and
+toehold arms remain visible instead of being flattened into a target-only row.
 
 ### Target-scale assembly map
 
 [![Three-way interfaces across one target](../assets/assembly-overview.svg)](../assets/assembly-overview.svg)
 
-This symbolic view answers where the interfaces occur. It omits nucleotide
-letters on purpose; use it to choose a junction for detailed review.
+This symbolic view answers where the interfaces occur. Stable junction IDs and
+target coordinates route into the detail view. It omits nucleotide letters on
+purpose.
 
 ### Selected junction details
 
