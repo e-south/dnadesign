@@ -22,7 +22,7 @@ from matplotlib.textpath import TextPath
 from matplotlib.transforms import Affine2D, IdentityTransform
 
 from ..sequence_preview import bounded_svg_gid
-from .foundation import DOMAIN, INK, STRAND_EDGE
+from .foundation import DOMAIN, INK, MOLECULAR_ANNOTATION_FONTSIZE, MUTED, STRAND_EDGE
 
 _DNA_BASES = "ACGT"
 
@@ -117,6 +117,33 @@ def draw_molecular_path(
     )
     line.set_gid(bounded_svg_gid(gid))
     axis.add_line(line)
+
+
+def draw_continuation(axis, *, x: float, y: float, side: str, gid: str) -> None:
+    direction = -1 if side == "left" else 1
+    for index, offset in enumerate((-0.004, 0.004)):
+        line = Line2D(
+            (x + offset - direction * 0.0025, x + offset + direction * 0.0025),
+            (y - 0.10, y + 0.10),
+            color=STRAND_EDGE,
+            linewidth=0.9,
+            zorder=4,
+        )
+        line.set_gid(bounded_svg_gid(f"{gid}:{index}"))
+        axis.add_line(line)
+
+
+def draw_terminus(axis, *, x: float, y: float, text: str, ha: str, gid: str) -> None:
+    artist = axis.text(
+        x,
+        y,
+        text,
+        fontsize=MOLECULAR_ANNOTATION_FONTSIZE,
+        color=MUTED,
+        ha=ha,
+        va="center",
+    )
+    artist.set_gid(bounded_svg_gid(gid))
 
 
 def draw_base_run(

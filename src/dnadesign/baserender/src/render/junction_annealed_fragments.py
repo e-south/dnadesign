@@ -21,16 +21,17 @@ import matplotlib.pyplot as plt
 
 from ..config import Style
 from ..core import Record
-from .junction_review.annealed_panel import draw_annealed_panel, fragment_selection, validate_fragment_rows
+from .junction_review.annealed_panel import (
+    annealed_figure_height,
+    draw_annealed_panel,
+    fragment_selection,
+    validate_fragment_rows,
+)
 from .junction_review.foundation import review_from_record, validate_figure_size
 from .palette import Palette
 
 _RENDERER = "junction_annealed_fragments"
 _FIGURE_WIDTH = 15.2
-
-
-def _figure_height(fragment_count: int) -> float:
-    return 1.65 + 1.10 * fragment_count
 
 
 @dataclass(frozen=True)
@@ -52,7 +53,7 @@ class JunctionAnnealedFragmentsRenderer:
             style,
             renderer=_RENDERER,
             width=_FIGURE_WIDTH,
-            height=_figure_height(len(indices)),
+            height=annealed_figure_height(len(indices)),
         )
 
     def render(
@@ -66,7 +67,7 @@ class JunctionAnnealedFragmentsRenderer:
         review = review_from_record(record)
         indices = fragment_selection(review, options, renderer=_RENDERER)
         validate_fragment_rows(review, indices, renderer=_RENDERER)
-        height = _figure_height(len(indices))
+        height = annealed_figure_height(len(indices))
         size = validate_figure_size(style, renderer=_RENDERER, width=_FIGURE_WIDTH, height=height)
         figure, axis = plt.subplots(figsize=size, dpi=style.dpi)
         draw_annealed_panel(axis, review, indices, height=height)

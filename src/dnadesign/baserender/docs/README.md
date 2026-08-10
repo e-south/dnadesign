@@ -3,15 +3,19 @@ doc_id: baserender-docs-index
 title: BaseRender documentation
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-02
+last_verified: 2026-08-10
 ---
 
 # BaseRender documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+**Last verified:** 2026-08-10
 
-Use this index for package-local `baserender` documentation. The public surface stays small: validate or run a `RenderJobV4`, render records through the stable package API, and use integrations only when a source tool needs a contract-specific adapter or render-contract descriptor.
+Use this index for package-local `baserender` documentation. The public surface
+stays small: validate or run a `RenderJobV4`, render records through the stable
+package API, and use an integration only to translate producer evidence into a
+reusable sequence or topology grammar. Producer-owned metrics and statistical
+plots stay in the producing tool.
 
 ### Start here
 

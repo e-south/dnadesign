@@ -64,25 +64,20 @@ def _records(workload: str):
     result = plan(request)
     plan_seconds = time.perf_counter() - started
     reviews = review_contracts(result)
-    records = baserender.adapt_records(
+    review_records = baserender.adapt_records(
         [review.model_dump(mode="json") for review in reviews],
         adapter_kind="three_way_junction_review_v1",
     )
-    return result, records, plan_seconds
+    return result, review_records, plan_seconds
 
 
-def _render_all(records) -> int:
+def _render_all(review_records) -> int:
     svg_bytes = 0
-    for record in records:
-        review = record.meta["three_way_junction_review"]
-        junction_ids = [row["junction_id"] for row in review["geometry"]["junctions"][:2]]
+    for record in review_records:
         jobs = (
             ("junction_annealed_fragments", None),
             ("junction_three_way_assembly", {"view": "assembly"}),
-            (
-                "junction_three_way_assembly",
-                {"view": "junction_detail", "junction_ids": junction_ids},
-            ),
+            ("junction_three_way_assembly", {"view": "junction_detail"}),
         )
         for renderer, options in jobs:
             figure = baserender.render(record, renderer=renderer, options=options)
@@ -137,17 +132,21 @@ def main() -> int:
     if args.runs < 1:
         parser.error("--runs must be positive")
 
-    result, records, plan_seconds = _records(args.workload)
+    result, review_records, plan_seconds = _records(args.workload)
     fragment_counts = [len(target.fragments) for target in result.targets]
     junction_counts = [len(target.junctions) for target in result.targets]
     report = {
         "workload": args.workload,
-        "targets": len(records),
-        "target_lengths": [len(record.sequence) for record in records],
+        "targets": len(review_records),
+        "assembly_groups": len(result.assembly_groups),
+        "target_lengths": [len(record.sequence) for record in review_records],
         "fragment_counts": fragment_counts,
         "junction_counts": junction_counts,
         "plan_seconds": plan_seconds,
-        "render_and_svg": _measure(lambda: _render_all(records), runs=args.runs),
+        "render_and_svg": _measure(
+            lambda: _render_all(review_records),
+            runs=args.runs,
+        ),
     }
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0

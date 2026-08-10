@@ -6,56 +6,46 @@ status: active
 last_verified: 2026-08-10
 ---
 
-# `junction` documentation
+# Start here
 
-Start with a complete request containing exact linear DNA targets, their
-assembly groups, recovery primers, bounded search settings, and order labels.
+Choose the path that matches what you need to do next.
 
-[![Base-level three-way-junction detail](assets/junction-detail.svg)](assets/junction-detail.svg)
+[![Input target, fragment oligos, pre-ligation junctions, and the expected PCR duplex](assets/assembly-process.svg)](assets/assembly-process.svg)
 
-Review images are opt in. Exact fragment annealing, the planned assembly
-process, and selected junction details all read the same verified review
-record and show expected sequence geometry.
+Give `junction` exact target sequences. It returns vendor-neutral oligo orders,
+FASTA files for downstream sequence tools, machine-readable checks, and a
+bundle that can be replayed. The figures and sequence exports come from the
+same plan.
 
-## Learn
+## Choose a path
 
-- [How `junction` works](explanation/how-junction-works.md) explains the
-  target-to-oligo process and separates software checks from laboratory
-  evidence.
-- [Getting started](getting-started.md) builds one synthetic gene-scale example.
-- The checked-in [three-fragment request](../examples/three-fragment-review/request.yaml)
-  and [review jobs](../examples/three-fragment-review/jobs/) generate the three
-  review views described in the inspection guide.
+| Need | Go to |
+| --- | --- |
+| Build and verify the example | [Getting started](getting-started.md) |
+| Understand the molecular sequence | [How `junction` works](explanation/how-junction-works.md) |
+| Prepare one target or a jointly designed set | [Prepare a request](guides/prepare-a-request.md) |
+| Trace an existing bundle | [Inspect and verify](guides/inspect-and-verify.md) |
+| Plan a larger request safely | [Scale](guides/scale.md) |
+| Check every input field and limit | [Request contract](reference/request.md) |
+| Use the CLI or Python API | [Artifacts, API, and errors](reference/artifacts-api-and-errors.md) |
+| Inspect exact formulas and search rules | [Method v1](reference/method-v1.md) |
+| Read the source and validation boundaries | [Sources and scope](reference/sources.md) |
 
-## Use
-
-- [Prepare a request](guides/prepare-a-request.md) covers one target, targets
-  designed together, independent assembly groups, recovery primers, and order
-  labels.
-- [Inspect and verify](guides/inspect-and-verify.md) maps review questions to
-  bundle files and optional BaseRender images.
-- [Scale](guides/scale.md) explains resource limits and the tested software
-  scenarios.
-
-## Reference
-
-- [Request contract](reference/request.md) lists fields, validation rules, and
-  resource ceilings.
-- [Artifacts, API, and errors](reference/artifacts-api-and-errors.md) specifies
-  commands, Python calls, bundle contents, publication, and verification.
-- [Method v1](reference/method-v1.md) gives the exact geometry, strand formulas,
-  search objectives, and deliberate differences from the papers.
-- [Sources and scope](reference/sources.md) identifies the primary literature,
-  attribution, implementation independence, and unresolved validation gaps.
-
-## Choose one operation
+## Commands
 
 | Need | Command | Work performed |
 | --- | --- | --- |
+| Turn raw, text, or FASTA sequences into request JSON | `uv run junction request --base-request <request> --input <file> --primer-binding-length <nt>` | Replaces the base request's targets while preserving its reviewed design policy; it does not run the design. |
 | Full design with a short, no-file summary | `uv run junction preflight <request>` | Runs the complete search; writes nothing. |
 | Full design as JSON | `uv run junction plan <request> --format json` | Runs the complete search; writes nothing. |
 | Publish a new, verified bundle | `uv run junction build <request> --output <new-directory>` | Runs the design, writes create-only files, then verifies the installed bundle by replay. |
 | Check an existing bundle later | `uv run junction verify <bundle>` | Replays the recorded request and checks every file and identity. |
 
-These commands are alternatives, not four stages of one efficient run.
-`preflight`, `plan`, and `build` each repeat the complete design search.
+`request` prepares canonical input. The other commands consume that same
+request contract. `preflight`, `plan`, and `build` each repeat the complete
+design search, so choose the one result you need.
+
+The checked-in [three-fragment request](../examples/three-fragment-review/request.yaml)
+and [BaseRender jobs](../examples/three-fragment-review/jobs/) generate the
+molecular figures used throughout these docs. Junction's deterministic SVG API
+generates the optional sequence-comparison figure.
