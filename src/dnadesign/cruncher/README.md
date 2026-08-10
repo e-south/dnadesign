@@ -1,11 +1,3 @@
----
-doc_id: cruncher-package
-title: Cruncher
-owner: dnadesign-maintainers
-status: active
-last_verified: 2026-08-08
----
-
 ![Cruncher banner](assets/cruncher-banner.svg)
 
 Cruncher runs reproducible DNA design jobs. It can optimize fixed-length

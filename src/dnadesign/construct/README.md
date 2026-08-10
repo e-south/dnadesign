@@ -1,11 +1,3 @@
----
-doc_id: construct-package
-title: Construct
-owner: dnadesign-maintainers
-status: active
-last_verified: 2026-08-08
----
-
 ![Construct banner](docs/assets/construct-banner.svg)
 
 Construct places declared DNA parts into named slots in a sequence context. It

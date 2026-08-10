@@ -1,11 +1,3 @@
----
-doc_id: opal-package
-title: OPAL
-owner: dnadesign-maintainers
-status: active
-last_verified: 2026-08-08
----
-
 ![OPAL banner](assets/opal-banner.svg)
 
 OPAL runs repeatable sequence-candidate campaigns. A campaign declares its
