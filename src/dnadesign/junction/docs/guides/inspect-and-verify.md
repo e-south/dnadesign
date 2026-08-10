@@ -73,32 +73,37 @@ Follow the [BaseRender integration](../../../baserender/docs/integrations/juncti
 Use a new BaseRender output directory beside the source bundle; never add
 images inside the verified source bundle.
 
-Use the fragment map to check expected strand annealing, the target overview to
-locate all interfaces, and junction details to inspect selected `t/t*`,
-`b/b*`, nick, and strand-end geometry. Light gray edges mark declared
-Watson–Crick pairs. Large requests require explicit fragment or junction
-selection before a detailed figure is allocated. Search receipts, primers,
-order rows, and software checks remain in their owning JSON or TSV artifacts;
-the plots do not duplicate them. A plot adds no thermodynamic or experimental
+Use the fragment view to check exact strand annealing, the process view to trace
+separate oligos through the modeled three-way state to the expected recovered
+duplex, and the detail view to inspect selected `t/t*`, `b/b*`, nick, and
+strand-end geometry. Light gray guides mark declared Watson–Crick pairs. Large
+requests require an explicit, bounded selection before detailed figures are
+allocated. Search receipts, primers, order rows, and software checks remain in
+their JSON or TSV artifacts. A plot adds no thermodynamic or experimental
 evidence and is not part of the `junction` plan identity.
 
 ### Expected fragment annealing
 
 [![Expected annealing for three selected fragment pairs](../assets/annealed-fragments.svg)](../assets/annealed-fragments.svg)
 
-This view gives every nucleotide the same physical spacing, keeps the two
-orderable strands antiparallel, and marks only the pairing declared by the
-verified record. Rounded outer edges show each contiguous order; categorical
-fills identify its target, toehold, and barcode spans. The unpaired barcode and
-toehold arms remain visible instead of being flattened into a target-only row.
+This view gives every nucleotide the same physical spacing and aligns paired
+bases vertically. The two orderable strands remain antiparallel. Square ends
+mark physical oligo termini; light outlines keep the nucleotide glyphs legible.
+Categorical fills identify target, toehold, and barcode spans. Unpaired barcode
+and toehold arms remain visible instead of being flattened into a target-only
+row.
 
-### Target-scale assembly map
+### Planned assembly process
 
-[![Three-way interfaces across one target](../assets/assembly-overview.svg)](../assets/assembly-overview.svg)
+[![Separate oligos, the modeled three-way state, and the expected recovered duplex](../assets/assembly-process.svg)](../assets/assembly-process.svg)
 
-This symbolic view answers where the interfaces occur. Stable junction IDs and
-target coordinates route into the detail view. It omits nucleotide letters on
-purpose.
+This view keeps the two physical strands separate at every stage. It shows
+unannealed fragment oligos, the sequence-derived pre-ligation state with one
+stable ID per junction, and the exact primer-extended duplex expected after
+recovery. The recovered duplex is drawn at nucleotide resolution in 100 bp
+windows. Slashes mark continued sequence, not molecular ends. The view models
+the intended sequence states; it does not show that annealing, ligation, or PCR
+occurred.
 
 ### Selected junction details
 
@@ -109,6 +114,11 @@ target helix, a perpendicular antiparallel barcode helix, barcode-arm 3′/5′
 polarity, break marks on cropped target flanks, the complement-strand nick,
 and source-derived Watson–Crick edges. The view is a deterministic sequence
 schematic, not a folding simulation.
+
+For a request with several targets, BaseRender writes one independently named
+figure per target. It does not compress a one-pot pool into a single molecular
+canvas. That keeps target identity, junction IDs, coordinates, and exact bases
+reviewable while the shared assembly-group evidence remains in `plan.json`.
 
 ## Review before any order or experiment
 

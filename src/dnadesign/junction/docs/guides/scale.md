@@ -5,7 +5,7 @@ type: guide
 audience: users evaluating larger requests
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-08-10
 ---
 
 # Scale
@@ -61,6 +61,24 @@ Together, these scenarios test schema expressivity, deterministic planning,
 guarded resource behavior, and selected artifact round trips. They do not
 validate the search policy, thermodynamics, oligo synthesis, pooled assembly,
 or experimental performance for those target counts or lengths.
+
+## Scale review images separately from planning
+
+The molecular views have tighter limits than the planner because they draw
+exact bases and pairing guides:
+
+- fragment annealing accepts at most 18 selected fragment pairs and 140
+  displayed bases per pair;
+- the process view accepts at most 64 fragments and a 1,024 bp expected
+  recovered duplex; and
+- junction detail accepts one to eight selected junctions and at most 512 base
+  glyphs per junction.
+
+The renderer is dogfooded on the 200 bp checked-in example, one 1,000 bp target
+with ten junctions, and a three-target one-pot request with three junctions per
+target. Multi-target jobs write one figure per target. Longer plans remain
+available in typed JSON and can use selected fragment or junction views; they
+do not trigger an unbounded whole-product plot.
 
 ## Limits and failure behavior
 
