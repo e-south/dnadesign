@@ -103,7 +103,7 @@ def test_large_group_requires_an_explicit_bounded_subset(monkeypatch: pytest.Mon
         raise AssertionError("oversized selections must fail before matrix or figure allocation")
 
     monkeypatch.setattr(plot_module, "pairwise_matrices", fail_if_allocated)
-    monkeypatch.setattr(plot_module.plt, "subplots", fail_if_allocated)
+    monkeypatch.setattr(plot_module, "Figure", fail_if_allocated)
     with pytest.raises(JunctionConfigError, match="has 25 junctions.*choose at most 24"):
         plot_sequence_dissimilarity(review)
 
@@ -119,18 +119,27 @@ def test_large_group_requires_an_explicit_bounded_subset(monkeypatch: pytest.Mon
 
 def test_long_sequences_fail_before_pairwise_or_figure_allocation(monkeypatch: pytest.MonkeyPatch) -> None:
     payload = _review().model_dump(mode="json")
+    payload["junctions"] = payload["junctions"][:2]
     for index, junction in enumerate(payload["junctions"]):
-        junction["toehold_sequence_5to3"] = "A" * 999 + "CGT"[index]
-        junction["barcode_sequence_5to3"] = "C" * 1_999 + "AGT"[index]
+        junction["toehold_sequence_5to3"] = "A" * 2_999 + "CG"[index]
+        junction["barcode_sequence_5to3"] = "AG"[index]
     review = JunctionSequenceDissimilarityV1.model_validate(payload)
 
     def fail_if_allocated(*_args: object, **_kwargs: object) -> None:
         raise AssertionError("oversized pairwise work must fail before allocation")
 
     monkeypatch.setattr(plot_module, "pairwise_matrices", fail_if_allocated)
-    monkeypatch.setattr(plot_module.plt, "subplots", fail_if_allocated)
+    monkeypatch.setattr(plot_module, "Figure", fail_if_allocated)
     with pytest.raises(JunctionConfigError, match="pairwise work requires.*dynamic-programming cells"):
         plot_sequence_dissimilarity(review)
+
+
+def test_import_and_svg_render_preserve_the_selected_matplotlib_backend() -> None:
+    original_backend = matplotlib.get_backend()
+
+    render_sequence_dissimilarity_svg(_review())
+
+    assert matplotlib.get_backend() == original_backend
 
 
 def test_contract_rejects_thermodynamic_overclaim_and_duplicate_barcodes() -> None:

@@ -16,11 +16,10 @@ from io import BytesIO
 from typing import Sequence
 
 import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.backends.backend_svg import FigureCanvasSVG
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.figure import Figure
 
 from .contract import JunctionSequenceDissimilarityV1
 from .metrics import DissimilaritySelection, pairwise_matrices, resolve_selection
@@ -102,7 +101,8 @@ def plot_sequence_dissimilarity(
     selection = resolve_selection(review, junction_ids)
     matrices = pairwise_matrices(review, selection)
     labels = _labels(review, selection)
-    figure, axes = plt.subplots(1, 3, figsize=(15.2, 5.7), dpi=150)
+    figure = Figure(figsize=(15.2, 5.7), dpi=150)
+    axes = figure.subplots(1, 3)
     figure.patch.set_facecolor(_BACKGROUND)
     figure.suptitle(
         "Pairwise string metrics show how the selected junctions differ",
@@ -173,11 +173,8 @@ def render_sequence_dissimilarity_svg(
     deterministic_rc["svg.hashsalt"] = "dnadesign.junction"
     with matplotlib.rc_context(deterministic_rc):
         figure = plot_sequence_dissimilarity(review, junction_ids=junction_ids)
-        try:
-            buffer = BytesIO()
-            figure.savefig(buffer, format="svg", metadata={"Date": None})
-        finally:
-            plt.close(figure)
+        buffer = BytesIO()
+        FigureCanvasSVG(figure).print_svg(buffer, metadata={"Date": None})
     lines = (line.rstrip() for line in buffer.getvalue().splitlines())
     return b"\n".join(lines) + b"\n"
 

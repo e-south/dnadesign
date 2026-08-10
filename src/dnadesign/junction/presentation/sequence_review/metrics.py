@@ -72,7 +72,9 @@ def resolve_selection(
         first = review.junctions[by_id[selected[0]]]
         toehold_length = len(first.toehold_sequence_5to3)
         barcode_length = len(first.barcode_sequence_5to3)
-        projected_cells = pair_count * (toehold_length**2 + barcode_length**2 + (toehold_length + barcode_length) ** 2)
+        projected_cells = pair_count * (
+            2 * toehold_length**2 + barcode_length**2 + (toehold_length + barcode_length) ** 2
+        )
         if projected_cells > MAX_DYNAMIC_PROGRAMMING_CELLS:
             raise JunctionConfigError(
                 f"pairwise work requires {projected_cells} dynamic-programming cells; "
