@@ -41,7 +41,7 @@ def draw_assembly_process(axis, review: ThreeWayJunctionReviewV1, *, height: flo
     axis.text(
         0.5,
         height - 0.10,
-        f"The junction plan for {target_id} resolves each molecular state",
+        f"The plan traces {target_id} from oligos to the expected PCR duplex",
         fontsize=17.0,
         fontweight="semibold",
         color=INK,
@@ -88,7 +88,7 @@ def draw_assembly_process(axis, review: ThreeWayJunctionReviewV1, *, height: flo
     _stage_title(
         axis,
         height - 2.38,
-        "The plan specifies an annealed pre-ligation state",
+        "Annealing forms the modeled pre-ligation junctions",
         gid="junction-three-way-assembly:three-way:title",
     )
     draw_three_way_stage(axis, review, y=height - 3.13)
@@ -108,7 +108,7 @@ def draw_assembly_process(axis, review: ThreeWayJunctionReviewV1, *, height: flo
     axis.text(
         0.5,
         0.08,
-        "This sequence-derived review does not establish annealing, ligation, amplification, or yield",
+        "Expected sequence geometry; no experimental measurements are shown",
         fontsize=9.0,
         color=MUTED,
         ha="center",

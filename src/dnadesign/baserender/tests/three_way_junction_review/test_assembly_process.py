@@ -21,6 +21,7 @@ import dnadesign.baserender as baserender
 from dnadesign.baserender.src.config import ImagesOutputCfg
 from dnadesign.baserender.src.outputs.images import write_images
 from dnadesign.baserender.src.render import junction_three_way_assembly as assembly_renderer
+from dnadesign.baserender.src.render.junction_review.assembly_geometry import assembly_figure_height
 from dnadesign.baserender.src.render.junction_review.primitives import (
     draw_molecular_path,
     draw_segmented_strand,
@@ -103,7 +104,7 @@ def test_fragment_and_detail_typography_is_centered_legible_and_collision_free()
     )
     try:
         annealed_axis = annealed.axes[0]
-        title = next(text for text in annealed_axis.texts if "expected to anneal" in text.get_text())
+        title = next(text for text in annealed_axis.texts if "expected annealing" in text.get_text())
         bases = _artists_with_prefix(annealed_axis, "junction-annealed:")
         assert title.get_position()[0] == pytest.approx(0.5)
         assert title.get_ha() == "center"
@@ -146,10 +147,11 @@ def test_assembly_view_shows_orders_three_way_state_and_exact_recovered_duplex()
         axis = figure.axes[0]
         assert axis.get_gid() == "junction-three-way-assembly:assembly"
         text = "\n".join(item.get_text() for item in axis.texts)
+        assert "from oligos to the expected PCR duplex" in text
         assert "The oligos remain separate before annealing" in text
-        assert "The plan specifies an annealed pre-ligation state" in text
+        assert "Annealing forms the modeled pre-ligation junctions" in text
         assert "The expected PCR product is a recovered duplex" in text
-        assert "does not establish annealing, ligation, amplification, or yield" in text
+        assert "Expected sequence geometry; no experimental measurements are shown" in text
         expected_top = review["recovery"]["extended_top_sequence_5to3"]
         assert _ordered_base_text(axis, "junction-three-way-assembly:product:top:window:") == expected_top
         expected_bottom = expected_top.translate(str.maketrans("ACGT", "TGCA"))
@@ -174,6 +176,25 @@ def test_assembly_view_shows_orders_three_way_state_and_exact_recovered_duplex()
         )
         assert _artists_with_prefix(axis, "junction-three-way-assembly:orders:")
         assert _artists_with_prefix(axis, "junction-three-way-assembly:three-way:")
+        fragment_count = len(review["geometry"]["fragments"])
+        preligation_bodies = [
+            patch
+            for patch in axis.patches
+            if (patch.get_gid() or "").startswith("junction-three-way-assembly:three-way:fragment:")
+            and (patch.get_gid() or "").endswith(":body")
+        ]
+        assert len(preligation_bodies) == fragment_count * 2
+        assert not any(
+            (patch.get_gid() or "").startswith("junction-three-way-assembly:three-way:target:")
+            for patch in axis.patches
+        )
+        top_gaps = [
+            line
+            for line in axis.lines
+            if (line.get_gid() or "").startswith("junction-three-way-assembly:three-way:")
+            and (line.get_gid() or "").endswith(":top-gap")
+        ]
+        assert len(top_gaps) == len(review["geometry"]["junctions"])
 
         figure.canvas.draw()
         renderer = figure.canvas.get_renderer()
@@ -190,6 +211,29 @@ def test_assembly_view_shows_orders_three_way_state_and_exact_recovered_duplex()
         assert all(not order_title.overlaps(label) for label in order_labels)
         assert not orientation.overlaps(annealing)
         assert not annealing.overlaps(three_way_title)
+    finally:
+        plt.close(figure)
+
+
+@pytest.mark.parametrize("figure_scale", [0.5, 1.5])
+def test_assembly_figure_scale_changes_canvas_without_changing_molecular_coordinates(
+    figure_scale: float,
+) -> None:
+    record = _adapt_payload(_payload())
+    review = record.meta["three_way_junction_review"]
+    coordinate_height = assembly_figure_height(len(review["recovery"]["extended_top_sequence_5to3"]))
+
+    figure = baserender.render(
+        record,
+        renderer="junction_three_way_assembly",
+        style={"figure_scale": figure_scale},
+        options={"view": "assembly"},
+    )
+    try:
+        assert tuple(figure.axes[0].get_ylim()) == pytest.approx((0.0, coordinate_height))
+        assert tuple(figure.get_size_inches()) == pytest.approx(
+            (assembly_renderer._FIGURE_WIDTH * figure_scale, coordinate_height * figure_scale)
+        )
     finally:
         plt.close(figure)
 

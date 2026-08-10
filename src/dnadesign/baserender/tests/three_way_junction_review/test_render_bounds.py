@@ -196,7 +196,7 @@ def test_annealed_map_requires_fragment_selection_before_large_allocation() -> N
     )
     try:
         text = "\n".join(item.get_text() for item in figure.axes[0].texts)
-        assert "2 selected fragment pairs" in text
+        assert "2 fragment pairs show the expected annealing" in text
         assert "F01" in text and "F02" in text
         assert "F03" not in text
     finally:
