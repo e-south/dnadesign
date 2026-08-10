@@ -5,7 +5,7 @@ type: reference
 scope: dnadesign.junction.request.v2
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-08-10
 ---
 
 # Request contract
@@ -59,6 +59,13 @@ The four iteration/attempt ceilings are 100,000; 10,000,000; 100,000; and
 These are software validity bounds, not validated laboratory defaults. The
 tool never changes them or relaxes `barcode_toehold_k` and `barcode_pair_k`
 silently.
+
+The paper-backed starting value for `toehold_length` is 10 nt. The Nature
+study standardized on 10 bases after testing nick positions and observing
+effective ligation at distances of about six bases or more from the barcode
+helix; the pooled study also used `t = 10` by default. The schema's broader
+integer range supports explicit computational experiments. It does not imply
+that longer toeholds have been experimentally validated by those sources.
 
 `nominal_fragment_oligo_length` controls locus spacing. It is not the Nature
 paper's physical input-oligo length and does not promise equal-length orders.
@@ -133,6 +140,13 @@ terminal domain must jointly yield fragment strands at or above the declared
 floor. The bounded seeded search ranks only feasible sampled paths and always
 includes the lexicographically first feasible path. It does not enumerate the
 Cartesian product of candidate loci.
+
+The interval is a hard synthesis boundary, not a uniformity objective. The
+three fragment roles contain different structural components, so target-domain
+length and ordered-strand length are different quantities. The search does not
+trade toehold separation for a narrower order-length spread. Review actual
+order lengths in `orders/oligos.tsv`; revise the declared geometry when the
+spread is operationally unsuitable.
 
 ## Request-wide resource envelope
 

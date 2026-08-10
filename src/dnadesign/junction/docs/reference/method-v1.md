@@ -5,7 +5,7 @@ type: reference
 scope: paper-inspired three-way-junction geometry, string objectives, and reconstruction evidence
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-08-10
 ---
 
 # Method v1
@@ -288,7 +288,8 @@ met.
 
 | Topic | Paper-stated behavior | junction v1 contract |
 | --- | --- | --- |
-| Terminal locus and order length | The pooled Methods text stops when `N - p_(m+1) <= c_max` and states final oligo lengths in `[L - R + 1, L + R - 1]`. For some target lengths, the literal predicate leaves a terminal barcode-bearing oligo longer than the stated geometry. | V1 stops from the current locus, retains another junction when needed, requires a nonempty terminal domain for every candidate, and covers both the `L + R - 1` offset bound and `L - b + t` terminal-complement bound. This correction can produce a terminal fragment order shorter than the preprint's stated lower bound. The v2 request makes the caller declare `minimum_fragment_oligo_length`; infeasible candidate paths are removed before path ranking and barcode work. |
+| Reported order-length interval | The pooled Methods text states final oligo lengths in `[L - R + 1, L + R - 1]`, or 82–110 nt for its default values. Its later strand equations also define shorter coding strands; for example, an internal coding strand is an inter-toehold domain plus one toehold. The interval therefore cannot be treated as a universal bound over every barcode and coding oligo described by those equations. | V1 composes every exact barcode-bearing and complement strand first, then applies the caller's declared synthesis interval to those physical order strings. It does not infer the paper's 82–110-nt statement as a hidden constraint. |
+| Terminal locus and order length | The pooled Methods text stops when `N - p_(m+1) <= c_max`. For some target lengths, the literal predicate leaves a terminal barcode-bearing oligo longer than its stated geometry. | V1 stops from the current locus, retains another junction when needed, requires a nonempty terminal domain for every candidate, and covers both the `L + R - 1` offset bound and `L - b + t` terminal-complement bound. This correction can produce a short terminal order. The v2 request makes the caller declare `minimum_fragment_oligo_length`; infeasible candidate paths are removed before path ranking and barcode work. |
 | Toehold selection scope | The pooled procedure selects a toehold set target by target before global barcode design. | V1 uses a different joint, cross-target-constrained search for all loci in one assembly group. Adding a target may therefore change existing assignments. No comparative laboratory result establishes either search as superior. |
 | Substring exclusion | The pooled method starts with `q = floor(t / 2)` for barcode-to-toehold exclusion and `k = max(floor(b / 4), q + 1)` for barcode-to-barcode exclusion, including reverse complements. | `barcode_toehold_k` and `barcode_pair_k` are fixed request fields. The paper-derived values are documented starting points, never inferred at runtime. |
 | Constraint pressure | The pooled method requires at least `5|T|` admissible barcodes. If its generator returns fewer, the described software reruns while alternating constraint relaxation: increment `k` on even iterations (or whenever `q >= t`) and increment `q` on eligible odd iterations, halting if the threshold still cannot be met. | Attempt and iteration budgets are explicit. Candidate exhaustion fails under the declared `q` and `k`; junction never changes them automatically. A reviewed replacement request may declare different values. |

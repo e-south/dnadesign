@@ -5,7 +5,7 @@ type: guide
 audience: users turning exact targets into a reviewed design request
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-08-10
 ---
 
 # Prepare a request
@@ -128,6 +128,14 @@ Review at least:
 - barcode GC and homopolymer bounds; and
 - barcode-to-toehold and barcode-to-barcode forbidden substring lengths.
 
+The Nature study found effective ligation when the nick was at least about six
+bases from the barcode helix and standardized its tested assemblies on a
+10-base toehold. The pooled study also used `t = 10` unless stated otherwise.
+The checked-in examples therefore use 10 nt. The request contract accepts other
+positive lengths for computational work, but the papers do not establish a
+general benefit for making the toehold longer than 10 nt. Treat a different
+value as a new reviewed method choice, not a routine scaling control.
+
 The tool never relaxes these values automatically. Candidate exhaustion fails
 with the original request preserved.
 
@@ -160,6 +168,31 @@ No default minimum is inferred from either paper. Declare the boundary that
 your downstream process has reviewed. Passing it proves only that the emitted
 fragment strings lie inside the caller's length interval; it does not validate
 synthesis, folding, annealing, ligation, or amplification.
+
+Balance the lengths of the **ordered strands**, not the target domains named
+F1, F2, and F3. A first, internal, or last fragment carries a different
+combination of target, toehold, and barcode sequence, so equally sized target
+domains do not produce equally sized orders. `junction` keeps sequence
+separation as the search objective and does not hide a second length-balancing
+score inside it. Use the published order table and BaseRender subtitle to
+review the minimum, maximum, and median. If the spread is unsuitable, revise
+the target length or declared geometry and rerun the complete search.
+
+Supplier limits change, and product lines from one supplier can have different
+windows. As of 2026-08-10, representative official specifications are:
+
+| Pool product | Stated oligo-length window |
+| --- | ---: |
+| [IDT oPools](https://www.idtdna.com/pages/products/custom-dna-rna/dna-oligos/custom-dna-oligos/opools-oligo-pools) | 40–350 bases |
+| [Twist Oligo Pools](https://www.twistbioscience.com/faq/oligo-pools/what-maximum-length-can-be-ordered-oligo-pool) | 20–350 nt |
+| [Agilent SurePrint G7636A](https://www.agilent.com/store/en_US/Prod-G7636A/G7636A) | 30–110 nt |
+
+These links are purchasing context, not built-in profiles or endorsements.
+Set `minimum_fragment_oligo_length` and `max_oligo_length` to the exact route
+you intend to use. If several routes must remain possible, declare their
+reviewed intersection. The planner rejects a candidate path that would emit a
+fragment below the minimum, and it rejects any fragment or recovery primer
+above the maximum before publication.
 
 An arbitrary 5′ primer extension may contain a caller-supplied adapter or Type
 IIS sequence. `junction` does not identify enzymes, design spacers, model
