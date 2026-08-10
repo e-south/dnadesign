@@ -10,11 +10,11 @@ last_verified: 2026-08-10
 
 # Getting started
 
-This tutorial publishes and verifies one synthetic 705 bp target. The request
+This tutorial builds and verifies one 705 bp example target. The request
 uses 96 nt nominal fragment geometry, 22 nt barcodes, 10 nt toeholds, and a
-15 nt locus search range. Those dimensions start from the pooled Sidewinder
-paper's method profile. The search policy and synthetic sequence are junction
-examples, not a paper-validated laboratory protocol or purchasing advice.
+15 nt locus search range. Those dimensions follow the starting profile in the
+pooled Sidewinder paper. The search policy and example sequence are software
+examples, not a validated laboratory protocol or purchasing advice.
 
 ## 1. Prepare the repository
 
@@ -35,19 +35,36 @@ cp src/dnadesign/junction/examples/gene-scale/request.yaml request.yaml
 
 The target is an exact uppercase 5′→3′ `ACGT` string. Recovery primers are
 inputs: `junction` checks their terminal matches and preserves each optional
-`five_prime_extension`. Primer design and PCR assessment happen upstream. The
-order labels are copied into vendor-neutral output rows.
+`five_prime_extension`. Primer optimization and PCR assessment happen
+upstream. Order labels are copied into vendor-neutral output rows.
+
+If your target already exists as a raw string, text file, or FASTA, compile it
+into the same request contract instead of copying sequence text by hand:
+
+```bash
+uv run junction request \
+  --base-request src/dnadesign/junction/examples/gene-scale/request.yaml \
+  --input targets.fasta \
+  --primer-binding-length 20 \
+  > request.json
+```
+
+`--base-request` contributes only the seed, planning profile, and order policy;
+its targets are replaced. FASTA record IDs become target IDs. For one
+in-memory sequence, use `--sequence ACGT... --target-id target-a`. Input is
+uppercased and whitespace is removed, while ambiguity codes and duplicate IDs
+fail. The explicit binding length selects terminal primer-binding spans; it is
+not a PCR-performance claim.
 
 For this exact request, the deterministic plan contains 13 fragment pairs and
 12 three-way junctions. Its 26 fragment orders range from 46 to 106 nt and are
-checked against the request's declared 45-to-110-nt interval. The contract does
-not decide whether an allowed oligo is synthesizable.
+checked against the request's declared 45-to-110-nt interval. Passing that
+check does not establish synthesis feasibility.
 
-`assembly_group_id` is the boundary across which `junction` compares candidate
-sequences. Put targets in the same group when their fragments must be designed
-against one another because they may encounter one another during the intended
-three-way-junction assembly. The ID does not specify a study, sample, vendor
-pool, annealing tube, PCR product, or biological condition.
+`assembly_group_id` says which targets must be checked together. Use one group
+when their fragments may encounter one another during the intended assembly.
+The ID does not specify a study, sample, vendor pool, annealing tube, PCR
+product, or biological condition.
 
 ## 3. Publish the bundle
 
@@ -83,22 +100,28 @@ request, reruns the deterministic algorithm, renders each expected artifact,
 and compares it with the saved file. A changed, missing, extra, relocated, or
 non-reproducible file fails verification.
 
-## 5. Review what was proved
+## 5. Inspect the bundle
 
 Start with:
 
 1. `checks.json` for compact scoped results and explicit `not_run` states;
 2. `plan.json` for selected loci, toeholds, barcodes, strands, and search
    receipts;
-3. `orders/oligos.tsv` for complete vendor-neutral sequences; and
-4. `views/three_way_junction_review.v1.json` for one review record per target.
+3. `orders/oligos.tsv` for the vendor-neutral order sheet;
+4. `sequences/targets.fasta`, `sequences/oligos.fasta`, and
+   `sequences/expected_pcr_products.fasta` for sequence-tool handoffs; and
+5. `views/three_way_junction_review.v1.json` for one molecular review record
+   per target; and
+6. `views/junction_sequence_dissimilarity.v1.json` for one compact sequence
+   comparison record per assembly group.
 
-Render that last artifact with
+Render `views/three_way_junction_review.v1.json` with
 [BaseRender](../../baserender/docs/integrations/junction.md) to inspect every
 selected nucleotide, its aligned complement, fragment and toehold boundaries,
-and a three-arm junction schematic. Read complete order rows, primer
-sequences, search receipts, and check states in the bundle rather than
-inferring them from a plot.
+and three-arm geometry. Use Junction's
+`plot_sequence_dissimilarity(...)` API for the optional pairwise string-metric
+view. Read complete order rows, primer sequences, search receipts, and check
+states in the bundle rather than inferring them from a plot.
 
 A successful verification establishes deterministic string construction and
 bundle integrity. Thermodynamic, synthesis, and laboratory review are separate

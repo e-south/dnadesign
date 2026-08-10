@@ -22,7 +22,11 @@ ARTIFACT_BYTE_LIMITS = MappingProxyType(
         "plan": 256 * _MIB,
         "checks": 16 * _MIB,
         "orders": 256 * _MIB,
+        "order_sequences": 256 * _MIB,
+        "expected_products": 256 * _MIB,
+        "targets": 256 * _MIB,
         "review": 256 * _MIB,
+        "sequence_dissimilarity": 256 * _MIB,
     }
 )
 
