@@ -8,12 +8,11 @@ last_verified: 2026-08-10
 
 ![junction banner](assets/junction-banner.svg)
 
-`junction` converts exact linear DNA targets into a reviewable oligo design for
-Sidewinder-style three-way-junction assembly. A request declares the targets,
-which targets are designed together, recovery primers, search limits, and order
-labels. The tool selects junction sequences, proves exact string
-reconstruction, and writes a replay-verifiable bundle. It does not design
-primers, predict molecular behavior, run an experiment, or place an order.
+`junction` designs vendor-neutral oligo sets for Sidewinder-style
+three-way-junction assembly. A request supplies exact linear DNA targets,
+assembly groups, recovery primers, search bounds, and order labels. The
+deterministic planner chooses target-derived toeholds and external barcodes,
+proves exact reconstruction, and writes a replay-verifiable review bundle.
 
 ## Documentation
 
@@ -24,10 +23,10 @@ primers, predict molecular behavior, run an experiment, or place an order.
 
 ## Review the design
 
-[![Base-level details for two selected three-way junctions](docs/assets/junction-detail.svg)](docs/assets/junction-detail.svg)
+[![Separate oligos, modeled pre-ligation junctions, and the expected PCR duplex](docs/assets/assembly-process.svg)](docs/assets/assembly-process.svg)
 
-BaseRender can draw exact fragment annealing, the planned molecular states, or
-selected three-way junctions from the verified review record. Each
-[review job](examples/three-fragment-review/jobs/) answers one question and
-writes one SVG per selected target. These schematics do not predict folding,
-ligation, PCR, yield, or fidelity.
+BaseRender provides three opt-in views from the same verified record: fragment
+annealing, the path from separate oligos to the expected recovered duplex, and
+nucleotide-level details for selected junctions. Each [review
+job](examples/three-fragment-review/jobs/) answers one question and writes one
+SVG per target.

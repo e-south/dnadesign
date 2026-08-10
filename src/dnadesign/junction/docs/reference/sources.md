@@ -64,7 +64,7 @@ preprint phosphorylates and anneals the mixed oligo pool. `junction` records
 only the caller's complement-strand end-preparation declaration; it does not
 specify either complete preparation route or generate a reaction protocol.
 
-## What is not established
+## Validation boundary
 
 - `thermodynamic_screening` is always `not_run`; string separation is not
   thermodynamic orthogonality.
@@ -81,8 +81,8 @@ specify either complete preparation route or generate a reaction protocol.
   enrich a truncated misassembly that retains both terminal priming regions.
   `junction` does not model that amplification bias or turn the paper's
   observed error counts into a general prediction.
-- The repository's software tests do not show that a generated oligo set will
-  synthesize, anneal, ligate, amplify, clone, or function experimentally.
+- Repository tests establish the software contracts and deterministic
+  artifacts. Experimental performance requires separate evidence.
 
 Optional BaseRender images are original QA views derived from the neutral
 review record. They follow the papers' conceptual order—separate oligos,
