@@ -11,249 +11,294 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from matplotlib.collections import LineCollection
-from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
-
 from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
 
-from .junction_review_common import INK, MUTED, PAIR, draw_base_run, junction_color, safe_identifier
+from .junction_review.detail_geometry import (
+    BOTTOM_Y,
+    STEM_LEFT_X,
+    STEM_RIGHT_X,
+    STEM_START_Y,
+    STRAND_WIDTH,
+    TOP_Y,
+    junction_detail_base_glyph_count,
+    local_junction_geometry,
+)
+from .junction_review.detail_primitives import add_break, add_nick, add_pairs, draw_component_path
+from .junction_review.foundation import (
+    BARCODE,
+    BARCODE_DARK,
+    DOMAIN,
+    INK,
+    MUTED,
+    STRAND_EDGE,
+    TOEHOLD,
+    TOEHOLD_DARK,
+    display_junction_id,
+)
+from .junction_review.primitives import draw_base_run, draw_molecular_path
 from .sequence_preview import bounded_svg_gid
-
-_CONTEXT_BASES = 6
-
-
-def _add_backbone(axis, xs, ys, *, gid: str, color: str = INK) -> None:
-    line = Line2D(xs, ys, color=color, linewidth=1.1, solid_capstyle="round", zorder=2)
-    line.set_gid(bounded_svg_gid(gid))
-    axis.add_line(line)
-
-
-def _add_pairs(axis, segments, *, gid: str) -> None:
-    collection = LineCollection(segments, colors=PAIR, linewidths=0.55, zorder=1)
-    collection.set_gid(bounded_svg_gid(gid))
-    axis.add_collection(collection)
-
-
-def _add_break(axis, *, x: float, y: float, gid: str) -> None:
-    """Mark a cropped strand without implying a physical terminus."""
-
-    for index, offset in enumerate((-0.012, 0.012)):
-        xs = (x + offset - 0.009, x + offset + 0.009)
-        ys = (y - 0.045, y + 0.045)
-        axis.add_line(Line2D(xs, ys, color="white", linewidth=3.2, zorder=4))
-        mark = Line2D(xs, ys, color=INK, linewidth=0.9, zorder=5)
-        mark.set_gid(bounded_svg_gid(f"{gid}:{index}"))
-        axis.add_line(mark)
-
-
-def junction_detail_base_glyph_count(review: ThreeWayJunctionReviewV1, index: int) -> int:
-    """Count the per-base text artists required by one local detail view."""
-
-    junction = review.geometry.junctions[index]
-    left_fragment = review.geometry.fragments[index]
-    right_fragment = review.geometry.fragments[index + 1]
-    left_bases = min(_CONTEXT_BASES, junction.toehold_span.start - left_fragment.domain_span.start)
-    right_bases = min(_CONTEXT_BASES, right_fragment.domain_span.end - junction.toehold_span.end)
-    return 2 * (left_bases + len(junction.toehold) + right_bases + len(junction.barcode))
 
 
 def draw_junction_detail(axis, review: ThreeWayJunctionReviewV1, index: int) -> None:
-    """Draw one exact, sequence-derived three-arm interface."""
+    """Draw one exact, sequence-derived three-arm interface on a shared base scale."""
 
-    junction = review.geometry.junctions[index]
-    left_fragment = review.geometry.fragments[index]
-    right_fragment = review.geometry.fragments[index + 1]
-    target = review.target.sequence_5to3
-    left_start = max(left_fragment.domain_span.start, junction.toehold_span.start - _CONTEXT_BASES)
-    right_end = min(right_fragment.domain_span.end, junction.toehold_span.end + _CONTEXT_BASES)
-    left_is_terminal = left_start == 0
-    right_is_terminal = right_end == len(target)
-    left_context = target[left_start : junction.toehold_span.start]
-    right_context = target[junction.toehold_span.end : right_end]
+    geometry = local_junction_geometry(review, index)
+    junction = geometry.junction
+    left_fragment = geometry.left_fragment
+    right_fragment = geometry.right_fragment
+    left_context = geometry.left_context
+    right_context = geometry.right_context
     toehold = junction.toehold
     toehold_bottom = junction.toehold_complement[::-1]
-    left_bottom = left_context.translate(str.maketrans("ACGT", "TGCA"))
-    right_bottom = right_context.translate(str.maketrans("ACGT", "TGCA"))
-    color = junction_color(index)
+    complement = str.maketrans("ACGT", "TGCA")
+    left_bottom = left_context.translate(complement)
+    right_bottom = right_context.translate(complement)
+    left_length = len(left_context) + len(toehold)
+    horizontal_span = max(left_length, len(right_context), 1)
+    stem_top = STEM_START_Y + len(junction.barcode)
+    base_fontsize = max(5.0, min(8.4, 180 / max(horizontal_span, len(junction.barcode), 1)))
 
     axis.set_gid(bounded_svg_gid(f"junction-three-way-assembly:{junction.junction_id}:detail"))
-    axis.set_xlim(-1, 1)
-    axis.set_ylim(-1, 1)
+    axis.set_xlim(-horizontal_span - 2.5, horizontal_span + 2.5)
+    axis.set_ylim(BOTTOM_Y - 4.2, stem_top + 5.2)
+    axis.set_aspect("equal", adjustable="box")
     axis.axis("off")
+
+    local_id = display_junction_id(junction.junction_id)
     axis.text(
-        -0.96,
-        0.93,
-        f"J{index + 1:02d} · F{index + 1:02d} → F{index + 2:02d}",
-        fontsize=7.0,
+        -horizontal_span - 2.1,
+        stem_top + 4.2,
+        (
+            f"{local_id} joins F{left_fragment.index + 1:02d} to F{right_fragment.index + 1:02d} "
+            f"at target bp {junction.toehold_span.start + 1}–{junction.toehold_span.end}"
+        ),
+        fontsize=9.5,
         fontweight="semibold",
         color=INK,
         va="top",
     )
-    axis.text(
-        0.96,
-        0.93,
-        f"target bp {junction.toehold_span.start + 1}–{junction.toehold_span.end}",
-        fontsize=5.5,
-        color=MUTED,
-        ha="right",
-        va="top",
-    )
 
-    total_left = len(left_context) + len(toehold)
-    horizontal_step = min(0.075, 0.72 / max(total_left, len(right_context), 1))
-    node_x = 0.0
-    top_y, bottom_y = 0.16, -0.12
-    left_x = node_x - total_left * horizontal_step
-    toehold_x = node_x - len(toehold) * horizontal_step
-    right_x = node_x + 0.08
+    left_x = -left_length
+    toehold_x = -len(toehold)
+    right_x = 0.0
 
-    _add_backbone(
+    draw_molecular_path(
         axis,
-        [left_x, node_x - 0.035, node_x - 0.035],
-        [top_y, top_y, 0.74],
+        [left_x, STEM_LEFT_X, STEM_LEFT_X],
+        [TOP_Y, TOP_Y, stem_top],
+        color=STRAND_EDGE,
         gid=f"junction:{junction.junction_id}:left-and-barcode-arm",
+        linewidth=STRAND_WIDTH,
+        zorder=0.2,
     )
-    _add_backbone(
+    draw_molecular_path(
         axis,
-        [node_x + 0.115, node_x + 0.115, right_x + len(right_context) * horizontal_step],
-        [0.74, top_y, top_y],
+        [STEM_RIGHT_X, STEM_RIGHT_X, len(right_context)],
+        [stem_top, TOP_Y, TOP_Y],
+        color=STRAND_EDGE,
         gid=f"junction:{junction.junction_id}:barcode-and-right-arm",
+        linewidth=STRAND_WIDTH,
+        zorder=0.2,
     )
-    _add_backbone(
+    draw_molecular_path(
         axis,
-        [left_x, toehold_x - 0.012],
-        [bottom_y, bottom_y],
+        [left_x, toehold_x - 0.34],
+        [BOTTOM_Y, BOTTOM_Y],
+        color=STRAND_EDGE,
         gid=f"junction:{junction.junction_id}:left-complement-arm",
-        color="#4B5563",
+        linewidth=STRAND_WIDTH,
+        zorder=0.2,
     )
-    _add_backbone(
+    draw_molecular_path(
         axis,
-        [toehold_x + 0.012, right_x + len(right_context) * horizontal_step],
-        [bottom_y, bottom_y],
+        [toehold_x + 0.34, len(right_context)],
+        [BOTTOM_Y, BOTTOM_Y],
+        color=STRAND_EDGE,
         gid=f"junction:{junction.junction_id}:right-complement-arm",
-        color="#4B5563",
+        linewidth=STRAND_WIDTH,
+        zorder=0.2,
     )
 
-    for y in (top_y, bottom_y):
-        axis.add_patch(
-            Rectangle(
-                (toehold_x - 0.01, y - 0.055),
-                len(toehold) * horizontal_step + 0.02,
-                0.11,
-                facecolor=color,
-                edgecolor="none",
-                alpha=0.24,
-                zorder=0,
-            )
+    if left_context:
+        draw_component_path(
+            axis,
+            [left_x, toehold_x],
+            [TOP_Y, TOP_Y],
+            color=DOMAIN,
+            gid=f"junction:{junction.junction_id}:left-target-top",
         )
-    stem_height = 0.50
-    for x in (node_x - 0.035, node_x + 0.055):
-        axis.add_patch(Rectangle((x, top_y), 0.06, stem_height, facecolor=color, edgecolor="none", alpha=0.22))
+        draw_component_path(
+            axis,
+            [left_x, toehold_x - 0.34],
+            [BOTTOM_Y, BOTTOM_Y],
+            color=DOMAIN,
+            gid=f"junction:{junction.junction_id}:left-target-bottom",
+        )
+    draw_component_path(
+        axis,
+        [toehold_x, STEM_LEFT_X],
+        [TOP_Y, TOP_Y],
+        color=TOEHOLD,
+        gid=f"junction:{junction.junction_id}:toehold-top-path",
+    )
+    draw_component_path(
+        axis,
+        [STEM_LEFT_X, STEM_LEFT_X],
+        [TOP_Y, stem_top],
+        color=BARCODE,
+        gid=f"junction:{junction.junction_id}:barcode-left-path",
+    )
+    draw_component_path(
+        axis,
+        [STEM_RIGHT_X, STEM_RIGHT_X],
+        [stem_top, TOP_Y],
+        color=BARCODE,
+        gid=f"junction:{junction.junction_id}:barcode-right-path",
+    )
+    if right_context:
+        draw_component_path(
+            axis,
+            [STEM_RIGHT_X, len(right_context)],
+            [TOP_Y, TOP_Y],
+            color=DOMAIN,
+            gid=f"junction:{junction.junction_id}:right-target-top",
+        )
+        draw_component_path(
+            axis,
+            [0.0, len(right_context)],
+            [BOTTOM_Y, BOTTOM_Y],
+            color=DOMAIN,
+            gid=f"junction:{junction.junction_id}:right-target-bottom",
+        )
+    draw_component_path(
+        axis,
+        [toehold_x + 0.34, 0.0],
+        [BOTTOM_Y, BOTTOM_Y],
+        color=TOEHOLD,
+        gid=f"junction:{junction.junction_id}:toehold-bottom-path",
+    )
 
     for sequence, start_x, y, role in (
-        (left_context, left_x, top_y, "left-top"),
-        (toehold, toehold_x, top_y, "toehold-top"),
-        (right_context, right_x, top_y, "right-top"),
-        (left_bottom, left_x, bottom_y, "left-bottom"),
-        (toehold_bottom, toehold_x, bottom_y, "toehold-bottom"),
-        (right_bottom, right_x, bottom_y, "right-bottom"),
+        (left_context, left_x, TOP_Y, "left-top"),
+        (toehold, toehold_x, TOP_Y, "toehold-top"),
+        (right_context, right_x, TOP_Y, "right-top"),
+        (left_bottom, left_x, BOTTOM_Y, "left-bottom"),
+        (toehold_bottom, toehold_x, BOTTOM_Y, "toehold-bottom"),
+        (right_bottom, right_x, BOTTOM_Y, "right-bottom"),
     ):
         draw_base_run(
             axis,
             sequence,
             start_x=start_x,
             start_y=y,
-            delta_x=horizontal_step,
-            delta_y=0,
+            delta_x=1.0,
+            delta_y=0.0,
             gid_prefix=f"junction:{junction.junction_id}:{role}",
-            fontsize=5.5,
+            fontsize=base_fontsize,
         )
 
-    barcode_y = top_y + 0.08
-    barcode_step = stem_height / max(len(junction.barcode), 1)
     draw_base_run(
         axis,
         junction.barcode,
-        start_x=node_x,
-        start_y=barcode_y,
-        delta_x=0,
-        delta_y=barcode_step,
+        start_x=STEM_LEFT_X,
+        start_y=STEM_START_Y,
+        delta_x=0.0,
+        delta_y=1.0,
         gid_prefix=f"junction:{junction.junction_id}:barcode-b",
-        fontsize=5.3,
+        fontsize=base_fontsize,
     )
     draw_base_run(
         axis,
         junction.barcode_complement,
-        start_x=node_x + 0.08,
-        start_y=barcode_y + stem_height,
-        delta_x=0,
-        delta_y=-barcode_step,
+        start_x=STEM_RIGHT_X,
+        start_y=stem_top,
+        delta_x=0.0,
+        delta_y=-1.0,
         gid_prefix=f"junction:{junction.junction_id}:barcode-b-star",
-        fontsize=5.3,
+        fontsize=base_fontsize,
     )
 
-    target_pairs = []
-    for start, length in (
-        (left_x, len(left_context)),
-        (toehold_x, len(toehold)),
-        (right_x, len(right_context)),
-    ):
-        target_pairs.extend(
-            (
-                (start + (base + 0.5) * horizontal_step, top_y - 0.035),
-                (start + (base + 0.5) * horizontal_step, bottom_y + 0.035),
-            )
-            for base in range(length)
+    target_pairs = [
+        ((start + base + 0.5, TOP_Y - 0.48), (start + base + 0.5, BOTTOM_Y + 0.48))
+        for start, length in (
+            (left_x, len(left_context)),
+            (toehold_x, len(toehold)),
+            (right_x, len(right_context)),
         )
-    _add_pairs(axis, target_pairs, gid=f"junction:{junction.junction_id}:target-pairs")
+        for base in range(length)
+    ]
+    add_pairs(axis, target_pairs, gid=f"junction:{junction.junction_id}:target-pairs")
     barcode_pairs = [
         (
-            (node_x + 0.022, barcode_y + (base + 0.5) * barcode_step),
-            (node_x + 0.058, barcode_y + (base + 0.5) * barcode_step),
+            ((STEM_LEFT_X + 0.32), STEM_START_Y + base + 0.5),
+            ((STEM_RIGHT_X - 0.32), STEM_START_Y + base + 0.5),
         )
         for base in range(len(junction.barcode))
     ]
-    _add_pairs(axis, barcode_pairs, gid=f"junction:{junction.junction_id}:barcode-pairs")
+    add_pairs(axis, barcode_pairs, gid=f"junction:{junction.junction_id}:barcode-pairs")
 
-    nick = Line2D(
-        [toehold_x - 0.012, toehold_x + 0.012],
-        [bottom_y - 0.045, bottom_y + 0.045],
-        color="#111827",
-        linewidth=1.1,
-    )
-    nick.set_gid(bounded_svg_gid(f"junction:{junction.junction_id}:nick"))
-    axis.add_line(nick)
-    axis.text(toehold_x, bottom_y - 0.14, "nick", fontsize=5.2, color=MUTED, ha="center", va="top")
-    axis.text((toehold_x + node_x) / 2, top_y + 0.09, f"t{index + 1}", fontsize=5.5, color=color, ha="center")
+    add_nick(axis, x=toehold_x, y=BOTTOM_Y, gid=f"junction:{junction.junction_id}:nick")
+    axis.text(toehold_x, BOTTOM_Y - 1.0, "nick", fontsize=7.0, color=MUTED, ha="center", va="top")
     axis.text(
-        (toehold_x + node_x) / 2,
-        bottom_y - 0.09,
+        (toehold_x + STEM_LEFT_X) / 2,
+        TOP_Y + 1.0,
+        f"t{index + 1}",
+        fontsize=7.5,
+        color=TOEHOLD_DARK,
+        ha="center",
+    )
+    axis.text(
+        toehold_x / 2,
+        BOTTOM_Y - 0.9,
         f"t{index + 1}*",
-        fontsize=5.5,
-        color=color,
+        fontsize=7.5,
+        color=TOEHOLD_DARK,
         ha="center",
         va="top",
     )
-    axis.text(node_x - 0.05, 0.67, f"b{index + 1}", fontsize=5.5, color=color, ha="right")
-    axis.text(node_x + 0.13, 0.67, f"b{index + 1}*", fontsize=5.5, color=color, ha="left")
-    axis.text(node_x, 0.77, "3′", fontsize=5.3, color=MUTED, ha="center", va="bottom")
-    axis.text(node_x + 0.08, 0.77, "5′", fontsize=5.3, color=MUTED, ha="center", va="bottom")
-    if left_is_terminal:
-        axis.text(left_x - 0.03, top_y, "5′", fontsize=5.3, color=MUTED, ha="right", va="center")
-        axis.text(left_x - 0.03, bottom_y, "3′", fontsize=5.3, color=MUTED, ha="right", va="center")
+    axis.text(
+        STEM_LEFT_X - 1.0,
+        stem_top - 0.2,
+        f"b{index + 1}",
+        fontsize=7.5,
+        color=BARCODE_DARK,
+        ha="right",
+    )
+    axis.text(
+        STEM_RIGHT_X + 1.0,
+        stem_top - 0.2,
+        f"b{index + 1}*",
+        fontsize=7.5,
+        color=BARCODE_DARK,
+        ha="left",
+    )
+    axis.text(STEM_LEFT_X, stem_top + 0.8, "3′", fontsize=7.5, color=MUTED, ha="center", va="bottom")
+    axis.text(STEM_RIGHT_X, stem_top + 0.8, "5′", fontsize=7.5, color=MUTED, ha="center", va="bottom")
+
+    if geometry.left_is_terminal:
+        axis.text(left_x - 0.8, TOP_Y, "5′", fontsize=7.5, color=MUTED, ha="right", va="center")
+        axis.text(left_x - 0.8, BOTTOM_Y, "3′", fontsize=7.5, color=MUTED, ha="right", va="center")
     else:
-        _add_break(axis, x=left_x, y=top_y, gid=f"junction:{junction.junction_id}:left-top-break")
-        _add_break(axis, x=left_x, y=bottom_y, gid=f"junction:{junction.junction_id}:left-bottom-break")
-    right_label_x = right_x + len(right_context) * horizontal_step + 0.03
-    if right_is_terminal:
-        axis.text(right_label_x, top_y, "3′", fontsize=5.3, color=MUTED, va="center")
-        axis.text(right_label_x, bottom_y, "5′", fontsize=5.3, color=MUTED, va="center")
+        add_break(axis, x=left_x, y=TOP_Y, gid=f"junction:{junction.junction_id}:left-top-break")
+        add_break(axis, x=left_x, y=BOTTOM_Y, gid=f"junction:{junction.junction_id}:left-bottom-break")
+
+    right_label_x = len(right_context) + 0.8
+    if geometry.right_is_terminal:
+        axis.text(right_label_x, TOP_Y, "3′", fontsize=7.5, color=MUTED, va="center")
+        axis.text(right_label_x, BOTTOM_Y, "5′", fontsize=7.5, color=MUTED, va="center")
     else:
-        right_boundary = right_x + len(right_context) * horizontal_step
-        _add_break(axis, x=right_boundary, y=top_y, gid=f"junction:{junction.junction_id}:right-top-break")
-        _add_break(axis, x=right_boundary, y=bottom_y, gid=f"junction:{junction.junction_id}:right-bottom-break")
-    axis.text(-0.96, -0.86, safe_identifier(junction.junction_id), fontsize=5.0, color=MUTED, va="bottom")
+        add_break(
+            axis,
+            x=float(len(right_context)),
+            y=TOP_Y,
+            gid=f"junction:{junction.junction_id}:right-top-break",
+        )
+        add_break(
+            axis,
+            x=float(len(right_context)),
+            y=BOTTOM_Y,
+            gid=f"junction:{junction.junction_id}:right-bottom-break",
+        )
 
 
 __all__ = ["draw_junction_detail", "junction_detail_base_glyph_count"]

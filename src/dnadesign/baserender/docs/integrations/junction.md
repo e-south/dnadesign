@@ -3,7 +3,7 @@ doc_id: baserender-junction-integration
 title: junction review integration
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-08-10
 ---
 
 # Review a junction design with BaseRender
@@ -35,7 +35,7 @@ directories use mode `0700`; files use mode `0600`.
 
 | Question | Renderer | Options |
 | --- | --- | --- |
-| Which fragment oligos are expected to pair? | `junction_annealed_fragments` | Optional `fragment_ids`; required when a target has more than 18 fragments. |
+| Which fragment oligos are expected to anneal? | `junction_annealed_fragments` | Optional `fragment_ids`; required when a target has more than 18 fragments. |
 | Where are all three-way interfaces on the target? | `junction_three_way_assembly` | `view: overview` |
 | Does a specific interface have the expected three-arm geometry? | `junction_three_way_assembly` | `view: junction_detail` and one to eight `junction_ids` |
 
@@ -48,11 +48,14 @@ record without forcing Matplotlib to allocate an unbounded number of artists.
 The target overview accepts at most 256 fragments; larger assemblies remain
 available as typed records but require a purpose-built aggregate view.
 
-The fragment map prints exact bases, strand ends, junction spans, and declared
-Watson–Crick edges. The target overview is intentionally symbolic. The junction
-detail uses a horizontal target helix, a perpendicular barcode helix, and an
-explicit complement-strand nick. It shows `t/t*` and `b/b*` on one shared
-three-arm node rather than as unrelated duplex rows.
+The fragment map prints exact bases, physical oligo lengths, strand ends,
+junction spans, and declared Watson–Crick edges on one nucleotide scale. The
+target overview is intentionally symbolic and labels each interface with a
+stable junction ID and target coordinate. The junction detail uses the same
+base spacing horizontally and vertically, centers a perpendicular barcode
+helix on the target helix, and marks the complement-strand nick. It shows
+`t/t*` and `b/b*` on one shared three-arm node rather than as unrelated duplex
+rows.
 
 These are sequence-derived schematics. They do not claim predicted secondary
 structure, thermodynamic stability, successful annealing or ligation, PCR

@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/baserender/src/render/junction_three_way_assembly.py
 
-Overview and selected-detail views for Junction three-way assemblies.
+Registered overview and selected-detail renderer for Junction assemblies.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -19,23 +19,23 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
-from matplotlib.patches import Rectangle
 
 from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
 
 from ..config import Style
 from ..core import Record, SchemaError
-from .junction_review_common import (
+from .junction_review.detail_geometry import junction_detail_base_glyph_count
+from .junction_review.foundation import (
     INK,
     MUTED,
-    junction_color,
+    fragment_order_lengths,
+    length_summary,
     review_from_record,
-    safe_identifier,
     selected_ids,
     validate_figure_size,
 )
-from .junction_three_way_detail import draw_junction_detail, junction_detail_base_glyph_count
+from .junction_review.overview_panel import draw_overview
+from .junction_three_way_detail import draw_junction_detail
 from .palette import Palette
 
 _RENDERER = "junction_three_way_assembly"
@@ -76,15 +76,17 @@ def _resolve_options(
 
 
 def _overview_size(style: Style) -> tuple[float, float]:
-    return validate_figure_size(style, renderer=_RENDERER, width=_FIGURE_WIDTH, height=4.2)
+    return validate_figure_size(style, renderer=_RENDERER, width=_FIGURE_WIDTH, height=4.8)
 
 
 def _detail_size(style: Style, count: int) -> tuple[float, float]:
+    columns = min(2, count)
+    rows = math.ceil(count / columns)
     return validate_figure_size(
         style,
         renderer=_RENDERER,
-        width=_FIGURE_WIDTH,
-        height=1.15 + math.ceil(count / 2) * 4.0,
+        width=8.2 if columns == 1 else _FIGURE_WIDTH,
+        height=1.65 + rows * 4.8,
     )
 
 
@@ -108,74 +110,6 @@ def _validate_overview_workload(review: ThreeWayJunctionReviewV1) -> None:
         )
 
 
-def _draw_overview(axis, review: ThreeWayJunctionReviewV1) -> None:
-    axis.set_gid("junction-three-way-assembly:overview")
-    axis.set_xlim(0, 1)
-    axis.set_ylim(0, 1)
-    axis.axis("off")
-    axis.text(0.025, 0.94, "Three-way assembly map", fontsize=12.5, fontweight="semibold", color=INK, va="top")
-    fragment_count = len(review.geometry.fragments)
-    junction_count = len(review.geometry.junctions)
-    axis.text(
-        0.025,
-        0.86,
-        (
-            f"{safe_identifier(review.target.target_id)} · "
-            f"{fragment_count} {'fragment' if fragment_count == 1 else 'fragments'} · "
-            f"{junction_count} {'junction' if junction_count == 1 else 'junctions'}"
-        ),
-        fontsize=6.8,
-        color=MUTED,
-        va="top",
-    )
-    left, right = 0.055, 0.965
-    top_y, bottom_y = 0.47, 0.39
-    length = len(review.target.sequence_5to3)
-
-    def x_for(coordinate: int) -> float:
-        return left + ((right - left) * coordinate / length)
-
-    axis.add_line(Line2D([left, right], [top_y, top_y], linewidth=4.2, color="#6B7280"))
-    axis.add_line(Line2D([left, right], [bottom_y, bottom_y], linewidth=4.2, color="#9AA1AA"))
-    for fragment in review.geometry.fragments:
-        x0, x1 = x_for(fragment.domain_span.start), x_for(fragment.domain_span.end)
-        fill = "#E2E6EB" if fragment.index % 2 == 0 else "#D5DBE2"
-        axis.add_patch(Rectangle((x0, top_y - 0.024), x1 - x0, 0.048, facecolor=fill, edgecolor="none", zorder=2))
-        axis.text(
-            (x0 + x1) / 2,
-            0.31,
-            f"F{fragment.index + 1}",
-            fontsize=5.6,
-            color=INK,
-            ha="center",
-            va="top",
-        )
-    for index, junction in enumerate(review.geometry.junctions):
-        x = x_for(junction.toehold_span.end)
-        color = junction_color(index)
-        axis.add_line(Line2D([x - 0.005, x - 0.005], [top_y, 0.73], linewidth=3.2, color=color))
-        axis.add_line(Line2D([x + 0.005, x + 0.005], [top_y, 0.73], linewidth=3.2, color=color, alpha=0.68))
-        axis.text(x, 0.77, f"J{index + 1}", fontsize=5.5, color=color, ha="center", va="bottom")
-        axis.add_line(Line2D([x, x], [bottom_y - 0.025, bottom_y + 0.025], linewidth=1.0, color=INK))
-    axis.text(
-        0.025,
-        0.10,
-        "Each stem marks one barcode-mediated interface. Use view: junction_detail for exact bases.",
-        fontsize=6.2,
-        color=MUTED,
-        va="bottom",
-    )
-    axis.text(
-        0.975,
-        0.10,
-        "Sequence-derived topology; not a structure or assembly simulation.",
-        fontsize=6.0,
-        color=MUTED,
-        ha="right",
-        va="bottom",
-    )
-
-
 @dataclass(frozen=True)
 class JunctionThreeWayAssemblyRenderer:
     """Render a target overview or explicitly selected nucleotide-level 3WJs."""
@@ -192,9 +126,10 @@ class JunctionThreeWayAssemblyRenderer:
         resolved = _resolve_options(review, options)
         if resolved.view == "overview":
             _validate_overview_workload(review)
+            _overview_size(style)
         else:
             _validate_detail_workload(review, resolved.junction_indices)
-        _overview_size(style) if resolved.view == "overview" else _detail_size(style, len(resolved.junction_indices))
+            _detail_size(style, len(resolved.junction_indices))
 
     def render(
         self,
@@ -209,23 +144,49 @@ class JunctionThreeWayAssemblyRenderer:
         if resolved.view == "overview":
             _validate_overview_workload(review)
             figure, axis = plt.subplots(figsize=_overview_size(style), dpi=style.dpi)
-            _draw_overview(axis, review)
+            draw_overview(axis, review)
             figure.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01)
             return figure
 
         _validate_detail_workload(review, resolved.junction_indices)
         count = len(resolved.junction_indices)
-        rows = math.ceil(count / 2)
-        figure, axes = plt.subplots(rows, 2, figsize=_detail_size(style, count), dpi=style.dpi, squeeze=False)
+        columns = min(2, count)
+        rows = math.ceil(count / columns)
+        figure, axes = plt.subplots(
+            rows,
+            columns,
+            figsize=_detail_size(style, count),
+            dpi=style.dpi,
+            squeeze=False,
+        )
         figure.suptitle(
-            f"Three-way junction details · {safe_identifier(review.target.target_id)}",
+            (
+                f"{count} selected three-way "
+                f"{'junction shows' if count == 1 else 'junctions show'} "
+                "the expected local annealing geometry"
+            ),
             x=0.02,
             y=0.995,
             ha="left",
             va="top",
-            fontsize=12.5,
+            fontsize=15.0,
             fontweight="semibold",
             color=INK,
+        )
+        lengths = fragment_order_lengths(review)
+        figure.text(
+            0.02,
+            0.95,
+            (
+                f"The {len(review.target.sequence_5to3)} bp target uses "
+                f"{len(review.geometry.junctions[0].toehold)} nt toeholds and "
+                f"{len(review.geometry.junctions[0].barcode)} nt barcodes; fragment oligos span "
+                f"{length_summary(lengths)}"
+            ),
+            fontsize=9.0,
+            color=MUTED,
+            ha="left",
+            va="top",
         )
         for axis, index in zip(axes.flat, resolved.junction_indices, strict=False):
             draw_junction_detail(axis, review, index)
@@ -234,12 +195,12 @@ class JunctionThreeWayAssemblyRenderer:
         figure.text(
             0.02,
             0.012,
-            "Exact local sequence mapping; topology is schematic, not a structure, ligation, or yield prediction.",
-            fontsize=6.0,
+            "Exact sequence mapping does not establish folding, ligation, yield, or experimental success",
+            fontsize=8.0,
             color=MUTED,
             va="bottom",
         )
-        figure.subplots_adjust(left=0.015, right=0.99, top=0.94, bottom=0.045, wspace=0.04, hspace=0.12)
+        figure.subplots_adjust(left=0.012, right=0.992, top=0.91, bottom=0.045, wspace=0.02, hspace=0.08)
         return figure
 
 

@@ -3,7 +3,7 @@ doc_id: junction-docs
 title: junction documentation
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-08-10
 ---
 
 # `junction` documentation
@@ -14,7 +14,7 @@ designed together, recovery primers, bounded search settings, and order labels.
 
 [![Base-level three-way-junction detail](assets/junction-detail.svg)](assets/junction-detail.svg)
 
-Review images are separate and opt in. The fragment-pairing map, target-scale
+Review images are separate and opt in. The fragment-annealing map, target-scale
 assembly map, and selected junction details all read the same verified review
 record. They do not predict whether the design will work in the laboratory.
 

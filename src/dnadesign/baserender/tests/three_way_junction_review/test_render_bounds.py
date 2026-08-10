@@ -22,7 +22,7 @@ from matplotlib.collections import LineCollection
 import dnadesign.baserender as baserender
 from dnadesign.baserender.src.outputs.names import _safe_stem
 from dnadesign.baserender.src.render import junction_three_way_assembly as assembly_renderer
-from dnadesign.baserender.src.render.junction_review_common import draw_base_run
+from dnadesign.baserender.src.render.junction_review.primitives import draw_base_run
 from dnadesign.baserender.src.render.sequence_preview import bounded_sequence_preview, bounded_svg_gid
 
 from .fixtures import (
@@ -156,7 +156,8 @@ def test_detail_preserves_every_junction_base_and_pairing_edge() -> None:
         assert _base_text(axis, f"{prefix}:barcode-b-star") == junction["barcode_complement"]
         assert _base_text(axis, f"{prefix}:toehold-top") == junction["toehold"]
         collections = [item for item in axis.collections if isinstance(item, LineCollection)]
-        expected = len(junction["barcode"]) + len(junction["toehold"]) + 12
+        context_bases = sum(len(_base_text(axis, f"{prefix}:{role}")) for role in ("left-top", "right-top"))
+        expected = len(junction["barcode"]) + len(junction["toehold"]) + context_bases
         assert sum(len(item.get_segments()) for item in collections) == expected
     finally:
         plt.close(figure)
@@ -172,7 +173,7 @@ def test_detail_rejects_excessive_base_glyphs_before_figure_allocation(
         raise AssertionError("oversized detail workload must reject before figure allocation")
 
     monkeypatch.setattr(assembly_renderer.plt, "subplots", fail_if_allocated)
-    with pytest.raises(baserender.SchemaError, match="requires 564 base glyphs; the per-junction limit is 512"):
+    with pytest.raises(baserender.SchemaError, match="requires 584 base glyphs; the per-junction limit is 512"):
         baserender.render(
             _adapt_payload(payload),
             renderer="junction_three_way_assembly",
@@ -195,7 +196,7 @@ def test_annealed_map_requires_fragment_selection_before_large_allocation() -> N
     )
     try:
         text = "\n".join(item.get_text() for item in figure.axes[0].texts)
-        assert "2 selected fragments" in text
+        assert "2 selected fragment pairs" in text
         assert "F01" in text and "F02" in text
         assert "F03" not in text
     finally:

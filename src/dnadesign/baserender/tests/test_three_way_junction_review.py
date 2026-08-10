@@ -130,10 +130,11 @@ def test_assembly_overview_is_a_separate_target_scale_view() -> None:
         assert [axis.get_gid() for axis in figure.axes] == ["junction-three-way-assembly:overview"]
         text = "\n".join(item.get_text() for axis in figure.axes for item in axis.texts)
         assert "target-01" in text
-        assert "2 fragments · 1 junction" in text
-        assert "J1" in text
-        assert "Use view: junction_detail for exact bases" in text
-        assert "not a structure or assembly simulation" in text
+        assert "1 three-way junction links 2 fragments" in text
+        assert "junction-01" in text
+        assert "bp 11–14" in text
+        assert "opens an exact nucleotide-level view" in text
+        assert "does not establish assembly success" in text
     finally:
         plt.close(figure)
 
@@ -149,10 +150,21 @@ def test_annealed_fragment_map_draws_every_declared_domain_pair() -> None:
         )
         assert sum(len(item.get_segments()) for item in pair_collections) == paired_fragment_bases
         text = "\n".join(item.get_text() for item in figure.axes[0].texts)
-        assert "Expected fragment pairing" in text
+        assert "2 selected fragment pairs are expected to anneal" in text
         assert "F01" in text
         assert "F02" in text
-        assert "not a thermodynamic prediction or experimental result" in text
+        assert "does not establish thermodynamic or experimental success" in text
+        top_steps: set[float] = set()
+        for fragment in payload["geometry"]["fragments"]:
+            top_bases = _base_artists(
+                figure.axes[0],
+                f"junction-annealed:{fragment['fragment_id']}:top",
+            )
+            top_steps.update(
+                round(right.get_position()[0] - left.get_position()[0], 12)
+                for left, right in zip(top_bases, top_bases[1:])
+            )
+        assert len(top_steps) == 1
         complement = str.maketrans("ACGT", "TGCA")
         for fragment in payload["geometry"]["fragments"]:
             fragment_id = fragment["fragment_id"]
@@ -195,6 +207,7 @@ def test_junction_detail_draws_one_shared_three_arm_node_and_nick() -> None:
         options={"view": "junction_detail", "junction_ids": ["junction-01"]},
     )
     try:
+        assert len(figure.axes) == 1
         axis = figure.axes[0]
         gids = {artist.get_gid() for artist in (*axis.lines, *axis.collections) if artist.get_gid()}
         assert "junction:junction-01:left-and-barcode-arm" in gids
@@ -202,8 +215,8 @@ def test_junction_detail_draws_one_shared_three_arm_node_and_nick() -> None:
         assert "junction:junction-01:nick" in gids
         assert "junction:junction-01:left-top-break:0" in gids
         assert "junction:junction-01:left-bottom-break:0" in gids
-        assert "junction:junction-01:right-top-break:0" in gids
-        assert "junction:junction-01:right-bottom-break:0" in gids
+        assert "junction:junction-01:right-top-break:0" not in gids
+        assert "junction:junction-01:right-bottom-break:0" not in gids
         barcode_pairs = next(
             collection
             for collection in axis.collections
@@ -215,11 +228,11 @@ def test_junction_detail_draws_one_shared_three_arm_node_and_nick() -> None:
         assert all(segment[0][1] == segment[1][1] for segment in barcode_pairs.get_segments())
         assert all(segment[0][0] == segment[1][0] for segment in target_pairs.get_segments())
         text = "\n".join(item.get_text() for item in axis.texts)
-        assert "J01 · F01 → F02" in text
+        assert "junction-01 joins F01 to F02" in text
         assert "t1" in text and "t1*" in text
         assert "b1" in text and "b1*" in text
-        assert sum(item.get_text() == "5′" for item in axis.texts) == 1
-        assert sum(item.get_text() == "3′" for item in axis.texts) == 1
+        assert sum(item.get_text() == "5′" for item in axis.texts) == 2
+        assert sum(item.get_text() == "3′" for item in axis.texts) == 2
         left_barcode = _base_artists(axis, "junction:junction-01:barcode-b")
         right_barcode = _base_artists(axis, "junction:junction-01:barcode-b-star")
         assert "".join(item.get_text() for item in left_barcode) == junction["barcode"]
@@ -230,6 +243,11 @@ def test_junction_detail_draws_one_shared_three_arm_node_and_nick() -> None:
         assert all(
             left.get_position()[1] > right.get_position()[1] for left, right in zip(right_barcode, right_barcode[1:])
         )
+        toehold_bases = _base_artists(axis, "junction:junction-01:toehold-top")
+        horizontal_step = toehold_bases[1].get_position()[0] - toehold_bases[0].get_position()[0]
+        vertical_step = left_barcode[1].get_position()[1] - left_barcode[0].get_position()[1]
+        assert horizontal_step == pytest.approx(1.0)
+        assert vertical_step == pytest.approx(horizontal_step)
 
         complement = str.maketrans("ACGT", "TGCA")
         top_target = _base_map(

@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/baserender/src/render/junction_review_common.py
+src/dnadesign/baserender/src/render/junction_review/foundation.py
 
-Shared contracts and bounds for Junction review renderers.
+Evidence access, selection, style, and resource policy for Junction review plots.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -12,32 +12,29 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import math
+import statistics
 from typing import Mapping, Sequence
 
 from pydantic import ValidationError
 
 from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
 
-from ..config import Style
-from ..core import Record, RenderingError, SchemaError
-from ..core.pydantic_validation import format_validation_error
-from .sequence_preview import bounded_svg_gid, bounded_text_preview
+from ...config import Style
+from ...core import Record, RenderingError, SchemaError
+from ...core.pydantic_validation import format_validation_error
+from ..sequence_preview import bounded_text_preview
 
 INK = "#172033"
 MUTED = "#667085"
-PAIR = "#CDD3DB"
-DOMAIN = "#E9EDF2"
+PAIR = "#B8C0CC"
+DOMAIN = "#E8EBEF"
+DOMAIN_DARK = "#667085"
+TOEHOLD = "#F3D6A1"
+TOEHOLD_DARK = "#8A5A00"
+BARCODE = "#A9D8D5"
+BARCODE_DARK = "#1F6F70"
+STRAND_EDGE = "#7C8798"
 BACKGROUND = "#FFFFFF"
-JUNCTION_COLORS = (
-    "#4E79A7",
-    "#2A9D8F",
-    "#7A9E4E",
-    "#D4A72C",
-    "#D96C5F",
-    "#A06CD5",
-    "#5C8D89",
-    "#C76B98",
-)
 
 MAX_DPI = 600
 MAX_FIGURE_SCALE = 4.0
@@ -68,41 +65,36 @@ def safe_identifier(value: str) -> str:
     return preview.preview
 
 
-def junction_color(index: int) -> str:
-    return JUNCTION_COLORS[index % len(JUNCTION_COLORS)]
+def display_junction_id(value: str) -> str:
+    """Return the stable local part of a plan-scoped junction identifier."""
+
+    return safe_identifier(value.rsplit(":", 1)[-1])
 
 
-def draw_base_run(
-    axis,
-    sequence: str,
-    *,
-    start_x: float,
-    start_y: float,
-    delta_x: float,
-    delta_y: float,
-    gid_prefix: str,
-    fontsize: float,
-    color: str = INK,
-) -> tuple[object, ...]:
-    """Draw bases at explicit centers shared with pairing geometry."""
+def fragment_order_lengths(
+    review: ThreeWayJunctionReviewV1,
+    indices: Sequence[int] | None = None,
+) -> tuple[int, ...]:
+    """Return actual emitted fragment-strand lengths for a selected view."""
 
-    safe_gid_prefix = bounded_svg_gid(gid_prefix)
-    artists: list[object] = []
-    for index, base in enumerate(sequence):
-        artist = axis.text(
-            start_x + (index + 0.5) * delta_x,
-            start_y + (index + 0.5) * delta_y,
-            base,
-            family="monospace",
-            fontsize=fontsize,
-            color=color,
-            ha="center",
-            va="center",
-            zorder=3,
+    selected = range(len(review.strands)) if indices is None else indices
+    return tuple(
+        length
+        for index in selected
+        for length in (
+            len(review.strands[index].barcode_bearing_sequence_5to3),
+            len(review.strands[index].complement_sequence_5to3),
         )
-        artist.set_gid(f"{safe_gid_prefix}:base:{index}:{base}")
-        artists.append(artist)
-    return tuple(artists)
+    )
+
+
+def length_summary(lengths: Sequence[int]) -> str:
+    """Describe a non-empty set of physical oligo lengths concisely."""
+
+    if not lengths:
+        raise ValueError("oligo length summary requires at least one length")
+    median = statistics.median(lengths)
+    return f"{min(lengths)}–{max(lengths)} nt with median {median:g} nt"
 
 
 def validate_figure_size(
@@ -164,18 +156,3 @@ def selected_ids(
     if unknown:
         raise SchemaError(f"{renderer} received unknown {key}: {unknown[:5]}")
     return selected
-
-
-__all__ = [
-    "BACKGROUND",
-    "DOMAIN",
-    "INK",
-    "MUTED",
-    "PAIR",
-    "draw_base_run",
-    "junction_color",
-    "review_from_record",
-    "safe_identifier",
-    "selected_ids",
-    "validate_figure_size",
-]
