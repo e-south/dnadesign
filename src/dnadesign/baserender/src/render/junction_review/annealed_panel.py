@@ -217,8 +217,8 @@ def draw_annealed_panel(axis, review: ThreeWayJunctionReviewV1, indices: tuple[i
         0.5,
         height - 0.10,
         (
-            f"{count} selected fragment {'pair is' if count == 1 else 'pairs are'} "
-            f"expected to anneal for {safe_identifier(review.target.target_id)}"
+            f"{count} {'fragment pair shows' if count == 1 else 'fragment pairs show'} "
+            f"the expected annealing for {safe_identifier(review.target.target_id)}"
         ),
         fontsize=17.0,
         fontweight="semibold",
@@ -242,7 +242,7 @@ def draw_annealed_panel(axis, review: ThreeWayJunctionReviewV1, indices: tuple[i
     axis.text(
         0.5,
         height - 0.76,
-        "Vertical guides join the exact target-derived bases; exposed barcode and toehold arms remain unpaired",
+        "Vertical guides align exact target-derived bases; exposed barcode and toehold arms remain unpaired",
         fontsize=9.0,
         color=MUTED,
         ha="center",
@@ -263,7 +263,7 @@ def draw_annealed_panel(axis, review: ThreeWayJunctionReviewV1, indices: tuple[i
     axis.text(
         0.5,
         0.07,
-        "Base pairing is sequence-derived and does not establish thermodynamic or experimental success",
+        "Expected sequence geometry; no experimental measurements are shown",
         fontsize=9.0,
         color=MUTED,
         ha="center",

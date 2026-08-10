@@ -130,11 +130,12 @@ def test_assembly_process_is_a_separate_target_scale_view() -> None:
         assert [axis.get_gid() for axis in figure.axes] == ["junction-three-way-assembly:assembly"]
         text = "\n".join(item.get_text() for axis in figure.axes for item in axis.texts)
         assert "target-01" in text
+        assert "from oligos to the expected PCR duplex" in text
         assert "The oligos remain separate before annealing" in text
-        assert "The plan specifies an annealed pre-ligation state" in text
+        assert "Annealing forms the modeled pre-ligation junctions" in text
         assert "The expected PCR product is a recovered duplex" in text
         assert "junction-01" in text
-        assert "does not establish annealing, ligation, amplification, or yield" in text
+        assert "Expected sequence geometry; no experimental measurements are shown" in text
     finally:
         plt.close(figure)
 
@@ -150,10 +151,10 @@ def test_annealed_fragment_map_draws_every_declared_domain_pair() -> None:
         )
         assert sum(len(item.get_segments()) for item in pair_collections) == paired_fragment_bases
         text = "\n".join(item.get_text() for item in figure.axes[0].texts)
-        assert "2 selected fragment pairs are expected to anneal" in text
+        assert "2 fragment pairs show the expected annealing" in text
         assert "F01" in text
         assert "F02" in text
-        assert "does not establish thermodynamic or experimental success" in text
+        assert "Expected sequence geometry; no experimental measurements are shown" in text
         top_steps: set[float] = set()
         for fragment in payload["geometry"]["fragments"]:
             top_bases = _base_artists(

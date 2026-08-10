@@ -155,8 +155,9 @@ class JunctionThreeWayAssemblyRenderer:
         if resolved.view == "assembly":
             _validate_assembly_workload(review)
             size = _assembly_size(style, review)
+            coordinate_height = assembly_figure_height(len(review.recovery.extended_top_sequence_5to3))
             figure, axis = plt.subplots(figsize=size, dpi=style.dpi)
-            draw_assembly_process(axis, review, height=size[1])
+            draw_assembly_process(axis, review, height=coordinate_height)
             figure.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01)
             return figure
 
@@ -207,7 +208,7 @@ class JunctionThreeWayAssemblyRenderer:
         figure.text(
             0.5,
             0.012,
-            "Exact sequence mapping does not establish folding, ligation, yield, or experimental success",
+            "Expected sequence geometry; no experimental measurements are shown",
             fontsize=9.0,
             color=MUTED,
             ha="center",

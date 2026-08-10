@@ -17,7 +17,7 @@ from matplotlib.lines import Line2D
 from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
 
 from ..sequence_preview import bounded_svg_gid
-from .foundation import BARCODE, BARCODE_DARK, DOMAIN, INK, MUTED, PAIR, TOEHOLD, display_junction_id
+from .foundation import BACKGROUND, BARCODE, BARCODE_DARK, DOMAIN, INK, MUTED, PAIR, TOEHOLD, display_junction_id
 from .fragment_geometry import fragment_pair_geometry
 from .primitives import draw_molecular_path, draw_segmented_strand
 
@@ -39,6 +39,21 @@ def target_spans(review: ThreeWayJunctionReviewV1, *, offset: int = 0):
             ),
             key=lambda item: item[0],
         )
+    )
+
+
+def _slice_spans(
+    spans: tuple[tuple[int, int, str], ...],
+    *,
+    start: int,
+    end: int,
+) -> tuple[tuple[int, int, str], ...]:
+    """Project global target spans into one fragment-local interval."""
+
+    return tuple(
+        (max(span_start, start) - start, min(span_end, end) - start, color)
+        for span_start, span_end, color in spans
+        if span_start < end and span_end > start
     )
 
 
@@ -92,24 +107,34 @@ def draw_orders_stage(axis, review: ThreeWayJunctionReviewV1, *, y: float) -> No
 
 
 def draw_three_way_stage(axis, review: ThreeWayJunctionReviewV1, *, y: float) -> None:
-    """Draw both target strands and every planned external barcode helix."""
+    """Draw each pre-ligation fragment and every planned external barcode helix."""
 
     left, right = 0.08, 0.96
     target_length = len(review.target.sequence_5to3)
     base_step = (right - left) / target_length
     spans = target_spans(review)
     top_y, bottom_y = y, y - 0.20
-    for strand_y, role in ((top_y, "top"), (bottom_y, "bottom")):
-        draw_segmented_strand(
-            axis,
-            start_x=left,
-            center_y=strand_y,
-            base_step=base_step,
-            length=target_length,
-            segments=spans,
-            height=0.075,
-            gid_prefix=f"junction-three-way-assembly:three-way:target:{role}",
-        )
+    for index, fragment in enumerate(review.geometry.fragments):
+        previous = None if index == 0 else review.geometry.junctions[index - 1]
+        following = None if index == len(review.geometry.fragments) - 1 else review.geometry.junctions[index]
+        top_start = fragment.domain_span.start
+        top_end = fragment.domain_span.end if following is None else following.toehold_span.end
+        bottom_start = fragment.domain_span.start if previous is None else previous.toehold_span.start
+        bottom_end = fragment.domain_span.end
+        for start, end, strand_y, role in (
+            (top_start, top_end, top_y, "top"),
+            (bottom_start, bottom_end, bottom_y, "bottom"),
+        ):
+            draw_segmented_strand(
+                axis,
+                start_x=left + start * base_step,
+                center_y=strand_y,
+                base_step=base_step,
+                length=end - start,
+                segments=_slice_spans(spans, start=start, end=end),
+                height=0.075,
+                gid_prefix=(f"junction-three-way-assembly:three-way:fragment:{fragment.fragment_id}:{role}"),
+            )
     for junction in review.geometry.junctions:
         x = left + junction.toehold_span.end * base_step
         stem_offset = 0.0035
@@ -123,6 +148,15 @@ def draw_three_way_stage(axis, review: ThreeWayJunctionReviewV1, *, y: float) ->
                 gid=f"junction-three-way-assembly:three-way:{junction.junction_id}:{direction}",
                 linewidth=6.0,
             )
+        gap = Line2D(
+            (x, x),
+            (top_y - 0.052, top_y + 0.052),
+            color=BACKGROUND,
+            linewidth=2.2,
+            zorder=2,
+        )
+        gap.set_gid(bounded_svg_gid(f"junction-three-way-assembly:three-way:{junction.junction_id}:top-gap"))
+        axis.add_line(gap)
         pairs = LineCollection(
             [((x - stem_offset, level), (x + stem_offset, level)) for level in (y + 0.10, y + 0.19, y + 0.28)],
             colors=PAIR,
