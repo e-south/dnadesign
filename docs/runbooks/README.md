@@ -1,7 +1,7 @@
 ## Runbook Catalog
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-09
+**Last verified:** 2026-08-10
 
 For command-first routing, start with `uv run ops catalog list --simple`, then
 open the linked runbook or tool doc once you know the route.
@@ -72,7 +72,7 @@ This table is generated from `*.tool-source.yaml` sidecars. Edit those files ins
 | `baserender` | [BaseRender documentation](../../src/dnadesign/baserender/docs/README.md) | Contract renderer for producer-emitted visual jobs, plus optional demo/ad hoc workspaces. |
 | `folding` | [Folding Docs](../../src/dnadesign/folding/docs/README.md) | Stateless secondary-structure preflight, ViennaRNA execution, and native structure plot publication for producer-owned artifacts. |
 | `permuter` | [Permuter Docs](../../src/dnadesign/permuter/docs/README.md) | Tool-owned variant generation, workspace execution, plotting, and handoff contracts for USR, Construct, Infer, and study-owned promotion. |
-| `junction` | [`junction` documentation](../../src/dnadesign/junction/docs/README.md) | Plans three-way-junction oligos from exact DNA targets and verifies each saved bundle. |
+| `junction` | [Start here](../../src/dnadesign/junction/docs/README.md) | Turns DNA sequences from text, FASTA, or a request into checked oligo plans for three-way-junction assembly. |
 
 ### Status views
 

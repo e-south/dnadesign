@@ -27,6 +27,9 @@ from dnadesign.devtools.docs.badges import find_markdown_badge_policy_issues, re
 from dnadesign.devtools.docs.banners.catalog import BANNERS
 from dnadesign.devtools.docs.banners.render import check_banners
 from dnadesign.devtools.docs.freshness import collect_changed_doc_dates, verification_change_issue
+from dnadesign.devtools.docs.landing import (
+    find_landing_readme_frontmatter_issues as _find_landing_readme_frontmatter_issues,
+)
 from dnadesign.devtools.docs.metadata import LAST_VERIFIED_PATTERN, OWNER_PATTERN, SOR_MARKDOWN_FILES
 from dnadesign.ops.catalog import (
     CatalogProcedureEntry,
@@ -2421,6 +2424,13 @@ def main(argv: list[str] | None = None) -> int:
     if banner_source_drift_issues:
         print("Banner source drift check failed:")
         for issue in banner_source_drift_issues:
+            print(f" - {issue}")
+        return 1
+
+    landing_readme_frontmatter_issues = _find_landing_readme_frontmatter_issues(repo_root)
+    if landing_readme_frontmatter_issues:
+        print("Landing README frontmatter check failed:")
+        for issue in landing_readme_frontmatter_issues:
             print(f" - {issue}")
         return 1
 

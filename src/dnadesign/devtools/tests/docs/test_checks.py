@@ -28,6 +28,7 @@ from dnadesign.devtools.docs.checks import (
     _find_deprecated_docs_entrypoint_issues,
     _find_docs_root_heading_style_issues,
     _find_entrypoint_local_path_literal_issues,
+    _find_landing_readme_frontmatter_issues,
     _find_legacy_contract_surface_doc_issues,
     _find_operational_runbook_path_issues,
     _find_ops_deprecated_semantics_issues,
@@ -551,7 +552,11 @@ def test_tool_readme_structure_check_accepts_banner_narrative_and_docs_link(tmp_
     assert issues == []
 
 
-def test_tool_readme_structure_check_accepts_frontmatter_before_banner(tmp_path: Path) -> None:
+def test_landing_readme_frontmatter_check_rejects_root_and_tool_metadata_blocks(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "README.md",
+        "---\ndoc_id: repository\n---\n\n![dnadesign banner](assets/banner.svg)\n",
+    )
     _write(
         tmp_path / "src" / "dnadesign" / "alpha" / "README.md",
         "\n".join(
@@ -573,13 +578,11 @@ def test_tool_readme_structure_check_accepts_frontmatter_before_banner(tmp_path:
             ]
         ),
     )
-    _write(
-        tmp_path / "src" / "dnadesign" / "alpha" / "assets" / "alpha-banner.svg",
-        VALID_TOOL_BANNER_SVG,
-    )
-    _write(tmp_path / "src" / "dnadesign" / "alpha" / "docs" / "README.md", "# Alpha docs\n")
+    issues = _find_landing_readme_frontmatter_issues(tmp_path)
 
-    assert _find_tool_readme_structure_issues(tmp_path) == []
+    assert len(issues) == 2
+    assert any(str(tmp_path / "README.md") in issue for issue in issues)
+    assert any(str(tmp_path / "src" / "dnadesign" / "alpha" / "README.md") in issue for issue in issues)
 
 
 def test_tool_readme_structure_check_rejects_multi_paragraph_intro(tmp_path: Path) -> None:

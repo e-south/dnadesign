@@ -200,7 +200,7 @@ BANNERS = (
         "src/dnadesign/junction/assets/junction-banner.svg",
         "src/dnadesign/junction/README.md",
         "junction",
-        "TARGETS / OLIGOS / CHECKS",
+        "THREE-WAY-JUNCTION OLIGO DESIGN",
         "Compile exact DNA targets into checked three-way-junction oligo plans.",
         "junction",
     ),
