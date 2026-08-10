@@ -5,7 +5,7 @@ type: explanation
 audience: readers new to three-way-junction DNA assembly
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-08-10
 ---
 
 # How `junction` works
@@ -181,9 +181,10 @@ choose or execute either reaction protocol.
 - No post-Type-IIS payload model or combinatorial/degenerate library compiler
   exists. Concrete library members may be submitted as exact targets, subject
   to the normal limits.
-- No vendor-pool allocation, fragment-annealing map, or reaction recipe is
-  generated. `assembly_group_id` is a search boundary, not a physical
-  processing plan.
+- No vendor-pool allocation or reaction recipe is generated.
+  `assembly_group_id` is a search boundary, not a physical processing plan.
+  Optional BaseRender views show expected sequence geometry, not a laboratory
+  workflow or observed molecular state.
 - Search receipts retain selected results and aggregate scores, not every
   rejected candidate or rejection reason.
 - Long searches expose bounded resource estimates but no live progress or

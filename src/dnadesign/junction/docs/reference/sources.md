@@ -85,7 +85,9 @@ specify either complete preparation route or generate a reaction protocol.
   synthesize, anneal, ligate, amplify, clone, or function experimentally.
 
 Optional BaseRender images are original QA views derived from the neutral
-review record. They do not reproduce paper figures or add experimental
+review record. They follow the papers' conceptual order—separate oligos,
+three-way association, and recovered duplex—while using a different layout for
+software review. They do not reproduce paper figures or add experimental
 evidence.
 
 Before laboratory or commercial use, review the primary papers, their

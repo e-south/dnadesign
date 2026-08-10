@@ -3,7 +3,7 @@ doc_id: baserender-reference
 title: BaseRender reference
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-08-10
 ---
 
 # BaseRender reference
@@ -156,8 +156,8 @@ Renderer families:
   - draws exact selected fragment strands, junction spans, and declared Watson–Crick edges
   - requires explicit `fragment_ids` when a target has more than 18 fragments
 - `junction_three_way_assembly`
-  - draws either a target-scale interface overview or one to eight explicitly selected nucleotide-level three-way junctions
-  - accepts at most 256 fragments in the target overview
+  - draws either the separate-oligo-to-recovered-duplex process or one to eight explicitly selected nucleotide-level three-way junctions
+  - accepts at most 64 fragments and a 1,024 bp expected recovered duplex in the process view
   - rejects a selected detail above 512 base glyphs before figure allocation
   - reports thermodynamic screening as `not_run`; it does not infer folding or experimental outcomes
 

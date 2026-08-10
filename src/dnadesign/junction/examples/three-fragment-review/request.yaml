@@ -17,7 +17,7 @@ planning:
   barcode_subset_iterations: 100
   matching_iterations: 100
 
-  # Junction's explicit string-screening policy, separate from the paper's
+  # junction's explicit string-screening policy, separate from the paper's
   # experimental validation.
   barcode_toehold_k: 5
   barcode_pair_k: 9
@@ -34,7 +34,7 @@ targets:
     sequence: TCATTCTAGGCTAGCTGAGTGCGCTATAAGCGTAGAACTACTACATCACATCCGCTACGCTCTCACCGTAGAGGGACTAGGGTCTATCAGATGATGCTTAGCGGAATAAGGTACAGGTATAATCCGAAACGCTTTGAATTTTGGGGACGCCTGATTAACGTAGTCTGATGAACGCCTCTAGCTCACCTTGGATTGACAGG
 
     recovery_primers:
-      # Junction validates caller-supplied primers; it does not design them.
+      # junction validates caller-supplied primers; it does not design them.
       mode: target_specific
       forward:
         binding_sequence: TCATTCTAGGCTAGCTGAGT
