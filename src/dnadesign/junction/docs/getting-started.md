@@ -5,7 +5,7 @@ type: tutorial
 audience: first-time users
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-08-10
 ---
 
 # Getting started
@@ -33,11 +33,10 @@ The checked-in request explains each field in YAML comments:
 cp src/dnadesign/junction/examples/gene-scale/request.yaml request.yaml
 ```
 
-The target is an exact uppercase 5′→3′ `ACGT` string. The caller supplies the
-terminal primer strings, including an explicit empty `five_prime_extension`.
-`junction` checks those strings against the target but does not design the
-primers or predict PCR behavior. The order labels are copied into the output;
-the tool does not choose a supplier or submit an order.
+The target is an exact uppercase 5′→3′ `ACGT` string. Recovery primers are
+inputs: `junction` checks their terminal matches and preserves each optional
+`five_prime_extension`. Primer design and PCR assessment happen upstream. The
+order labels are copied into vendor-neutral output rows.
 
 For this exact request, the deterministic plan contains 13 fragment pairs and
 12 three-way junctions. Its 26 fragment orders range from 46 to 106 nt and are
@@ -102,8 +101,7 @@ sequences, search receipts, and check states in the bundle rather than
 inferring them from a plot.
 
 A successful verification establishes deterministic string construction and
-file integrity within the documented software checks. It does not establish
-thermodynamic folding, synthesis quality, phosphorylation, ligation, PCR,
-cloning, or experimental success. Continue with [How `junction`
+bundle integrity. Thermodynamic, synthesis, and laboratory review are separate
+acceptance steps. Continue with [How `junction`
 works](explanation/how-junction-works.md), then [prepare a real
 request](guides/prepare-a-request.md).

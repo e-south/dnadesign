@@ -8,16 +8,14 @@ last_verified: 2026-08-10
 
 # `junction` documentation
 
-Start with a complete request: exact linear DNA targets, which targets must be
-designed together, recovery primers, bounded search settings, and order labels.
-`junction` does not infer these choices from a bare sequence.
+Start with a complete request containing exact linear DNA targets, their
+assembly groups, recovery primers, bounded search settings, and order labels.
 
 [![Base-level three-way-junction detail](assets/junction-detail.svg)](assets/junction-detail.svg)
 
-Review images are separate and opt in. Exact fragment annealing, the planned
-assembly process, and selected junction details all read the same verified
-review record. They do not predict whether the design will work in the
-laboratory.
+Review images are opt in. Exact fragment annealing, the planned assembly
+process, and selected junction details all read the same verified review
+record and show expected sequence geometry.
 
 ## Learn
 

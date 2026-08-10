@@ -10,8 +10,7 @@ last_verified: 2026-08-10
 
 # Inspect and verify a bundle
 
-A bundle is a reproducible software record, not a laboratory acceptance
-packet. Review the evidence in this order.
+A bundle is a reproducible design record. Review its evidence in this order.
 
 ## Find the answer in the right file
 
@@ -73,14 +72,12 @@ Follow the [BaseRender integration](../../../baserender/docs/integrations/juncti
 Use a new BaseRender output directory beside the source bundle; never add
 images inside the verified source bundle.
 
-Use the fragment view to check exact strand annealing, the process view to trace
-separate oligos through the modeled three-way state to the expected recovered
-duplex, and the detail view to inspect selected `t/t*`, `b/b*`, nick, and
-strand-end geometry. Light gray guides mark declared Watson–Crick pairs. Large
-requests require an explicit, bounded selection before detailed figures are
-allocated. Search receipts, primers, order rows, and software checks remain in
-their JSON or TSV artifacts. A plot adds no thermodynamic or experimental
-evidence and is not part of the `junction` plan identity.
+Use the fragment view to check annealing, the process view to trace oligos into
+the expected recovered duplex, and the detail view to inspect selected
+`t/t*`, `b/b*`, nick, and strand-end geometry. Light gray guides mark declared
+Watson–Crick pairs. Large requests require an explicit bounded selection before
+detailed figures are allocated. Search receipts, primers, order rows, and
+software checks remain in their JSON or TSV artifacts.
 
 ### Expected fragment annealing
 
@@ -97,32 +94,29 @@ row.
 
 [![Separate oligos, the modeled three-way state, and the expected recovered duplex](../assets/assembly-process.svg)](../assets/assembly-process.svg)
 
-This view keeps the two physical strands separate at every stage. It shows
-unannealed fragment oligos, the sequence-derived pre-ligation state with one
-stable ID per junction, and the exact primer-extended duplex expected after
-recovery. The recovered duplex is drawn at nucleotide resolution in 100 bp
-windows. Slashes mark continued sequence, not molecular ends. The view models
-the intended sequence states; it does not show that annealing, ligation, or PCR
-occurred.
+This view keeps each physical oligo separate before ligation. It shows the
+unannealed strands, the pre-ligation junctions with stable IDs, and the exact
+primer-extended duplex expected after recovery. The recovered duplex is drawn
+at nucleotide resolution in 100 bp windows. Slashes mark continued sequence,
+not molecular ends.
 
 ### Selected junction details
 
 [![Base-level details for two selected three-way junctions](../assets/junction-detail.svg)](../assets/junction-detail.svg)
 
-This is the decisive geometry check. Each selected interface has a horizontal
+This is the most detailed geometry check. Each selected interface has a horizontal
 target helix, a perpendicular antiparallel barcode helix, barcode-arm 3′/5′
 polarity, break marks on cropped target flanks, the complement-strand nick,
-and source-derived Watson–Crick edges. The view is a deterministic sequence
-schematic, not a folding simulation.
+and sequence-derived Watson–Crick edges.
 
 For a request with several targets, BaseRender writes one independently named
 figure per target. It does not compress a one-pot pool into a single molecular
 canvas. That keeps target identity, junction IDs, coordinates, and exact bases
 reviewable while the shared assembly-group evidence remains in `plan.json`.
 
-## Review before any order or experiment
+## Complete downstream review
 
-The owning project must still review synthesis feasibility, secondary
-structure, crosstalk, phosphorylation, ligation conditions, primer behavior,
-downstream cloning, safety, purchasing, and experimental controls. A verified
-bundle only establishes the software contract described above.
+Before ordering or experimental work, review synthesis feasibility, secondary
+structure, crosstalk, end preparation, reaction conditions, primer behavior,
+downstream cloning, purchasing, and experimental controls in their owning
+workflows.

@@ -10,8 +10,8 @@ last_verified: 2026-08-10
 
 # How `junction` works
 
-`junction` is a sequence planner. It turns a fully specified request into the
-oligo sequences and evidence needed for review. It does not assemble DNA.
+`junction` is a sequence planner. It turns a complete request into oligo
+sequences, exact reconstruction evidence, and a reproducible review bundle.
 
 ## The physical idea
 
@@ -46,8 +46,8 @@ reconstructed complement         rc(D1) · rc(t1) · rc(D0)
 
 `D0` and `D1` are target domains, `t1` is the target-derived toehold, `b1`
 is the temporary external barcode, and `rc(...)` means reverse complement.
-The software checks these strings. It does not claim that the physical
-association, ligation, displacement, or amplification occurred.
+These checks establish the sequence composition. Physical outcomes require
+separate experimental evidence.
 
 ## From a request to order rows
 
@@ -105,8 +105,8 @@ to an assembly group can change the group's selected toeholds and barcodes.
 | barcode oligo | barcode-bearing strand | Neutral name for coding and non-coding targets. |
 | coding oligo | complement strand | Neutral name; it does not imply gene coding sequence. |
 | Sidewinder barcode or helix | barcode and its complement | Temporary external assembly code. |
-| 3WJ assembly | no claimed physical output | `junction` records sequence layout but does not perform or validate the reaction. |
-| restored 2WJ | expected submitted target and complement strings | A software expectation, not an observed PCR product. |
+| 3WJ assembly | modeled pre-ligation junctions | Expected strand layout before the recorded nick is ligated. |
+| restored 2WJ | expected recovered duplex | Exact primer-extended target and complement strings. |
 | construct-specific PCR | `target_specific` recovery | The spelling is generic; the caller still supplies the primers. |
 | universal PCR | `universal` recovery | Method v1 only checks one shared exact primer pair for the group. |
 
@@ -147,14 +147,12 @@ The current planner accepts a broader software geometry, uses deterministic
 string objectives, adds fixed GC and homopolymer filters, and fails instead of
 relaxing declared substring constraints. It also selects toeholds jointly
 across an assembly group, whereas the pooled paper describes selecting
-toeholds target by target before global barcode design and matching. This is a
-method difference, not a claim of superiority or PyWinder equivalence.
+toeholds target by target before global barcode design and matching.
 
-The `universal` recovery mode is intentionally narrow. It requires one exact
-caller-supplied primer pair across an assembly group and consolidates the order
-rows. It does not design the pooled paper's shared priming regions, variable
-buffers for length equalization, internal Type IIS sites, payload spans,
-cleavage products, or downstream hierarchical assembly.
+The `universal` recovery mode requires one exact caller-supplied primer pair
+across an assembly group and consolidates the shared order rows. Shared priming
+regions, length-equalizing buffers, internal Type IIS sites, and later
+hierarchical assembly must already be designed upstream.
 
 Universal recovery also has a source-observed risk that the request mode does
 not evaluate. The preprint notes that PCR can favor shorter products, so a
@@ -168,29 +166,23 @@ prediction for a `junction` plan.
 Laboratory preparation also differs between the two sources. The Nature paper
 phosphorylates coding oligos before annealing fragment pairs; the pooled
 preprint phosphorylates and anneals the pooled oligos together. `junction`
-only records the caller's complement-end preparation declaration. It does not
-choose or execute either reaction protocol.
+records the caller's complement-end preparation choice without selecting a
+complete reaction protocol.
 
-## Known gaps
+## Current boundaries
 
-- No bare-sequence or FASTA onboarding command exists; callers prepare the
-  complete request themselves.
-- No thermodynamic validation or PyWinder output-equivalence study exists.
-- No automatic primer design, primer-temperature analysis, or broad off-target
-  search exists.
-- No post-Type-IIS payload model or combinatorial/degenerate library compiler
-  exists. Concrete library members may be submitted as exact targets, subject
-  to the normal limits.
-- No vendor-pool allocation or reaction recipe is generated.
-  `assembly_group_id` is a search boundary, not a physical processing plan.
-  Optional BaseRender views show expected sequence geometry, not a laboratory
-  workflow or observed molecular state.
-- Search receipts retain selected results and aggregate scores, not every
-  rejected candidate or rejection reason.
-- Long searches expose bounded resource estimates but no live progress or
-  timing telemetry.
-- No `junction`-generated oligo set has inherited experimental validation from
-  the cited papers.
+- Requests are complete JSON or YAML documents; bare-sequence and FASTA
+  onboarding are not yet available.
+- Primer choice, melting-temperature analysis, broader off-target search, and
+  thermodynamic screening remain upstream review steps.
+- Post-Type-IIS payload modeling and degenerate-library compilation are outside
+  method v1. Concrete library members can be submitted as exact targets.
+- `assembly_group_id` controls joint sequence search. It is not a vendor-pool
+  allocation or reaction recipe.
+- Search receipts retain selected results and aggregate scores rather than a
+  full rejected-candidate trace or live progress stream.
+- Comparative software validation and laboratory validation of
+  `junction`-generated designs remain future evidence work.
 
 For formulas and exact algorithm choices, read [Method
 v1](../reference/method-v1.md). For source status and claim boundaries, read

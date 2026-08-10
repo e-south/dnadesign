@@ -10,8 +10,7 @@ last_verified: 2026-08-10
 
 # Prepare a request
 
-`junction` does not infer a complete design from a sequence alone. Before
-planning, supply five things:
+A complete request supplies five things:
 
 1. the v2 request-schema identifier and one deterministic seed;
 2. a planning profile;
@@ -97,19 +96,17 @@ The forward binding string must match the target prefix. The reverse binding
 string must match the reverse complement of the target suffix. The order row
 is `five_prime_extension + binding_sequence`.
 
-The request requires one recovery mode per assembly group:
+Choose one recovery mode per assembly group:
 
-- `target_specific` rejects a binding pair that also exactly resolves another
-  declared target in the same group.
-- `universal` requires one identical forward/reverse pair, including
-  extensions, across the group and emits that pair once with all consuming
-  target IDs.
+| Mode | Use it when | Contract |
+| --- | --- | --- |
+| `target_specific` | Each target is recovered with its own terminal pair. The papers call this construct-specific recovery. | A pair must not also resolve another declared target in the group. |
+| `universal` | Every target already carries the same terminal binding regions. | The complete pair, including extensions, must match across the group and is emitted once for all consuming target IDs. |
 
-This one-mode rule is a software restriction, not a physical claim that an
-assembled mixture cannot be divided for different recovery strategies.
-`junction` does not design primers, compute melting temperatures, search the
-broader genome, predict PCR, or implement the pooled paper's buffer-equalized
-universal/Type-IIS workflow.
+An assembled mixture may still be split for different downstream operations;
+the one-mode rule keeps one request unambiguous. Primer selection,
+melting-temperature analysis, broader off-target search, and the pooled
+paper's buffer-equalized universal/Type-IIS design remain upstream tasks.
 
 ## Declare the planning profile
 
@@ -194,9 +191,9 @@ reviewed intersection. The planner rejects a candidate path that would emit a
 fragment below the minimum, and it rejects any fragment or recovery primer
 above the maximum before publication.
 
-An arbitrary 5′ primer extension may contain a caller-supplied adapter or Type
-IIS sequence. `junction` does not identify enzymes, design spacers, model
-cleavage, validate overhangs, or plan later cloning.
+A 5′ primer extension may carry a caller-supplied adapter or Type IIS sequence.
+`junction` preserves that sequence exactly; enzyme choice, spacers, cleavage,
+overhangs, and later cloning remain part of the upstream design.
 
 ## Check without publishing
 
