@@ -16,7 +16,8 @@ from typing import Any
 from dnadesign.junction.contracts.identity import canonical_json_bytes
 from dnadesign.junction.contracts.plan import JunctionPlan
 from dnadesign.junction.contracts.request import JunctionRequest, canonical_request_bytes
-from dnadesign.junction.presentation import render_review_contracts, render_sequence_dissimilarity_contracts
+from dnadesign.junction.presentation.review_contract import render_review_contracts
+from dnadesign.junction.presentation.sequence_review.projection import render_sequence_dissimilarity_contracts
 from dnadesign.junction.publication.fasta import (
     render_expected_products_fasta,
     render_orders_fasta,

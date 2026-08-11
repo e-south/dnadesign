@@ -24,11 +24,13 @@ from dnadesign.junction.design.planner import design_junction
 from dnadesign.junction.errors import JunctionConfigError
 from dnadesign.junction.presentation.sequence_review import (
     JunctionSequenceDissimilarityV1,
-    plot_sequence_dissimilarity,
-    render_sequence_dissimilarity_svg,
     sequence_dissimilarity_contracts,
 )
 from dnadesign.junction.presentation.sequence_review import plot as plot_module
+from dnadesign.junction.presentation.sequence_review.plot import (
+    plot_sequence_dissimilarity,
+    render_sequence_dissimilarity_svg,
+)
 from dnadesign.junction.sequence import (
     levenshtein_distance,
     longest_common_substring_length,

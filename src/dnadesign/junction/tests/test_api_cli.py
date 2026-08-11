@@ -42,7 +42,20 @@ def test_public_facade_is_lazy() -> None:
     code = (
         "import sys; import dnadesign.junction; "
         "assert 'typer' not in sys.modules; "
-        "assert 'dnadesign.artifacts' not in sys.modules"
+        "assert 'dnadesign.artifacts' not in sys.modules; "
+        "assert 'matplotlib' not in sys.modules"
+    )
+
+    completed = subprocess.run([sys.executable, "-c", code], check=False, capture_output=True, text=True)
+
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_core_api_and_cli_imports_do_not_load_plotting_stack() -> None:
+    code = (
+        "import sys; import dnadesign.junction.api; import dnadesign.junction.cli; "
+        "assert 'matplotlib' not in sys.modules; "
+        "assert 'matplotlib.pyplot' not in sys.modules"
     )
 
     completed = subprocess.run([sys.executable, "-c", code], check=False, capture_output=True, text=True)
