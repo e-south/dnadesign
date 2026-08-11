@@ -18,6 +18,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import pytest
 import yaml
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 from dnadesign.junction.contracts import parse_request
 from dnadesign.junction.design.planner import design_junction
@@ -117,6 +118,97 @@ def test_large_group_requires_an_explicit_bounded_subset(monkeypatch: pytest.Mon
     try:
         assert len(figure.axes[0].get_xticklabels()) == 12
         assert "12 of 25 junctions" in figure.texts[1].get_text()
+    finally:
+        plt.close(figure)
+
+
+@pytest.mark.parametrize("identifier_length", [128, 256])
+def test_multi_target_matrix_labels_fit_once_without_repeating_between_panels(
+    identifier_length: int,
+) -> None:
+    payload = _review(junction_count=24).model_dump(mode="json")
+    for index, junction in enumerate(payload["junctions"]):
+        group = index // 6 + 1
+        target_id = f"candidate-{'x' * (identifier_length - 13)}-{group:02d}"
+        junction["target_id"] = target_id
+        junction["junction_id"] = f"{target_id}:junction-{index % 6 + 1:04d}"
+    review = JunctionSequenceDissimilarityV1.model_validate(payload)
+    assert all(len(junction.target_id) == identifier_length for junction in review.junctions)
+
+    figure = plot_sequence_dissimilarity(review)
+    try:
+        matrix_axes = [axis for axis in figure.axes if axis.get_gid()]
+        canvas = FigureCanvasAgg(figure)
+        canvas.draw()
+        renderer = canvas.get_renderer()
+        visible_row_labels = [label for label in matrix_axes[0].get_yticklabels() if label.get_text()]
+        assert all(label.get_window_extent(renderer).x0 >= figure.bbox.x0 for label in visible_row_labels)
+        assert all(label.get_text() for label in matrix_axes[0].get_yticklabels())
+        assert all("~" in label.get_text() for label in visible_row_labels)
+        assert len({label.get_text() for label in visible_row_labels}) == len(visible_row_labels)
+        assert all(label.get_text() == "" for axis in matrix_axes[1:] for label in axis.get_yticklabels())
+    finally:
+        plt.close(figure)
+
+
+def test_compacted_target_labels_remain_unique_if_hash_suffixes_collide(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _CollisionDigest:
+        @staticmethod
+        def hexdigest() -> str:
+            return "0" * 64
+
+    monkeypatch.setattr(plot_module.hashlib, "sha256", lambda _value: _CollisionDigest())
+    payload = _review(junction_count=4).model_dump(mode="json")
+    for index, junction in enumerate(payload["junctions"]):
+        target_id = f"{'shared-long-target-prefix-' * 4}{index // 2 + 1:02d}"
+        junction["target_id"] = target_id
+        junction["junction_id"] = f"{target_id}:junction-{index % 2 + 1:04d}"
+    review = JunctionSequenceDissimilarityV1.model_validate(payload)
+
+    figure = plot_sequence_dissimilarity(review)
+    try:
+        labels = [label.get_text() for label in figure.axes[0].get_yticklabels()]
+        assert len(set(labels)) == len(labels) == 4
+    finally:
+        plt.close(figure)
+
+
+def test_display_labels_remain_unique_after_identifier_sanitization() -> None:
+    payload = _review(junction_count=3).model_dump(mode="json")
+    identifiers = (
+        ("target-a", "target-a:a b"),
+        ("target-a", "target-a:a?b"),
+        ("target-b", "target-b:a b"),
+    )
+    for junction, (target_id, junction_id) in zip(payload["junctions"], identifiers, strict=True):
+        junction["target_id"] = target_id
+        junction["junction_id"] = junction_id
+    review = JunctionSequenceDissimilarityV1.model_validate(payload)
+
+    figure = plot_sequence_dissimilarity(review)
+    try:
+        labels = [label.get_text() for label in figure.axes[0].get_yticklabels()]
+        assert len(set(labels)) == len(labels) == 3
+    finally:
+        plt.close(figure)
+
+
+def test_wide_compacted_labels_fit_at_the_larger_tick_size() -> None:
+    payload = _review(junction_count=12).model_dump(mode="json")
+    for index, junction in enumerate(payload["junctions"]):
+        junction["junction_id"] = f"target-a:{'W' * 256}{index:02d}"
+    review = JunctionSequenceDissimilarityV1.model_validate(payload)
+
+    figure = plot_sequence_dissimilarity(review)
+    try:
+        canvas = FigureCanvasAgg(figure)
+        canvas.draw()
+        renderer = canvas.get_renderer()
+        labels = [label for label in figure.axes[0].get_yticklabels() if label.get_text()]
+        assert all(label.get_window_extent(renderer).x0 >= figure.bbox.x0 for label in labels)
+        assert len({label.get_text() for label in labels}) == len(labels) == 12
     finally:
         plt.close(figure)
 
