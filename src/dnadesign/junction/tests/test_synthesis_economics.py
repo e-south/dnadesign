@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 import pytest
 
 from dnadesign.junction.economics import (
+    PurchasePriceRow,
     SynthesisScenario,
     build_purchase_price_rows,
     load_pricing_snapshot,
@@ -86,6 +87,25 @@ def test_price_rows_start_at_the_first_complete_priced_pool() -> None:
 
     assert rows[0].target_count == 2
     assert rows[0].oligo_count == 2
+
+
+def test_always_cheaper_pool_advantage_starts_at_first_priced_target() -> None:
+    rows = (
+        PurchasePriceRow(
+            target_count=2,
+            gene_fragments_usd=Decimal("400"),
+            oligo_pool_usd=Decimal("320"),
+            oligo_count=2,
+        ),
+        PurchasePriceRow(
+            target_count=3,
+            gene_fragments_usd=Decimal("600"),
+            oligo_pool_usd=Decimal("320"),
+            oligo_count=3,
+        ),
+    )
+
+    assert stable_oligo_pool_advantage(rows) == 2
 
 
 def test_snapshot_rejects_duplicate_length_band_ids_and_non_usd_currency() -> None:

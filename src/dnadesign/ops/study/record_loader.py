@@ -152,8 +152,13 @@ def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
             + ", ".join(sorted(forbidden))
             + f": {contract_path}"
         )
-    scope_groups = _validated_scope_groups(scope_payloads, contract_path=contract_path)
-    known_preflight_groups = _declared_check_groups(checks_payload)
+    declared_preflight_groups = _declared_check_groups(checks_payload)
+    scope_groups = _validated_scope_groups(
+        scope_payloads,
+        declared_groups=declared_preflight_groups,
+        contract_path=contract_path,
+    )
+    known_preflight_groups = set(declared_preflight_groups)
     unknown_scope_groups = sorted(
         group for groups in scope_groups.values() for group in groups if group not in known_preflight_groups
     )
@@ -495,6 +500,7 @@ def _validated_preflight_scopes(
 def _validated_scope_groups(
     scopes: Mapping[str, Mapping[str, object]],
     *,
+    declared_groups: tuple[str, ...],
     contract_path: Path,
 ) -> dict[str, tuple[str, ...]]:
     required_scopes = STUDY_PREFLIGHT_SCOPES.difference(scopes)
@@ -518,6 +524,7 @@ def _validated_scope_groups(
         if scope == "full":
             if groups != ("all",):
                 raise ValueError(f"ops.study.yaml preflight.scopes.full.include_groups must be [all]: {contract_path}")
+            result[scope] = declared_groups
             continue
         if "all" in groups:
             raise ValueError(
@@ -527,17 +534,19 @@ def _validated_scope_groups(
     return result
 
 
-def _declared_check_groups(checks_payload: Mapping[object, object]) -> set[str]:
-    groups: set[str] = set()
+def _declared_check_groups(checks_payload: Mapping[object, object]) -> tuple[str, ...]:
+    groups: list[str] = []
+    seen: set[str] = set()
     for raw_specs in checks_payload.values():
         if not isinstance(raw_specs, list):
             continue
         for raw_spec in raw_specs:
             if isinstance(raw_spec, dict):
                 group = str(raw_spec.get("check_group") or "").strip()
-                if group:
-                    groups.add(group)
-    return groups
+                if group and group not in seen:
+                    seen.add(group)
+                    groups.append(group)
+    return tuple(groups)
 
 
 def _validated_preflight_checks(
