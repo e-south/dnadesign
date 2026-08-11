@@ -77,16 +77,18 @@ def test_plot_uses_the_exact_junction_string_metrics() -> None:
             "junction-sequence-dissimilarity:combined",
         }
         first, second = review.junctions[:2]
-        assert float(axes["junction-sequence-dissimilarity:toeholds"].images[0].get_array()[0, 1]) == pytest.approx(
+        assert float(
+            axes["junction-sequence-dissimilarity:toeholds"].collections[0].get_array()[0, 1]
+        ) == pytest.approx(
             position_weighted_levenshtein(
                 first.toehold_sequence_5to3,
                 second.toehold_sequence_5to3,
             )
         )
-        assert int(axes["junction-sequence-dissimilarity:barcodes"].images[0].get_array()[0, 1]) == (
+        assert int(axes["junction-sequence-dissimilarity:barcodes"].collections[0].get_array()[0, 1]) == (
             levenshtein_distance(first.barcode_sequence_5to3, second.barcode_sequence_5to3)
         )
-        assert int(axes["junction-sequence-dissimilarity:combined"].images[0].get_array()[0, 1]) == (
+        assert int(axes["junction-sequence-dissimilarity:combined"].collections[0].get_array()[0, 1]) == (
             longest_common_substring_length(
                 first.toehold_sequence_5to3 + first.barcode_sequence_5to3,
                 second.toehold_sequence_5to3 + second.barcode_sequence_5to3,
@@ -166,3 +168,4 @@ def test_checked_in_sequence_comparison_matches_the_demo_request() -> None:
     second = render_sequence_dissimilarity_svg(review)
 
     assert first == second == asset_path.read_bytes()
+    assert b"data:image/png" not in first
