@@ -2,10 +2,10 @@ version: 4
 contract:
   kind: three_way_junction_review_render_v1
 bundle:
-  path: .tmp/annealed-fragments
+  path: reviews/annealed-fragments
 input:
   kind: json
-  path: .tmp/design-bundle/views/three_way_junction_review.v1.json
+  path: design-bundle/views/three_way_junction_review.v1.json
   adapter:
     kind: three_way_junction_review_v1
   alphabet: DNA

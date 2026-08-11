@@ -43,7 +43,7 @@ def draw_assembly_process(axis, review: ThreeWayJunctionReviewV1, *, layout: Ass
     title = axis.text(
         0.5,
         layout.title_y,
-        f"The plan traces {target_id} from target sequence to the expected PCR duplex",
+        f"Oligo plan for {target_id}",
         fontsize=20.0,
         fontweight="semibold",
         color=INK,

@@ -229,7 +229,7 @@ def test_assembly_view_shows_orders_three_way_state_and_exact_pcr_duplex() -> No
         axis = figure.axes[0]
         assert axis.get_gid() == "junction-three-way-assembly:assembly"
         text = "\n".join(item.get_text() for item in axis.texts)
-        assert "from target sequence to the expected PCR duplex" in text
+        assert "Oligo plan for target-0000" in text
         assert "Input target sequence" in text
         assert "The oligos remain separate before annealing" not in text
         assert "Fragment oligos encode the target" in text

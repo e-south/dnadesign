@@ -160,7 +160,7 @@ def test_contract_rejects_thermodynamic_overclaim_and_duplicate_barcodes() -> No
 
 def test_checked_in_sequence_comparison_matches_the_demo_request() -> None:
     package_root = Path(__file__).resolve().parents[1]
-    request_path = package_root / "examples" / "three-fragment-review" / "request.yaml"
+    request_path = package_root / "examples" / "gene-scale" / "request.yaml"
     asset_path = package_root / "docs" / "assets" / "sequence-dissimilarity.svg"
     plan = design_junction(parse_request(yaml.safe_load(request_path.read_text(encoding="utf-8"))))
     [review] = sequence_dissimilarity_contracts(plan)

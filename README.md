@@ -1,4 +1,4 @@
-# ![dnadesign sequence toolkit](assets/dnadesign-banner.svg)
+![dnadesign sequence toolkit](assets/dnadesign-banner.svg)
 
 [![CI](https://github.com/e-south/dnadesign/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/e-south/dnadesign/actions/workflows/ci.yaml)
 [![Codecov](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg)](https://codecov.io/gh/e-south/dnadesign)
