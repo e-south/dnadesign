@@ -1,4 +1,13 @@
-"""Discover parseable promoter sources from an explicit data repository root."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/src/ingest/promoter_filesystem.py
+
+Discover parseable promoter sources from an explicit data repository root.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
