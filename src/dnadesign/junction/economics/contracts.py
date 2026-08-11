@@ -72,6 +72,8 @@ class PricingSnapshot:
     def __post_init__(self) -> None:
         if any(not value.strip() for value in (self.supplier, self.price_context, self.currency, self.source_url)):
             raise ValueError("pricing snapshot identity fields must not be empty")
+        if self.currency != "USD":
+            raise ValueError("pricing snapshot must use USD because price fields are USD-denominated")
         if self.n_nucleotide_surcharge_fraction < 0:
             raise ValueError("N-nucleotide surcharge must be non-negative")
         if not self.gene_fragment_bands or not self.oligo_length_bands or not self.oligo_pool_tiers:
@@ -79,13 +81,20 @@ class PricingSnapshot:
         _require_non_overlapping_bands(self.gene_fragment_bands, label="gene-fragment")
         _require_non_overlapping_bands(self.oligo_length_bands, label="oligo")
         expected_minimum = self.oligo_pool_tiers[0].minimum_oligos
-        band_ids = {band.band_id for band in self.oligo_length_bands}
+        declared_band_ids = [band.band_id for band in self.oligo_length_bands]
+        band_ids = set(declared_band_ids)
+        if len(band_ids) != len(declared_band_ids):
+            raise ValueError("oligo length-band ids must be unique")
         for tier in self.oligo_pool_tiers:
             if tier.minimum_oligos != expected_minimum:
                 raise ValueError("oligo-pool tiers must be contiguous")
             if set(tier.prices_usd) != band_ids:
                 raise ValueError("every oligo-pool tier must price every declared length band")
             expected_minimum = tier.maximum_oligos + 1
+
+    @property
+    def minimum_oligos_per_pool(self) -> int:
+        return self.oligo_pool_tiers[0].minimum_oligos
 
     @property
     def maximum_oligos_per_pool(self) -> int:

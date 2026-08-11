@@ -6,10 +6,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.ticker import FuncFormatter  # noqa: E402
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.figure import Figure
+from matplotlib.ticker import FuncFormatter
 
 from .contracts import PricingSnapshot, SynthesisScenario
 from .model import build_purchase_price_rows
@@ -60,7 +59,9 @@ def render_purchase_price_comparison(
             "svg.hashsalt": "junction-purchase-price-comparison-v1",
         }
     ):
-        figure, axis = plt.subplots(figsize=(7.2, 7.2))
+        figure = Figure(figsize=(7.2, 7.2))
+        FigureCanvasAgg(figure)
+        axis = figure.subplots()
         figure.subplots_adjust(left=0.16, right=0.96, top=0.90, bottom=0.14)
         axis.set_box_aspect(1)
         axis.plot(target_counts, gene_prices, color=_GENE_COLOR, linewidth=2.7, label="Gene fragments")
@@ -100,7 +101,7 @@ def render_purchase_price_comparison(
         figure.savefig(svg_path, format="svg", metadata=metadata)
         _normalize_svg_whitespace(svg_path)
         figure.savefig(png_path, format="png", metadata={"Software": "dnadesign junction"})
-        plt.close(figure)
+        figure.clear()
     return RenderedPurchasePriceComparison(svg_path=svg_path, png_path=png_path)
 
 
