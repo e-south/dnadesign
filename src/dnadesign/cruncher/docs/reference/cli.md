@@ -1446,7 +1446,7 @@ Subcommands:
 * `sources info <source> [config]`
 * `sources datasets <source> [config]` — list HT datasets (if supported)
 * `sources promoters <source> [config]` — inspect promoter coverage without writing an export
-* `sources materialize-promoters <destination> [--data-root <root>]` — write a new provenance-qualified promoter export from declared source files
+* `sources materialize-promoters <destination> [--data-root <root>]` — write a provenance-qualified promoter export from declared source files
 * `sources summary [config]` — summarize cache + remote inventory (supports JSON output, combined view)
 
 Example:
@@ -1469,7 +1469,8 @@ Note:
 
 * `sources list` attempts full config resolution (workspace/CWD). If none is found, it lists built-in sources only.
   Pass CONFIG (or set `CRUNCHER_CONFIG`/`CRUNCHER_WORKSPACE`) to include local sources from a workspace config.
-* `sources materialize-promoters` requires a new destination directory and publishes only after the complete export has been staged successfully. It never replaces an existing directory.
+* With `--data-root`, `sources materialize-promoters` reads release-pinned RegulonDB tables directly from that root. Without it, the command uses the installed `dnadesign-data` provider.
+* The command requires a new destination directory and publishes only after the complete export has been staged successfully. It never replaces an existing directory.
 * Some sources do not expose full remote inventories; use `--remote-limit` (partial counts)
   or `--scope cache` if you only need cached regulators.
 * `sources datasets --dataset-source <X>` performs a strict row-level source filter on returned datasets.
