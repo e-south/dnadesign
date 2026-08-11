@@ -47,6 +47,10 @@ from .promoter_contracts import (
     SourceProvenance,
     TranscriptionUnitRef,
 )
+from .promoter_filesystem import (
+    iter_promoter_association_source_files as iter_filesystem_promoter_association_sources,
+)
+from .promoter_filesystem import iter_promoter_source_files as iter_filesystem_promoter_sources
 from .promoter_payloads import (
     _float_or_none,
     _list_payload,
@@ -345,6 +349,9 @@ def export_dnadesign_data_promoter_superset(
     """
 
     resolved_root = _resolve_dnadesign_data_root(data_root)
+    if data_root is not None:
+        provider = provider or iter_filesystem_promoter_sources
+        association_provider = association_provider or iter_filesystem_promoter_association_sources
     sources = discover_dnadesign_data_promoter_sources(data_root=resolved_root, provider=provider)
     association_sources = discover_dnadesign_data_promoter_association_sources(
         data_root=resolved_root,
