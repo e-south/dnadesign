@@ -1,7 +1,7 @@
 ## Cruncher CLI
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-09
+**Last verified:** 2026-08-11
 
 
 **Last updated by:** cruncher-maintainers on 2026-07-13
@@ -57,7 +57,7 @@ cruncher study list
 #### Quick command map
 
 * **Cache data** → `fetch motifs` / `fetch sites`
-* **Inspect cache** → `sources ...` / `catalog ...`
+* **Inspect or materialize source data** → `sources ...` / `catalog ...`
 * **Pin TFs** → `lock`
 * **Validate motifs** → `parse`
 * **Render logos** → `catalog logos`
@@ -1445,12 +1445,15 @@ Subcommands:
 * `sources list [config]` — list registered sources (auto-detects config in CWD to include local sources; pass CONFIG when elsewhere)
 * `sources info <source> [config]`
 * `sources datasets <source> [config]` — list HT datasets (if supported)
+* `sources promoters <source> [config]` — inspect promoter coverage without writing an export
+* `sources materialize-promoters <destination> [--data-root <root>]` — write a new provenance-qualified promoter export from declared source files
 * `sources summary [config]` — summarize cache + remote inventory (supports JSON output, combined view)
 
 Example:
 
 * `cruncher sources list configs/config.yaml`
 * `cruncher sources datasets regulondb configs/config.yaml --tf lexA`
+* `cruncher sources materialize-promoters outputs/promoters --data-root <dnadesign-data-root> --format json`
 * `cruncher sources summary configs/config.yaml`
 * `cruncher sources summary --view combined configs/config.yaml`
 * `cruncher sources summary --scope remote --format json configs/config.yaml`
@@ -1466,6 +1469,7 @@ Note:
 
 * `sources list` attempts full config resolution (workspace/CWD). If none is found, it lists built-in sources only.
   Pass CONFIG (or set `CRUNCHER_CONFIG`/`CRUNCHER_WORKSPACE`) to include local sources from a workspace config.
+* `sources materialize-promoters` requires a new destination directory and publishes only after the complete export has been staged successfully. It never replaces an existing directory.
 * Some sources do not expose full remote inventories; use `--remote-limit` (partial counts)
   or `--scope cache` if you only need cached regulators.
 * `sources datasets --dataset-source <X>` performs a strict row-level source filter on returned datasets.

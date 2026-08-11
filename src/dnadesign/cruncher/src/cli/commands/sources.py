@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import tempfile
 from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
@@ -41,6 +43,7 @@ from dnadesign.cruncher.ingest.promoters import (
     PromoterQuery,
     build_promoter_descriptor_inventory,
     build_promoter_source_inventory,
+    export_dnadesign_data_promoter_superset,
     summarize_promoter_collection,
     summarize_promoter_descriptors,
 )
@@ -313,6 +316,71 @@ def promoters(
         console.print(json.dumps(payload, indent=2), markup=False)
         return
     _render_promoter_inventory(payload)
+
+
+@app.command(
+    "materialize-promoters",
+    help="Normalize declared promoter source files into a provenance-qualified export.",
+)
+def materialize_promoters(
+    destination: Path = typer.Argument(..., help="New directory for the promoter export."),
+    data_root: Path | None = typer.Option(
+        None,
+        "--data-root",
+        help="Root of the declared promoter source files; uses dnadesign-data when omitted.",
+    ),
+    require_association_sources: bool = typer.Option(
+        False,
+        "--require-association-sources",
+        help="Fail unless promoter-regulator association sources are available.",
+    ),
+    output_format: str = typer.Option("table", "--format", help="Output format: table or json."),
+) -> None:
+    """Publish one complete promoter export without leaving partial output."""
+
+    output_format = output_format.lower()
+    if output_format not in {"table", "json"}:
+        raise typer.BadParameter("--format must be one of: table, json.")
+    resolved_destination = destination.expanduser().resolve()
+    if resolved_destination.exists():
+        console.print(f"Error: Destination already exists: {resolved_destination}")
+        raise typer.Exit(code=1)
+    destination_parent = resolved_destination.parent
+    if not destination_parent.is_dir():
+        console.print(f"Error: Destination parent does not exist: {destination_parent}")
+        raise typer.Exit(code=1)
+    resolved_data_root = data_root.expanduser().resolve() if data_root is not None else None
+    if resolved_data_root is not None and not resolved_data_root.is_dir():
+        console.print(f"Error: Promoter source root does not exist: {resolved_data_root}")
+        raise typer.Exit(code=1)
+
+    staging = Path(tempfile.mkdtemp(prefix=f".{resolved_destination.name}.", dir=destination_parent))
+    try:
+        manifest = export_dnadesign_data_promoter_superset(
+            staging,
+            data_root=resolved_data_root,
+            require_association_sources=require_association_sources,
+        )
+        staging.replace(resolved_destination)
+    except (OSError, RuntimeError, ValueError) as exc:
+        shutil.rmtree(staging, ignore_errors=True)
+        console.print(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+
+    payload = {
+        "schema": "cruncher.promoter-export/v1",
+        "status": "ok",
+        "destination": str(resolved_destination),
+        "complete": manifest.complete,
+        "record_count": manifest.record_count,
+    }
+    if output_format == "json":
+        typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    console.print(
+        f"Promoter export written to {resolved_destination} "
+        f"({manifest.record_count} records; complete={manifest.complete})."
+    )
 
 
 @app.command("summary", help="Summarize local cache and remote inventories for sources.")
