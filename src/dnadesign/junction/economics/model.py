@@ -27,12 +27,13 @@ def build_purchase_price_rows(
         scenario.minimum_oligo_length_nt,
         scenario.maximum_oligo_length_nt,
     )
+    minimum_targets = (snapshot.minimum_oligos_per_pool + scenario.oligos_per_target - 1) // scenario.oligos_per_target
     maximum_targets = snapshot.maximum_oligos_per_pool // scenario.oligos_per_target
-    if maximum_targets < 1:
+    if minimum_targets > maximum_targets:
         raise ValueError("oligo-pool snapshot cannot hold one complete target")
     rows: list[PurchasePriceRow] = []
     gene_price_per_target = Decimal(scenario.target_length_nt) * gene_band.with_adapters_usd_per_bp
-    for target_count in range(1, maximum_targets + 1):
+    for target_count in range(minimum_targets, maximum_targets + 1):
         oligo_count = target_count * scenario.oligos_per_target
         pool_price = snapshot.oligo_pool_price(
             oligo_count=oligo_count,

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import importlib
 from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
 
+import matplotlib
 import matplotlib.pyplot as plt
 import pytest
 
@@ -14,6 +16,7 @@ from dnadesign.junction.economics import (
     render_purchase_price_comparison,
     stable_oligo_pool_advantage,
 )
+from dnadesign.junction.economics import render as economics_render
 from dnadesign.junction.economics.contracts import default_pricing_snapshot_path
 
 
@@ -65,6 +68,25 @@ def test_price_contract_rejects_ranges_that_cross_length_bands() -> None:
         )
 
 
+def test_price_rows_start_at_the_first_complete_priced_pool() -> None:
+    snapshot = load_pricing_snapshot(default_pricing_snapshot_path())
+
+    rows = build_purchase_price_rows(snapshot, replace(_scenario(), oligos_per_target=1))
+
+    assert rows[0].target_count == 2
+    assert rows[0].oligo_count == 2
+
+
+def test_snapshot_rejects_duplicate_length_band_ids_and_non_usd_currency() -> None:
+    snapshot = load_pricing_snapshot(default_pricing_snapshot_path())
+    duplicate_id = replace(snapshot.oligo_length_bands[1], band_id=snapshot.oligo_length_bands[0].band_id)
+
+    with pytest.raises(ValueError, match="ids must be unique"):
+        replace(snapshot, oligo_length_bands=(snapshot.oligo_length_bands[0], duplicate_id))
+    with pytest.raises(ValueError, match="must use USD"):
+        replace(snapshot, currency="EUR")
+
+
 def test_n_nucleotide_surcharge_is_explicit() -> None:
     snapshot = load_pricing_snapshot(default_pricing_snapshot_path())
     baseline = build_purchase_price_rows(snapshot, _scenario())[0]
@@ -88,3 +110,11 @@ def test_purchase_price_figure_is_square_generic_and_deterministic(tmp_path: Pat
     assert "Portal prices" not in svg
     assert first.png_path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     assert plt.get_fignums() == []
+
+
+def test_importing_renderer_preserves_the_selected_backend() -> None:
+    backend = matplotlib.get_backend()
+
+    importlib.reload(economics_render)
+
+    assert matplotlib.get_backend() == backend
