@@ -1,4 +1,4 @@
-"""Purchase-price comparison for gene fragments and Junction oligo pools."""
+"""Purchase-price comparison for gene fragments and oligo pools."""
 
 from .contracts import PricingSnapshot, SynthesisScenario, load_pricing_snapshot
 from .model import PurchasePriceRow, build_purchase_price_rows, stable_oligo_pool_advantage

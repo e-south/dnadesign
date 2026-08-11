@@ -104,7 +104,7 @@ def test_purchase_price_figure_is_square_generic_and_deterministic(tmp_path: Pat
     assert first.svg_path.read_bytes() == second.svg_path.read_bytes()
     assert first.png_path.read_bytes() == second.png_path.read_bytes()
     svg = first.svg_path.read_text(encoding="utf-8")
-    assert "Gene fragments and Junction oligo pools" in svg
+    assert "Gene fragments and oligo pools" in svg
     assert "Eco1" not in svg
     assert "Budget capacity" not in svg
     assert "Portal prices" not in svg

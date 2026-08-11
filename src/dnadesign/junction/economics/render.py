@@ -71,13 +71,13 @@ def render_purchase_price_comparison(
             color=_JUNCTION_COLOR,
             linewidth=2.7,
             drawstyle="steps-post",
-            label="Junction oligo pool",
+            label="Oligo pool",
         )
         axis.set_xscale("log")
         axis.set_yscale("log")
         axis.set_xlim(1, rows[-1].target_count)
         axis.set_ylim(bottom=min(gene_prices[0], pool_prices[0]) * 0.8)
-        axis.set_title("Gene fragments and Junction oligo pools", loc="center", pad=16)
+        axis.set_title("Gene fragments and oligo pools", loc="center", pad=16)
         axis.set_xlabel("Target sequences", labelpad=10)
         axis.set_ylabel("Purchase price (USD)", labelpad=10)
         axis.grid(which="major", color=_GRID_COLOR, linewidth=0.8)
@@ -89,10 +89,10 @@ def render_purchase_price_comparison(
         axis.yaxis.set_major_formatter(FuncFormatter(_currency_tick))
         axis.legend(frameon=False, loc="upper left")
         metadata = {
-            "Title": "Gene fragments and Junction oligo pools",
+            "Title": "Gene fragments and oligo pools",
             "Description": (
                 f"Purchase-price comparison for {scenario.target_length_nt}-nt targets using "
-                f"{scenario.oligos_per_target} oligos per Junction target. Snapshot dated "
+                f"{scenario.oligos_per_target} oligos per target. Snapshot dated "
                 f"{snapshot.retrieved_on.isoformat()}."
             ),
             "Creator": "dnadesign junction",
