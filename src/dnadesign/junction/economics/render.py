@@ -47,7 +47,7 @@ def render_purchase_price_comparison(
             "font.family": "Arial",
             "font.size": 12,
             "axes.titlesize": 15,
-            "axes.titleweight": "semibold",
+            "axes.titleweight": "bold",
             "axes.labelsize": 13,
             "axes.spines.top": False,
             "axes.spines.right": False,
