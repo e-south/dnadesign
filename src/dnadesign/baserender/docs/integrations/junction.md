@@ -138,11 +138,11 @@ The job writes a new bundle atomically and fails if `bundle.path` already
 exists. It never edits the `junction` bundle. The adapter supports image
 directories only; video and a combined single-file output are rejected.
 
-The checked-in [three-fragment example](../../../junction/examples/three-fragment-review/)
-contains separate jobs for fragment annealing, the assembly process, and junction
-details. Junction owns its sequence-comparison diagnostic because that figure
-computes Junction's search metrics rather than rendering generic molecular
-geometry.
+The checked-in [gene-scale example](../../../junction/examples/gene-scale/)
+contains separate jobs for fragment annealing, the assembly process, and
+junction details. Junction owns its sequence-comparison diagnostic because
+that figure computes Junction's search metrics rather than rendering generic
+molecular geometry.
 
 ## Contract limits
 

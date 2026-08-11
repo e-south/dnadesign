@@ -300,18 +300,17 @@ def test_adapter_accepts_real_universal_primers_across_unequal_target_lengths() 
 
 def test_checked_in_junction_figures_match_the_demo_jobs(tmp_path: Path) -> None:
     repository_root = Path(__file__).resolve().parents[5]
-    example_root = repository_root / "src/dnadesign/junction/examples/three-fragment-review"
+    example_root = repository_root / "src/dnadesign/junction/examples/gene-scale"
     assets_root = repository_root / "src/dnadesign/junction/docs/assets"
     request_mapping = yaml.safe_load((example_root / "request.yaml").read_text(encoding="utf-8"))
     request = parse_request(request_mapping)
     assert request.planning.toehold_length == 10
-    design_bundle = tmp_path / ".tmp/design-bundle"
+    design_bundle = tmp_path / "design-bundle"
     build(request, destination=design_bundle)
     plan_mapping = json.loads((design_bundle / "plan.json").read_text(encoding="utf-8"))
     fragment_lengths = tuple(order["length"] for order in plan_mapping["orders"] if order["fragment_id"] is not None)
     assert min(fragment_lengths) >= request.order_policy.minimum_fragment_oligo_length
     assert max(fragment_lengths) <= request.order_policy.max_oligo_length
-    assert max(fragment_lengths) - min(fragment_lengths) <= 50
 
     with matplotlib.rc_context(rc=matplotlib.rcParamsDefault):
         for name in ("annealed-fragments", "assembly-process", "junction-detail"):

@@ -34,8 +34,8 @@ def _repository_root() -> Path:
 
 
 def _request_mapping(workload: str) -> dict[str, object]:
-    if workload == "demo_200bp":
-        path = _repository_root() / "src/dnadesign/junction/examples/three-fragment-review/request.yaml"
+    if workload == "demo_gene_scale":
+        path = _repository_root() / "src/dnadesign/junction/examples/gene-scale/request.yaml"
         return yaml.safe_load(path.read_text(encoding="utf-8"))
     if workload == "single_1kb":
         return scale_request_mapping(
@@ -124,7 +124,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--workload",
-        choices=("demo_200bp", "single_1kb", "pool_3x360bp"),
+        choices=("demo_gene_scale", "single_1kb", "pool_3x360bp"),
         required=True,
     )
     parser.add_argument("--runs", type=int, default=3)
