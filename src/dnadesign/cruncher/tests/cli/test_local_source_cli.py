@@ -123,3 +123,27 @@ def test_sources_materialize_promoters_removes_failed_staging_directory(
     assert "invalid source inventory" in result.output
     assert not destination.exists()
     assert list(tmp_path.glob(".promoter-export.*")) == []
+
+
+def test_sources_materialize_promoters_rejects_incomplete_manifest(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    destination = tmp_path / "promoter-export"
+
+    def _materialize(staging: Path, **_kwargs):
+        (staging / "manifest.json").write_text("{}\n", encoding="utf-8")
+        inventory = SimpleNamespace(route_failure_count=2, conflict_count=1)
+        return SimpleNamespace(complete=False, record_count=12, source_inventory=inventory)
+
+    monkeypatch.setattr(
+        "dnadesign.cruncher.cli.commands.sources.export_dnadesign_data_promoter_superset",
+        _materialize,
+    )
+
+    result = runner.invoke(app, ["sources", "materialize-promoters", str(destination)])
+
+    assert result.exit_code == 1
+    assert "promoter export is incomplete (2 route failures; 1 sequence conflicts)" in result.output
+    assert not destination.exists()
+    assert list(tmp_path.glob(".promoter-export.*")) == []

@@ -361,6 +361,13 @@ def materialize_promoters(
             data_root=resolved_data_root,
             require_association_sources=require_association_sources,
         )
+        if not manifest.complete:
+            inventory = manifest.source_inventory
+            raise ValueError(
+                "promoter export is incomplete "
+                f"({inventory.route_failure_count} route failures; "
+                f"{inventory.conflict_count} sequence conflicts)"
+            )
         staging.replace(resolved_destination)
     except (OSError, RuntimeError, ValueError) as exc:
         shutil.rmtree(staging, ignore_errors=True)
