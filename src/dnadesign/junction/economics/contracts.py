@@ -1,4 +1,13 @@
-"""Typed contracts for dated synthesis-price snapshots."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/junction/economics/contracts.py
+
+Define typed contracts for dated synthesis-price snapshots.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

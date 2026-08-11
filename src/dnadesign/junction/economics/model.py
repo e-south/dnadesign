@@ -1,4 +1,13 @@
-"""Calculate purchase-price curves from a dated snapshot."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/junction/economics/model.py
+
+Calculate purchase-price curves from a dated snapshot.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

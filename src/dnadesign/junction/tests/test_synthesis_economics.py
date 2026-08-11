@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/junction/tests/test_synthesis_economics.py
+
+Verify synthesis purchase-price contracts, calculations, and rendering.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
 from __future__ import annotations
 
 import importlib

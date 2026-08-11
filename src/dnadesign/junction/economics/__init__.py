@@ -1,4 +1,13 @@
-"""Purchase-price comparison for gene fragments and oligo pools."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/junction/economics/__init__.py
+
+Expose synthesis purchase-price comparison contracts and services.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from .contracts import PricingSnapshot, SynthesisScenario, load_pricing_snapshot
 from .model import PurchasePriceRow, build_purchase_price_rows, stable_oligo_pool_advantage
