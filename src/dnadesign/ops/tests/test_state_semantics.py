@@ -102,16 +102,16 @@ def test_preflight_blockers_sort_missing_before_attention() -> None:
         build_state_check(
             check_id="attention.check",
             check_group="demo",
-            phase="ops",
-            phase_id="demo_phase",
+            category="ops",
+            check_set_id="demo_checks",
             state="attention",
             summary="attention",
         ),
         build_state_check(
             check_id="missing.check",
             check_group="demo",
-            phase="ops",
-            phase_id="demo_phase",
+            category="ops",
+            check_set_id="demo_checks",
             state="missing",
             summary="missing",
         ),
@@ -119,15 +119,12 @@ def test_preflight_blockers_sort_missing_before_attention() -> None:
 
     evaluation = evaluate_preflight_checks(
         checks,
-        phase_states=[{"id": "demo_phase", "status": "planned"}],
         scope_plan=type(
             "ScopePlan",
             (),
             {
                 "scope": "full",
-                "target_phase_id": None,
                 "included_groups": ("demo",),
-                "phase_scoped_groups": (),
             },
         )(),
     )

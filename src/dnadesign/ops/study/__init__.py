@@ -11,28 +11,26 @@ Module Author(s): Eric J. South
 
 from .models import (
     StudyOpsContract,
-    StudyPhaseContract,
     StudyPreflightContract,
-    StudyPreflightNextScopeContract,
     StudyStatusContext,
     StudyStatusService,
 )
 from .preflight_plan import (
     StudyPreflightPlan,
     build_study_preflight_plan,
+    compile_study_preflight_execution_plan,
     normalize_study_preflight_scope,
 )
 from .record_loader import load_study_ops_contract
 
 __all__ = [
     "StudyOpsContract",
-    "StudyPhaseContract",
     "StudyPreflightContract",
-    "StudyPreflightNextScopeContract",
     "StudyPreflightPlan",
     "StudyStatusContext",
     "StudyStatusService",
     "build_study_preflight_plan",
+    "compile_study_preflight_execution_plan",
     "load_study_ops_contract",
     "normalize_study_preflight_scope",
 ]

@@ -44,13 +44,13 @@ class CommandExecution:
 @dataclass(frozen=True)
 class PreflightCheck:
     id: str
-    phase: str
+    category: str
     state: Literal["ok", "attention", "missing"]
     summary: str
     kind: str = "state"
     required: bool = True
     check_group: str | None = None
-    phase_id: str | None = None
+    check_set_id: str | None = None
     surface_id: str | None = None
     artifact_id: str | None = None
     command: str | None = None
@@ -63,13 +63,13 @@ class PreflightCheck:
 
     def __post_init__(self) -> None:
         normalized_id = str(self.id or "").strip()
-        normalized_phase = str(self.phase or "").strip()
+        normalized_category = str(self.category or "").strip()
         normalized_summary = str(self.summary or "").strip()
         if not normalized_id:
             raise ValueError("preflight check id must be non-empty")
         normalized_kind = str(self.kind or "").strip()
-        if not normalized_phase:
-            raise ValueError(f"preflight check {normalized_id} phase must be non-empty")
+        if not normalized_category:
+            raise ValueError(f"preflight check {normalized_id} category must be non-empty")
         if not normalized_kind:
             raise ValueError(f"preflight check {normalized_id} kind must be non-empty")
         if self.state not in _CHECK_STATES:
@@ -83,8 +83,8 @@ class PreflightCheck:
             "kind": self.kind,
             "required": self.required,
             "check_group": self.check_group,
-            "phase": self.phase,
-            "phase_id": self.phase_id,
+            "category": self.category,
+            "check_set_id": self.check_set_id,
             "surface_id": self.surface_id,
             "artifact_id": self.artifact_id,
             "state": self.state,
@@ -105,8 +105,8 @@ def build_command_check(
     kind: str = "command",
     required: bool = True,
     check_group: str | None,
-    phase: str,
-    phase_id: str | None,
+    category: str,
+    check_set_id: str | None,
     summary: str,
     execution: CommandExecution,
     surface_id: str | None = None,
@@ -129,8 +129,8 @@ def build_command_check(
         kind=kind,
         required=required,
         check_group=str(check_group or "").strip() or None,
-        phase=phase,
-        phase_id=phase_id,
+        category=category,
+        check_set_id=check_set_id,
         surface_id=str(surface_id or "").strip() or None,
         artifact_id=str(artifact_id or "").strip() or None,
         state=state,
@@ -151,8 +151,8 @@ def build_state_check(
     kind: str = "state",
     required: bool = True,
     check_group: str | None,
-    phase: str,
-    phase_id: str | None,
+    category: str,
+    check_set_id: str | None,
     state: Literal["ok", "attention", "missing"],
     summary: str,
     surface_id: str | None = None,
@@ -164,8 +164,8 @@ def build_state_check(
         kind=kind,
         required=required,
         check_group=str(check_group or "").strip() or None,
-        phase=phase,
-        phase_id=phase_id,
+        category=category,
+        check_set_id=check_set_id,
         surface_id=str(surface_id or "").strip() or None,
         artifact_id=str(artifact_id or "").strip() or None,
         state=state,

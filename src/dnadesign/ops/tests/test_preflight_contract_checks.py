@@ -27,9 +27,7 @@ from dnadesign.ops.preflight import (
 from dnadesign.ops.preflight.models import supported_preflight_check_kinds
 from dnadesign.ops.study import (
     StudyOpsContract,
-    StudyPhaseContract,
     StudyPreflightContract,
-    StudyPreflightNextScopeContract,
 )
 
 
@@ -50,7 +48,6 @@ def _contract() -> StudyOpsContract:
         status_kind="stress-ethanol-cipro-growth-status",
         preflight_kind="stress-ethanol-cipro-growth-preflight",
         title="Demo study",
-        phase_order=("infer_batch_preparation", "infer_anchor_only_20b", "infer_anchor_only_7b"),
         snapshot_summary_scope="repo",
         execution_surfaces={
             "infer_batch_20b_anchor_only": {
@@ -87,18 +84,10 @@ def _contract() -> StudyOpsContract:
         },
         preflight=StudyPreflightContract(
             default_scope="next",
-            group_phase_bindings={"notify_environment": "infer_batch_preparation"},
-            next_scope=StudyPreflightNextScopeContract(
-                target_phase_groups={
-                    "infer_batch_preparation": (
-                        "infer",
-                        "notify_environment",
-                        "infer_batch_plan",
-                    ),
-                },
-                runtime_phase_groups=("infer_batch_plan",),
-                runtime_shared_groups=("notify_environment",),
-            ),
+            scope_groups={
+                "next": ("infer", "notify_environment", "infer_batch_plan"),
+                "full": ("infer", "notify_environment", "infer_batch_plan"),
+            },
             check_specs={
                 "infer_batch_preparation": (
                     {
@@ -122,7 +111,6 @@ def _contract() -> StudyOpsContract:
                         "kind": "command",
                         "check_id": "infer.validate.anchor_only_20b",
                         "check_group": "infer",
-                        "phase_id": "infer_anchor_only_20b",
                         "summary": "Infer config validation completed.",
                         "required": True,
                         "surface": "infer_validate_anchor_only_20b",
@@ -141,7 +129,6 @@ def _contract() -> StudyOpsContract:
                         "kind": "runbook_plan",
                         "check_id": "infer.batch.20b.anchor_only.plan",
                         "check_group": "infer_batch_plan",
-                        "phase_id": "infer_anchor_only_20b",
                         "summary": "Anchor-only 20B infer runbook renders cleanly.",
                         "required": False,
                         "surface": "infer_batch_20b_anchor_only",
@@ -150,19 +137,12 @@ def _contract() -> StudyOpsContract:
                         "kind": "runbook_plan",
                         "check_id": "infer.batch.7b.anchor_only.plan",
                         "check_group": "infer_batch_plan",
-                        "phase_id": "infer_anchor_only_7b",
                         "summary": "Anchor-only 7B infer runbook renders cleanly.",
                         "required": False,
                         "surface": "infer_batch_7b_anchor_only",
                     },
                 )
             },
-        ),
-        current_phase_id="infer_batch_preparation",
-        phases=(
-            StudyPhaseContract(id="infer_batch_preparation", status="in_progress"),
-            StudyPhaseContract(id="infer_anchor_only_20b", status="planned"),
-            StudyPhaseContract(id="infer_anchor_only_7b", status="planned"),
         ),
         raw_payload={},
     )
@@ -204,8 +184,8 @@ def test_build_command_check_omits_success_output_tails() -> None:
     check = build_command_check(
         check_id="infer.validate.anchor_only_20b",
         check_group="infer",
-        phase="infer",
-        phase_id="infer_anchor_only_20b",
+        category="infer",
+        check_set_id="infer_batch_preparation",
         summary="Infer config validation completed.",
         execution=CommandExecution(
             argv=("uv", "run", "infer", "validate", "config"),
@@ -220,14 +200,18 @@ def test_build_command_check_omits_success_output_tails() -> None:
     assert check.state == "ok"
     assert check.stdout_tail is None
     assert check.stderr_tail is None
+    assert check.as_dict()["category"] == "infer"
+    assert check.as_dict()["check_set_id"] == "infer_batch_preparation"
+    assert "phase" not in check.as_dict()
+    assert "phase_id" not in check.as_dict()
 
 
 def test_build_command_check_keeps_failure_output_tails() -> None:
     check = build_command_check(
         check_id="notify.profile.anchor_only_20b",
         check_group="notify",
-        phase="notify",
-        phase_id="infer_anchor_only_20b",
+        category="notify",
+        check_set_id="infer_batch_preparation",
         summary="Notify profile doctor completed.",
         execution=CommandExecution(
             argv=("uv", "run", "notify", "profile", "doctor"),
@@ -374,8 +358,10 @@ def test_build_contract_preflight_checks_executes_declared_command_and_scheduler
     assert by_id["infer.batch.queue"].state == "attention"
     assert by_id["infer.batch.queue"].required is False
     assert by_id["infer.batch.queue"].details["running_jobs"] == 4
-    assert by_id["infer.batch.20b.anchor_only.plan"].phase_id == "infer_anchor_only_20b"
-    assert by_id["infer.batch.7b.anchor_only.plan"].phase_id == "infer_anchor_only_7b"
+    assert by_id["infer.batch.20b.anchor_only.plan"].check_set_id == "infer_batch_preparation"
+    assert by_id["infer.batch.7b.anchor_only.plan"].check_set_id == "infer_batch_preparation"
+    assert by_id["infer.batch.20b.anchor_only.plan"].details["check_set_id"] == "infer_batch_preparation"
+    assert "contract_phase_id" not in by_id["infer.batch.20b.anchor_only.plan"].details
     assert by_id["infer.batch.20b.anchor_only.plan"].state == "attention"
     assert (
         by_id["infer.batch.20b.anchor_only.plan"].summary
