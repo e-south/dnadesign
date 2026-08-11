@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib import colors as mcolors
 
-from dnadesign.baserender import DENSEGEN_TFBS_REQUIRED_KEYS, render_parquet_record_figure
+from dnadesign.baserender import render_parquet_record_figure
 from dnadesign.densegen.src.core.record_values import normalize_used_tfbs_entries
 from dnadesign.densegen.src.integrations.baserender.notebook_contract import (
     REQUIRED_TFBS_ENTRY_KEYS,
@@ -84,7 +84,7 @@ def test_notebook_render_contract_is_explicit_and_complete() -> None:
     assert contract.style_overrides.get("legend_vertical_align") == 1.0
     assert contract.style_overrides.get("uniform_display_font_size") is True
     assert contract.record_window_limit == 500
-    assert REQUIRED_TFBS_ENTRY_KEYS == DENSEGEN_TFBS_REQUIRED_KEYS
+    assert REQUIRED_TFBS_ENTRY_KEYS == ("regulator", "sequence", "orientation", "offset")
 
 
 def test_notebook_render_contract_renders_extended_densegen_tf_tags(tmp_path: Path) -> None:

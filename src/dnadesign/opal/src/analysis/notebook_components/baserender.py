@@ -17,6 +17,7 @@ from typing import Any, Mapping, Sequence
 BASERENDER_CONTRACT_SCHEMA_VERSION = "dnadesign.baserender.record_render_contract.v1"
 NO_RENDERABLE_RECORDS_LABEL = "(no renderable records)"
 GENERIC_BASERENDER_FEATURES_COLUMN = "opal__baserender_features"
+PROMOTER_SEQUENCE_PANEL_PROFILE = "promoter_compact_slide.v1"
 
 
 def build_notebook_baserender_contract(
@@ -47,7 +48,10 @@ def build_notebook_baserender_contract(
             caption="Sequence feature annotation.",
         )
 
-    densegen_config = baserender.sequence_panel_config_for_adapter("densegen_tfbs")
+    densegen_config = baserender.sequence_panel_config_for_adapter(
+        "densegen_tfbs",
+        style_profile=PROMOTER_SEQUENCE_PANEL_PROFILE,
+    )
     densegen_columns = dict(densegen_config.adapter_columns)
     detection_required = [
         str(densegen_columns[key]) for key in ("id", "sequence", "annotations") if key in densegen_columns
@@ -68,6 +72,7 @@ def build_notebook_baserender_contract(
             metadata_records_path=metadata_records_path if has_metadata_annotations else None,
             metadata_required_columns=metadata_required if has_metadata_annotations else [],
             caption="DenseGen TFBS annotation.",
+            style_profile=str(densegen_config.style_profile),
             style_overrides=dict(densegen_config.style_overrides or {}),
             target_width_px=int(densegen_config.target_width_px),
             target_height_px=int(densegen_config.target_height_px),
@@ -103,6 +108,7 @@ def _available_contract(
     metadata_records_path: str | None = None,
     metadata_required_columns: Sequence[str] | None = None,
     caption: str,
+    style_profile: str | None = None,
     style_overrides: Mapping[str, Any] | None = None,
     target_width_px: int | None = None,
     target_height_px: int | None = None,
@@ -123,6 +129,7 @@ def _available_contract(
         "metadata_required_columns": list(metadata_required_columns or ()),
         "reason": "detected",
         "caption": caption,
+        "style_profile": style_profile,
         "alt_text_template": "BaseRender sequence diagram for record {record_id}; {feature_count} annotations.",
         "style_overrides": dict(style_overrides or {}),
         "target_width_px": target_width_px,

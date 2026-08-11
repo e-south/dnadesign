@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from dnadesign.baserender import cruncher_showcase_style_overrides
+from dnadesign.baserender import style_profile_overrides
 from dnadesign.cruncher.analysis.plots.elites_showcase import (
     _overlay_text,
     build_elites_showcase_records,
@@ -182,14 +182,14 @@ def test_elites_showcase_supports_multiple_occurrences_for_one_tf() -> None:
 
 
 def test_elites_showcase_style_uses_match_window_coloring() -> None:
-    overrides = cruncher_showcase_style_overrides()
+    overrides = style_profile_overrides("motif_showcase.v1")
     motif_logo = dict(overrides.get("motif_logo", {}))
     letter_coloring = dict(motif_logo.get("letter_coloring", {}))
     assert str(letter_coloring.get("mode")) == "match_window_seq"
 
 
 def test_elites_showcase_style_covers_canonical_workspace_tf_palette_tags() -> None:
-    overrides = cruncher_showcase_style_overrides()
+    overrides = style_profile_overrides("motif_showcase.v1")
     palette = dict(overrides.get("palette", {}))
     expected_tags = {
         "tf:acrR",

@@ -14,12 +14,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Mapping
 
-from dnadesign.baserender import cruncher_showcase_style_overrides
+from dnadesign.baserender import style_profile_overrides
 from dnadesign.cruncher.config.schema_v3 import AnalysisTrajectoryVideoConfig
 
 
 def _trajectory_video_style_overrides() -> dict[str, object]:
-    overrides = dict(cruncher_showcase_style_overrides())
+    overrides = dict(style_profile_overrides("motif_showcase.v1"))
     overrides["figure_scale"] = 0.98
     overrides["padding_y"] = 3.0
     overrides["font_size_label"] = 15

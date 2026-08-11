@@ -11,16 +11,13 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from importlib import import_module
-from importlib.metadata import entry_points
 from typing import Protocol, Sequence
 
 from ..config import PluginSpec
-from ..core import PluginError, Record
-from .attach_motifs_from_config import AttachMotifsFromConfigTransform
-from .attach_motifs_from_cruncher_lockfile import AttachMotifsFromCruncherLockfileTransform
-from .attach_motifs_from_library import AttachMotifsFromLibraryTransform
-from .sigma70 import Sigma70Transform
+from ..core import PluginError, Record, SchemaError
+from ..integrations import transform_descriptor
 
 
 class Transform(Protocol):
@@ -43,36 +40,17 @@ def load_transforms(requested: Sequence[PluginSpec]) -> tuple[Transform, ...]:
     for spec in requested:
         name = spec.name
         params = spec.params
-        if name == "sigma70":
-            transforms.append(Sigma70Transform(**params))
-            continue
-        if name == "attach_motifs_from_config":
-            transforms.append(AttachMotifsFromConfigTransform(**params))
-            continue
-        if name == "attach_motifs_from_cruncher_lockfile":
-            transforms.append(AttachMotifsFromCruncherLockfileTransform(**params))
-            continue
-        if name == "attach_motifs_from_library":
-            transforms.append(AttachMotifsFromLibraryTransform(**params))
-            continue
-
         if ":" in name:
             cls = _load_class(name)
             transforms.append(cls(**params))
             continue
-
-        eps = entry_points(group="baserender.plugins")
-        found = [ep for ep in eps if ep.name == name]
-        if not found:
-            raise PluginError(
-                f"Unknown transform '{name}'. "
-                "Use 'sigma70', 'module:Class', or an installed "
-                "baserender.plugins entry point."
-            )
-        if len(found) > 1:
-            raise PluginError(f"Multiple entry points found for transform '{name}'")
-        cls = found[0].load()
-        transforms.append(cls(**params))
+        try:
+            descriptor = transform_descriptor(name)
+        except SchemaError as exc:
+            raise PluginError(str(exc)) from exc
+        if not isinstance(params, Mapping):
+            raise PluginError(f"Transform parameters must be a mapping for {name!r}")
+        transforms.append(descriptor.factory(params))
     return tuple(transforms)
 
 

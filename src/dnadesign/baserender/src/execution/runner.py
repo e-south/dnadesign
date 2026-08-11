@@ -20,7 +20,6 @@ from typing import Iterable, Iterator
 
 from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
 
-from ..adapters import build_adapter, finalize_adapter, required_source_columns
 from ..config import (
     ImagesOutputCfg,
     InputEnvelope,
@@ -35,8 +34,8 @@ from ..config import (
     validate_output_configuration,
     validate_render_contract_renderer,
 )
-from ..config.adapter_contracts import adapter_contract
 from ..core import Record, SchemaError, SkipRecord
+from ..integrations import adapter_contract, build_adapter, finalize_adapter, required_source_columns
 from ..io import iter_json_rows, iter_jsonl_rows, iter_parquet_rows
 from ..pipeline import apply_selection, apply_transforms, enforce_selection_policy, load_transforms
 from ..reporting import RunReport

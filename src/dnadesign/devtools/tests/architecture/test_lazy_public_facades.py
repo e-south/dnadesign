@@ -23,7 +23,6 @@ import pytest
 _LAZY_PUBLIC_FACADES = (
     "dnadesign.baserender",
     "dnadesign.baserender.src",
-    "dnadesign.baserender.src.adapters",
     "dnadesign.baserender.src.public",
     "dnadesign.contracts",
     "dnadesign.contracts.folding",

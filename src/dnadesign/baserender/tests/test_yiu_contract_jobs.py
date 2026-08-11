@@ -20,12 +20,16 @@ import pytest
 from matplotlib.patches import FancyBboxPatch
 
 import dnadesign.baserender as baserender
-from dnadesign.baserender.src.adapters.sequence_evidence_map_v1 import SequenceEvidenceMapV1Adapter
-from dnadesign.baserender.src.adapters.yiu_payload_motif_overlay import build_motif_overlay
-from dnadesign.baserender.src.adapters.yiu_payload_sequence_projection import build_sequence_evidence_map_contract
-from dnadesign.baserender.src.adapters.yiu_payload_visual_v1 import YiuPayloadVisualV1Adapter
 from dnadesign.baserender.src.config import resolve_style
 from dnadesign.baserender.src.core import RenderingError
+from dnadesign.baserender.src.integrations.generic.sequence_evidence_map_v1 import (
+    SequenceEvidenceMapV1Adapter,
+)
+from dnadesign.baserender.src.integrations.yiu.payload_motif_overlay import build_motif_overlay
+from dnadesign.baserender.src.integrations.yiu.payload_sequence_projection import (
+    build_sequence_evidence_map_contract,
+)
+from dnadesign.baserender.src.integrations.yiu.payload_visual_v1 import YiuPayloadVisualV1Adapter
 from dnadesign.baserender.src.render.effects.motif_logo import compute_motif_logo_geometry
 from dnadesign.baserender.src.render.layout import compute_layout
 from dnadesign.contracts.visual import YiuPayloadVisualV1

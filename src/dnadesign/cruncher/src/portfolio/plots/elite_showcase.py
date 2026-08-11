@@ -18,8 +18,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from dnadesign.baserender import (
-    cruncher_showcase_style_overrides,
     render_record_grid_figure,
+    style_profile_overrides,
 )
 from dnadesign.cruncher.analysis.plots._savefig import savefig
 from dnadesign.cruncher.analysis.plots.elites_showcase import (
@@ -228,7 +228,7 @@ def plot_portfolio_elite_showcase(
     fig = render_record_grid_figure(
         records,
         ncols=showcase_cols,
-        style_overrides=cruncher_showcase_style_overrides(),
+        style_overrides=style_profile_overrides("motif_showcase.v1"),
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     savefig(fig, out_path, dpi=int(dpi), png_compress_level=9)

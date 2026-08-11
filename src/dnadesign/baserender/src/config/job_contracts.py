@@ -11,42 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Literal
-
-from ..core import SchemaError
-
-
-@dataclass(frozen=True)
-class InputEnvelope:
-    max_bytes: int
-    max_records: int
-    max_bases: int
-    base_field_path: tuple[str, ...]
-    accepted_input_kinds: tuple[str, ...]
-
-
-THREE_WAY_JUNCTION_REVIEW_INPUT_ENVELOPE = InputEnvelope(
-    max_bytes=64 * 1024 * 1024,
-    max_records=2_000,
-    max_bases=10_000_000,
-    base_field_path=("target", "sequence_5to3"),
-    accepted_input_kinds=("json",),
-)
-
-
-@dataclass(frozen=True)
-class RenderContractDescriptor:
-    kind: str
-    schema_version: int
-    display_name: str
-    purpose: str
-    accepted_renderers: tuple[str, ...]
-    compatibility_aliases: tuple[str, ...] = ()
-    docs_slug: str | None = None
-    sensitivity: Literal["public", "private"] = "public"
-    input_envelope: InputEnvelope | None = None
-
+from ..core import InputEnvelope, RenderContractDescriptor, SchemaError
+from ..integrations import registered_render_contracts
 
 _DESCRIPTORS: dict[str, RenderContractDescriptor] = {
     "render_job_v4": RenderContractDescriptor(
@@ -72,14 +38,6 @@ _DESCRIPTORS: dict[str, RenderContractDescriptor] = {
         purpose="Linear sequence-row visualization for sequence features, motifs, and interval annotations.",
         accepted_renderers=("sequence_rows",),
         docs_slug="sequence-rows-render-v3",
-    ),
-    "usr_genbank_annotation_render_v1": RenderContractDescriptor(
-        kind="usr_genbank_annotation_render_v1",
-        schema_version=1,
-        display_name="USR GenBank annotation render contract",
-        purpose=("Linear sequence-row visualization for USR datasets with seq_annot GenBank feature overlays."),
-        accepted_renderers=("sequence_rows",),
-        docs_slug="usr-genbank-annotation-render-v1",
     ),
     "nucleotide_evidence_map_render_v3": RenderContractDescriptor(
         kind="nucleotide_evidence_map_render_v3",
@@ -113,17 +71,12 @@ _DESCRIPTORS: dict[str, RenderContractDescriptor] = {
         accepted_renderers=("snapback_map",),
         docs_slug="snapback-map-render-v3",
     ),
-    "three_way_junction_review_render_v1": RenderContractDescriptor(
-        kind="three_way_junction_review_render_v1",
-        schema_version=1,
-        display_name="Three-way-junction review render contract",
-        purpose="Selected annealed-fragment and three-way-assembly QA views from explicit design evidence.",
-        accepted_renderers=("junction_annealed_fragments", "junction_three_way_assembly"),
-        docs_slug="three-way-junction-review-render-v1",
-        sensitivity="private",
-        input_envelope=THREE_WAY_JUNCTION_REVIEW_INPUT_ENVELOPE,
-    ),
 }
+
+for _integration_descriptor in registered_render_contracts():
+    if _integration_descriptor.kind in _DESCRIPTORS:
+        raise RuntimeError(f"Duplicate BaseRender render contract: {_integration_descriptor.kind}")
+    _DESCRIPTORS[_integration_descriptor.kind] = _integration_descriptor
 
 _ALIASES: dict[str, str] = {
     alias: descriptor.kind for descriptor in _DESCRIPTORS.values() for alias in descriptor.compatibility_aliases
@@ -175,7 +128,6 @@ DEFAULT_RENDER_CONTRACT_KIND = "render_job_v4"
 __all__ = [
     "DEFAULT_RENDER_CONTRACT_KIND",
     "InputEnvelope",
-    "THREE_WAY_JUNCTION_REVIEW_INPUT_ENVELOPE",
     "RenderContractDescriptor",
     "render_contract_descriptor",
     "render_contract_descriptors",

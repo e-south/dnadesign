@@ -15,7 +15,7 @@ from pathlib import Path
 
 from dnadesign.baserender.src.core import Record, Span
 from dnadesign.baserender.src.core.record import Display, Feature
-from dnadesign.baserender.src.pipeline.sigma70 import Sigma70Transform
+from dnadesign.baserender.src.integrations.motif_annotation.sigma70 import Sigma70Transform
 
 
 def test_core_and_render_do_not_embed_sigma70_semantics() -> None:

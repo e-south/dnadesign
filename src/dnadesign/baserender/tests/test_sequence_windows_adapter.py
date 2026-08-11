@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.baserender.src.adapters.sequence_windows_v1 import SequenceWindowsV1Adapter
 from dnadesign.baserender.src.config import load_render_job
+from dnadesign.baserender.src.integrations.generic.sequence_windows_v1 import SequenceWindowsV1Adapter
 
 from .conftest import write_job, write_parquet
 

@@ -107,9 +107,11 @@ def test_src_nested_ia_packages_exist() -> None:
     for rel in (
         "src/public",
         "src/execution",
+        "src/integrations",
+        "src/integrations/cruncher",
+        "src/integrations/densegen",
         "src/runtime",
         "src/workspaces",
-        "src/styles/curated",
     ):
         assert (root / rel / "__init__.py").exists(), rel
 

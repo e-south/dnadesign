@@ -15,7 +15,7 @@ import re
 from pathlib import Path
 from urllib.parse import urlparse
 
-from dnadesign.baserender import DENSEGEN_TFBS_REQUIRED_KEYS
+from dnadesign.densegen.src.integrations.baserender.notebook_contract import REQUIRED_TFBS_ENTRY_KEYS
 
 ROOT = Path(__file__).resolve().parents[2]
 DOCS_ROOT = ROOT / "docs"
@@ -237,5 +237,5 @@ def test_outputs_reference_documents_strict_notebook_render_contract() -> None:
     assert "outputs/plots/current_inventory.json" in content
     assert "outputs/plots/artifact_ledger.json" in content
     assert "Required TFBS entry keys inside `densegen__used_tfbs_detail`" in content
-    for key in DENSEGEN_TFBS_REQUIRED_KEYS:
+    for key in REQUIRED_TFBS_ENTRY_KEYS:
         assert f"`{key}`" in content

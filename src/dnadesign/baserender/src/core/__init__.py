@@ -10,6 +10,8 @@ Module Author(s): Eric J. South
 """
 
 from .contracts import ensure, reject_unknown_keys, require_mapping, require_one_of
+from .descriptors import RenderContractDescriptor
+from .envelopes import InputEnvelope
 from .errors import (
     AlphabetError,
     BaseRenderError,
@@ -50,9 +52,11 @@ __all__ = [
     "BoundsError",
     "LayoutError",
     "RenderingError",
+    "RenderContractDescriptor",
     "ExportError",
     "PluginError",
     "SkipRecord",
+    "InputEnvelope",
     "ensure",
     "reject_unknown_keys",
     "require_mapping",

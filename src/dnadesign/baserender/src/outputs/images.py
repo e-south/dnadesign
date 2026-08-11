@@ -18,11 +18,11 @@ from typing import Iterable, Mapping
 import numpy as np
 
 from ..config import ImagesOutputCfg, Style
-from ..config.adapter_contracts import (
+from ..core import Record, SchemaError
+from ..integrations import (
     adapter_grid_record_limit,
     validate_records_output_policy,
 )
-from ..core import Record, SchemaError
 from ..render import Palette, render_record, validate_records_for_rendering
 from ..render.renderer import get_renderer_descriptor
 from .names import _safe_stem, _unique_stem

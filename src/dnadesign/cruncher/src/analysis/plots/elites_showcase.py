@@ -26,8 +26,8 @@ from dnadesign.baserender import (
     Feature,
     Record,
     Span,
-    cruncher_showcase_style_overrides,
     render_record_grid_figure,
+    style_profile_overrides,
 )
 from dnadesign.cruncher.analysis.plots._savefig import savefig
 
@@ -238,7 +238,7 @@ def _overlay_text(
     return "\n".join([*subject_lines, *score_lines])
 
 
-_SHOWCASE_STYLE_OVERRIDES: Mapping[str, object] = cruncher_showcase_style_overrides()
+_SHOWCASE_STYLE_OVERRIDES: Mapping[str, object] = style_profile_overrides("motif_showcase.v1")
 OverlayTextFn = Callable[[pd.Series, list[str]], str]
 
 

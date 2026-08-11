@@ -130,7 +130,7 @@ def test_assembly_process_is_a_separate_target_scale_view() -> None:
         assert [axis.get_gid() for axis in figure.axes] == ["junction-three-way-assembly:assembly"]
         text = "\n".join(item.get_text() for axis in figure.axes for item in axis.texts)
         assert "target-01" in text
-        assert "from target sequence to the expected PCR duplex" in text
+        assert "Oligo plan for target-01" in text
         assert "The oligos remain separate before annealing" not in text
         assert "Fragment oligos encode the target" in text
         assert "Annealing forms pre-ligation junctions" in text

@@ -16,9 +16,9 @@ import numpy as np
 import pytest
 from matplotlib.patches import FancyBboxPatch, PathPatch
 
-from dnadesign.baserender.src.adapters.densegen_tfbs import DensegenTfbsAdapter
 from dnadesign.baserender.src.config import resolve_style
 from dnadesign.baserender.src.core import SchemaError
+from dnadesign.baserender.src.integrations.densegen.adapter import DensegenTfbsAdapter
 from dnadesign.baserender.src.render import Palette, legend_entries_for_record, render_record
 from dnadesign.baserender.src.render.layout import compute_layout
 from dnadesign.baserender.src.render.sequence_rows import _span_link_label_boxes, _text_px_width

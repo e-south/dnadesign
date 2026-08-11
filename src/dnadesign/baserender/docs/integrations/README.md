@@ -1,12 +1,12 @@
-# Integration Contracts
+---
+owner: dnadesign-maintainers
+last_verified: 2026-08-10
+---
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+# Integrations
 
-
-These guides connect outputs from other dnadesign tools to BaseRender.
-
-Choose the tool that wrote the records you want to render.
+Choose the tool that wrote the input. Each guide names the accepted record,
+adapter, renderer, and failure rules.
 
 ## Available integrations
 
@@ -17,8 +17,14 @@ Choose the tool that wrote the records you want to render.
 
 ## Scope boundary
 
-- The package README remains general.
-- The [technical reference](../reference.md) defines the public API.
-- Each integration page explains its tool's fields and gives an example.
-- Other tools write JSON or JSONL records and `RenderJobV4` YAML. Render them
-  through the public `dnadesign.baserender` API or CLI.
+- Integrations translate producer records; they do not move producer analysis
+  into BaseRender.
+- Built-in integrations live under `src/integrations/<producer>/` and register
+  through one internal descriptor catalog.
+- The central job parser reads descriptors and contains no producer branches.
+- External plugin discovery is intentionally absent. Add an entry-point pack
+  only when an integration is distributed independently.
+- Use the public `dnadesign.baserender` API or CLI. Private `src.*` imports are
+  unsupported.
+
+Run `uv run baserender catalog --json` to inspect the installed capability set.

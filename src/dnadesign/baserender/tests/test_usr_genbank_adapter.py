@@ -17,8 +17,8 @@ import matplotlib.pyplot as plt
 import pytest
 
 from dnadesign.baserender.src.config import load_render_job, resolve_style
-from dnadesign.baserender.src.config.adapter_contracts import adapter_descriptor
 from dnadesign.baserender.src.core import SchemaError
+from dnadesign.baserender.src.integrations import adapter_descriptor
 from dnadesign.baserender.src.public import adapt_record, get_render_contract_descriptor
 from dnadesign.baserender.src.render import Palette, render_record
 from dnadesign.baserender.src.render.layout import compute_layout

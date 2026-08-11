@@ -18,10 +18,10 @@ import pyarrow.parquet as pq
 import pytest
 import yaml
 
-from dnadesign.baserender.src.adapters import build_adapter
-from dnadesign.baserender.src.adapters.cruncher_best_window import CruncherBestWindowAdapter
 from dnadesign.baserender.src.config import AdapterCfg
 from dnadesign.baserender.src.core import SchemaError
+from dnadesign.baserender.src.integrations import build_adapter
+from dnadesign.baserender.src.integrations.cruncher.best_window import CruncherBestWindowAdapter
 
 
 def test_build_adapter_unknown_kind_raises_schema_error() -> None:
