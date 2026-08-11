@@ -163,8 +163,6 @@ def _left_margin_for_visible_labels(figure: Figure, axis) -> float:
     canvas.draw()
     renderer = canvas.get_renderer()
     labels = [label for label in axis.get_yticklabels() if label.get_text()]
-    if not labels:
-        return _LEFT_MARGIN_MIN
     leftmost = min(label.get_window_extent(renderer).x0 for label in labels)
     padding = _LABEL_PADDING_POINTS * figure.dpi / 72.0
     if leftmost >= padding:
