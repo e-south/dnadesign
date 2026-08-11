@@ -41,8 +41,8 @@ def build_environment_checks(
                 kind="environment",
                 required=target.required,
                 check_group=target.check_group,
-                phase=target.phase,
-                phase_id=target.phase_id,
+                category=target.category,
+                check_set_id=target.check_set_id,
                 state="ok" if matched else "attention",
                 summary=target.ok_summary if matched else target.missing_summary,
                 details={

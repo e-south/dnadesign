@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from .models import StudyPreflightContract
@@ -20,9 +20,7 @@ from .models import StudyPreflightContract
 @dataclass(frozen=True)
 class StudyPreflightPlan:
     scope: str
-    target_phase_id: str | None
     included_groups: tuple[str, ...]
-    phase_scoped_groups: tuple[str, ...] = ()
 
     def includes_group(self, group: str) -> bool:
         return str(group).strip() in self.included_groups
@@ -33,8 +31,8 @@ class CompiledStudyPreflightCheck:
     check_id: str
     kind: str
     check_group: str
-    phase_id: str
-    phase: str
+    check_set_id: str
+    category: str
     summary: str
     required: bool
     payload: dict[str, object] = field(default_factory=dict)
@@ -54,49 +52,14 @@ def normalize_study_preflight_scope(scope: str | None, *, default_scope: str = "
 
 def build_study_preflight_plan(
     *,
-    current_phase: str | None,
-    next_ready_phase: Mapping[str, object] | None,
     scope: str | None,
     contract: StudyPreflightContract,
-    runtime_phase_ids: Sequence[str] | None = None,
 ) -> StudyPreflightPlan:
     scope_norm = normalize_study_preflight_scope(scope, default_scope=contract.default_scope)
-    target_phase_id = _target_phase_id(
-        current_phase=current_phase,
-        next_ready_phase=next_ready_phase,
-        scope=scope_norm,
-    )
-    if scope_norm != "next":
-        return StudyPreflightPlan(
-            scope=scope_norm,
-            target_phase_id=target_phase_id,
-            included_groups=contract.known_groups,
-        )
-
-    if target_phase_id is None:
-        raise ValueError("study preflight next scope requires a current or next-ready phase")
-
-    runtime_phase_index = {str(phase_id).strip() for phase_id in runtime_phase_ids or () if str(phase_id).strip()}
-    if target_phase_id in contract.next_scope.target_phase_groups:
-        included_groups = contract.next_scope.target_phase_groups[target_phase_id]
-        return StudyPreflightPlan(
-            scope=scope_norm,
-            target_phase_id=target_phase_id,
-            included_groups=included_groups,
-        )
-
-    if target_phase_id in runtime_phase_index:
-        included_groups = _ordered_unique(
-            (*contract.next_scope.runtime_shared_groups, *contract.next_scope.runtime_phase_groups)
-        )
-        return StudyPreflightPlan(
-            scope=scope_norm,
-            target_phase_id=target_phase_id,
-            included_groups=included_groups,
-            phase_scoped_groups=contract.next_scope.runtime_phase_groups,
-        )
-
-    raise ValueError(f"ops.study.yaml does not declare next-scope groups for phase {target_phase_id!r}")
+    included_groups = contract.known_groups if scope_norm == "full" else contract.scope_groups.get("next")
+    if included_groups is None:
+        raise ValueError("study preflight next scope requires explicit preflight.scopes.next.include_groups")
+    return StudyPreflightPlan(scope=scope_norm, included_groups=included_groups)
 
 
 def compile_study_preflight_execution_plan(
@@ -106,65 +69,40 @@ def compile_study_preflight_execution_plan(
 ) -> CompiledStudyPreflightExecutionPlan:
     enabled_group_set = {str(group).strip() for group in enabled_groups if str(group).strip()}
     compiled_checks: list[CompiledStudyPreflightCheck] = []
-    for declared_phase_id, specs in contract.check_specs.items():
+    for check_set_id, specs in contract.check_specs.items():
         for spec in specs:
             check_group = str(spec.get("check_group") or "").strip()
             if not check_group or check_group not in enabled_group_set:
                 continue
             kind = str(spec.get("kind") or "").strip()
-            phase = str(spec.get("phase") or "").strip()
-            if not phase:
-                if kind == "runbook_plan" or check_group.endswith("_plan"):
-                    phase = "ops"
-                elif kind == "scheduler_queue":
-                    phase = "scheduler"
-                elif check_group.startswith("notify"):
-                    phase = "notify"
-                else:
-                    phase = check_group or kind
+            category = _check_category(check_group=check_group, kind=kind)
             compiled_checks.append(
                 CompiledStudyPreflightCheck(
                     check_id=str(spec.get("check_id") or "").strip(),
                     kind=kind,
                     check_group=check_group,
-                    phase_id=str(spec.get("phase_id") or declared_phase_id).strip() or declared_phase_id,
-                    phase=phase,
+                    check_set_id=check_set_id,
+                    category=category,
                     summary=str(spec.get("summary") or "").strip(),
                     required=bool(spec.get("required", True)),
                     payload={
                         key: value
                         for key, value in dict(spec).items()
-                        if key not in {"check_id", "kind", "check_group", "phase_id", "phase", "summary", "required"}
+                        if key not in {"check_id", "kind", "check_group", "summary", "required"}
                     },
                 )
             )
     return CompiledStudyPreflightExecutionPlan(checks=tuple(compiled_checks))
 
 
-def _target_phase_id(
-    *,
-    current_phase: str | None,
-    next_ready_phase: Mapping[str, object] | None,
-    scope: str,
-) -> str | None:
-    if scope != "next":
-        return None
-    if next_ready_phase is not None:
-        phase_id = str(next_ready_phase.get("id") or "").strip()
-        return phase_id or None
-    phase_id = str(current_phase or "").strip()
-    return phase_id or None
-
-
-def _ordered_unique(groups: Sequence[str]) -> tuple[str, ...]:
-    ordered: list[str] = []
-    seen: set[str] = set()
-    for group in groups:
-        normalized_group = str(group).strip()
-        if normalized_group and normalized_group not in seen:
-            seen.add(normalized_group)
-            ordered.append(normalized_group)
-    return tuple(ordered)
+def _check_category(*, check_group: str, kind: str) -> str:
+    if kind == "runbook_plan" or check_group.endswith("_plan"):
+        return "ops"
+    if kind == "scheduler_queue":
+        return "scheduler"
+    if check_group.startswith("notify"):
+        return "notify"
+    return check_group or kind
 
 
 __all__ = [

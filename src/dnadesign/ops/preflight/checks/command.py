@@ -39,8 +39,8 @@ def build_command_checks(
                 kind="command",
                 required=target.required,
                 check_group=target.check_group,
-                phase=target.phase,
-                phase_id=target.phase_id,
+                category=target.category,
+                check_set_id=target.check_set_id,
                 summary=dependencies.choose_command_summary(
                     execution,
                     fallback=target.fallback_summary,

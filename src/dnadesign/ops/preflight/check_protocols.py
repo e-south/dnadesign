@@ -23,8 +23,8 @@ EnvironmentMatchMode = Literal["all", "any"]
 class CommandCheckTarget:
     check_id: str
     check_group: str | None
-    phase: str
-    phase_id: str | None
+    category: str
+    check_set_id: str | None
     argv: tuple[str, ...]
     cwd: Path
     fallback_summary: str
@@ -37,8 +37,8 @@ class CommandCheckTarget:
 class RunbookPlanCheckTarget:
     check_id: str
     check_group: str
-    phase: str
-    phase_id: str | None
+    category: str
+    check_set_id: str | None
     runbook_path: Path
     fallback_summary: str
     required: bool = True
@@ -50,8 +50,8 @@ class RunbookPlanCheckTarget:
 class EnvironmentCheckTarget:
     check_id: str
     check_group: str | None
-    phase: str
-    phase_id: str | None
+    category: str
+    check_set_id: str | None
     flag_names: tuple[str, ...]
     match_mode: EnvironmentMatchMode
     ok_summary: str
@@ -64,8 +64,8 @@ class EnvironmentCheckTarget:
 class SchedulerQueueCheckTarget:
     check_id: str
     check_group: str | None
-    phase: str
-    phase_id: str | None
+    category: str
+    check_set_id: str | None
     backend: str
     max_running_jobs: int
     max_queued_jobs: int | None = None

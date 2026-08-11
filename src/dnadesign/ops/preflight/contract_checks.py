@@ -51,8 +51,8 @@ class _CompiledContractCheck:
     check_id: str
     kind: str
     check_group: str
-    phase_id: str
-    phase: str
+    check_set_id: str
+    category: str
     summary: str
     required: bool
     payload: dict[str, object]
@@ -91,15 +91,13 @@ def build_contract_preflight_checks(
     for compiled in compiled_checks:
         kind = compiled.kind
         check_group = compiled.check_group
-        phase_id = compiled.phase_id
-        phase = compiled.phase
+        check_set_id = compiled.check_set_id
+        category = compiled.category
         check_id = compiled.check_id
         summary = compiled.summary
         required = compiled.required
         spec = dict(compiled.payload)
-        details = {
-            "contract_phase_id": phase_id,
-        }
+        details = {"check_set_id": check_set_id}
 
         if kind == "path_exists":
             artifact_id = str(spec.get("artifact") or "").strip()
@@ -107,8 +105,8 @@ def build_contract_preflight_checks(
                 _build_path_exists_check(
                     check_id=check_id,
                     check_group=check_group,
-                    phase=phase,
-                    phase_id=phase_id,
+                    category=category,
+                    check_set_id=check_set_id,
                     summary=summary,
                     required=required,
                     artifact_id=artifact_id,
@@ -127,8 +125,8 @@ def build_contract_preflight_checks(
                 _build_dataset_snapshot_check(
                     check_id=check_id,
                     check_group=check_group,
-                    phase=phase,
-                    phase_id=phase_id,
+                    category=category,
+                    check_set_id=check_set_id,
                     summary=summary,
                     required=required,
                     artifact_id=artifact_id,
@@ -149,8 +147,8 @@ def build_contract_preflight_checks(
                 _build_sequence_view_contract_check(
                     check_id=check_id,
                     check_group=check_group,
-                    phase=phase,
-                    phase_id=phase_id,
+                    category=category,
+                    check_set_id=check_set_id,
                     summary=summary,
                     required=required,
                     artifact_id=artifact_id,
@@ -170,8 +168,8 @@ def build_contract_preflight_checks(
                 _build_infer_sequence_view_completion_check(
                     check_id=check_id,
                     check_group=check_group,
-                    phase=phase,
-                    phase_id=phase_id,
+                    category=category,
+                    check_set_id=check_set_id,
                     summary=summary,
                     required=required,
                     surface_id=surface_id,
@@ -191,8 +189,8 @@ def build_contract_preflight_checks(
                 _build_workspace_layout_check(
                     check_id=check_id,
                     check_group=check_group,
-                    phase=phase,
-                    phase_id=phase_id,
+                    category=category,
+                    check_set_id=check_set_id,
                     summary=summary,
                     required=required,
                     surface_id=surface_id,
@@ -211,8 +209,8 @@ def build_contract_preflight_checks(
                 _build_environment_check(
                     check_id=check_id,
                     check_group=check_group,
-                    phase=phase,
-                    phase_id=phase_id,
+                    category=category,
+                    check_set_id=check_set_id,
                     summary=summary,
                     required=required,
                     vars_list=vars_list,
@@ -230,8 +228,8 @@ def build_contract_preflight_checks(
                 _build_gpu_availability_check(
                     check_id=check_id,
                     check_group=check_group,
-                    phase=phase,
-                    phase_id=phase_id,
+                    category=category,
+                    check_set_id=check_set_id,
                     summary=summary,
                     required=required,
                     min_visible=int(spec.get("min_visible") or 0),
@@ -251,8 +249,8 @@ def build_contract_preflight_checks(
                         RunbookPlanCheckTarget(
                             check_id=check_id,
                             check_group=check_group,
-                            phase=phase,
-                            phase_id=phase_id,
+                            category=category,
+                            check_set_id=check_set_id,
                             runbook_path=runbook_path,
                             fallback_summary=summary,
                             required=required,
@@ -279,8 +277,8 @@ def build_contract_preflight_checks(
                         CommandCheckTarget(
                             check_id=check_id,
                             check_group=check_group,
-                            phase=phase,
-                            phase_id=phase_id,
+                            category=category,
+                            check_set_id=check_set_id,
                             argv=argv,
                             cwd=_resolve_command_cwd(
                                 surface_payload=surface_payload,
@@ -312,8 +310,8 @@ def build_contract_preflight_checks(
                         SchedulerQueueCheckTarget(
                             check_id=check_id,
                             check_group=check_group,
-                            phase=phase,
-                            phase_id=phase_id,
+                            category=category,
+                            check_set_id=check_set_id,
                             backend=backend,
                             max_running_jobs=int(spec.get("max_running_jobs") or 0),
                             max_queued_jobs=(
@@ -362,8 +360,8 @@ def _build_environment_check(
     *,
     check_id: str,
     check_group: str,
-    phase: str,
-    phase_id: str,
+    category: str,
+    check_set_id: str,
     summary: str,
     required: bool,
     vars_list: Sequence[str],
@@ -391,8 +389,8 @@ def _build_environment_check(
         kind="environment",
         required=required,
         check_group=check_group,
-        phase=phase,
-        phase_id=phase_id,
+        category=category,
+        check_set_id=check_set_id,
         state="ok" if matched else "attention",
         summary=resolved_summary,
         details={
@@ -422,8 +420,8 @@ def _build_gpu_availability_check(
     *,
     check_id: str,
     check_group: str,
-    phase: str,
-    phase_id: str,
+    category: str,
+    check_set_id: str,
     summary: str,
     required: bool,
     min_visible: int,
@@ -438,8 +436,8 @@ def _build_gpu_availability_check(
         kind="gpu_availability",
         required=required,
         check_group=check_group,
-        phase=phase,
-        phase_id=phase_id,
+        category=category,
+        check_set_id=check_set_id,
         state="ok" if matched else "attention",
         summary=resolved_summary,
         details={
@@ -455,8 +453,8 @@ def _build_workspace_layout_check(
     *,
     check_id: str,
     check_group: str,
-    phase: str,
-    phase_id: str,
+    category: str,
+    check_set_id: str,
     summary: str,
     required: bool,
     surface_id: str,
@@ -478,8 +476,8 @@ def _build_workspace_layout_check(
         kind="workspace_layout",
         required=required,
         check_group=check_group,
-        phase=phase,
-        phase_id=phase_id,
+        category=category,
+        check_set_id=check_set_id,
         state=state,
         summary=resolved_summary,
         surface_id=surface_id,
@@ -496,8 +494,8 @@ def _build_path_exists_check(
     *,
     check_id: str,
     check_group: str,
-    phase: str,
-    phase_id: str,
+    category: str,
+    check_set_id: str,
     summary: str,
     required: bool,
     artifact_id: str,
@@ -521,8 +519,8 @@ def _build_path_exists_check(
         kind="path_exists",
         required=required,
         check_group=check_group,
-        phase=phase,
-        phase_id=phase_id,
+        category=category,
+        check_set_id=check_set_id,
         state="ok" if exists else "missing",
         summary=resolved_summary,
         artifact_id=artifact_id,
@@ -537,8 +535,8 @@ def _build_dataset_snapshot_check(
     *,
     check_id: str,
     check_group: str,
-    phase: str,
-    phase_id: str,
+    category: str,
+    check_set_id: str,
     summary: str,
     required: bool,
     artifact_id: str,
@@ -583,8 +581,8 @@ def _build_dataset_snapshot_check(
         kind="dataset_snapshot",
         required=required,
         check_group=check_group,
-        phase=phase,
-        phase_id=phase_id,
+        category=category,
+        check_set_id=check_set_id,
         state=state,
         summary=resolved_summary,
         artifact_id=artifact_id,
@@ -603,8 +601,8 @@ def _build_sequence_view_contract_check(
     *,
     check_id: str,
     check_group: str,
-    phase: str,
-    phase_id: str,
+    category: str,
+    check_set_id: str,
     summary: str,
     required: bool,
     artifact_id: str,
@@ -628,8 +626,8 @@ def _build_sequence_view_contract_check(
             kind="sequence_view_contract",
             required=required,
             check_group=check_group,
-            phase=phase,
-            phase_id=phase_id,
+            category=category,
+            check_set_id=check_set_id,
             state="missing",
             summary=f"{summary.rstrip('.')} Missing dataset artifact: {artifact_state['path']}.",
             artifact_id=artifact_id,
@@ -644,8 +642,8 @@ def _build_sequence_view_contract_check(
             kind="sequence_view_contract",
             required=required,
             check_group=check_group,
-            phase=phase,
-            phase_id=phase_id,
+            category=category,
+            check_set_id=check_set_id,
             state="attention",
             summary=f"{summary.rstrip('.')} Dataset root could not be resolved for artifact {artifact_id}.",
             artifact_id=artifact_id,
@@ -664,8 +662,8 @@ def _build_sequence_view_contract_check(
             kind="sequence_view_contract",
             required=required,
             check_group=check_group,
-            phase=phase,
-            phase_id=phase_id,
+            category=category,
+            check_set_id=check_set_id,
             state="attention",
             summary=f"{summary.rstrip('.')} Sequence-view contract probe failed: {exc}",
             artifact_id=artifact_id,
@@ -687,8 +685,8 @@ def _build_sequence_view_contract_check(
         kind="sequence_view_contract",
         required=required,
         check_group=check_group,
-        phase=phase,
-        phase_id=phase_id,
+        category=category,
+        check_set_id=check_set_id,
         state="ok" if report.ok else "attention",
         summary=summary if report.ok else f"{summary.rstrip('.')} {len(report.errors)} contract error(s).",
         artifact_id=artifact_id,
@@ -704,8 +702,8 @@ def _build_infer_sequence_view_completion_check(
     *,
     check_id: str,
     check_group: str,
-    phase: str,
-    phase_id: str,
+    category: str,
+    check_set_id: str,
     summary: str,
     required: bool,
     surface_id: str,
@@ -736,8 +734,8 @@ def _build_infer_sequence_view_completion_check(
             kind="infer_sequence_view_completion",
             required=required,
             check_group=check_group,
-            phase=phase,
-            phase_id=phase_id,
+            category=category,
+            check_set_id=check_set_id,
             summary=summary,
             execution=execution,
             surface_id=surface_id,
@@ -755,8 +753,8 @@ def _build_infer_sequence_view_completion_check(
             kind="infer_sequence_view_completion",
             required=required,
             check_group=check_group,
-            phase=phase,
-            phase_id=phase_id,
+            category=category,
+            check_set_id=check_set_id,
             summary=f"{summary.rstrip('.')} Infer completion planner output could not be parsed: {exc}",
             execution=execution,
             surface_id=surface_id,
@@ -778,8 +776,8 @@ def _build_infer_sequence_view_completion_check(
         kind="infer_sequence_view_completion",
         required=required,
         check_group=check_group,
-        phase=phase,
-        phase_id=phase_id,
+        category=category,
+        check_set_id=check_set_id,
         summary=resolved_summary,
         execution=execution,
         surface_id=surface_id,
@@ -1051,10 +1049,7 @@ def _resolve_command_cwd(
     )
 
 
-def _phase_label(*, spec: Mapping[str, object], check_group: str, kind: str) -> str:
-    explicit_phase = str(spec.get("phase") or "").strip()
-    if explicit_phase:
-        return explicit_phase
+def _check_category(*, check_group: str, kind: str) -> str:
     if kind == "runbook_plan" or check_group.endswith("_plan"):
         return "ops"
     if kind == "scheduler_queue":
@@ -1071,7 +1066,7 @@ def _compile_contract_preflight_checks(
 ) -> tuple[_CompiledContractCheck, ...]:
     enabled_group_set = {str(group).strip() for group in enabled_groups if str(group).strip()}
     compiled_checks: list[_CompiledContractCheck] = []
-    for declared_phase_id, specs in check_specs.items():
+    for check_set_id, specs in check_specs.items():
         for raw_spec in specs:
             spec = dict(raw_spec)
             check_group = str(spec.get("check_group") or "").strip()
@@ -1083,14 +1078,14 @@ def _compile_contract_preflight_checks(
                     check_id=str(spec.get("check_id") or "").strip(),
                     kind=kind,
                     check_group=check_group,
-                    phase_id=str(spec.get("phase_id") or declared_phase_id).strip() or declared_phase_id,
-                    phase=_phase_label(spec=spec, check_group=check_group, kind=kind),
+                    check_set_id=check_set_id,
+                    category=_check_category(check_group=check_group, kind=kind),
                     summary=str(spec.get("summary") or "").strip(),
                     required=bool(spec.get("required", True)),
                     payload={
                         key: value
                         for key, value in spec.items()
-                        if key not in {"check_id", "kind", "check_group", "phase_id", "phase", "summary", "required"}
+                        if key not in {"check_id", "kind", "check_group", "summary", "required"}
                     },
                 )
             )
