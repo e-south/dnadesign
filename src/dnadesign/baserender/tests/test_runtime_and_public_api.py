@@ -260,6 +260,16 @@ def test_public_style_helpers_are_root_exports() -> None:
     assert baserender.get_style_profile_descriptor("motif_showcase.v1").docs_slug == "motif-showcase"
 
 
+def test_promoter_profile_preserves_the_motif_palette() -> None:
+    motif_palette = baserender.style_profile_overrides("motif_showcase.v1")["palette"]
+    promoter_palette = baserender.style_profile_overrides("promoter_compact_slide.v1")["palette"]
+
+    assert set(motif_palette).issubset(promoter_palette)
+    for regulator in ("acrR", "araC", "fnr", "fur", "lacI", "lrp", "rcdA", "soxR", "soxS"):
+        key = f"tf:{regulator}"
+        assert promoter_palette[key] == motif_palette[key]
+
+
 def test_public_catalog_describes_transform_parameters() -> None:
     assert set(baserender.list_transforms()) == {
         "attach_motifs_from_config",
