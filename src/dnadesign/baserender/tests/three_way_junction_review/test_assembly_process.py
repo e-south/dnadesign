@@ -28,6 +28,7 @@ from dnadesign.baserender.src.render.junction_review.assembly_geometry import (
     PRODUCT_BASE_WIDTH_INCHES,
     STAGE_TITLE_TO_MOLECULE,
     TRANSITION_TO_STAGE_TITLE,
+    assembly_layout,
 )
 from dnadesign.baserender.src.render.junction_review.foundation import PRIMER_BINDING_SITE, review_from_record
 from dnadesign.baserender.src.render.junction_review.primitives import (
@@ -167,9 +168,12 @@ def test_fragment_and_detail_typography_is_centered_legible_and_collision_free()
         assert title.get_ha() == "center"
         assert min(text.get_fontsize() for text in bases if ":base:" in (text.get_gid() or "")) >= 9.0
         annealed_text = "\n".join(text.get_text() for text in annealed_axis.texts)
-        assert "forward primer-binding site" in annealed_text
-        assert "reverse primer-binding site" in annealed_text
-        assert any(patch.get_facecolor() == to_rgba(PRIMER_BINDING_SITE) for patch in annealed_axis.patches)
+        assert annealed_text.splitlines().count("forward primer-binding site") == 1
+        assert annealed_text.splitlines().count("reverse primer-binding site") == 1
+        primer_binding_fills = [
+            patch for patch in annealed_axis.patches if patch.get_facecolor() == to_rgba(PRIMER_BINDING_SITE)
+        ]
+        assert len(primer_binding_fills) == 4
         assert "target contributes" not in annealed_text
         assert "Vertical guides" not in annealed_text
         assert "Expected sequence geometry" not in annealed_text
@@ -230,7 +234,7 @@ def test_assembly_view_shows_orders_three_way_state_and_exact_pcr_duplex() -> No
         assert axis.get_gid() == "junction-three-way-assembly:assembly"
         text = "\n".join(item.get_text() for item in axis.texts)
         assert "Oligo plan for target-0000" in text
-        assert "Input target sequence" in text
+        assert "Submitted target specification" in text
         assert "The oligos remain separate before annealing" not in text
         assert "Fragment oligos encode the target" in text
         assert "Annealing forms pre-ligation junctions" in text
@@ -239,6 +243,14 @@ def test_assembly_view_shows_orders_three_way_state_and_exact_pcr_duplex() -> No
         assert "forward primer-binding site" in text
         assert "reverse primer-binding site" in text
         assert any(patch.get_facecolor() == to_rgba(PRIMER_BINDING_SITE) for patch in axis.patches)
+        input_body = next(
+            patch for patch in axis.patches if patch.get_gid() == "junction-three-way-assembly:input:strand:body"
+        )
+        input_outline = next(
+            patch for patch in axis.patches if patch.get_gid() == "junction-three-way-assembly:input:strand:outline"
+        )
+        assert input_body.get_facecolor() != to_rgba("#EEF0F3")
+        assert input_outline.get_linestyle() != "solid"
         assert "anneal" not in {
             artist.get_text()
             for artist in axis.texts
@@ -376,7 +388,7 @@ def test_assembly_view_shows_orders_three_way_state_and_exact_pcr_duplex() -> No
             for gid, artist in by_gid.items()
             if gid.startswith("junction-three-way-assembly:product:terminus:")
         ]
-        assert len(product_coordinates) == 3
+        assert not product_coordinates
         assert all(
             not coordinate.overlaps(terminus) for coordinate in product_coordinates for terminus in product_termini
         )
@@ -490,6 +502,31 @@ def test_expected_pcr_duplex_stays_on_one_row_when_it_fits() -> None:
         assert len(pairs) == 1
     finally:
         plt.close(figure)
+
+
+def test_capped_gene_scale_product_reuses_target_scale_before_wrapping() -> None:
+    [record] = _real_records(target_count=1, target_length=1_000)
+    review = review_from_record(record)
+    layout = assembly_renderer._assembly_layout(review)
+    product_length = len(review.recovery.extended_top_sequence_5to3)
+
+    assert layout.width == pytest.approx(64.0)
+    assert layout.product_bases_per_row == product_length
+    assert (layout.product_right - layout.product_left) / product_length == pytest.approx(layout.target_base_step)
+
+
+def test_product_wraps_only_after_exhausting_the_target_scale_row() -> None:
+    layout = assembly_layout(
+        fragment_widths=(100,) * 10,
+        target_length=1_000,
+        barcode_length=22,
+        product_length=1_100,
+    )
+
+    assert 1_000 < layout.product_bases_per_row < 1_100
+    assert (layout.product_right - layout.product_left) / layout.product_bases_per_row == pytest.approx(
+        layout.target_base_step
+    )
 
 
 def test_oversized_expected_pcr_duplex_rejects_before_figure_allocation(

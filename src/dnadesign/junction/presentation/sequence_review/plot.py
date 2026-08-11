@@ -107,6 +107,14 @@ def _limits(matrix: np.ndarray) -> tuple[float, float]:
     return minimum, maximum
 
 
+def _matrix_value_text_color(image, value: float) -> str:
+    """Choose legible text against the rendered heatmap cell."""
+
+    red, green, blue, _alpha = image.cmap(image.norm(value))
+    luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+    return "#FFFFFF" if luminance < 0.52 else _INK
+
+
 def _draw_matrix(
     axis,
     matrix: np.ndarray,
@@ -132,6 +140,7 @@ def _draw_matrix(
     image.set_gid(f"{gid}:matrix")
     axis.set_xlim(-0.5, matrix.shape[0] - 0.5)
     axis.set_ylim(matrix.shape[0] - 0.5, -0.5)
+    axis.set_aspect("equal", adjustable="box")
     axis.set_title(title, fontsize=13.0, color=_INK, pad=12, fontweight="normal")
     axis.set_xticks(range(len(labels)), labels=labels, rotation=55, ha="right", rotation_mode="anchor")
     axis.set_yticks(
@@ -144,12 +153,22 @@ def _draw_matrix(
         spine.set_visible(False)
     if len(labels) <= 12:
         integer_values = np.allclose(matrix, np.rint(matrix))
+        value_fontsize = min(9.0, max(6.5, 88.0 / len(labels)))
         for row in range(len(labels)):
             for column in range(len(labels)):
                 value = "—" if row == column else f"{matrix[row, column]:.0f}"
                 if row != column and not integer_values:
                     value = f"{matrix[row, column]:.2f}"
-                axis.text(column, row, value, ha="center", va="center", fontsize=8.5, color=_INK)
+                artist = axis.text(
+                    column,
+                    row,
+                    value,
+                    ha="center",
+                    va="center",
+                    fontsize=value_fontsize,
+                    color=_MUTED if row == column else _matrix_value_text_color(image, matrix[row, column]),
+                )
+                artist.set_gid(f"{gid}:value:{row}:{column}")
     colorbar = axis.figure.colorbar(image, ax=axis, fraction=0.046, pad=0.035)
     colorbar.solids.set_rasterized(False)
     colorbar.outline.set_visible(False)
@@ -181,11 +200,15 @@ def plot_sequence_dissimilarity(
     selection = resolve_selection(review, junction_ids)
     matrices = pairwise_matrices(review, selection)
     labels = _labels(review, selection)
-    figure = Figure(figsize=(15.2, 5.7), dpi=150)
+    figure = Figure(figsize=(17.4, 6.5), dpi=150)
     axes = figure.subplots(1, 3)
     figure.patch.set_facecolor(_BACKGROUND)
     figure.suptitle(
-        "Pairwise string metrics show how the selected junctions differ",
+        (
+            f"Pairwise string metrics compare {selection.selected_count} of {selection.total_count} junctions"
+            if selection.selected_count != selection.total_count
+            else f"Pairwise string metrics compare {selection.selected_count} junctions"
+        ),
         x=0.5,
         y=0.985,
         ha="center",
@@ -193,20 +216,6 @@ def plot_sequence_dissimilarity(
         fontsize=19.0,
         fontweight="semibold",
         color=_INK,
-    )
-    scope = (
-        f"{selection.selected_count} of {selection.total_count} junctions"
-        if selection.selected_count != selection.total_count
-        else f"{selection.selected_count} junctions"
-    )
-    figure.text(
-        0.5,
-        0.925,
-        f"{_safe_identifier(review.assembly_group_id)} · {scope} · thermodynamic screening not run",
-        ha="center",
-        va="top",
-        fontsize=11.5,
-        color=_MUTED,
     )
     panels = (
         (
@@ -242,9 +251,9 @@ def plot_sequence_dissimilarity(
     figure.subplots_adjust(
         left=_LEFT_MARGIN_MIN,
         right=0.965,
-        top=0.81,
-        bottom=0.19,
-        wspace=0.42,
+        top=0.82,
+        bottom=0.18,
+        wspace=0.34,
     )
     figure.subplots_adjust(left=_left_margin_for_visible_labels(figure, axes[0]))
     return figure

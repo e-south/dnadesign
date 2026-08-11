@@ -1,110 +1,129 @@
 ---
 doc_id: junction-getting-started
-title: Run the junction gene-scale example
+title: Build a gene-scale junction design
 type: tutorial
 audience: first-time users
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-10
+last_verified: 2026-08-11
 ---
 
-# Run the gene-scale example
+# Build a gene-scale design
 
-This tutorial plans one 705 bp target as 13 fragment pairs joined at 12
-three-way interfaces. It produces order and sequence files, verifies the
-bundle, and renders four optional checks.
+This tutorial starts with one 705 bp DNA sequence and two 20 nt primer-binding
+sites, one at each end. `junction` divides the sequence into 13 two-strand
+fragments, chooses 12 temporary three-way interfaces, writes the order files,
+and confirms that the planned fragments reconstruct the submitted sequence.
 
-## 1. Choose the input
+The figures are optional checks. The order table and FASTA files are the
+handoff artifacts.
 
-`junction` accepts a complete JSON or YAML request. The `request` command can
-also place raw, text, or FASTA sequences into an existing planning profile. A
-FASTA input has this form (the sequence is shortened here only for display):
+## Before you start
+
+Run the tutorial from the root of a cloned `dnadesign` repository. If the
+environment is not installed yet, follow the repository [installation
+guide](../../../../docs/setup/installation.md), then run:
+
+```bash
+# Install the exact dependency versions recorded by dnadesign.
+uv sync --locked
+```
+
+## 1. Copy the example into a temporary directory
+
+The target could also arrive as raw DNA, a text file, or FASTA. A FASTA record
+looks like this; the sequence is shortened only in this display:
 
 ```fasta
 >gene-scale-target
 TCATTCTAGGCTAGCTGAGT...TATAGGGTTCTGCAGTACTCGGTCCTG
 ```
 
-Use the checked-in request for the runnable example:
+Prepare the checked-in example:
 
 ```bash
-uv sync --locked
+# Make a new temporary directory so generated files do not mix with source files.
 JUNCTION_DEMO_ROOT="$(mktemp -d)"
+
+# Resolve the directory to one physical path and make it available to later commands.
 JUNCTION_DEMO_ROOT="$(cd "$JUNCTION_DEMO_ROOT" && pwd -P)"
 export JUNCTION_DEMO_ROOT
+
+# Copy the example request and the three optional drawing jobs.
 cp src/dnadesign/junction/examples/gene-scale/request.yaml \
   "$JUNCTION_DEMO_ROOT/request.yaml"
 cp src/dnadesign/junction/examples/gene-scale/jobs/*.yaml \
   "$JUNCTION_DEMO_ROOT/"
 ```
 
-For your own FASTA file, replace the targets in a reviewed base request:
+The request contains the target sequence, the two primer sequences, acceptable
+fragment lengths, search limits, and a fixed random seed. Read those values
+before substituting a real sequence.
+
+You can also replace the example target with one or more FASTA records while
+keeping the same planning limits:
 
 ```bash
+# Read the planning limits from the example and the target sequences from FASTA.
 uv run junction request \
-  --base-request reviewed-request.yaml \
+  --base-request "$JUNCTION_DEMO_ROOT/request.yaml" \
   --input targets.fasta \
   --assembly-group assembly-01 \
   --primer-binding-length 20 \
-  > request.json
+  > "$JUNCTION_DEMO_ROOT/request-from-fasta.json"
 ```
 
-FASTA record IDs become target IDs. The compiler normalizes whitespace and
-case, but rejects ambiguity codes, duplicate IDs, and malformed input. It
-preserves the base request's planning and order policy; inspect those fields
-before using the compiled request.
+FASTA IDs become target IDs. Malformed FASTA, duplicate IDs, ambiguity codes,
+and invalid terminal primer matches fail before search begins.
 
-## 2. Build the design bundle
+## 2. Build the bundle
 
 ```bash
+# Plan the oligos, publish a new bundle, and replay it once after publication.
 uv run junction build "$JUNCTION_DEMO_ROOT/request.yaml" \
   --output "$JUNCTION_DEMO_ROOT/design-bundle" \
   --format json
 ```
 
-The search chooses one target-derived toehold at each interface, generates
-temporary barcodes, and compares the selected strings within their assembly
-group. It then composes both strands of every fragment and checks exact target
-reconstruction, primer matches, and the declared order-length interval.
+`junction` chooses short target-derived toeholds, assigns temporary barcode
+sequences, builds both strands of every fragment, and checks the final sequence
+and every order length. The output directory must be new; the command will not
+silently replace an earlier design.
 
-The output directory is create-only. Reuse requires a new destination rather
-than overwriting an earlier result.
-
-## 3. Check the fragment pairs
-
-Run the packaged BaseRender job:
+## 3. Check the planned fragment pairs
 
 ```bash
+# Render the two orderable strands for every planned fragment.
 uv run baserender job run \
   "$JUNCTION_DEMO_ROOT/annealed-fragments.yaml"
 ```
 
 [![The 13 fragment pairs aligned by expected base pairing](assets/annealed-fragments.svg)](assets/annealed-fragments.svg)
 
-Each row shows the two orderable strands for one fragment. Vertical alignment
-marks declared Watson–Crick pairs; the external barcode and target-derived
-toehold arms remain exposed. The labels report the actual strand lengths.
+Each fragment occupies one row. The two oligos are aligned on the bases that
+should anneal. Primer-binding, target, toehold, and barcode spans keep the same
+colors across the tutorial; exposed barcode and toehold arms remain unpaired.
+The strand labels give the actual order lengths.
 
-## 4. Compare the selected interfaces
+## 4. Compare the interface strings
 
-The search uses three string comparisons: position-weighted edit distance for
-toeholds, edit distance for barcodes, and the longest shared span after each
-toehold is joined to its assigned barcode. Render the selected set through the
-public API:
+The planner compares the toeholds and barcodes that must remain distinguishable
+within one assembly reaction. Draw the selected strings through the Python API:
 
 ```python
-from pathlib import Path
 import os
+from pathlib import Path
 
 from dnadesign.junction import render_sequence_dissimilarity_svg
 
 root = Path(os.environ["JUNCTION_DEMO_ROOT"])
-request = root / "request.yaml"
 output = root / "reviews" / "sequence-dissimilarity.svg"
 output.parent.mkdir(parents=True, exist_ok=True)
+
+# Reuse the request and write one deterministic SVG.
 output.write_bytes(
     render_sequence_dissimilarity_svg(
-        request,
+        root / "request.yaml",
         assembly_group_id="gene-scale-example",
     )
 )
@@ -112,54 +131,57 @@ output.write_bytes(
 
 [![Pairwise string comparisons for 12 selected interfaces](assets/sequence-dissimilarity.svg)](assets/sequence-dissimilarity.svg)
 
-Larger values indicate better separation in the first two panels; smaller
-values indicate better separation in the last. These are the planner's string
-metrics, not folding or thermodynamic predictions.
+In the first two panels, a larger number means the strings differ more. In the
+third, a smaller number means they share a shorter exact span. The planner uses
+these sequence comparisons during search; the plots do not predict folding or
+reaction yield.
 
-## 5. Inspect every three-way interface
+## 5. Inspect each three-way interface
 
 ```bash
+# Render every local junction at nucleotide resolution.
 uv run baserender job run \
   "$JUNCTION_DEMO_ROOT/junction-detail.yaml"
 ```
 
 [![Nucleotide-level geometry for all 12 three-way interfaces](assets/junction-detail.svg)](assets/junction-detail.svg)
 
-Each panel shows the horizontal target helix, the perpendicular barcode helix,
-the complement-strand nick, strand direction, and exact paired bases. The
-figure is a local sequence check; the bundle remains the source for complete
-oligo strings and search evidence.
+Each panel shows one target helix, its perpendicular barcode helix, the
+complement-strand nick, 5′/3′ direction, and every declared base pair. Use this
+view to inspect local sequence geometry. Use `orders/oligos.tsv` for complete
+order strings.
 
-## 6. Review the complete oligo plan
+## 6. Follow the complete sequence path
 
 ```bash
+# Render the target specification, oligos, pre-ligation state, and PCR product.
 uv run baserender job run \
   "$JUNCTION_DEMO_ROOT/assembly-process.yaml"
 ```
 
 [![The target, fragment oligos, pre-ligation interfaces, and expected PCR duplex](assets/assembly-process.svg)](assets/assembly-process.svg)
 
-This view aligns the input target, separate fragment oligos, complete
-pre-ligation assembly, and expected PCR duplex on nucleotide coordinates. Use
-the other two molecular views when exact pairing or local junction geometry is
-the review question.
+The first row is the submitted in-silico target specification, shown with a
+dashed outline. The next rows show the physical oligos before annealing, the
+expected pre-ligation geometry, and the primer-extended duplex expected from
+PCR. A product stays on one row when the nucleotide scale permits it and wraps
+only when it exceeds the available width.
 
 ## 7. Verify and hand off
 
 ```bash
+# Reopen the finished bundle and reproduce its sequences and checks.
 uv run junction verify "$JUNCTION_DEMO_ROOT/design-bundle" --format json
 ```
 
-Use these files for the next task:
-
 | Need | File |
 | --- | --- |
-| Complete order rows | `orders/oligos.tsv` |
-| Target, oligo, and expected PCR sequences | `sequences/*.fasta` |
+| Order rows | `orders/oligos.tsv` |
+| Targets, oligos, and expected PCR products | `sequences/*.fasta` |
 | Selected loci, strings, and search receipts | `plan.json` |
-| Compact pass and `not_run` states | `checks.json` |
-| Replay identity and file digests | `manifest.json` |
+| Passed and `not_run` checks | `checks.json` |
+| File inventory, digests, and replay identity | `manifest.json` |
 
-Continue with [Prepare a request](guides/prepare-a-request.md) for real inputs
-or [Inspect and verify](guides/inspect-and-verify.md) for the complete bundle
-review path.
+Next, use [Prepare a request](guides/prepare-a-request.md) for real targets or
+[Inspect and verify](guides/inspect-and-verify.md) for a field-by-field bundle
+review.
