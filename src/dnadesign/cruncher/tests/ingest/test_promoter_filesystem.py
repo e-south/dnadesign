@@ -1,4 +1,13 @@
-"""Filesystem-backed promoter source discovery."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/tests/ingest/test_promoter_filesystem.py
+
+Regression tests for filesystem-backed promoter source discovery.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
