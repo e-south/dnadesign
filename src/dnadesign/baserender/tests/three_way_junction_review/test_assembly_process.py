@@ -513,6 +513,22 @@ def test_capped_gene_scale_product_reuses_target_scale_before_wrapping() -> None
     assert layout.width == pytest.approx(64.0)
     assert layout.product_bases_per_row == product_length
     assert (layout.product_right - layout.product_left) / product_length == pytest.approx(layout.target_base_step)
+    assert layout.target_fontsize < 11.0
+
+    figure = baserender.render(record, renderer="junction_three_way_assembly")
+    try:
+        product_glyphs = [
+            collection
+            for collection in figure.axes[0].collections
+            if (collection.get_gid() or "").startswith("junction-three-way-assembly:product:")
+            and ":glyph:" in (collection.get_gid() or "")
+        ]
+        assert product_glyphs
+        assert all(
+            collection.get_sizes() == pytest.approx([layout.target_fontsize**2]) for collection in product_glyphs
+        )
+    finally:
+        plt.close(figure)
 
 
 def test_product_wraps_only_after_exhausting_the_target_scale_row() -> None:

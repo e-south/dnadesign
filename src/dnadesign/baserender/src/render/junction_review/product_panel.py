@@ -107,7 +107,7 @@ def draw_expected_pcr_product(
                 delta_x=base_step,
                 delta_y=0.0,
                 gid_prefix=f"junction-three-way-assembly:product:{role}:window:{window.index}",
-                fontsize=11.0,
+                fontsize=layout.target_fontsize,
             )
         pairs = LineCollection(
             [
