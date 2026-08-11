@@ -156,7 +156,7 @@ def render_sequence_dissimilarity_svg(
 ) -> bytes:
     """Render deterministic SVG bytes for one assembly group's string metrics."""
 
-    from dnadesign.junction.presentation.sequence_review import (
+    from dnadesign.junction.presentation.sequence_review.plot import (
         render_sequence_dissimilarity_svg as _render_sequence_dissimilarity_svg,
     )
 
