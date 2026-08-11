@@ -1,4 +1,13 @@
-"""Render a compact synthesis purchase-price comparison."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/junction/economics/render.py
+
+Render a compact synthesis purchase-price comparison.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
