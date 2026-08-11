@@ -15,7 +15,7 @@ fragment arrives as one assembled sequence. Junction plans a target as a set of
 short oligos that still require annealing, three-way-junction assembly,
 ligation, PCR, and verification.
 
-![Purchase price for gene fragments and Junction oligo pools](../assets/purchase-price-comparison.svg)
+![Purchase price for gene fragments and oligo pools](../assets/purchase-price-comparison.svg)
 
 The example prices 1,000-nt targets against one pool of 36 oligos per target.
 Both axes are logarithmic because the supplied pool table spans 2 to 696,000
