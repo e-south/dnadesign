@@ -17,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-from dnadesign.baserender import cruncher_showcase_style_overrides
+from dnadesign.baserender import style_profile_overrides
 from dnadesign.baserender.src.config import load_render_job
 from dnadesign.baserender.src.public import run_render_job
 
@@ -51,7 +51,7 @@ def test_curated_workspace_demos_are_self_contained() -> None:
         assert _is_under(job.input.path, ws / "inputs"), f"{name} input path must be within workspace inputs/"
 
         if name == "demo_cruncher_render":
-            assert raw["render"]["style"]["overrides"] == cruncher_showcase_style_overrides()
+            assert raw["render"]["style"]["overrides"] == style_profile_overrides("motif_showcase.v1")
             cols = job.input.adapter.columns
             assert job.input.adapter.kind == "generic_features"
             assert cols["features"] == "features"

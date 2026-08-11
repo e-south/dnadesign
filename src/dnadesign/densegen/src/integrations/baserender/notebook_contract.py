@@ -15,10 +15,10 @@ import re
 from dataclasses import dataclass
 from typing import Mapping
 
-from dnadesign.baserender import DENSEGEN_TFBS_REQUIRED_KEYS, cruncher_showcase_style_overrides
+from dnadesign.baserender import style_profile_overrides
 
 REQUIRED_ADAPTER_COLUMN_KEYS = ("id", "sequence", "annotations")
-REQUIRED_TFBS_ENTRY_KEYS = DENSEGEN_TFBS_REQUIRED_KEYS
+REQUIRED_TFBS_ENTRY_KEYS = ("regulator", "sequence", "orientation", "offset")
 
 _NOTEBOOK_COLORBLIND_PASTEL_PALETTE: Mapping[str, str] = {
     "tf:background": "#C3CAD3",
@@ -123,7 +123,7 @@ def _validate_notebook_render_contract(contract: DenseGenNotebookRenderContract)
 
 
 def densegen_notebook_render_contract() -> DenseGenNotebookRenderContract:
-    showcase_style = dict(cruncher_showcase_style_overrides())
+    showcase_style = dict(style_profile_overrides("motif_showcase.v1"))
     showcase_palette = dict(showcase_style.get("palette") or {})
     showcase_palette.update(densegen_baserender_palette_overrides())
     style_overrides = dict(showcase_style)

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.baserender import DENSEGEN_TFBS_REQUIRED_KEYS
+_DENSEGEN_TFBS_REQUIRED_KEYS = ("regulator", "sequence", "orientation", "offset")
 
 
 def _pkg_root() -> Path:
@@ -26,7 +26,6 @@ def test_docs_surface_stays_compact() -> None:
     assert docs_md == [
         "docs/README.md",
         "docs/demos/workspaces.md",
-        "docs/dev/journal.md",
         "docs/integrations/README.md",
         "docs/integrations/cruncher.md",
         "docs/integrations/densegen.md",
@@ -47,8 +46,8 @@ def test_readme_points_to_single_reference_and_examples() -> None:
 
 def test_baserender_docs_index_routes_to_reference_integrations_and_demos() -> None:
     text = (_pkg_root() / "docs" / "README.md").read_text()
-    assert "### Start here" in text
-    assert "### Documentation by type" in text
+    assert "## Choose a route" in text
+    assert "## Boundary" in text
     assert "reference.md" in text
     assert "integrations/README.md" in text
     assert "demos/workspaces.md" in text
@@ -73,7 +72,7 @@ def test_workspace_demo_guide_matches_output_contract() -> None:
 
 def test_densegen_integration_doc_declares_strict_tfbs_contract() -> None:
     text = (_pkg_root() / "docs" / "integrations" / "densegen.md").read_text()
-    for key in DENSEGEN_TFBS_REQUIRED_KEYS:
+    for key in _DENSEGEN_TFBS_REQUIRED_KEYS:
         assert f"`{key}`" in text
     assert "Legacy TFBS keys (`tf`, `tfbs`, `stage_a_*`) are not accepted" in text
     assert "`on_invalid_row=error`" in text
@@ -89,13 +88,10 @@ def test_reference_and_cruncher_integration_docs_cover_cassette_json_contract_pa
     assert "src/public/" in reference
     assert "src/execution/" in reference
     assert "src/workspaces/" in reference
-    assert "sequence_rows_render_v3" in reference
-    assert "nucleotide_evidence_map_render_v3" in reference
+    assert "src/integrations/" in reference
+    assert "baserender catalog --json" in reference
     assert "list_render_contracts" in reference
-    assert "`json`" in reference
-    assert "`jsonl`" in reference
-    assert "duplex_sequence_v1" in reference
-    assert "hairpin_topology_v1" in reference
+    assert "parquet, json, and jsonl" in reference
     assert "linear_duplex.v1.json" in cruncher
     assert "top_hits.linear_duplex.v1.jsonl" in cruncher
     assert "duplex_sequence_v1" in cruncher
@@ -105,10 +101,8 @@ def test_reference_and_yiu_integration_docs_cover_payload_visual_adapter_surface
     reference = (_pkg_root() / "docs" / "reference.md").read_text()
     yiu = (_pkg_root() / "docs" / "integrations" / "yiu.md").read_text()
 
-    assert "yiu_payload_visual_v1" in reference
-    assert "nucleotide_evidence_map" in reference
     assert "adapt_record" in reference
-    assert "topology cartoons require explicit segment geometry" in reference
+    assert "producing tool owns calculations" in reference
     assert "YiuPayloadVisualV1" in yiu
     assert "yiu_payload_visual_v1" in yiu
     assert "nucleotide_evidence_map" in yiu
@@ -125,3 +119,15 @@ def test_reference_and_yiu_integration_docs_cover_payload_visual_adapter_surface
 def test_yiu_payload_visual_projection_shim_stays_removed() -> None:
     shim = _pkg_root() / "src" / "adapters" / "yiu_payload_visual_projection.py"
     assert not shim.exists()
+
+
+def test_reference_describes_the_integration_boundary_without_stale_paths() -> None:
+    reference = (_pkg_root() / "docs" / "reference.md").read_text()
+
+    assert "src/integrations/<producer>/" in reference
+    assert "parser has no producer-specific branches" in reference
+    assert "entry-point discovery" in reference
+    assert "src/config/adapter_contracts.py" not in reference
+    assert "src/adapters/" not in reference
+    assert "src/styles/" not in reference
+    assert "Developer journal" not in reference

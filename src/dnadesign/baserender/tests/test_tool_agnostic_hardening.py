@@ -37,6 +37,18 @@ def test_job_parser_avoids_adapter_kind_branching() -> None:
     assert "cruncher_best_window" not in parser_text
 
 
+def test_job_parser_avoids_transform_name_branching() -> None:
+    root = Path(__file__).resolve().parents[1]
+    parser_text = _read(root / "src" / "config" / "render_job_v4.py")
+    for transform_name in (
+        "attach_motifs_from_config",
+        "attach_motifs_from_cruncher_lockfile",
+        "attach_motifs_from_library",
+        "sigma70",
+    ):
+        assert transform_name not in parser_text
+
+
 def test_render_layer_does_not_import_producer_implementations() -> None:
     root = Path(__file__).resolve().parents[1] / "src" / "render"
     violations: list[str] = []

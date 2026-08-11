@@ -188,6 +188,51 @@ def show_style_action(preset: str) -> dict[str, Any]:
     return loaded
 
 
+def catalog_action() -> dict[str, object]:
+    from ..public import (
+        get_adapter_descriptor,
+        get_style_profile_descriptor,
+        get_transform_descriptor,
+        list_adapters,
+        list_render_contracts,
+        list_renderers,
+        list_style_profiles,
+        list_transforms,
+    )
+
+    return {
+        "schema": "dnadesign.baserender.catalog.v1",
+        "adapters": [
+            {
+                "kind": descriptor.kind,
+                "owner_tool": descriptor.owner_tool,
+                "supported_renderers": list(descriptor.supported_renderers),
+                "supported_alphabets": list(descriptor.supported_alphabets),
+            }
+            for descriptor in (get_adapter_descriptor(kind) for kind in list_adapters())
+        ],
+        "transforms": [
+            {
+                "name": descriptor.name,
+                "owner_tool": descriptor.owner_tool,
+                "allowed_params": list(descriptor.allowed_params),
+                "required_params": list(descriptor.required_params),
+                "path_params": list(descriptor.path_params),
+            }
+            for descriptor in (get_transform_descriptor(name) for name in list_transforms())
+        ],
+        "style_profiles": [
+            {
+                "name": descriptor.name,
+                "owner_tool": descriptor.owner_tool,
+            }
+            for descriptor in (get_style_profile_descriptor(name) for name in list_style_profiles())
+        ],
+        "renderers": list(list_renderers()),
+        "render_contracts": list(list_render_contracts()),
+    }
+
+
 def discover_workspaces_action(root: Path | None) -> tuple[Workspace, ...]:
     return discover_workspaces(root=root)
 

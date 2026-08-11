@@ -20,6 +20,7 @@ import yaml
 from ..core import BaseRenderError
 from ..workspaces import default_workspaces_root
 from .actions import (
+    catalog_action,
     discover_workspaces_action,
     init_workspace_action,
     list_style_presets_action,
@@ -36,6 +37,24 @@ workspace_app = typer.Typer(help="Workspace commands")
 app.add_typer(job_app, name="job")
 app.add_typer(style_app, name="style")
 app.add_typer(workspace_app, name="workspace")
+
+
+@app.command("catalog")
+def catalog(
+    as_json: bool = typer.Option(False, "--json", help="Write the machine-readable capability catalog."),
+) -> None:
+    """List adapters, transforms, style profiles, renderers, and contracts."""
+    payload = catalog_action()
+    if as_json:
+        typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    for section in ("adapters", "transforms", "style_profiles", "renderers", "render_contracts"):
+        typer.echo(section)
+        entries = payload[section]
+        assert isinstance(entries, list)
+        for entry in entries:
+            name = entry if isinstance(entry, str) else entry.get("kind", entry.get("name"))
+            typer.echo(f"- {name}")
 
 
 def _exit_cli_error(exc: Exception) -> None:

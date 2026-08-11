@@ -16,29 +16,28 @@ import matplotlib.pyplot as plt
 import pytest
 from matplotlib.patches import FancyBboxPatch
 
-from dnadesign.baserender.src.adapters import build_adapter, required_source_columns
-from dnadesign.baserender.src.adapters.cruncher_best_window import CruncherBestWindowAdapter
-from dnadesign.baserender.src.adapters.duplex_sequence_v1 import DuplexSequenceV1Adapter
-from dnadesign.baserender.src.adapters.hairpin_topology_v1 import HairpinTopologyV1Adapter
-from dnadesign.baserender.src.adapters.scar_nick_visual_v1 import ScarNickVisualV1Adapter
-from dnadesign.baserender.src.adapters.sequence_evidence_map_v1 import (
+from dnadesign.baserender.src.config import AdapterCfg, resolve_style
+from dnadesign.baserender.src.core import SchemaError
+from dnadesign.baserender.src.integrations import adapter_descriptor, build_adapter, required_source_columns
+from dnadesign.baserender.src.integrations.cassette.duplex_sequence_v1 import DuplexSequenceV1Adapter
+from dnadesign.baserender.src.integrations.cassette.hairpin_topology_v1 import HairpinTopologyV1Adapter
+from dnadesign.baserender.src.integrations.cruncher.best_window import CruncherBestWindowAdapter
+from dnadesign.baserender.src.integrations.generic.sequence_evidence_map_v1 import (
     SequenceEvidenceMapV1Adapter,
     _style_token_for_owner,
     _style_token_for_tag,
 )
-from dnadesign.baserender.src.adapters.sequence_windows_v1 import SequenceWindowsV1Adapter
-from dnadesign.baserender.src.adapters.snapback_visual_v1 import SnapbackVisualV1Adapter
-from dnadesign.baserender.src.adapters.yiu_hairpin_topology_v1 import (
+from dnadesign.baserender.src.integrations.generic.sequence_windows_v1 import SequenceWindowsV1Adapter
+from dnadesign.baserender.src.integrations.scar_nick.visual_v1 import ScarNickVisualV1Adapter
+from dnadesign.baserender.src.integrations.snapback.visual_v1 import SnapbackVisualV1Adapter
+from dnadesign.baserender.src.integrations.yiu.hairpin_topology_v1 import (
     YiuHairpinTopologyV1Adapter,
 )
-from dnadesign.baserender.src.adapters.yiu_hairpin_topology_v1 import (
+from dnadesign.baserender.src.integrations.yiu.hairpin_topology_v1 import (
     _span as _yiu_hairpin_span,
 )
-from dnadesign.baserender.src.adapters.yiu_linear_state_v1 import YiuLinearStateV1Adapter
-from dnadesign.baserender.src.adapters.yiu_topology_cartoon_v1 import YiuTopologyCartoonV1Adapter
-from dnadesign.baserender.src.config import AdapterCfg, resolve_style
-from dnadesign.baserender.src.config.adapter_contracts import adapter_descriptor
-from dnadesign.baserender.src.core import SchemaError
+from dnadesign.baserender.src.integrations.yiu.linear_state_v1 import YiuLinearStateV1Adapter
+from dnadesign.baserender.src.integrations.yiu.topology_cartoon_v1 import YiuTopologyCartoonV1Adapter
 from dnadesign.baserender.src.render import Palette, legend_entries_for_record, render_record
 from dnadesign.baserender.src.runtime import initialize_runtime
 

@@ -15,9 +15,9 @@ import matplotlib.pyplot as plt
 import pytest
 from matplotlib.patches import FancyBboxPatch
 
-from dnadesign.baserender.src.adapters import build_adapter
 from dnadesign.baserender.src.config import AdapterCfg, resolve_style
 from dnadesign.baserender.src.core import SchemaError
+from dnadesign.baserender.src.integrations import build_adapter
 from dnadesign.baserender.src.render import Palette, render_record
 from dnadesign.baserender.src.render.layout import compute_layout
 from dnadesign.baserender.src.runtime import initialize_runtime

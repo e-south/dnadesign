@@ -34,6 +34,8 @@ from dnadesign.baserender.src.runtime import initialize_runtime
 
 from .conftest import densegen_job_payload, write_job, write_parquet
 
+_PROMOTER_PANEL_PROFILE = "promoter_compact_slide.v1"
+
 
 def test_runtime_bootstrap_is_explicit_and_idempotent() -> None:
     clear_feature_effect_contracts()
@@ -101,6 +103,7 @@ def test_public_sequence_panel_contract_renders_image() -> None:
     result = baserender.render_sequence_panel_image(
         row,
         adapter_kind="densegen_tfbs",
+        style_profile=_PROMOTER_PANEL_PROFILE,
         target_width_px=420,
         target_height_px=140,
     )
@@ -133,6 +136,7 @@ def test_public_sequence_panel_contract_uses_white_canvas_under_dark_rc() -> Non
         result = baserender.render_sequence_panel_image(
             row,
             adapter_kind="densegen_tfbs",
+            style_profile=_PROMOTER_PANEL_PROFILE,
             target_width_px=420,
             target_height_px=140,
         )
@@ -152,6 +156,7 @@ def test_public_sequence_panel_contract_renders_empty_densegen_annotations() -> 
     result = baserender.render_sequence_panel_image(
         row,
         adapter_kind="densegen_tfbs",
+        style_profile=_PROMOTER_PANEL_PROFILE,
         target_width_px=420,
         target_height_px=140,
     )
@@ -216,6 +221,7 @@ def test_public_sequence_panel_contract_renders_usr_genbank_image() -> None:
     result = baserender.render_sequence_panel_image(
         row,
         adapter_kind="usr_genbank_annotations_v1",
+        style_profile=_PROMOTER_PANEL_PROFILE,
         target_width_px=420,
         target_height_px=140,
     )
@@ -231,17 +237,39 @@ def test_public_sequence_panel_contract_renders_usr_genbank_image() -> None:
 
 
 def test_public_sequence_panel_contract_rejects_invalid_profile_and_adapter() -> None:
+    with pytest.raises(baserender.SchemaError, match="style_profile is required"):
+        baserender.render_sequence_panel_image({}, adapter_kind="densegen_tfbs")
+
     with pytest.raises(baserender.SchemaError, match="Unknown sequence panel profile"):
         baserender.sequence_panel_config_for_adapter("densegen_tfbs", style_profile="missing_profile")
 
     with pytest.raises(baserender.SchemaError, match="Unsupported sequence panel adapter kind"):
-        baserender.sequence_panel_config_for_adapter("missing_adapter")
+        baserender.sequence_panel_config_for_adapter(
+            "missing_adapter",
+            style_profile=_PROMOTER_PANEL_PROFILE,
+        )
 
 
 def test_public_style_helpers_are_root_exports() -> None:
     assert "presentation_default" in baserender.list_style_presets()
     style = baserender.resolve_style(preset=None, overrides={})
     assert isinstance(style, baserender.Style)
+    assert baserender.list_style_profiles() == ("motif_showcase.v1", "promoter_compact_slide.v1")
+    overrides = baserender.style_profile_overrides("motif_showcase.v1")
+    assert overrides["motif_logo"]["display_mode"] == "information"
+    assert baserender.get_style_profile_descriptor("motif_showcase.v1").docs_slug == "motif-showcase"
+
+
+def test_public_catalog_describes_transform_parameters() -> None:
+    assert set(baserender.list_transforms()) == {
+        "attach_motifs_from_config",
+        "attach_motifs_from_cruncher_lockfile",
+        "attach_motifs_from_library",
+        "sigma70",
+    }
+    descriptor = baserender.get_transform_descriptor("attach_motifs_from_library")
+    assert descriptor.required_params == ("library_path",)
+    assert descriptor.path_params == ("library_path",)
 
 
 def test_image_grid_uses_record_max_rows_hint() -> None:

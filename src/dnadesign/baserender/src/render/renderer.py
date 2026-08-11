@@ -15,8 +15,8 @@ from dataclasses import dataclass
 from typing import Callable, Mapping, Protocol
 
 from ..config import Style
-from ..config.adapter_contracts import validate_record_renderer_compatibility
 from ..core import ContractError, Record, RenderingError, SchemaError, validate_record_kinds
+from ..integrations import validate_record_renderer_compatibility
 from .palette import Palette
 
 

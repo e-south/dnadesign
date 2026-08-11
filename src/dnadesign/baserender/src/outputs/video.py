@@ -19,8 +19,8 @@ from typing import Iterable, Sequence
 import numpy as np
 
 from ..config import Style, VideoOutputCfg
-from ..config.adapter_contracts import validate_records_output_policy
 from ..core import Record, SchemaError
+from ..integrations import validate_records_output_policy
 from ..render import Palette, render_record, validate_records_for_rendering
 
 

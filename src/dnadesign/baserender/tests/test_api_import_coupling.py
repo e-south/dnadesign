@@ -47,9 +47,13 @@ def test_public_api_catalog_names_are_exact_reexports() -> None:
         "get_adapter_descriptor",
         "get_render_contract_descriptor",
         "get_renderer_descriptor",
+        "get_style_profile_descriptor",
+        "get_transform_descriptor",
         "list_adapters",
         "list_render_contracts",
         "list_renderers",
+        "list_style_profiles",
+        "list_transforms",
     ):
         assert getattr(api, name) is getattr(catalog, name)
 
@@ -104,7 +108,8 @@ def test_catalog_access_does_not_preload_adapters_or_numpy() -> None:
             "import dnadesign.baserender as baserender",
             "print('densegen_tfbs' in baserender.list_adapters())",
             "print('numpy' in sys.modules)",
-            "print('dnadesign.baserender.src.adapters.densegen_tfbs' in sys.modules)",
+            "print('pydantic' in sys.modules)",
+            "print('dnadesign.baserender.src.integrations.densegen.adapter' in sys.modules)",
             "print('dnadesign.baserender.src.public.api' in sys.modules)",
         ]
     )
@@ -115,4 +120,4 @@ def test_catalog_access_does_not_preload_adapters_or_numpy() -> None:
         text=True,
     )
 
-    assert proc.stdout.splitlines() == ["True", "False", "False", "False"]
+    assert proc.stdout.splitlines() == ["True", "False", "False", "False", "False"]

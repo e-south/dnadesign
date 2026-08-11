@@ -1,7 +1,7 @@
 # Cruncher Integration Contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-29
+**Last verified:** 2026-08-10
 
 
 This page defines Cruncher schema mappings used by `baserender`.
@@ -17,7 +17,7 @@ Cruncher-specific semantics stay in adapters and transform wiring.
 Cruncher `analyze` builds in-memory `Record` primitives for `elites_showcase` and calls BaseRender public APIs directly:
 
 - `dnadesign.baserender.render_record_grid_figure(...)`
-- `dnadesign.baserender.cruncher_showcase_style_overrides()`
+- `dnadesign.baserender.style_profile_overrides("motif_showcase.v1")`
 
 Record semantics in this path:
 - `features[*].id`: `<elite_id>:best_window:<tf>:<tf_index>`

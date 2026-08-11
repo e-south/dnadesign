@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     from .api import (  # noqa: F401
         adapt_record,
         adapt_records,
-        cruncher_showcase_style_overrides,
         load_record_from_parquet,
         load_records_from_parquet,
         render,
@@ -28,6 +27,7 @@ if TYPE_CHECKING:
         render_sequence_panel_image,
         run_job,
         run_render_job,
+        style_profile_overrides,
         validate_job,
         validate_render_job,
     )
@@ -35,14 +35,17 @@ if TYPE_CHECKING:
         get_adapter_descriptor,
         get_render_contract_descriptor,
         get_renderer_descriptor,
+        get_style_profile_descriptor,
+        get_transform_descriptor,
         list_adapters,
         list_render_contracts,
         list_renderers,
+        list_style_profiles,
+        list_transforms,
     )
     from .sequence_panel import (  # noqa: F401
         BASERENDER_SEQUENCE_PANEL_CONTRACT_ID,
         BASERENDER_SEQUENCE_PANEL_CONTRACT_VERSION,
-        DEFAULT_SEQUENCE_PANEL_PROFILE,
         SequencePanelConfig,
         SequencePanelDiagnostics,
         SequencePanelImage,
@@ -53,14 +56,17 @@ _CATALOG_EXPORTS = {
     "get_adapter_descriptor",
     "get_render_contract_descriptor",
     "get_renderer_descriptor",
+    "get_style_profile_descriptor",
+    "get_transform_descriptor",
     "list_adapters",
     "list_render_contracts",
     "list_renderers",
+    "list_style_profiles",
+    "list_transforms",
 }
 _API_EXPORTS = {
     "adapt_record",
     "adapt_records",
-    "cruncher_showcase_style_overrides",
     "load_record_from_parquet",
     "load_records_from_parquet",
     "render",
@@ -70,13 +76,13 @@ _API_EXPORTS = {
     "render_sequence_panel_image",
     "run_job",
     "run_render_job",
+    "style_profile_overrides",
     "validate_job",
     "validate_render_job",
 }
 _SEQUENCE_PANEL_EXPORTS = {
     "BASERENDER_SEQUENCE_PANEL_CONTRACT_ID",
     "BASERENDER_SEQUENCE_PANEL_CONTRACT_VERSION",
-    "DEFAULT_SEQUENCE_PANEL_PROFILE",
     "SequencePanelConfig",
     "SequencePanelDiagnostics",
     "SequencePanelImage",

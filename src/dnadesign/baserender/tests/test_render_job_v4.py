@@ -628,6 +628,34 @@ def test_attach_motifs_from_library_path_resolves_at_config_boundary(tmp_path: P
     assert Path(str(plugin.params["library_path"])) == library.resolve()
 
 
+def test_unknown_builtin_transform_fails_at_config_boundary(tmp_path: Path) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        bundle_path=tmp_path / "results",
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+    payload["pipeline"] = {"plugins": ["unknown_transform"]}
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    with pytest.raises(SchemaError, match="Unsupported pipeline transform"):
+        load_render_job(job_path)
+
+
+def test_transform_unknown_parameter_fails_at_config_boundary(tmp_path: Path) -> None:
+    parquet = _make_input_parquet(tmp_path)
+    payload = densegen_job_payload(
+        parquet_path=parquet,
+        bundle_path=tmp_path / "results",
+        outputs=[{"kind": "images", "fmt": "png"}],
+    )
+    payload["pipeline"] = {"plugins": [{"sigma70": {"unbounded": True}}]}
+    job_path = write_job(tmp_path / "job.yaml", payload)
+
+    with pytest.raises(SchemaError, match="Unknown keys in pipeline.plugins.sigma70"):
+        load_render_job(job_path)
+
+
 def test_inline_job_source_name_rejects_directory_components(tmp_path: Path) -> None:
     parquet = _make_input_parquet(tmp_path)
     payload = densegen_job_payload(

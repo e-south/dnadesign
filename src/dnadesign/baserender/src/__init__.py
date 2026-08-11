@@ -16,7 +16,6 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from dnadesign.baserender.src.config import RenderContractDescriptor, RenderJobV4  # noqa: F401
-    from dnadesign.baserender.src.contracts import DENSEGEN_TFBS_REQUIRED_KEYS  # noqa: F401
     from dnadesign.baserender.src.core import (  # noqa: F401
         ContractError,
         Display,
@@ -31,13 +30,16 @@ if TYPE_CHECKING:
     from dnadesign.baserender.src.public import (  # noqa: F401
         adapt_record,
         adapt_records,
-        cruncher_showcase_style_overrides,
         get_adapter_descriptor,
         get_render_contract_descriptor,
         get_renderer_descriptor,
+        get_style_profile_descriptor,
+        get_transform_descriptor,
         list_adapters,
         list_render_contracts,
         list_renderers,
+        list_style_profiles,
+        list_transforms,
         load_record_from_parquet,
         load_records_from_parquet,
         render_parquet_record_figure,
@@ -45,6 +47,7 @@ if TYPE_CHECKING:
         render_record_grid_figure,
         run_job,
         run_render_job,
+        style_profile_overrides,
         validate_job,
         validate_render_job,
     )
@@ -61,10 +64,17 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "list_adapters": ("dnadesign.baserender.src.public.catalog", "list_adapters"),
     "list_render_contracts": ("dnadesign.baserender.src.public.catalog", "list_render_contracts"),
     "list_renderers": ("dnadesign.baserender.src.public.catalog", "list_renderers"),
+    "list_style_profiles": ("dnadesign.baserender.src.public.catalog", "list_style_profiles"),
     "get_adapter_descriptor": ("dnadesign.baserender.src.public.catalog", "get_adapter_descriptor"),
     "get_render_contract_descriptor": ("dnadesign.baserender.src.public.catalog", "get_render_contract_descriptor"),
     "get_renderer_descriptor": ("dnadesign.baserender.src.public.catalog", "get_renderer_descriptor"),
-    "cruncher_showcase_style_overrides": ("dnadesign.baserender.src.public", "cruncher_showcase_style_overrides"),
+    "get_style_profile_descriptor": (
+        "dnadesign.baserender.src.public.catalog",
+        "get_style_profile_descriptor",
+    ),
+    "get_transform_descriptor": ("dnadesign.baserender.src.public.catalog", "get_transform_descriptor"),
+    "list_transforms": ("dnadesign.baserender.src.public.catalog", "list_transforms"),
+    "style_profile_overrides": ("dnadesign.baserender.src.public", "style_profile_overrides"),
     "Record": ("dnadesign.baserender.src.core", "Record"),
     "Feature": ("dnadesign.baserender.src.core", "Feature"),
     "Effect": ("dnadesign.baserender.src.core", "Effect"),
@@ -79,7 +89,6 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "render_record_figure": ("dnadesign.baserender.src.public", "render_record_figure"),
     "render_record_grid_figure": ("dnadesign.baserender.src.public", "render_record_grid_figure"),
     "render_parquet_record_figure": ("dnadesign.baserender.src.public", "render_parquet_record_figure"),
-    "DENSEGEN_TFBS_REQUIRED_KEYS": ("dnadesign.baserender.src.contracts", "DENSEGEN_TFBS_REQUIRED_KEYS"),
 }
 
 __all__ = list(_LAZY_EXPORTS)

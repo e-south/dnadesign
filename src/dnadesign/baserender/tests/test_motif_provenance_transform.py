@@ -19,8 +19,8 @@ import yaml
 
 from dnadesign.baserender.src.core import PluginError, Record, Span
 from dnadesign.baserender.src.core.record import Display, Effect, Feature
-from dnadesign.baserender.src.pipeline.attach_motifs_from_config import AttachMotifsFromConfigTransform
-from dnadesign.baserender.src.pipeline.attach_motifs_from_cruncher_lockfile import (
+from dnadesign.baserender.src.integrations.cruncher.motifs_from_config import AttachMotifsFromConfigTransform
+from dnadesign.baserender.src.integrations.cruncher.motifs_from_lockfile import (
     AttachMotifsFromCruncherLockfileTransform,
 )
 

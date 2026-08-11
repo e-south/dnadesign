@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import matplotlib.pyplot as plt
 
-from dnadesign.baserender.src.adapters.snapback_visual_v1 import SnapbackVisualV1Adapter
 from dnadesign.baserender.src.config import resolve_style
+from dnadesign.baserender.src.integrations.snapback.visual_v1 import SnapbackVisualV1Adapter
 from dnadesign.baserender.src.render import Palette, render_record
 from dnadesign.baserender.src.runtime import initialize_runtime
 

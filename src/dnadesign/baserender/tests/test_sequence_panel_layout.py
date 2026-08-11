@@ -22,6 +22,8 @@ import dnadesign.baserender as baserender
 from dnadesign.baserender.src.public import api as public_api
 from dnadesign.baserender.src.public.sequence_panel_layout import normalize_panel_image
 
+_PROMOTER_PANEL_PROFILE = "promoter_compact_slide.v1"
+
 
 def _densegen_row() -> dict[str, object]:
     return {
@@ -108,6 +110,7 @@ def test_public_sequence_panel_contract_renders_caller_title_inside_panel(monkey
     result = baserender.render_sequence_panel_image(
         _densegen_row(),
         adapter_kind="densegen_tfbs",
+        style_profile=_PROMOTER_PANEL_PROFILE,
         target_width_px=420,
         target_height_px=140,
         title=title,
@@ -143,6 +146,7 @@ def test_public_sequence_panel_title_preserves_adapter_record_label(monkeypatch)
     result = baserender.render_sequence_panel_image(
         row,
         adapter_kind="usr_genbank_annotations_v1",
+        style_profile=_PROMOTER_PANEL_PROFILE,
         target_width_px=420,
         target_height_px=140,
         title=title,
@@ -172,7 +176,10 @@ def test_sequence_panel_normalization_accepts_anchor_at_lower_image_boundary() -
 
 def test_sequence_panel_profile_keeps_title_and_legend_near_sequence_content() -> None:
     title = "Candidate ES42 · ethanol view · rank 3"
-    config = baserender.sequence_panel_config_for_adapter("densegen_tfbs")
+    config = baserender.sequence_panel_config_for_adapter(
+        "densegen_tfbs",
+        style_profile=_PROMOTER_PANEL_PROFILE,
+    )
     record = baserender.adapt_record(
         _densegen_row(),
         adapter_kind=config.adapter_kind,
@@ -214,7 +221,10 @@ def test_sequence_panel_profile_keeps_title_and_legend_near_sequence_content() -
 
 def test_sequence_panel_profile_routes_both_fixed_element_annotations_around_centered_title() -> None:
     title = "a52819bb39e768a258df0a790ee8a27241450490 · ciprofloxacin view · rank 1"
-    config = baserender.sequence_panel_config_for_adapter("densegen_tfbs")
+    config = baserender.sequence_panel_config_for_adapter(
+        "densegen_tfbs",
+        style_profile=_PROMOTER_PANEL_PROFILE,
+    )
     record = baserender.adapt_record(
         _crowded_densegen_promoter_row(),
         adapter_kind=config.adapter_kind,

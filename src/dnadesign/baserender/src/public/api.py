@@ -16,7 +16,6 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Iterable, Mapping
 
-from ..adapters import build_adapter, finalize_adapter, required_source_columns
 from ..config import (
     AdapterCfg,
     RenderJobV4,
@@ -29,21 +28,23 @@ from ..config import (
 from ..config import (
     validate_render_job as _validate_render_job,
 )
-from ..config.adapter_contracts import (
-    adapter_contract,
-    adapter_grid_record_limit,
-    normalize_adapter_config,
-)
 from ..core import Record, SchemaError, ensure
 from ..execution import run_render_job as _run_render_job
+from ..integrations import (
+    adapter_contract,
+    adapter_grid_record_limit,
+    build_adapter,
+    finalize_adapter,
+    normalize_adapter_config,
+    required_source_columns,
+)
+from ..integrations.styles import integration_style_overrides
 from ..io import iter_parquet_rows
 from ..runtime import initialize_runtime
-from ..styles.curated import cruncher_showcase_style_overrides as _cruncher_showcase_style_overrides
 from . import catalog as _catalog
 from .sequence_panel import (
     BASERENDER_SEQUENCE_PANEL_CONTRACT_ID,
     BASERENDER_SEQUENCE_PANEL_CONTRACT_VERSION,
-    DEFAULT_SEQUENCE_PANEL_PROFILE,
     SequencePanelConfig,
     SequencePanelDiagnostics,
     SequencePanelImage,
@@ -54,9 +55,13 @@ from .sequence_panel_layout import normalize_panel_image, sequence_center_y_px
 get_adapter_descriptor = _catalog.get_adapter_descriptor
 get_render_contract_descriptor = _catalog.get_render_contract_descriptor
 get_renderer_descriptor = _catalog.get_renderer_descriptor
+get_style_profile_descriptor = _catalog.get_style_profile_descriptor
+get_transform_descriptor = _catalog.get_transform_descriptor
 list_adapters = _catalog.list_adapters
 list_render_contracts = _catalog.list_render_contracts
 list_renderers = _catalog.list_renderers
+list_style_profiles = _catalog.list_style_profiles
+list_transforms = _catalog.list_transforms
 
 
 def _legend_tags(record: Record) -> tuple[str, ...]:
@@ -74,7 +79,7 @@ def render_sequence_panel_image(
     *,
     config: SequencePanelConfig | None = None,
     adapter_kind: str | None = None,
-    style_profile: str = DEFAULT_SEQUENCE_PANEL_PROFILE,
+    style_profile: str | None = None,
     adapter_columns: Mapping[str, object] | None = None,
     adapter_policies: Mapping[str, object] | None = None,
     style_overrides: Mapping[str, object] | None = None,
@@ -93,9 +98,10 @@ def render_sequence_panel_image(
 
     if config is None:
         ensure(adapter_kind is not None, "adapter_kind is required when config is not provided", SchemaError)
+        ensure(style_profile is not None, "style_profile is required when config is not provided", SchemaError)
         config = sequence_panel_config_for_adapter(
             adapter_kind=str(adapter_kind),
-            style_profile=style_profile,
+            style_profile=str(style_profile),
             adapter_columns=adapter_columns,
             adapter_policies=adapter_policies,
             style_overrides=style_overrides,
@@ -623,5 +629,6 @@ def render(
     return render_record_grid_figure(records_list, **grid_kwargs)
 
 
-def cruncher_showcase_style_overrides() -> Mapping[str, object]:
-    return _cruncher_showcase_style_overrides()
+def style_profile_overrides(profile_name: str) -> Mapping[str, object]:
+    """Return a defensive copy of a registered style profile."""
+    return integration_style_overrides(profile_name)

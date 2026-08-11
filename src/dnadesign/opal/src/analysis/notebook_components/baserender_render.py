@@ -49,6 +49,7 @@ def render_notebook_baserender_record(
             panel = render_sequence_panel_image(
                 dict(record_row),
                 adapter_kind=adapter_kind,
+                style_profile=str(contract.get("style_profile") or ""),
                 adapter_columns=adapter_columns,
                 adapter_policies=dict(contract.get("adapter_policies") or {}),
                 style_overrides=style_overrides,

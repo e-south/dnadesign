@@ -18,7 +18,9 @@ import pytest
 
 from dnadesign.baserender.src.core import PluginError, Record, Span
 from dnadesign.baserender.src.core.record import Display, Effect, Feature
-from dnadesign.baserender.src.pipeline.attach_motifs_from_library import AttachMotifsFromLibraryTransform
+from dnadesign.baserender.src.integrations.motif_annotation.motifs_from_library import (
+    AttachMotifsFromLibraryTransform,
+)
 
 
 def _build_single_feature_record(*, label: str, start: int, end: int, tf_tag: str) -> Record:

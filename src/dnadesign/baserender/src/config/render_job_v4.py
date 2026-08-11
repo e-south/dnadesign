@@ -29,12 +29,15 @@ from ..core import (
     require_mapping,
     require_one_of,
 )
-from ..workspaces import WORKSPACE_MARKER_FILENAME
-from .adapter_contracts import (
+from ..integrations import (
     adapter_contract,
+    declared_adapter_path_values,
+    declared_transform_path_values,
     normalize_adapter_config,
+    normalize_transform_config,
     validate_adapter_output_policy,
 )
+from ..workspaces import WORKSPACE_MARKER_FILENAME
 from .job_contracts import (
     DEFAULT_RENDER_CONTRACT_KIND,
     render_contract_descriptor,
@@ -252,8 +255,8 @@ def _inline_mapping_allowed_roots(
         if isinstance(adapter_data, Mapping):
             columns_data = adapter_data.get("columns")
             if isinstance(columns_data, Mapping):
-                for key in ("hits_path", "config_path"):
-                    _append_if_absolute(columns_data.get(key))
+                for value in declared_adapter_path_values(adapter_data.get("kind"), columns_data):
+                    _append_if_absolute(value)
 
     selection_data = mapping.get("selection")
     if isinstance(selection_data, Mapping):
@@ -266,11 +269,11 @@ def _inline_mapping_allowed_roots(
             for plugin in plugins_data:
                 if not isinstance(plugin, Mapping) or len(plugin) != 1:
                     continue
-                _, params = next(iter(plugin.items()))
+                name, params = next(iter(plugin.items()))
                 if not isinstance(params, Mapping):
                     continue
-                for key in ("config_path", "library_path", "run_manifest_path", "lockfile_path", "motif_store_root"):
-                    _append_if_absolute(params.get(key))
+                for value in declared_transform_path_values(name, params):
+                    _append_if_absolute(value)
 
     return tuple(roots)
 
@@ -444,60 +447,31 @@ def _parse_plugin_specs(job_path: Path, raw: Any, *, allowed_roots: tuple[Path, 
     out: list[PluginSpec] = []
     for item in raw:
         if isinstance(item, str):
-            out.append(PluginSpec(name=item, params={}))
+            name, params = normalize_transform_config(name=item, params={})
+            out.append(PluginSpec(name=name, params=params))
         elif isinstance(item, Mapping):
             if len(item) != 1:
                 raise SchemaError(f"plugin mapping must have a single key, got: {item}")
             name, params = next(iter(item.items()))
             if not isinstance(params, Mapping):
                 raise SchemaError(f"plugin params must be a mapping for '{name}'")
-            parsed_params = dict(params)
-            plugin_name = str(name)
-            if plugin_name == "attach_motifs_from_config":
-                config_path_raw = parsed_params.get("config_path")
-                if config_path_raw is None:
-                    raise SchemaError("pipeline plugin 'attach_motifs_from_config' requires params.config_path")
-                parsed_params["config_path"] = str(
+            plugin_name = str(name).strip()
+
+            def _resolve_transform_path(key: str, value: Any) -> str:
+                return str(
                     _resolve_path(
                         job_path,
-                        str(config_path_raw),
-                        field="pipeline.plugins.attach_motifs_from_config.config_path",
+                        str(value),
+                        field=f"pipeline.plugins.{plugin_name}.{key}",
                         allowed_roots=allowed_roots,
                     )
                 )
-            if plugin_name == "attach_motifs_from_library":
-                library_path_raw = parsed_params.get("library_path")
-                if library_path_raw is None:
-                    raise SchemaError("pipeline plugin 'attach_motifs_from_library' requires params.library_path")
-                parsed_params["library_path"] = str(
-                    _resolve_path(
-                        job_path,
-                        str(library_path_raw),
-                        field="pipeline.plugins.attach_motifs_from_library.library_path",
-                        allowed_roots=allowed_roots,
-                    )
-                )
-            if plugin_name == "attach_motifs_from_cruncher_lockfile":
-                for key in ("run_manifest_path", "lockfile_path", "motif_store_root"):
-                    value = parsed_params.get(key)
-                    if value is not None:
-                        parsed_params[key] = str(
-                            _resolve_path(
-                                job_path,
-                                str(value),
-                                field=f"pipeline.plugins.attach_motifs_from_cruncher_lockfile.{key}",
-                                allowed_roots=allowed_roots,
-                            )
-                        )
-                has_manifest = parsed_params.get("run_manifest_path") is not None
-                has_lock_bundle = (
-                    parsed_params.get("lockfile_path") is not None and parsed_params.get("motif_store_root") is not None
-                )
-                if not has_manifest and not has_lock_bundle:
-                    raise SchemaError(
-                        "pipeline plugin 'attach_motifs_from_cruncher_lockfile' requires "
-                        "params.run_manifest_path or both params.lockfile_path + params.motif_store_root"
-                    )
+
+            plugin_name, parsed_params = normalize_transform_config(
+                name=plugin_name,
+                params=params,
+                resolve_path=_resolve_transform_path,
+            )
             out.append(PluginSpec(name=plugin_name, params=parsed_params))
         else:
             raise SchemaError(f"Unsupported plugin spec: {item!r}")
