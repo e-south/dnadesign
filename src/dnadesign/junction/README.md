@@ -13,5 +13,6 @@ records, and a bundle that can be checked again without the source request.
 | Run a complete example | [Gene-scale tutorial](docs/getting-started.md) |
 | Prepare raw, text, FASTA, JSON, or YAML input | [Prepare a request](docs/guides/prepare-a-request.md) |
 | Inspect and verify a finished bundle | [Inspect a bundle](docs/guides/inspect-and-verify.md) |
+| Compare gene fragments with an oligo-pool route | [Choose a synthesis route](docs/guides/choose-a-synthesis-route.md) |
 | Understand the assembly model | [Method overview](docs/explanation/how-junction-works.md) |
 | Check exact schemas and algorithms | [Reference](docs/README.md#reference) |

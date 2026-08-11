@@ -21,6 +21,9 @@ routes:
   - id: inspect-and-verify
     path: guides/inspect-and-verify.md
     summary: Find exact sequences and checks, then verify an existing bundle.
+  - id: choose-a-synthesis-route
+    path: guides/choose-a-synthesis-route.md
+    summary: Compare gene fragments with a Junction oligo-pool route using a dated price snapshot.
   - id: scale
     path: guides/scale.md
     summary: Understand resource limits and tested software scenarios.

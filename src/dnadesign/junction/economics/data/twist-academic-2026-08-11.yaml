@@ -1,0 +1,114 @@
+schema: junction.synthesis-pricing-snapshot/v1
+supplier: Twist Bioscience
+price_context: academic pricing
+currency: USD
+retrieved_on: 2026-08-11
+source_url: https://www.twistbioscience.com/products/oligo-pools
+
+gene_fragment_bands:
+  - minimum_length_nt: 500
+    maximum_length_nt: 1800
+    with_adapters_usd_per_bp: 0.06
+    without_adapters_usd_per_bp: 0.07
+  - minimum_length_nt: 1801
+    maximum_length_nt: 3200
+    with_adapters_usd_per_bp: 0.06
+    without_adapters_usd_per_bp: 0.07
+  - minimum_length_nt: 3201
+    maximum_length_nt: 5000
+    with_adapters_usd_per_bp: 0.08
+    without_adapters_usd_per_bp: 0.09
+
+oligo_length_bands:
+  - {id: 20-120nt, minimum_length_nt: 20, maximum_length_nt: 120}
+  - {id: 121-150nt, minimum_length_nt: 121, maximum_length_nt: 150}
+  - {id: 151-200nt, minimum_length_nt: 151, maximum_length_nt: 200}
+  - {id: 201-250nt, minimum_length_nt: 201, maximum_length_nt: 250}
+  - {id: 251-300nt, minimum_length_nt: 251, maximum_length_nt: 300}
+  - {id: 301-350nt, minimum_length_nt: 301, maximum_length_nt: 350}
+
+oligo_pool_tiers:
+  - minimum_oligos: 2
+    maximum_oligos: 100
+    prices_usd: {20-120nt: 320.00, 121-150nt: 372.80, 151-200nt: 416.00, 201-250nt: 551.20, 251-300nt: 824.00, 301-350nt: 1030.40}
+  - minimum_oligos: 101
+    maximum_oligos: 500
+    prices_usd: {20-120nt: 640.00, 121-150nt: 746.40, 151-200nt: 832.00, 201-250nt: 1103.20, 251-300nt: 1648.00, 301-350nt: 2060.00}
+  - minimum_oligos: 501
+    maximum_oligos: 1000
+    prices_usd: {20-120nt: 960.00, 121-150nt: 1120.00, 151-200nt: 1248.00, 201-250nt: 1654.40, 251-300nt: 2472.00, 301-350nt: 3090.40}
+  - minimum_oligos: 1001
+    maximum_oligos: 2000
+    prices_usd: {20-120nt: 1280.00, 121-150nt: 1493.60, 151-200nt: 1664.00, 201-250nt: 2205.60, 251-300nt: 3296.80, 301-350nt: 4121.60}
+  - minimum_oligos: 2001
+    maximum_oligos: 6000
+    prices_usd: {20-120nt: 1920.00, 121-150nt: 2240.00, 151-200nt: 2496.00, 201-250nt: 3308.80, 251-300nt: 4944.80, 301-350nt: 6181.60}
+  - minimum_oligos: 6001
+    maximum_oligos: 12000
+    prices_usd: {20-120nt: 2496.00, 121-150nt: 2995.20, 151-200nt: 3244.80, 201-250nt: 4118.40, 251-300nt: 6155.20, 301-350nt: 7694.40}
+  - minimum_oligos: 12001
+    maximum_oligos: 18000
+    prices_usd: {20-120nt: 3244.80, 121-150nt: 3893.60, 151-200nt: 4218.40, 201-250nt: 5355.20, 251-300nt: 8003.20, 301-350nt: 10004.00}
+  - minimum_oligos: 18001
+    maximum_oligos: 24000
+    prices_usd: {20-120nt: 4218.40, 121-150nt: 5061.60, 151-200nt: 5484.00, 201-250nt: 6961.60, 251-300nt: 10404.80, 301-350nt: 13006.40}
+  - minimum_oligos: 24001
+    maximum_oligos: 30000
+    prices_usd: {20-120nt: 5484.00, 121-150nt: 6580.00, 151-200nt: 7129.60, 201-250nt: 9052.00, 251-300nt: 13528.00, 301-350nt: 16910.40}
+  - minimum_oligos: 30001
+    maximum_oligos: 36000
+    prices_usd: {20-120nt: 5629.60, 121-150nt: 6755.20, 151-200nt: 7319.20, 201-250nt: 9292.00, 251-300nt: 13887.20, 301-350nt: 17359.20}
+  - minimum_oligos: 36001
+    maximum_oligos: 42000
+    prices_usd: {20-120nt: 6192.80, 121-150nt: 7431.20, 151-200nt: 8051.20, 201-250nt: 10220.00, 251-300nt: 15274.40, 301-350nt: 19093.60}
+  - minimum_oligos: 42001
+    maximum_oligos: 48000
+    prices_usd: {20-120nt: 6812.00, 121-150nt: 8174.40, 151-200nt: 8856.00, 201-250nt: 11240.80, 251-300nt: 16800.00, 301-350nt: 21000.00}
+  - minimum_oligos: 48001
+    maximum_oligos: 54000
+    prices_usd: {20-120nt: 7493.60, 121-150nt: 8992.00, 151-200nt: 9741.60, 201-250nt: 12364.80, 251-300nt: 18480.00, 301-350nt: 23100.00}
+  - minimum_oligos: 54001
+    maximum_oligos: 60000
+    prices_usd: {20-120nt: 8243.20, 121-150nt: 9891.20, 151-200nt: 10716.00, 201-250nt: 13602.40, 251-300nt: 20328.80, 301-350nt: 25411.20}
+  - minimum_oligos: 60001
+    maximum_oligos: 72000
+    prices_usd: {20-120nt: 8655.20, 121-150nt: 10385.60, 151-200nt: 11252.00, 201-250nt: 14283.20, 251-300nt: 21347.20, 301-350nt: 26684.00}
+  - minimum_oligos: 72001
+    maximum_oligos: 84000
+    prices_usd: {20-120nt: 8957.60, 121-150nt: 10749.60, 151-200nt: 11645.60, 201-250nt: 14781.60, 251-300nt: 22091.20, 301-350nt: 27614.40}
+  - minimum_oligos: 84001
+    maximum_oligos: 96000
+    prices_usd: {20-120nt: 9201.60, 121-150nt: 11041.60, 151-200nt: 11962.40, 201-250nt: 15184.80, 251-300nt: 22693.60, 301-350nt: 28367.20}
+  - minimum_oligos: 96001
+    maximum_oligos: 120000
+    prices_usd: {20-120nt: 9303.20, 121-150nt: 11164.80, 151-200nt: 12095.20, 201-250nt: 15352.00, 251-300nt: 22944.00, 301-350nt: 28680.00}
+  - minimum_oligos: 120001
+    maximum_oligos: 150000
+    prices_usd: {20-120nt: 10627.20, 121-150nt: 12753.60, 151-200nt: 13816.00, 201-250nt: 17535.20, 251-300nt: 26206.40, 301-350nt: 32758.40}
+  - minimum_oligos: 150001
+    maximum_oligos: 180000
+    prices_usd: {20-120nt: 11690.40, 121-150nt: 14028.80, 151-200nt: 15197.60, 201-250nt: 19288.80, 251-300nt: 28828.00, 301-350nt: 36035.20}
+  - minimum_oligos: 180001
+    maximum_oligos: 210000
+    prices_usd: {20-120nt: 12383.20, 121-150nt: 14860.00, 151-200nt: 16098.40, 201-250nt: 20432.80, 251-300nt: 30537.60, 301-350nt: 38172.00}
+  - minimum_oligos: 210001
+    maximum_oligos: 240000
+    prices_usd: {20-120nt: 13621.60, 121-150nt: 16345.60, 151-200nt: 17708.00, 201-250nt: 22476.00, 251-300nt: 33591.20, 301-350nt: 41989.60}
+  - minimum_oligos: 240001
+    maximum_oligos: 300000
+    prices_usd: {20-120nt: 16800.00, 121-150nt: 20400.00, 151-200nt: 21600.00, 201-250nt: 26400.00, 251-300nt: 39456.00, 301-350nt: 49320.00}
+  - minimum_oligos: 300001
+    maximum_oligos: 360000
+    prices_usd: {20-120nt: 20160.00, 121-150nt: 24480.00, 151-200nt: 25920.00, 201-250nt: 31680.00, 251-300nt: 47347.20, 301-350nt: 59184.00}
+  - minimum_oligos: 360001
+    maximum_oligos: 420000
+    prices_usd: {20-120nt: 23520.00, 121-150nt: 28560.00, 151-200nt: 30240.00, 201-250nt: 36960.00, 251-300nt: 55238.40, 301-350nt: 69048.00}
+  - minimum_oligos: 420001
+    maximum_oligos: 480000
+    prices_usd: {20-120nt: 26880.00, 121-150nt: 32640.00, 151-200nt: 34560.00, 201-250nt: 42240.00, 251-300nt: 63129.60, 301-350nt: 78912.00}
+  - minimum_oligos: 480001
+    maximum_oligos: 600000
+    prices_usd: {20-120nt: 32928.00, 121-150nt: 39984.00, 151-200nt: 42336.00, 201-250nt: 51744.00, 251-300nt: 77333.60, 301-350nt: 96667.20}
+  - minimum_oligos: 600001
+    maximum_oligos: 696000
+    prices_usd: {20-120nt: 38976.00, 121-150nt: 47328.00, 151-200nt: 50112.00, 201-250nt: 61248.00, 251-300nt: 91537.60, 301-350nt: 114422.40}

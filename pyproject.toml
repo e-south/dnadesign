@@ -170,6 +170,7 @@ exclude = [
 ]
 "dnadesign.junction" = [
   "docs/assets/*.svg",
+  "economics/data/*.yaml",
   "examples/*/*.yaml",
   "examples/*/jobs/*.yaml",
 ]
