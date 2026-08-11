@@ -11,12 +11,14 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import re
 from io import BytesIO
 from typing import Sequence
 
 import matplotlib
 import numpy as np
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.backends.backend_svg import FigureCanvasSVG
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.figure import Figure
@@ -33,10 +35,36 @@ _BARCODE = "#75B9B4"
 _BARCODE_DARK = "#286F6B"
 _COMBINED = "#A99BC3"
 _COMBINED_DARK = "#5E4B7A"
+_LEFT_MARGIN_MIN = 0.065
+_LEFT_MARGIN_MAX = 0.24
+_LABEL_PADDING_POINTS = 4.0
+_DISPLAY_LABEL_MAX = 28
+_DISPLAY_TARGET_MAX = 14
+_DISPLAY_LOCAL_MAX = 13
 
 
 def _safe_identifier(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.:/-]+", "-", value).strip("-") or "junction"
+
+
+def _compact_display_identifier(value: str, *, maximum: int) -> str:
+    safe = _safe_identifier(value)
+    if len(safe) <= maximum:
+        return safe
+    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:8]
+    return f"{safe[: maximum - len(digest) - 1]}~{digest}"
+
+
+def _unique_display_tokens(values: Sequence[str], *, maximum: int) -> dict[str, str]:
+    distinct = tuple(sorted(set(values)))
+    tokens = {value: _compact_display_identifier(value, maximum=maximum) for value in distinct}
+    if len(set(tokens.values())) == len(tokens):
+        return tokens
+    ordinal_width = max(2, len(str(len(distinct))))
+    return {
+        value: (f"{_safe_identifier(value)[: maximum - ordinal_width - 1]}~{ordinal:0{ordinal_width}d}")
+        for ordinal, value in enumerate(distinct, start=1)
+    }
 
 
 def _labels(
@@ -46,10 +74,22 @@ def _labels(
     selected = tuple(review.junctions[index] for index in selection.indices)
     local = tuple(junction.junction_id.rsplit(":", 1)[-1] for junction in selected)
     if len(local) == len(set(local)):
-        return tuple(_safe_identifier(label) for label in local)
-    return tuple(
-        _safe_identifier(f"{junction.target_id}/{junction.junction_id.rsplit(':', 1)[-1]}") for junction in selected
+        tokens = _unique_display_tokens(local, maximum=_DISPLAY_LABEL_MAX)
+        return tuple(tokens[label] for label in local)
+    target_tokens = _unique_display_tokens(
+        tuple(junction.target_id for junction in selected),
+        maximum=_DISPLAY_TARGET_MAX,
     )
+    labels = tuple(
+        f"{target_tokens[junction.target_id]}/"
+        f"{_compact_display_identifier(junction.junction_id.rsplit(':', 1)[-1], maximum=_DISPLAY_LOCAL_MAX)}"
+        for junction in selected
+    )
+    if len(labels) == len(set(labels)):
+        return labels
+    sources = tuple(f"{junction.target_id}/{junction.junction_id.rsplit(':', 1)[-1]}" for junction in selected)
+    tokens = _unique_display_tokens(sources, maximum=_DISPLAY_LABEL_MAX)
+    return tuple(tokens[source] for source in sources)
 
 
 def _color_map(name: str, light: str, dark: str) -> LinearSegmentedColormap:
@@ -67,7 +107,16 @@ def _limits(matrix: np.ndarray) -> tuple[float, float]:
     return minimum, maximum
 
 
-def _draw_matrix(axis, matrix: np.ndarray, *, labels: tuple[str, ...], title: str, cmap, gid: str) -> None:
+def _draw_matrix(
+    axis,
+    matrix: np.ndarray,
+    *,
+    labels: tuple[str, ...],
+    title: str,
+    cmap,
+    gid: str,
+    show_y_labels: bool,
+) -> None:
     axis.set_gid(gid)
     masked = np.ma.array(matrix, mask=np.eye(matrix.shape[0], dtype=bool))
     boundaries = np.arange(matrix.shape[0] + 1, dtype=np.float64) - 0.5
@@ -85,7 +134,10 @@ def _draw_matrix(axis, matrix: np.ndarray, *, labels: tuple[str, ...], title: st
     axis.set_ylim(matrix.shape[0] - 0.5, -0.5)
     axis.set_title(title, fontsize=13.0, color=_INK, pad=12, fontweight="normal")
     axis.set_xticks(range(len(labels)), labels=labels, rotation=55, ha="right", rotation_mode="anchor")
-    axis.set_yticks(range(len(labels)), labels=labels)
+    axis.set_yticks(
+        range(len(labels)),
+        labels=labels if show_y_labels else ("",) * len(labels),
+    )
     tick_size = 8.5 if len(labels) <= 12 else 7.0
     axis.tick_params(axis="both", which="both", length=0, labelsize=tick_size, colors=_INK)
     for spine in axis.spines.values():
@@ -102,6 +154,23 @@ def _draw_matrix(axis, matrix: np.ndarray, *, labels: tuple[str, ...], title: st
     colorbar.solids.set_rasterized(False)
     colorbar.outline.set_visible(False)
     colorbar.ax.tick_params(labelsize=8, colors=_MUTED, length=0)
+
+
+def _left_margin_for_visible_labels(figure: Figure, axis) -> float:
+    """Reserve bounded space for the first matrix's rendered row labels."""
+
+    canvas = FigureCanvasAgg(figure)
+    canvas.draw()
+    renderer = canvas.get_renderer()
+    labels = [label for label in axis.get_yticklabels() if label.get_text()]
+    if not labels:
+        return _LEFT_MARGIN_MIN
+    leftmost = min(label.get_window_extent(renderer).x0 for label in labels)
+    padding = _LABEL_PADDING_POINTS * figure.dpi / 72.0
+    if leftmost >= padding:
+        return _LEFT_MARGIN_MIN
+    required = _LEFT_MARGIN_MIN + (padding - leftmost) / figure.bbox.width
+    return min(_LEFT_MARGIN_MAX, required)
 
 
 def plot_sequence_dissimilarity(
@@ -161,7 +230,7 @@ def plot_sequence_dissimilarity(
             "combined",
         ),
     )
-    for axis, (matrix, title, cmap, suffix) in zip(axes, panels, strict=True):
+    for index, (axis, (matrix, title, cmap, suffix)) in enumerate(zip(axes, panels, strict=True)):
         axis.set_facecolor(_BACKGROUND)
         _draw_matrix(
             axis,
@@ -170,8 +239,16 @@ def plot_sequence_dissimilarity(
             title=title,
             cmap=cmap,
             gid=f"junction-sequence-dissimilarity:{suffix}",
+            show_y_labels=index == 0,
         )
-    figure.subplots_adjust(left=0.065, right=0.965, top=0.81, bottom=0.19, wspace=0.42)
+    figure.subplots_adjust(
+        left=_LEFT_MARGIN_MIN,
+        right=0.965,
+        top=0.81,
+        bottom=0.19,
+        wspace=0.42,
+    )
+    figure.subplots_adjust(left=_left_margin_for_visible_labels(figure, axes[0]))
     return figure
 
 
