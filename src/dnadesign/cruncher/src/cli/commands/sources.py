@@ -13,8 +13,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
-import tempfile
 from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
@@ -24,6 +22,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from dnadesign.artifacts import CreateOnlyDirectoryPublication
 from dnadesign.cruncher.app.source_summary_service import (
     summarize_cache,
     summarize_combined,
@@ -354,10 +353,11 @@ def materialize_promoters(
         console.print(f"Error: Promoter source root does not exist: {resolved_data_root}")
         raise typer.Exit(code=1)
 
-    staging = Path(tempfile.mkdtemp(prefix=f".{resolved_destination.name}.", dir=destination_parent))
+    publication: CreateOnlyDirectoryPublication | None = None
     try:
+        publication = CreateOnlyDirectoryPublication.prepare(resolved_destination)
         manifest = export_dnadesign_data_promoter_superset(
-            staging,
+            publication.stage,
             data_root=resolved_data_root,
             require_association_sources=require_association_sources,
         )
@@ -368,11 +368,13 @@ def materialize_promoters(
                 f"({inventory.route_failure_count} route failures; "
                 f"{inventory.conflict_count} sequence conflicts)"
             )
-        staging.replace(resolved_destination)
+        publication.publish(required_manifest="manifest.json")
     except (OSError, RuntimeError, ValueError) as exc:
-        shutil.rmtree(staging, ignore_errors=True)
         console.print(f"Error: {exc}")
         raise typer.Exit(code=1) from exc
+    finally:
+        if publication is not None:
+            publication.close()
 
     payload = {
         "schema": "cruncher.promoter-export/v1",

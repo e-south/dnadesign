@@ -147,3 +147,49 @@ def test_sources_materialize_promoters_rejects_incomplete_manifest(
     assert "promoter export is incomplete (2 route failures; 1 sequence conflicts)" in result.output
     assert not destination.exists()
     assert list(tmp_path.glob(".promoter-export.*")) == []
+
+
+def test_sources_materialize_promoters_never_replaces_destination_created_during_export(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    destination = tmp_path / "promoter-export"
+
+    def _materialize(staging: Path, **_kwargs):
+        (staging / "manifest.json").write_text("{}\n", encoding="utf-8")
+        destination.mkdir()
+        (destination / "keep.txt").write_text("keep\n", encoding="utf-8")
+        inventory = SimpleNamespace(route_failure_count=0, conflict_count=0)
+        return SimpleNamespace(complete=True, record_count=12, source_inventory=inventory)
+
+    monkeypatch.setattr(
+        "dnadesign.cruncher.cli.commands.sources.export_dnadesign_data_promoter_superset",
+        _materialize,
+    )
+
+    result = runner.invoke(app, ["sources", "materialize-promoters", str(destination)])
+
+    assert result.exit_code == 1
+    assert "publication is create-only" in result.output
+    assert (destination / "keep.txt").read_text(encoding="utf-8") == "keep\n"
+
+
+def test_sources_materialize_promoters_reports_staging_preparation_failure(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    destination = tmp_path / "promoter-export"
+
+    def _fail(_destination: Path):
+        raise OSError("staging is unavailable")
+
+    monkeypatch.setattr(
+        "dnadesign.cruncher.cli.commands.sources.CreateOnlyDirectoryPublication.prepare",
+        _fail,
+    )
+
+    result = runner.invoke(app, ["sources", "materialize-promoters", str(destination)])
+
+    assert result.exit_code == 1
+    assert "staging is unavailable" in result.output
+    assert not destination.exists()
