@@ -29,7 +29,9 @@ Use the checked-in request for the runnable example:
 
 ```bash
 uv sync --locked
-export JUNCTION_DEMO_ROOT="$(mktemp -d)"
+JUNCTION_DEMO_ROOT="$(mktemp -d)"
+JUNCTION_DEMO_ROOT="$(cd "$JUNCTION_DEMO_ROOT" && pwd -P)"
+export JUNCTION_DEMO_ROOT
 cp src/dnadesign/junction/examples/gene-scale/request.yaml \
   "$JUNCTION_DEMO_ROOT/request.yaml"
 cp src/dnadesign/junction/examples/gene-scale/jobs/*.yaml \
