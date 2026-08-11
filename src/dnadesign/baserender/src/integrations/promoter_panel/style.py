@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+from ..motif_annotation.style import motif_showcase_style_overrides
+
 _STYLE: dict[str, object] = {
     "figure_scale": 1.60,
     "padding_y": 24.0,
@@ -86,7 +88,10 @@ _STYLE: dict[str, object] = {
 
 
 def promoter_compact_slide_style() -> dict[str, object]:
-    return deepcopy(_STYLE)
+    style = deepcopy(_STYLE)
+    motif_palette = dict(motif_showcase_style_overrides()["palette"])
+    style["palette"] = {**motif_palette, **dict(style["palette"])}
+    return style
 
 
 __all__ = ["promoter_compact_slide_style"]
