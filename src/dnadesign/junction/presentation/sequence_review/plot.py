@@ -53,7 +53,7 @@ def _labels(
 
 
 def _color_map(name: str, light: str, dark: str) -> LinearSegmentedColormap:
-    return LinearSegmentedColormap.from_list(name, (_BACKGROUND, light, dark))
+    return LinearSegmentedColormap.from_list(name, (_BACKGROUND, light, dark), N=9)
 
 
 def _limits(matrix: np.ndarray) -> tuple[float, float]:
@@ -70,7 +70,19 @@ def _limits(matrix: np.ndarray) -> tuple[float, float]:
 def _draw_matrix(axis, matrix: np.ndarray, *, labels: tuple[str, ...], title: str, cmap, gid: str) -> None:
     axis.set_gid(gid)
     masked = np.ma.array(matrix, mask=np.eye(matrix.shape[0], dtype=bool))
-    image = axis.imshow(masked, cmap=cmap, vmin=_limits(matrix)[0], vmax=_limits(matrix)[1])
+    boundaries = np.arange(matrix.shape[0] + 1, dtype=np.float64) - 0.5
+    image = axis.pcolormesh(
+        boundaries,
+        boundaries,
+        masked,
+        cmap=cmap,
+        vmin=_limits(matrix)[0],
+        vmax=_limits(matrix)[1],
+        shading="flat",
+    )
+    image.set_gid(f"{gid}:matrix")
+    axis.set_xlim(-0.5, matrix.shape[0] - 0.5)
+    axis.set_ylim(matrix.shape[0] - 0.5, -0.5)
     axis.set_title(title, fontsize=13.0, color=_INK, pad=12, fontweight="normal")
     axis.set_xticks(range(len(labels)), labels=labels, rotation=55, ha="right", rotation_mode="anchor")
     axis.set_yticks(range(len(labels)), labels=labels)
@@ -87,6 +99,7 @@ def _draw_matrix(axis, matrix: np.ndarray, *, labels: tuple[str, ...], title: st
                     value = f"{matrix[row, column]:.2f}"
                 axis.text(column, row, value, ha="center", va="center", fontsize=8.5, color=_INK)
     colorbar = axis.figure.colorbar(image, ax=axis, fraction=0.046, pad=0.035)
+    colorbar.solids.set_rasterized(False)
     colorbar.outline.set_visible(False)
     colorbar.ax.tick_params(labelsize=8, colors=_MUTED, length=0)
 
