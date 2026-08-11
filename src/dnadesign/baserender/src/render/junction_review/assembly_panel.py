@@ -54,7 +54,7 @@ def draw_assembly_process(axis, review: ThreeWayJunctionReviewV1, *, layout: Ass
     _stage_title(
         axis,
         layout.input_title_y,
-        "Input target sequence",
+        "Submitted target specification",
         gid="junction-three-way-assembly:input:title",
     )
     draw_input_target(axis, review, y=layout.input_first_y, layout=layout)

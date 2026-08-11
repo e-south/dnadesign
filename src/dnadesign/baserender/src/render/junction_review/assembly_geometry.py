@@ -25,6 +25,7 @@ MIN_ASSEMBLY_WIDTH = 15.2
 MAX_ASSEMBLY_WIDTH = 64.0
 TARGET_BASE_WIDTH_INCHES = 0.085
 PRODUCT_BASE_WIDTH_INCHES = 0.13
+PRODUCT_PLOT_FRACTION = 0.93
 STAGE_TITLE_TO_MOLECULE = 0.72
 MOLECULE_TO_TRANSITION = 0.38
 TRANSITION_TO_STAGE_TITLE = 0.38
@@ -103,9 +104,9 @@ def assembly_layout(
 
     product_bases_per_row = min(
         product_length,
-        max(1, math.floor(width * plot_fraction / PRODUCT_BASE_WIDTH_INCHES + 1e-9)),
+        max(1, math.floor(PRODUCT_PLOT_FRACTION / target_base_step + 1e-9)),
     )
-    product_fraction = product_bases_per_row * PRODUCT_BASE_WIDTH_INCHES / width
+    product_fraction = product_bases_per_row * target_base_step
     product_left = 0.5 - product_fraction / 2
     product_right = 0.5 + product_fraction / 2
     product_rows = math.ceil(product_length / product_bases_per_row)

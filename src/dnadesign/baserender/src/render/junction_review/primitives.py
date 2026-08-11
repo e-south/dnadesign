@@ -33,12 +33,8 @@ def _centered_base_glyph(base: str):
         raise ValueError(f"unsupported DNA base {base!r}")
     raw = TextPath((0, 0), base, prop=FontProperties(family="monospace"), size=1.0)
     bounds = raw.get_extents()
-    return raw.transformed(
-        Affine2D().translate(
-            -bounds.x0 - bounds.width / 2,
-            -bounds.y0 - bounds.height / 2,
-        )
-    )
+    translation = Affine2D().translate(-bounds.x0 - bounds.width / 2, -bounds.y0 - bounds.height / 2)
+    return raw.transformed(translation)
 
 
 def draw_segmented_strand(
@@ -51,6 +47,9 @@ def draw_segmented_strand(
     segments: Sequence[tuple[int, int, str]],
     height: float,
     gid_prefix: str,
+    body_color: str = DOMAIN,
+    outline_color: str = STRAND_EDGE,
+    outline_linestyle: str | tuple = "solid",
 ) -> None:
     """Draw one contiguous oligo with clipped categorical component spans."""
 
@@ -61,7 +60,7 @@ def draw_segmented_strand(
         (start_x, center_y - height / 2),
         width,
         height,
-        facecolor=DOMAIN,
+        facecolor=body_color,
         edgecolor="none",
         zorder=0,
     )
@@ -86,8 +85,9 @@ def draw_segmented_strand(
         width,
         height,
         facecolor="none",
-        edgecolor=STRAND_EDGE,
+        edgecolor=outline_color,
         linewidth=0.55,
+        linestyle=outline_linestyle,
         zorder=0.4,
     )
     outline.set_gid(bounded_svg_gid(f"{gid_prefix}:outline"))
@@ -191,12 +191,7 @@ def draw_compact_base_run(
     fontsize: float,
     color: str = INK,
 ) -> tuple[PathCollection, ...]:
-    """Draw a long exact sequence with four bounded vector collections.
-
-    One collection per nucleotide avoids allocating a Matplotlib text artist
-    for every product base. Collection offsets remain the authoritative base
-    centers, so Watson-Crick guides use the same coordinates.
-    """
+    """Draw exact bases in four collections while preserving pairing centers."""
 
     invalid = sorted(set(sequence) - set(_DNA_BASES))
     if invalid:

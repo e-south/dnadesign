@@ -26,6 +26,7 @@ from .foundation import (
     INK,
     MUTED,
     PAIR,
+    PRIMER_BINDING_SITE,
     TOEHOLD,
     TOEHOLD_DARK,
     safe_identifier,
@@ -84,8 +85,19 @@ def _component_text_color(color: str) -> str:
     return DOMAIN_DARK
 
 
-def _draw_span_labels(axis, *, spans, start_x: float, base_step: float, y: float, above: bool) -> None:
+def _draw_span_labels(
+    axis,
+    *,
+    spans,
+    start_x: float,
+    base_step: float,
+    y: float,
+    above: bool,
+    excluded_colors: frozenset[str] = frozenset(),
+) -> None:
     for start, end, color, label in spans:
+        if color in excluded_colors:
+            continue
         left = start_x + start * base_step
         right = start_x + end * base_step
         axis.text(
@@ -152,6 +164,7 @@ def _draw_fragment(
         base_step=base_step,
         y=bottom_y - 0.13,
         above=False,
+        excluded_colors=frozenset({PRIMER_BINDING_SITE}),
     )
     pair_segments = [
         (

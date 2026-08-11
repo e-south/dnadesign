@@ -117,7 +117,9 @@ def test_large_group_requires_an_explicit_bounded_subset(monkeypatch: pytest.Mon
     figure = plot_sequence_dissimilarity(review, junction_ids=selected)
     try:
         assert len(figure.axes[0].get_xticklabels()) == 12
-        assert "12 of 25 junctions" in figure.texts[1].get_text()
+        assert len(figure.texts) == 1
+        assert "12 of 25 junctions" in figure.texts[0].get_text()
+        assert "thermodynamic screening" not in figure.texts[0].get_text()
     finally:
         plt.close(figure)
 
@@ -209,6 +211,41 @@ def test_wide_compacted_labels_fit_at_the_larger_tick_size() -> None:
         labels = [label for label in figure.axes[0].get_yticklabels() if label.get_text()]
         assert all(label.get_window_extent(renderer).x0 >= figure.bbox.x0 for label in labels)
         assert len({label.get_text() for label in labels}) == len(labels) == 12
+    finally:
+        plt.close(figure)
+
+
+def test_numeric_heatmap_labels_stay_inside_enlarged_cells() -> None:
+    figure = plot_sequence_dissimilarity(_review(junction_count=12))
+    try:
+        assert tuple(figure.get_size_inches()) == pytest.approx((17.4, 6.5))
+        canvas = FigureCanvasAgg(figure)
+        canvas.draw()
+        renderer = canvas.get_renderer()
+        for axis in figure.axes:
+            gid = axis.get_gid() or ""
+            if not gid.startswith("junction-sequence-dissimilarity:"):
+                continue
+            labels = [text for text in axis.texts if ":value:" in (text.get_gid() or "")]
+            assert len(labels) == 12 * 12
+            for label in labels:
+                row, column = (int(value) for value in (label.get_gid() or "").rsplit(":", 2)[-2:])
+                left, bottom = axis.transData.transform((column - 0.5, row - 0.5))
+                right, top = axis.transData.transform((column + 0.5, row + 0.5))
+                cell_x0, cell_x1 = sorted((left, right))
+                cell_y0, cell_y1 = sorted((bottom, top))
+                bounds = label.get_window_extent(renderer)
+                assert bounds.x0 >= cell_x0 + 0.5
+                assert bounds.x1 <= cell_x1 - 0.5
+                assert bounds.y0 >= cell_y0 + 0.5
+                assert bounds.y1 <= cell_y1 - 0.5
+        numeric_colors = {
+            text.get_color().lower()
+            for axis in figure.axes
+            for text in axis.texts
+            if ":value:" in (text.get_gid() or "") and text.get_text() != "—"
+        }
+        assert numeric_colors == {"#24313d", "#ffffff"}
     finally:
         plt.close(figure)
 

@@ -1,8 +1,9 @@
 ![junction banner](assets/junction-banner.svg)
 
-`junction` designs oligos for assembling one or more DNA sequences with the
-Sidewinder three-way-junction method. It exports vendor-neutral order tables,
-FASTA files, interface records, and a manifest that can be verified offline.
+`junction` turns one or more exact DNA sequences into oligos for Sidewinder
+assembly, which joins short fragments through temporary three-way DNA
+junctions. It writes vendor-neutral order tables, FASTA files, interface
+records, and a bundle that can be checked again without the source request.
 
 ## Documentation
 

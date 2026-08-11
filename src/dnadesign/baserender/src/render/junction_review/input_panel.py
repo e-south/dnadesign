@@ -15,7 +15,13 @@ from dnadesign.contracts.visual import ThreeWayJunctionReviewV1
 
 from ..sequence_preview import bounded_svg_gid
 from .assembly_geometry import AssemblyLayout
-from .foundation import MOLECULAR_ANNOTATION_FONTSIZE, PRIMER_BINDING_SITE, PRIMER_BINDING_SITE_DARK
+from .foundation import (
+    INPUT_SPECIFICATION,
+    INPUT_SPECIFICATION_EDGE,
+    MOLECULAR_ANNOTATION_FONTSIZE,
+    PRIMER_BINDING_SITE,
+    PRIMER_BINDING_SITE_DARK,
+)
 from .primitives import draw_compact_base_run, draw_segmented_strand, draw_terminus
 
 
@@ -48,6 +54,9 @@ def draw_input_target(
         segments=binding_spans,
         height=0.14,
         gid_prefix="junction-three-way-assembly:input:strand",
+        body_color=INPUT_SPECIFICATION,
+        outline_color=INPUT_SPECIFICATION_EDGE,
+        outline_linestyle=(0, (3, 2)),
     )
     draw_compact_base_run(
         axis,
