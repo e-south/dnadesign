@@ -4,6 +4,7 @@ price_context: academic pricing
 currency: USD
 retrieved_on: 2026-08-11
 source_url: https://www.twistbioscience.com/products/oligo-pools
+n_nucleotide_surcharge_fraction: 0.20
 
 gene_fragment_bands:
   - minimum_length_nt: 500

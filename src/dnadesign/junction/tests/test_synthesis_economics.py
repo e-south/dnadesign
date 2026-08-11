@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
 
@@ -31,6 +32,7 @@ def test_pricing_snapshot_covers_all_supplied_count_and_length_tiers() -> None:
     assert len(snapshot.oligo_length_bands) == 6
     assert len(snapshot.oligo_pool_tiers) == 28
     assert snapshot.maximum_oligos_per_pool == 696_000
+    assert snapshot.n_nucleotide_surcharge_fraction == Decimal("0.20")
     assert snapshot.oligo_pool_price(oligo_count=100, length_band_id="20-120nt") == 320
     assert snapshot.oligo_pool_price(oligo_count=696_000, length_band_id="301-350nt") == Decimal("114422.40")
 
@@ -61,6 +63,15 @@ def test_price_contract_rejects_ranges_that_cross_length_bands() -> None:
                 maximum_oligo_length_nt=130,
             ),
         )
+
+
+def test_n_nucleotide_surcharge_is_explicit() -> None:
+    snapshot = load_pricing_snapshot(default_pricing_snapshot_path())
+    baseline = build_purchase_price_rows(snapshot, _scenario())[0]
+    with_n = build_purchase_price_rows(snapshot, replace(_scenario(), uses_n_nucleotide=True))[0]
+
+    assert baseline.oligo_pool_usd == Decimal("320.00")
+    assert with_n.oligo_pool_usd == Decimal("384.0000")
 
 
 def test_purchase_price_figure_is_square_generic_and_deterministic(tmp_path: Path) -> None:
