@@ -9,7 +9,9 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
+import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import yaml
 from typer.testing import CliRunner
@@ -43,3 +45,81 @@ def test_sources_list_includes_local_sources(tmp_path: Path) -> None:
     result = runner.invoke(app, ["sources", "list", str(config_path)])
     assert result.exit_code == 0
     assert "local_omalle" in result.output
+
+
+def test_sources_materialize_promoters_publishes_complete_export(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    data_root = tmp_path / "source-data"
+    data_root.mkdir()
+    destination = tmp_path / "promoter-export"
+
+    def _materialize(staging: Path, **kwargs):
+        assert kwargs == {
+            "data_root": data_root,
+            "require_association_sources": True,
+        }
+        (staging / "manifest.json").write_text("{}\n", encoding="utf-8")
+        return SimpleNamespace(complete=True, record_count=12)
+
+    monkeypatch.setattr(
+        "dnadesign.cruncher.cli.commands.sources.export_dnadesign_data_promoter_superset",
+        _materialize,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "sources",
+            "materialize-promoters",
+            str(destination),
+            "--data-root",
+            str(data_root),
+            "--require-association-sources",
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output) == {
+        "complete": True,
+        "destination": str(destination),
+        "record_count": 12,
+        "schema": "cruncher.promoter-export/v1",
+        "status": "ok",
+    }
+    assert (destination / "manifest.json").is_file()
+
+
+def test_sources_materialize_promoters_rejects_existing_destination(tmp_path: Path) -> None:
+    destination = tmp_path / "promoter-export"
+    destination.mkdir()
+
+    result = runner.invoke(app, ["sources", "materialize-promoters", str(destination)])
+
+    assert result.exit_code == 1
+    assert "Destination already exists" in result.output
+
+
+def test_sources_materialize_promoters_removes_failed_staging_directory(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    destination = tmp_path / "promoter-export"
+
+    def _fail(_staging: Path, **_kwargs):
+        raise ValueError("invalid source inventory")
+
+    monkeypatch.setattr(
+        "dnadesign.cruncher.cli.commands.sources.export_dnadesign_data_promoter_superset",
+        _fail,
+    )
+
+    result = runner.invoke(app, ["sources", "materialize-promoters", str(destination)])
+
+    assert result.exit_code == 1
+    assert "invalid source inventory" in result.output
+    assert not destination.exists()
+    assert list(tmp_path.glob(".promoter-export.*")) == []
