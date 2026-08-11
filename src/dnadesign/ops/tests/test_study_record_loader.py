@@ -88,8 +88,32 @@ def test_loads_explicit_scope_contract(tmp_path: Path) -> None:
 
     assert contract.study_id == "demo_study"
     assert contract.snapshot_summary_scope == "repo"
-    assert contract.preflight.scope_groups == {"next": ("study_record",)}
+    assert contract.preflight.scope_groups == {
+        "next": ("study_record",),
+        "full": ("study_record",),
+    }
     assert tuple(contract.preflight.check_specs) == ("study_record",)
+
+
+def test_full_scope_expands_all_declared_check_groups(tmp_path: Path) -> None:
+    payload = _base_payload()
+    payload["preflight"]["checks"]["optional_review"] = [
+        {
+            "kind": "command",
+            "check_id": "study.optional-review.valid",
+            "check_group": "optional_review",
+            "summary": "Optional review validates.",
+            "required": False,
+            "surface": "validate_status",
+        }
+    ]
+
+    contract = load_study_ops_contract(_write_contract(tmp_path, payload))
+
+    assert contract.preflight.scope_groups == {
+        "next": ("study_record",),
+        "full": ("study_record", "optional_review"),
+    }
 
 
 def test_accepts_split_mapping_parts(tmp_path: Path) -> None:

@@ -68,7 +68,7 @@ def stable_oligo_pool_advantage(rows: tuple[PurchasePriceRow, ...]) -> int | Non
         raise ValueError("purchase-price rows must not be empty")
     last_gene_advantage = max(
         (row.target_count for row in rows if row.oligo_pool_usd >= row.gene_fragments_usd),
-        default=0,
+        default=rows[0].target_count - 1,
     )
     candidate = last_gene_advantage + 1
     return candidate if candidate <= rows[-1].target_count else None
