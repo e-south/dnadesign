@@ -37,6 +37,10 @@ The comparison excludes primers, phosphorylation, enzymes, PCR, purification,
 cloning, verification, labor, failures, reorders, shipping, and tax. Those costs
 can reverse a purchase-price advantage.
 
+The figure assumes resolved A, C, G, and T sequences. The supplied price table
+adds 20% to an oligo-pool order that uses `N`; Junction applies that surcharge
+when `uses_n_nucleotide` is true in the synthesis scenario.
+
 ## Price provenance
 
 The checked figure uses an academic-pricing snapshot retrieved on 2026-08-11

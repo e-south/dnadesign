@@ -34,14 +34,17 @@ def build_purchase_price_rows(
     gene_price_per_target = Decimal(scenario.target_length_nt) * gene_band.with_adapters_usd_per_bp
     for target_count in range(1, maximum_targets + 1):
         oligo_count = target_count * scenario.oligos_per_target
+        pool_price = snapshot.oligo_pool_price(
+            oligo_count=oligo_count,
+            length_band_id=oligo_band.band_id,
+        )
+        if scenario.uses_n_nucleotide:
+            pool_price *= Decimal("1") + snapshot.n_nucleotide_surcharge_fraction
         rows.append(
             PurchasePriceRow(
                 target_count=target_count,
                 gene_fragments_usd=Decimal(target_count) * gene_price_per_target,
-                oligo_pool_usd=snapshot.oligo_pool_price(
-                    oligo_count=oligo_count,
-                    length_band_id=oligo_band.band_id,
-                ),
+                oligo_pool_usd=pool_price,
                 oligo_count=oligo_count,
             )
         )

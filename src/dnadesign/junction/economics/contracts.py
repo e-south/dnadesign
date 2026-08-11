@@ -64,6 +64,7 @@ class PricingSnapshot:
     currency: str
     retrieved_on: date
     source_url: str
+    n_nucleotide_surcharge_fraction: Decimal
     gene_fragment_bands: tuple[GeneFragmentBand, ...]
     oligo_length_bands: tuple[OligoLengthBand, ...]
     oligo_pool_tiers: tuple[OligoPoolTier, ...]
@@ -71,6 +72,8 @@ class PricingSnapshot:
     def __post_init__(self) -> None:
         if any(not value.strip() for value in (self.supplier, self.price_context, self.currency, self.source_url)):
             raise ValueError("pricing snapshot identity fields must not be empty")
+        if self.n_nucleotide_surcharge_fraction < 0:
+            raise ValueError("N-nucleotide surcharge must be non-negative")
         if not self.gene_fragment_bands or not self.oligo_length_bands or not self.oligo_pool_tiers:
             raise ValueError("pricing snapshot bands and tiers must not be empty")
         _require_non_overlapping_bands(self.gene_fragment_bands, label="gene-fragment")
@@ -113,10 +116,13 @@ class SynthesisScenario:
     oligos_per_target: int
     minimum_oligo_length_nt: int
     maximum_oligo_length_nt: int
+    uses_n_nucleotide: bool = False
 
     def __post_init__(self) -> None:
         if self.target_length_nt <= 0 or self.oligos_per_target <= 0:
             raise ValueError("target length and oligos per target must be positive")
+        if not isinstance(self.uses_n_nucleotide, bool):
+            raise ValueError("uses_n_nucleotide must be a boolean")
         _positive_span(self.minimum_oligo_length_nt, self.maximum_oligo_length_nt, label="physical oligo length")
 
 
@@ -136,6 +142,7 @@ def load_pricing_snapshot(path: Path) -> PricingSnapshot:
         currency=_text(raw, "currency"),
         retrieved_on=retrieved if isinstance(retrieved, date) else date.fromisoformat(str(retrieved)),
         source_url=_text(raw, "source_url"),
+        n_nucleotide_surcharge_fraction=Decimal(str(_required(raw, "n_nucleotide_surcharge_fraction"))),
         gene_fragment_bands=tuple(
             GeneFragmentBand(
                 minimum_length_nt=int(_required(item, "minimum_length_nt")),
