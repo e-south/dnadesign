@@ -18,6 +18,7 @@ tasks and the reference pages for exact fields, limits, and failure rules.
 | Build, inspect, and verify the checked-in example | [Run the gene-scale example](getting-started.md) |
 | Turn raw, text, or FASTA sequences into a request | [Prepare a request](guides/prepare-a-request.md) |
 | Trace an existing bundle and its checks | [Inspect and verify](guides/inspect-and-verify.md) |
+| Compare gene fragments with an oligo-pool route | [Choose a synthesis route](guides/choose-a-synthesis-route.md) |
 | Bound a larger request | [Scale](guides/scale.md) |
 
 ## Understand the method
