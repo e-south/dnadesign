@@ -121,9 +121,10 @@ def _annotation_semantic(
     end: int,
     sequence_length: int,
 ) -> tuple[str, str]:
-    del feature_type
     if _is_source_fragment_label(label, start=start, end=end, sequence_length=sequence_length):
         return "source_fragment", label or "Source fragment"
+    if str(feature_type).strip().lower() == "promoter":
+        return "promoter_region", label or "Promoter region"
     if _looks_like_operator_label(label):
         return "operator_site", label or "Operator site"
     if _looks_like_promoter_region_label(label, start=start, end=end, sequence_length=sequence_length):

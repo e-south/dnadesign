@@ -320,6 +320,52 @@ def test_usr_genbank_interval_annotations_render_as_filled_spans_with_near_label
         plt.close(fig)
 
 
+def test_sequence_rows_suppresses_overlay_that_repeats_full_span_annotation_label() -> None:
+    row = _genbank_row()
+    row["usr_label__primary"] = "J23105"
+    sequence = str(row["sequence"])
+    row["seq_annot__features"] = [
+        {
+            "feature_id": "feat_promoter",
+            "feature_order": 1,
+            "feature_type": "promoter",
+            "label": "J23105",
+            "role_hint": None,
+            "start_0": 0,
+            "end_0": len(sequence),
+            "strand": 1,
+            "confidence": "high",
+        }
+    ]
+    record = adapt_record(
+        row,
+        adapter_kind="usr_genbank_annotations_v1",
+        adapter_columns=_adapter_columns(),
+        alphabet="DNA",
+    )
+    assert record.features[0].tags == ("genbank:promoter_region",)
+    style = resolve_style(
+        preset="presentation_default",
+        overrides={
+            "show_reverse_complement": False,
+            "connectors": False,
+            "legend": False,
+            "font_size_seq": 18,
+            "font_size_label": 18,
+            "legend_font_size": 18,
+            "uniform_display_font_size": True,
+        },
+    )
+
+    initialize_runtime()
+    fig = render_record(record, renderer_name="sequence_rows", style=style, palette=Palette(style.palette))
+    try:
+        rendered_labels = [text for text in fig.axes[0].texts if text.get_text() == "J23105"]
+        assert len(rendered_labels) == 1
+    finally:
+        plt.close(fig)
+
+
 def test_usr_genbank_render_uses_shared_near_feature_annotation_labels() -> None:
     record = adapt_record(
         _genbank_row(),

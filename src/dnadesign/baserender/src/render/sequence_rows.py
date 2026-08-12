@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from typing import Mapping, Sequence
 
@@ -68,6 +68,22 @@ class _SequenceRowsInput:
     tone_fwd: tuple[float, ...] | None
     tone_rev: tuple[float, ...] | None
     explicit_complement_sequence: str | None
+
+
+def _without_redundant_full_span_overlay(record: Record) -> Record:
+    overlay = str(record.display.overlay_text or "").strip()
+    if not overlay:
+        return record
+    repeats_full_span = any(
+        feature.kind == "interval_annotation"
+        and feature.span.start == 0
+        and feature.span.end == len(record.sequence)
+        and str(feature.label or "").strip() == overlay
+        for feature in record.features
+    )
+    if not repeats_full_span:
+        return record
+    return replace(record, display=replace(record.display, overlay_text=None))
 
 
 def _optional_meta_float(record: Record, key: str) -> float | None:
@@ -158,10 +174,10 @@ def _preflight_sequence_rows(record: Record, style: Style, palette: Palette) -> 
 @dataclass(frozen=True)
 class SequenceRowsRenderer:
     def preflight(self, record: Record, style: Style, palette: Palette) -> None:
-        _preflight_sequence_rows(record, style, palette)
+        _preflight_sequence_rows(_without_redundant_full_span_overlay(record), style, palette)
 
     def render(self, record: Record, style: Style, palette: Palette):
-        record = record.validate()
+        record = _without_redundant_full_span_overlay(record.validate())
         prepared = _preflight_sequence_rows(record, style, palette)
         show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
         layout = prepared.layout
