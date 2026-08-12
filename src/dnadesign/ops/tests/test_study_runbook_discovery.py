@@ -19,17 +19,41 @@ from dnadesign.ops.api import discover_infer_runbook_paths_for_study
 
 
 def _write_study_contract(study_dir: Path, *, runbook_ref: str) -> None:
+    repo_root = study_dir.parents[2]
+    repo_root.mkdir(parents=True, exist_ok=True)
+    (repo_root / "pyproject.toml").write_text("[project]\nname='studies'\nversion='0.0.0'\n", encoding="utf-8")
     operations_dir = study_dir / "operations"
     operations_dir.mkdir(parents=True)
     (operations_dir / "ops.study.yaml").write_text(
         yaml.safe_dump(
             {
+                "version": 2,
+                "study_id": "study",
                 "execution_surfaces": {
                     "infer": {
                         "surface_type": "runbook",
                         "runbook_ref": runbook_ref,
                     }
-                }
+                },
+                "preflight": {
+                    "default_scope": "next",
+                    "scopes": {
+                        "next": {"include_groups": ["infer_runbook"]},
+                        "full": {"include_groups": ["all"]},
+                    },
+                    "checks": {
+                        "infer_runbook": [
+                            {
+                                "kind": "runbook_plan",
+                                "check_id": "infer.runbook.plan",
+                                "check_group": "infer_runbook",
+                                "summary": "Infer runbook can be planned.",
+                                "required": True,
+                                "surface": "infer",
+                            }
+                        ]
+                    },
+                },
             },
             sort_keys=False,
         ),

@@ -1103,7 +1103,7 @@ def test_infer_fill_discovers_study_runbooks_and_plans_missing_lanes(
 
     repo_root = tmp_path
     (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\nversion='0.0.0'\n", encoding="utf-8")
-    study_dir = repo_root / "docs" / "studies" / "demo"
+    study_dir = repo_root / "studies" / "demo"
     (study_dir / "operations").mkdir(parents=True)
     workspace_root = repo_root / "workspace"
     _write_sequence_view_infer_config(workspace_root / "config.yaml")
@@ -1118,20 +1118,6 @@ def test_infer_fill_discovers_study_runbooks_and_plans_missing_lanes(
             {
                 "version": 2,
                 "study_id": "demo",
-                "lifecycle": {
-                    "mode": "sequential",
-                    "phase_order": ["infer_batch_preparation"],
-                    "current_phase": {
-                        "strategy": "explicit",
-                        "id": "infer_batch_preparation",
-                    },
-                },
-                "phases": [
-                    {
-                        "id": "infer_batch_preparation",
-                        "status": "in_progress",
-                    },
-                ],
                 "execution_surfaces": {
                     "infer_sequence_views": {
                         "surface_type": "runbook",
@@ -1140,11 +1126,21 @@ def test_infer_fill_discovers_study_runbooks_and_plans_missing_lanes(
                 },
                 "preflight": {
                     "default_scope": "next",
-                    "group_phase_bindings": {"infer": "infer_batch_preparation"},
-                    "next_scope": {
-                        "target_phase_groups": {"infer_batch_preparation": ["infer"]},
-                        "runtime_phase_groups": ["infer"],
-                        "runtime_shared_groups": [],
+                    "scopes": {
+                        "next": {"include_groups": ["infer_runbook"]},
+                        "full": {"include_groups": ["all"]},
+                    },
+                    "checks": {
+                        "infer_runbook": [
+                            {
+                                "kind": "runbook_plan",
+                                "check_id": "infer.runbook.plan",
+                                "check_group": "infer_runbook",
+                                "summary": "Infer runbook can be planned.",
+                                "required": True,
+                                "surface": "infer_sequence_views",
+                            }
+                        ]
                     },
                 },
             }
@@ -1216,6 +1212,32 @@ def test_infer_fill_discovers_study_runbooks_and_plans_missing_lanes(
     assert lane.audit_json_path == workspace_root / "outputs" / "logs" / "ops" / "audit" / (
         "infer_sequence_view.fill-infer.json"
     )
+
+
+def test_infer_fill_rejects_legacy_study_contract_before_runbook_discovery(tmp_path: Path) -> None:
+    repo_root = tmp_path
+    (repo_root / "pyproject.toml").write_text("[project]\nname='dnadesign'\nversion='0.0.0'\n", encoding="utf-8")
+    study_dir = repo_root / "studies" / "demo"
+    (study_dir / "operations").mkdir(parents=True)
+    (study_dir / "operations" / "ops.study.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "version": 2,
+                "study_id": "demo",
+                "lifecycle": {"mode": "sequential"},
+                "execution_surfaces": {},
+                "preflight": {
+                    "default_scope": "next",
+                    "group_phase_bindings": {},
+                    "next_scope": {},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"unknown key\(s\) lifecycle"):
+        build_infer_fill_plan(repo_root=repo_root, study_dir=study_dir)
 
 
 def test_infer_fill_blocks_missing_sequence_products_before_batch_plan(
