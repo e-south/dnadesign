@@ -38,6 +38,7 @@ _PROTEINMPNN_FILES = {
     "structure.py",
     "validation.py",
 }
+_LIGANDMPNN_FILES = {"__init__.py", "commands.py", "models.py", "preflight.py", "receipts.py"}
 _COLABFOLD_FILES = {"__init__.py", "index.py", "manifest.py", "metrics.py", "outputs.py"}
 _BIOHUB_ESMC_FILES = {
     "__init__.py",
@@ -92,6 +93,19 @@ def test_proteinmpnn_adapter_owns_generic_request_mechanics() -> None:
         assert "wang" not in text
     assert "ProteinMPNN" in (root / "validation.py").read_text(encoding="utf-8")
     assert "resolve_manifest_sidecar_path" in (root / "sidecars.py").read_text(encoding="utf-8")
+
+
+def test_ligandmpnn_adapter_owns_only_generic_request_mechanics() -> None:
+    root = _repo_root() / "src/dnadesign/thread/adapters/ligandmpnn"
+
+    assert sorted(path.name for path in root.glob("*.py")) == sorted(_LIGANDMPNN_FILES)
+    for path in root.glob("*.py"):
+        text = path.read_text(encoding="utf-8").lower()
+        assert "eco1" not in text
+        assert "p4" not in text
+        assert "scaffold" not in text
+    assert "--model_type" in (root / "commands.py").read_text(encoding="utf-8")
+    assert "ligand_mpnn" in (root / "commands.py").read_text(encoding="utf-8")
 
 
 def test_colabfold_adapter_owns_generic_result_normalization() -> None:

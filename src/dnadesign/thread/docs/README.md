@@ -2,7 +2,7 @@
 doc_id: dnadesign-thread-docs
 surface: tool-docs
 owner: dnadesign-maintainers
-last_verified: 2026-08-09
+last_verified: 2026-08-14
 ---
 
 # Thread
@@ -17,6 +17,7 @@ selection and decides what the results mean.
 | Job | Surface | Result |
 | --- | --- | --- |
 | Prepare a ProteinMPNN run | `dnadesign.thread.adapters.proteinmpnn` | Validated request sidecars and a request manifest |
+| Declare a pinned LigandMPNN run | `dnadesign.thread.adapters.ligandmpnn` | Preflight report, explicit commands, and a planned receipt |
 | Read ProteinMPNN samples | `dnadesign.thread.adapters.proteinmpnn` | Normalized backend sample rows |
 | Build stable candidate rows | `dnadesign.thread.candidates` | Sequence, mutation, and mask-audit fields |
 | Read ColabFold output | `dnadesign.thread.adapters.colabfold` | Normalized confidence, PAE, and RMSD rows |
@@ -27,6 +28,14 @@ selection and decides what the results mean.
 | Inspect existing structures | `dnadesign.thread.structure_views` | An interactive browser view |
 
 ## Boundaries
+
+The LigandMPNN adapter always declares `--model_type ligand_mpnn` and keeps
+fixed or redesigned residues, atom and fixed-side-chain context, packing,
+seeds, temperature, and sample counts explicit. Its CLI contract was checked
+against official upstream commit
+`26ec57ac976ade5379920dbd43c7f97a91cf82de`. The caller supplies the pinned
+checkout and checkpoint hashes; the adapter does not clone, download, execute,
+choose residues, or interpret designs.
 
 - Adapters own translation to or from one external tool. They do not own
   candidate selection or biological interpretation.
