@@ -1,4 +1,13 @@
-"""Preflight tests for a pinned official LigandMPNN checkout."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/tests/adapters/ligandmpnn/test_preflight.py
+
+Preflight tests for a pinned official LigandMPNN checkout.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

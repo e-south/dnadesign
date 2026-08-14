@@ -1,4 +1,13 @@
-"""Official LigandMPNN probability-scoring command tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/tests/adapters/ligandmpnn/test_scoring.py
+
+Official LigandMPNN probability-scoring command tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

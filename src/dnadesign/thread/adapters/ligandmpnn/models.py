@@ -1,4 +1,13 @@
-"""Typed, study-neutral LigandMPNN request models."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/adapters/ligandmpnn/models.py
+
+Typed study-neutral LigandMPNN request models.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Residue-specific LigandMPNN alphabet contract tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/tests/adapters/ligandmpnn/test_alphabets.py
+
+Residue-specific LigandMPNN alphabet contract tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

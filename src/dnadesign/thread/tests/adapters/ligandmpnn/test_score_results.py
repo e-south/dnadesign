@@ -1,4 +1,13 @@
-"""Executed LigandMPNN probability-result boundary tests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/tests/adapters/ligandmpnn/test_score_results.py
+
+Executed LigandMPNN probability-result boundary tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

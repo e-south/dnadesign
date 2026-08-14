@@ -1,4 +1,13 @@
-"""Deterministic official ``--omit_AA_per_residue`` sidecars."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/adapters/ligandmpnn/alphabets.py
+
+Deterministic residue-alphabet sidecars for LigandMPNN.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

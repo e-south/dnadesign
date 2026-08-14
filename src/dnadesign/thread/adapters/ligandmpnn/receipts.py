@@ -1,4 +1,13 @@
-"""Normalized LigandMPNN provenance and non-executing request receipts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/adapters/ligandmpnn/receipts.py
+
+Normalized LigandMPNN provenance and planned request receipts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Typed official LigandMPNN per-position probability scoring commands."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/adapters/ligandmpnn/scoring.py
+
+Typed LigandMPNN per-position probability-scoring commands.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

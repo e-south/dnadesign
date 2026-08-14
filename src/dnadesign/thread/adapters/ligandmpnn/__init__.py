@@ -1,4 +1,13 @@
-"""Study-neutral adaptation of pinned official LigandMPNN requests."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/adapters/ligandmpnn/__init__.py
+
+Public study-neutral LigandMPNN adapter surface.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from dnadesign.thread.adapters.ligandmpnn.alphabets import (
     LigandMpnnResidueAlphabetSidecar,

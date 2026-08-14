@@ -1,11 +1,17 @@
-"""Strict parsing and lineage for official LigandMPNN ``score.py`` outputs.
-
-The pinned upstream writes NumPy arrays through ``torch.save``. PyTorch files
-are pickle-capable containers, so this module accepts them only from an
-explicitly attested, pinned local execution root. It still uses
-``weights_only=True`` with a narrow NumPy allowlist. That reduces the loading
-surface; it does not make arbitrary downloaded ``.pt`` files trustworthy.
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/adapters/ligandmpnn/score_results.py
+
+Strict parsing and lineage for official LigandMPNN score outputs.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+# Upstream writes NumPy arrays through pickle-capable torch containers. This
+# boundary accepts only attested pinned-local outputs and still loads with
+# weights_only=True plus a narrow NumPy allowlist.
 
 from __future__ import annotations
 

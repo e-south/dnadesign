@@ -1,4 +1,13 @@
-"""Pinned official LigandMPNN checkout and checkpoint preflight."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/adapters/ligandmpnn/preflight.py
+
+Pinned LigandMPNN checkout and checkpoint preflight.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

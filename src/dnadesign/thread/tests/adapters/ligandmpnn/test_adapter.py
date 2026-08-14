@@ -1,4 +1,13 @@
-"""Behavior tests for LigandMPNN request and command adaptation."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/tests/adapters/ligandmpnn/test_adapter.py
+
+Behavior tests for LigandMPNN request and command adaptation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Deterministic official LigandMPNN command construction."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/adapters/ligandmpnn/commands.py
+
+Deterministic official LigandMPNN command construction.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
