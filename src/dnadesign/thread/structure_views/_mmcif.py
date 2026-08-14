@@ -13,7 +13,30 @@ from __future__ import annotations
 
 import shlex
 from dataclasses import dataclass
+from io import StringIO
 from typing import Iterator
+
+from Bio.PDB.MMCIF2Dict import MMCIF2Dict
+
+_BROWSER_ATOM_SITE_FIELDS: tuple[str, ...] = (
+    "_atom_site.group_pdb",
+    "_atom_site.id",
+    "_atom_site.type_symbol",
+    "_atom_site.label_atom_id",
+    "_atom_site.label_alt_id",
+    "_atom_site.label_comp_id",
+    "_atom_site.label_asym_id",
+    "_atom_site.label_seq_id",
+    "_atom_site.cartn_x",
+    "_atom_site.cartn_y",
+    "_atom_site.cartn_z",
+    "_atom_site.auth_asym_id",
+    "_atom_site.auth_seq_id",
+    "_atom_site.pdbx_pdb_ins_code",
+    "_atom_site.occupancy",
+    "_atom_site.b_iso_or_equiv",
+    "_atom_site.pdbx_pdb_model_num",
+)
 
 
 @dataclass(frozen=True)
@@ -26,6 +49,114 @@ class MmcifAtomSiteRecord:
     residue_number: str
     insertion_code: str
     source_line_indices: tuple[int, ...]
+
+
+def serialize_mmcif_atom_sites_for_3dmol(structure_text: str) -> str:
+    """Return a coordinate-only mmCIF payload safe for 3Dmol's CIF tokenizer.
+
+    3Dmol 2.5.5 treats apostrophes inside otherwise valid unquoted CIF tokens as
+    quote delimiters. Nucleic-acid atom names such as ``O5'`` then shift the
+    remaining atom-site columns. This adapter emits one canonical coordinate
+    loop and double-quotes every atom name, which 3Dmol explicitly unquotes.
+    """
+
+    raw = MMCIF2Dict(StringIO(structure_text))
+    source = {str(key).lower(): _as_mmcif_values(value) for key, value in raw.items()}
+    fields = _browser_atom_site_values(source)
+    row_count = len(fields["_atom_site.group_pdb"])
+    if row_count == 0:
+        raise ValueError("mmCIF browser serialization requires at least one atom-site record")
+    inconsistent = {field: len(values) for field, values in fields.items() if len(values) != row_count}
+    if inconsistent:
+        raise ValueError(
+            "mmCIF browser serialization received inconsistent atom-site column lengths: "
+            f"expected {row_count}, got {inconsistent}"
+        )
+
+    lines = ["data_dnadesign_browser", "loop_", *_BROWSER_ATOM_SITE_FIELDS]
+    for row_index in range(row_count):
+        row = [fields[field][row_index] for field in _BROWSER_ATOM_SITE_FIELDS]
+        row[3] = _quote_3dmol_atom_name(row[3])
+        lines.append(
+            " ".join(
+                _browser_cif_token(value, field=_BROWSER_ATOM_SITE_FIELDS[index]) for index, value in enumerate(row)
+            )
+        )
+    lines.append("#")
+    return "\n".join(lines)
+
+
+def _as_mmcif_values(value: object) -> tuple[str, ...]:
+    if isinstance(value, list):
+        return tuple(str(item) for item in value)
+    return (str(value),)
+
+
+def _browser_atom_site_values(source: dict[str, tuple[str, ...]]) -> dict[str, tuple[str, ...]]:
+    group = _required_atom_site_column(source, "_atom_site.group_pdb")
+    row_count = len(group)
+
+    def column(
+        name: str,
+        *fallback_names: str,
+        default: str | None = None,
+    ) -> tuple[str, ...]:
+        for candidate in (name, *fallback_names):
+            values = source.get(candidate)
+            if values is not None:
+                return values
+        if default is not None:
+            return (default,) * row_count
+        joined = ", ".join((name, *fallback_names))
+        raise ValueError(f"mmCIF browser serialization requires one of these atom-site columns: {joined}")
+
+    return {
+        "_atom_site.group_pdb": group,
+        "_atom_site.id": source.get("_atom_site.id", tuple(str(index + 1) for index in range(row_count))),
+        "_atom_site.type_symbol": column("_atom_site.type_symbol"),
+        "_atom_site.label_atom_id": column("_atom_site.label_atom_id", "_atom_site.auth_atom_id"),
+        "_atom_site.label_alt_id": column("_atom_site.label_alt_id", default="."),
+        "_atom_site.label_comp_id": column("_atom_site.label_comp_id", "_atom_site.auth_comp_id"),
+        "_atom_site.label_asym_id": column("_atom_site.label_asym_id", "_atom_site.auth_asym_id"),
+        "_atom_site.label_seq_id": column("_atom_site.label_seq_id", "_atom_site.auth_seq_id"),
+        "_atom_site.cartn_x": column("_atom_site.cartn_x"),
+        "_atom_site.cartn_y": column("_atom_site.cartn_y"),
+        "_atom_site.cartn_z": column("_atom_site.cartn_z"),
+        "_atom_site.auth_asym_id": column("_atom_site.auth_asym_id", "_atom_site.label_asym_id"),
+        "_atom_site.auth_seq_id": column("_atom_site.auth_seq_id", "_atom_site.label_seq_id"),
+        "_atom_site.pdbx_pdb_ins_code": column("_atom_site.pdbx_pdb_ins_code", default="?"),
+        "_atom_site.occupancy": column("_atom_site.occupancy", default="1.00"),
+        "_atom_site.b_iso_or_equiv": column("_atom_site.b_iso_or_equiv", default="0.00"),
+        "_atom_site.pdbx_pdb_model_num": column("_atom_site.pdbx_pdb_model_num", default="1"),
+    }
+
+
+def _required_atom_site_column(
+    source: dict[str, tuple[str, ...]],
+    name: str,
+) -> tuple[str, ...]:
+    values = source.get(name)
+    if values is None:
+        raise ValueError(f"mmCIF browser serialization requires atom-site column {name}")
+    return values
+
+
+def _quote_3dmol_atom_name(value: str) -> str:
+    if not value or any(character in value for character in ('"', "\n", "\r")):
+        raise ValueError(f"mmCIF atom name cannot be serialized safely for 3Dmol: {value!r}")
+    return f'"{value}"'
+
+
+def _browser_cif_token(value: str, *, field: str) -> str:
+    if field == "_atom_site.label_atom_id" and value.startswith('"') and value.endswith('"'):
+        return value
+    if (
+        not value
+        or any(character.isspace() for character in value)
+        or any(character in value for character in ("'", '"'))
+    ):
+        raise ValueError(f"mmCIF value cannot be serialized safely for 3Dmol at {field}: {value!r}")
+    return value
 
 
 def iter_mmcif_atom_site_records(structure_text: str) -> Iterator[MmcifAtomSiteRecord]:

@@ -15,6 +15,7 @@ import hashlib
 import html
 import json
 
+from dnadesign.thread.structure_views._mmcif import serialize_mmcif_atom_sites_for_3dmol
 from dnadesign.thread.structure_views.models import (
     DNA_RESIDUE_NAMES,
     PROTEIN_BACKBONE_ATOM_NAMES,
@@ -118,7 +119,10 @@ def render_py3dmol_structure_view(spec: StructureViewSpec) -> str:
         nucleic_geometry_by_model_class.update(
             {(model.model_id, molecule_class): geometry for molecule_class, geometry in model_nucleic_geometry.items()}
         )
-        view.addModel(structure_text, _py3dmol_model_format(model.structure_format))
+        view.addModel(
+            _py3dmol_model_payload(structure_text, structure_format=model.structure_format),
+            _py3dmol_model_format(model.structure_format),
+        )
         if "protein" in visible_molecule_classes:
             view.setStyle(_molecule_selection(index, "protein"), _style_for_model(spec, model))
         if (
@@ -204,6 +208,12 @@ def _py3dmol_model_format(structure_format: str) -> str:
     if structure_format == "mmcif":
         return "cif"
     return structure_format
+
+
+def _py3dmol_model_payload(structure_text: str, *, structure_format: str) -> str:
+    if structure_format == "mmcif":
+        return serialize_mmcif_atom_sites_for_3dmol(structure_text)
+    return structure_text
 
 
 def _py3dmol_background_color(color: str) -> str:
