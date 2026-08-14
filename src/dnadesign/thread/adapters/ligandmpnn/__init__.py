@@ -1,7 +1,12 @@
 """Study-neutral adaptation of pinned official LigandMPNN requests."""
 
+from dnadesign.thread.adapters.ligandmpnn.alphabets import (
+    LigandMpnnResidueAlphabetSidecar,
+    materialize_residue_alphabet_sidecar,
+)
 from dnadesign.thread.adapters.ligandmpnn.commands import build_ligandmpnn_commands
 from dnadesign.thread.adapters.ligandmpnn.models import (
+    CANONICAL_AA_ALPHABET,
     DEFAULT_CHECKPOINT_PATH,
     DEFAULT_PACKING_CHECKPOINT_PATH,
     UPSTREAM_REPOSITORY,
@@ -9,6 +14,7 @@ from dnadesign.thread.adapters.ligandmpnn.models import (
     LigandMpnnPackingConfig,
     LigandMpnnRequest,
     LigandMpnnResidue,
+    LigandMpnnResidueAlphabet,
     LigandMpnnUpstreamPin,
 )
 from dnadesign.thread.adapters.ligandmpnn.preflight import (
@@ -21,10 +27,16 @@ from dnadesign.thread.adapters.ligandmpnn.receipts import (
     LigandMpnnRunReceipt,
     build_planned_receipt,
 )
+from dnadesign.thread.adapters.ligandmpnn.scoring import (
+    LigandMpnnScoreMode,
+    LigandMpnnScoreRequest,
+    build_ligandmpnn_score_commands,
+)
 
 __all__ = [
     "DEFAULT_CHECKPOINT_PATH",
     "DEFAULT_PACKING_CHECKPOINT_PATH",
+    "CANONICAL_AA_ALPHABET",
     "UPSTREAM_REPOSITORY",
     "LigandMpnnCommand",
     "LigandMpnnPackingConfig",
@@ -33,9 +45,15 @@ __all__ = [
     "LigandMpnnProvenance",
     "LigandMpnnRequest",
     "LigandMpnnResidue",
+    "LigandMpnnResidueAlphabet",
+    "LigandMpnnResidueAlphabetSidecar",
     "LigandMpnnRunReceipt",
     "LigandMpnnUpstreamPin",
+    "LigandMpnnScoreMode",
+    "LigandMpnnScoreRequest",
     "build_ligandmpnn_commands",
+    "build_ligandmpnn_score_commands",
     "build_planned_receipt",
+    "materialize_residue_alphabet_sidecar",
     "preflight_ligandmpnn",
 ]

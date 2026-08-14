@@ -45,6 +45,9 @@ def preflight_ligandmpnn(
     entrypoint = root / "run.py"
     if not entrypoint.is_file():
         issues.append(_issue("missing_entrypoint", "checkout is missing official run.py", entrypoint))
+    score_entrypoint = root / "score.py"
+    if not score_entrypoint.is_file():
+        issues.append(_issue("missing_score_entrypoint", "checkout is missing official score.py", score_entrypoint))
 
     observed_commit = _git_commit(root)
     if observed_commit is None:

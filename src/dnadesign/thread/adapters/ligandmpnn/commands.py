@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dnadesign.thread.adapters.ligandmpnn.alphabets import LigandMpnnResidueAlphabetSidecar
 from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnCommand, LigandMpnnRequest
 
 
@@ -12,9 +13,11 @@ def build_ligandmpnn_commands(
     *,
     checkout_root: Path,
     python_executable: str = "python",
+    residue_alphabet_sidecar: LigandMpnnResidueAlphabetSidecar | None = None,
 ) -> tuple[LigandMpnnCommand, ...]:
     """Build one explicit official ``run.py`` invocation per requested seed."""
 
+    _validate_alphabet_sidecar(request, residue_alphabet_sidecar)
     commands: list[LigandMpnnCommand] = []
     for seed in request.seeds:
         output_dir = request.output_dir / f"seed_{seed}"
@@ -43,6 +46,8 @@ def build_ligandmpnn_commands(
             _flag(request.use_side_chain_context),
         ]
         _append_residue_selection(argv, request)
+        if residue_alphabet_sidecar is not None:
+            argv.extend(["--omit_AA_per_residue", str(residue_alphabet_sidecar.path)])
         argv.extend(
             [
                 "--pack_side_chains",
@@ -59,6 +64,18 @@ def build_ligandmpnn_commands(
             argv.extend(["--checkpoint_path_sc", str(checkout_root / request.upstream.packing_checkpoint_path)])
         commands.append(LigandMpnnCommand(seed=seed, output_dir=output_dir, argv=tuple(argv)))
     return tuple(commands)
+
+
+def _validate_alphabet_sidecar(
+    request: LigandMpnnRequest,
+    sidecar: LigandMpnnResidueAlphabetSidecar | None,
+) -> None:
+    if request.residue_alphabets and sidecar is None:
+        raise ValueError("residue alphabets require a typed residue alphabet sidecar")
+    if not request.residue_alphabets and sidecar is not None:
+        raise ValueError("typed residue alphabet sidecar requires residue alphabets")
+    if sidecar is not None:
+        sidecar.validate_for(request)
 
 
 def _append_residue_selection(argv: list[str], request: LigandMpnnRequest) -> None:

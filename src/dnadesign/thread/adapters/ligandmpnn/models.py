@@ -13,6 +13,7 @@ DEFAULT_PACKING_CHECKPOINT_PATH = Path("model_params/ligandmpnn_sc_v_32_002_16.p
 _HEX_40 = re.compile(r"[0-9a-fA-F]{40}")
 _HEX_64 = re.compile(r"[0-9a-fA-F]{64}")
 _REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
+CANONICAL_AA_ALPHABET = "ACDEFGHIKLMNPQRSTVWY"
 
 
 @dataclass(frozen=True, order=True)
@@ -36,6 +37,36 @@ class LigandMpnnResidue:
         """Render the exact chain-number-insertion token parsed by upstream."""
 
         return f"{self.chain_id}{self.residue_number}{self.insertion_code}"
+
+
+@dataclass(frozen=True)
+class LigandMpnnResidueAlphabet:
+    """Allowed canonical amino acids for one redesigned residue."""
+
+    residue: LigandMpnnResidue
+    allowed_amino_acids: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.residue, LigandMpnnResidue):
+            raise ValueError("residue must be a LigandMpnnResidue")
+        if not isinstance(self.allowed_amino_acids, tuple):
+            raise ValueError("allowed_amino_acids must be a tuple")
+        if not self.allowed_amino_acids:
+            raise ValueError("allowed_amino_acids must not be empty")
+        seen: set[str] = set()
+        for amino_acid in self.allowed_amino_acids:
+            if not isinstance(amino_acid, str) or len(amino_acid) != 1 or amino_acid not in CANONICAL_AA_ALPHABET:
+                raise ValueError("allowed_amino_acids must use the canonical 20 amino acids")
+            if amino_acid in seen:
+                raise ValueError(f"allowed_amino_acids contains duplicate amino acid {amino_acid}")
+            seen.add(amino_acid)
+
+    @property
+    def omitted_amino_acids(self) -> str:
+        """Render the official upstream omission alphabet in canonical order."""
+
+        allowed = set(self.allowed_amino_acids)
+        return "".join(amino_acid for amino_acid in f"{CANONICAL_AA_ALPHABET}X" if amino_acid not in allowed)
 
 
 @dataclass(frozen=True)
@@ -94,6 +125,7 @@ class LigandMpnnRequest:
     upstream: LigandMpnnUpstreamPin
     fixed_residues: tuple[LigandMpnnResidue, ...] = field(default_factory=tuple)
     redesigned_residues: tuple[LigandMpnnResidue, ...] = field(default_factory=tuple)
+    residue_alphabets: tuple[LigandMpnnResidueAlphabet, ...] = field(default_factory=tuple)
     seeds: tuple[int, ...] = (1,)
     temperature: float = 0.1
     batch_size: int = 1
@@ -111,6 +143,7 @@ class LigandMpnnRequest:
             raise ValueError("fixed_residues and redesigned_residues must be tuples")
         _require_unique_residues(self.fixed_residues, field_name="fixed_residues")
         _require_unique_residues(self.redesigned_residues, field_name="redesigned_residues")
+        _require_residue_alphabets(self.residue_alphabets, redesigned_residues=self.redesigned_residues)
         if not isinstance(self.seeds, tuple):
             raise ValueError("seeds must be a tuple of positive integers")
         if not self.seeds or any(
@@ -169,6 +202,26 @@ def _require_unique_residues(residues: tuple[LigandMpnnResidue, ...], *, field_n
         if residue.upstream_id in seen:
             raise ValueError(f"{field_name} contains duplicate residue {residue.upstream_id}")
         seen.add(residue.upstream_id)
+
+
+def _require_residue_alphabets(
+    alphabets: tuple[LigandMpnnResidueAlphabet, ...],
+    *,
+    redesigned_residues: tuple[LigandMpnnResidue, ...],
+) -> None:
+    if not isinstance(alphabets, tuple):
+        raise ValueError("residue_alphabets must be a tuple")
+    redesigned_ids = {residue.upstream_id for residue in redesigned_residues}
+    seen: set[str] = set()
+    for alphabet in alphabets:
+        if not isinstance(alphabet, LigandMpnnResidueAlphabet):
+            raise ValueError("residue_alphabets must contain LigandMpnnResidueAlphabet values")
+        residue_id = alphabet.residue.upstream_id
+        if residue_id in seen:
+            raise ValueError(f"residue_alphabets contains duplicate residue {residue_id}")
+        if residue_id not in redesigned_ids:
+            raise ValueError(f"residue alphabet constraint {residue_id} must be redesigned")
+        seen.add(residue_id)
 
 
 def _require_relative_file(path: Path, *, field_name: str) -> None:

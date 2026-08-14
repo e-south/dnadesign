@@ -17,7 +17,8 @@ selection and decides what the results mean.
 | Job | Surface | Result |
 | --- | --- | --- |
 | Prepare a ProteinMPNN run | `dnadesign.thread.adapters.proteinmpnn` | Validated request sidecars and a request manifest |
-| Declare a pinned LigandMPNN run | `dnadesign.thread.adapters.ligandmpnn` | Preflight report, explicit commands, and a planned receipt |
+| Declare a pinned LigandMPNN run | `dnadesign.thread.adapters.ligandmpnn` | Preflight report, digest-bound alphabet sidecars, explicit commands, and a planned receipt |
+| Declare a LigandMPNN probability probe | `dnadesign.thread.adapters.ligandmpnn` | Explicit single-AA or autoregressive `score.py` commands |
 | Read ProteinMPNN samples | `dnadesign.thread.adapters.proteinmpnn` | Normalized backend sample rows |
 | Build stable candidate rows | `dnadesign.thread.candidates` | Sequence, mutation, and mask-audit fields |
 | Read ColabFold output | `dnadesign.thread.adapters.colabfold` | Normalized confidence, PAE, and RMSD rows |
@@ -31,7 +32,21 @@ selection and decides what the results mean.
 
 The LigandMPNN adapter always declares `--model_type ligand_mpnn` and keeps
 fixed or redesigned residues, atom and fixed-side-chain context, packing,
-seeds, temperature, and sample counts explicit. Its CLI contract was checked
+seeds, temperature, and sample counts explicit. Residue-specific allowed
+alphabets contain only the 20 canonical amino acids and are translated into a
+deterministic, SHA256-bound official `--omit_AA_per_residue` JSON sidecar; a
+bare sidecar path is not accepted. The upstream noncanonical `X` state is
+always omitted. Atomic planners may write the bytes to a staging path while
+binding a distinct final execution path; only the final path is serialized,
+and the promoted file has an explicit digest-validation method.
+
+Probability probes use the official `score.py` single-AA or autoregressive
+mode with explicit sequence, atom-context, and fixed-side-chain-context flags.
+The request requires at least 10 batches because the pinned upstream recommends
+that minimum for decoding-order-dependent probabilities. This is an execution
+stability policy, not a universal biological or statistical threshold.
+
+The CLI contracts were checked
 against official upstream commit
 `26ec57ac976ade5379920dbd43c7f97a91cf82de`. The caller supplies the pinned
 checkout and checkpoint hashes; the adapter does not clone, download, execute,

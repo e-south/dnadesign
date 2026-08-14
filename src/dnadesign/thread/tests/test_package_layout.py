@@ -38,7 +38,15 @@ _PROTEINMPNN_FILES = {
     "structure.py",
     "validation.py",
 }
-_LIGANDMPNN_FILES = {"__init__.py", "commands.py", "models.py", "preflight.py", "receipts.py"}
+_LIGANDMPNN_FILES = {
+    "__init__.py",
+    "alphabets.py",
+    "commands.py",
+    "models.py",
+    "preflight.py",
+    "receipts.py",
+    "scoring.py",
+}
 _COLABFOLD_FILES = {"__init__.py", "index.py", "manifest.py", "metrics.py", "outputs.py"}
 _BIOHUB_ESMC_FILES = {
     "__init__.py",
