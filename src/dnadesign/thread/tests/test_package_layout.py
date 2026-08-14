@@ -45,6 +45,7 @@ _LIGANDMPNN_FILES = {
     "models.py",
     "preflight.py",
     "receipts.py",
+    "score_results.py",
     "scoring.py",
 }
 _COLABFOLD_FILES = {"__init__.py", "index.py", "manifest.py", "metrics.py", "outputs.py"}

@@ -14,6 +14,7 @@ from dnadesign.thread.adapters.ligandmpnn.models import (
 )
 
 _REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
+_HEX_64 = re.compile(r"[0-9a-fA-F]{64}")
 
 
 class LigandMpnnScoreMode(str, Enum):
@@ -29,6 +30,7 @@ class LigandMpnnScoreRequest:
 
     request_id: str
     pdb_path: Path
+    pdb_sha256: str
     output_dir: Path
     upstream: LigandMpnnUpstreamPin
     fixed_residues: tuple[LigandMpnnResidue, ...] = field(default_factory=tuple)
@@ -46,6 +48,9 @@ class LigandMpnnScoreRequest:
             raise ValueError("request_id must contain only letters, numbers, dots, underscores, or hyphens")
         if not isinstance(self.pdb_path, Path) or self.pdb_path.suffix.lower() != ".pdb":
             raise ValueError("pdb_path must be a Path ending in .pdb")
+        if _HEX_64.fullmatch(self.pdb_sha256) is None:
+            raise ValueError("pdb_sha256 must be a 64-character SHA256 digest")
+        object.__setattr__(self, "pdb_sha256", self.pdb_sha256.lower())
         if not isinstance(self.output_dir, Path):
             raise ValueError("output_dir must be a Path")
         if not isinstance(self.upstream, LigandMpnnUpstreamPin):

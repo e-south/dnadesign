@@ -21,6 +21,7 @@ def _request(**overrides: object) -> LigandMpnnScoreRequest:
     values: dict[str, object] = {
         "request_id": "generic_context_probe",
         "pdb_path": Path("inputs/target.pdb"),
+        "pdb_sha256": _DIGEST,
         "output_dir": Path("outputs/scores"),
         "upstream": LigandMpnnUpstreamPin(commit=_COMMIT, checkpoint_sha256=_DIGEST),
         "seeds": (7,),
@@ -85,3 +86,5 @@ def test_score_request_enforces_upstream_minimum_batch_policy() -> None:
         _request(mode="single_aa")
     with pytest.raises(ValueError, match="LigandMpnnUpstreamPin"):
         _request(upstream="unpinned")
+    with pytest.raises(ValueError, match="pdb_sha256"):
+        _request(pdb_sha256="not-a-digest")
