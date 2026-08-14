@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from pathlib import Path
 
 from dnadesign.thread.adapters.ligandmpnn.alphabets import LigandMpnnResidueAlphabetSidecar
 from dnadesign.thread.adapters.ligandmpnn.models import (
@@ -62,18 +63,23 @@ class LigandMpnnRunReceipt:
     commands: tuple[LigandMpnnCommand, ...]
     expected_sequence_count: int
     provenance: LigandMpnnProvenance
+    input_path: Path
+    input_sha256: str
+    context_inventory: dict[str, str]
     residue_alphabet_sidecar: LigandMpnnResidueAlphabetSidecar | None = None
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
             "schema_id": "thread.ligandmpnn.run_receipt",
-            "schema_version": 1,
+            "schema_version": 2,
             "status": "planned_not_run",
             "model_type": "ligand_mpnn",
             "request_id": self.request_id,
             "request_hash": self.request_hash,
             "expected_sequence_count": self.expected_sequence_count,
             "provenance": self.provenance.to_dict(),
+            "input": {"path": self.input_path.as_posix(), "sha256": f"sha256:{self.input_sha256}"},
+            "context_inventory": self.context_inventory,
             "commands": [command.to_dict() for command in self.commands],
         }
         payload["residue_alphabet_sidecar"] = (
@@ -102,6 +108,8 @@ def build_planned_receipt(
     canonical = json.dumps(
         {
             "request_id": request.request_id,
+            "pdb_sha256": f"sha256:{request.pdb_sha256}",
+            "context_inventory": request.context_inventory.to_dict(),
             "commands": command_payload,
             "residue_alphabet_sidecar": sidecar_payload,
         },
@@ -114,6 +122,9 @@ def build_planned_receipt(
         commands=commands,
         expected_sequence_count=request.expected_sequence_count,
         provenance=LigandMpnnProvenance.from_pin(request.upstream),
+        input_path=request.pdb_path,
+        input_sha256=request.pdb_sha256,
+        context_inventory=request.context_inventory.to_dict(),
         residue_alphabet_sidecar=residue_alphabet_sidecar,
     )
 

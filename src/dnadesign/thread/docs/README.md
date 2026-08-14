@@ -17,8 +17,9 @@ selection and decides what the results mean.
 | Job | Surface | Result |
 | --- | --- | --- |
 | Prepare a ProteinMPNN run | `dnadesign.thread.adapters.proteinmpnn` | Validated request sidecars and a request manifest |
-| Declare a pinned LigandMPNN run | `dnadesign.thread.adapters.ligandmpnn` | Preflight report, digest-bound alphabet sidecars, explicit commands, and a planned receipt |
-| Run and read a LigandMPNN probability probe | `dnadesign.thread.adapters.ligandmpnn` | Explicit `score.py` commands and a digest-bound executed-result receipt |
+| Inventory LigandMPNN atom context | `dnadesign.thread.adapters.ligandmpnn` | Pinned-parser request, command, and digest-bound observed-atom receipt |
+| Declare a pinned LigandMPNN run | `dnadesign.thread.adapters.ligandmpnn` | Preflight report, digest-bound context and alphabet references, explicit commands, and a planned receipt |
+| Run and read a LigandMPNN probability probe | `dnadesign.thread.adapters.ligandmpnn` | Explicit `score.py` commands and a context-proven executed-result receipt |
 | Read ProteinMPNN samples | `dnadesign.thread.adapters.proteinmpnn` | Normalized backend sample rows |
 | Build stable candidate rows | `dnadesign.thread.candidates` | Sequence, mutation, and mask-audit fields |
 | Read ColabFold output | `dnadesign.thread.adapters.colabfold` | Normalized confidence, PAE, and RMSD rows |
@@ -40,19 +41,37 @@ always omitted. Atomic planners may write the bytes to a staging path while
 binding a distinct final execution path; only the final path is serialized,
 and the promoted file has an explicit digest-validation method.
 
+An atom-context request is not evidence that context was parsed. Before a
+design or probability request is admitted, the context probe imports
+`data_utils.parse_PDB` from the exact clean upstream commit and records the
+effective nonprotein atoms returned in upstream `Y`, `Y_t`, and `Y_m`. The
+probe associates those effective rows back to the same upstream `other_atoms`
+selection to retain atom name, element, chain, residue name, residue number,
+and insertion code. It fails before writing a receipt when no expected DNA or
+RNA atoms survive the upstream parser. Standard PDB DNA residue names
+`DA/DC/DG/DI/DT/DU` and RNA residue names `A/C/G/I/U` (plus their `R`-prefixed
+forms) are classified; any other residue identity remains explicitly `other`.
+This classification labels the observed atoms—it does not decide which atoms
+upstream consumes.
+
 Probability probes use the official `score.py` single-AA or autoregressive
 mode with explicit sequence, atom-context, and fixed-side-chain-context flags.
 The request requires at least 10 batches because the pinned upstream recommends
 that minimum for decoding-order-dependent probabilities. This is an execution
 stability policy, not a universal biological or statistical threshold.
 
-Each score request binds the input PDB digest before execution. Result parsing
-then requires the exact planned command tuple and exactly one upstream `.pt`
-artifact per requested seed. The executed receipt records the semantic request,
-input, command-set, per-command, checkpoint, upstream-commit, and output
-identities; it also records whether atom context was on or off. Missing, extra,
-symlinked, schema-drifted, wrong-seed, wrong-alphabet, or wrong-shaped outputs
-fail closed.
+Each score request binds the input PDB digest and an immutable context-inventory
+receipt before execution. Result parsing requires that receipt to match the
+same PDB, upstream commit, all-chain parser scope, side-chain parsing mode, and
+positive-occupancy default. It then requires the exact planned command tuple
+and exactly one upstream `.pt` artifact per requested seed. The executed receipt
+records the semantic request, input, command-set, per-command, checkpoint,
+upstream-commit, output identities, parser source digest, and full observed
+context inventory. `atom_context_status` can become
+`enabled_with_observed_nucleotide_context` only after those checks pass; it is
+never copied directly from the requested flag. Missing, extra, symlinked,
+schema-drifted, zero-nucleotide-context, wrong-seed, wrong-alphabet, or
+wrong-shaped outputs fail closed.
 
 The pinned upstream has one mode-specific shape distinction: single-AA results
 carry a `[draw, residue, decoding-position]` decoding-order tensor, while
@@ -79,9 +98,12 @@ study-owned.
 
 The CLI contracts were checked
 against official upstream commit
-`26ec57ac976ade5379920dbd43c7f97a91cf82de`. The caller supplies the pinned
-checkout and checkpoint hashes; the adapter does not clone, download, execute,
-choose residues, or interpret designs.
+`26ec57ac976ade5379920dbd43c7f97a91cf82de`; its `data_utils.py` digest at that
+commit is
+`sha256:a39c4674977786f9fa697f962d4e91ec79989ede30a79ad389d698291d0484c8`.
+The caller supplies the pinned checkout and checkpoint hashes. The adapter does
+not clone, download, choose residues, or interpret designs; only the explicit
+context-probe entrypoint executes upstream parsing.
 
 - Adapters own translation to or from one external tool. They do not own
   candidate selection or biological interpretation.

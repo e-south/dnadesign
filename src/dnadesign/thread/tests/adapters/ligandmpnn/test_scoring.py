@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from dnadesign.thread.adapters.ligandmpnn import (
+    LigandMpnnContextInventoryReference,
     LigandMpnnScoreMode,
     LigandMpnnScoreRequest,
     LigandMpnnUpstreamPin,
@@ -33,6 +34,9 @@ def _request(**overrides: object) -> LigandMpnnScoreRequest:
         "pdb_sha256": _DIGEST,
         "output_dir": Path("outputs/scores"),
         "upstream": LigandMpnnUpstreamPin(commit=_COMMIT, checkpoint_sha256=_DIGEST),
+        "context_inventory": LigandMpnnContextInventoryReference(
+            path=Path("evidence/context-inventory.json"), sha256=_DIGEST
+        ),
         "seeds": (7,),
         "batch_size": 2,
         "number_of_batches": 10,

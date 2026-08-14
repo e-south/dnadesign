@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -22,6 +23,10 @@ import torch
 from dnadesign.thread.adapters.ligandmpnn import (
     EXPECTED_LIGANDMPNN_SCORE_ALPHABET,
     LigandMpnnCanonical20Policy,
+    LigandMpnnContextAtom,
+    LigandMpnnContextInventory,
+    LigandMpnnContextInventoryReference,
+    LigandMpnnContextPolymer,
     LigandMpnnScoreMode,
     LigandMpnnScoreOutputTrust,
     LigandMpnnScoreRequest,
@@ -44,12 +49,14 @@ def _prepare_request(root: Path, *, seeds: tuple[int, ...] = (7, 11)) -> LigandM
     pdb_path = root / "inputs/target.pdb"
     pdb_path.parent.mkdir(parents=True)
     pdb_path.write_bytes(pdb_payload)
+    context_inventory = _write_context_inventory(root, pdb_sha256=_sha256(pdb_payload))
     return LigandMpnnScoreRequest(
         request_id="generic_context_probe",
         pdb_path=Path("inputs/target.pdb"),
         pdb_sha256=_sha256(pdb_payload),
         output_dir=Path("outputs/scores"),
         upstream=LigandMpnnUpstreamPin(commit=_COMMIT, checkpoint_sha256=_CHECKPOINT_SHA256),
+        context_inventory=context_inventory,
         seeds=seeds,
         batch_size=2,
         number_of_batches=10,
@@ -57,6 +64,41 @@ def _prepare_request(root: Path, *, seeds: tuple[int, ...] = (7, 11)) -> LigandM
         use_sequence=False,
         use_atom_context=True,
         use_side_chain_context=False,
+    )
+
+
+def _write_context_inventory(
+    root: Path,
+    *,
+    pdb_sha256: str,
+) -> LigandMpnnContextInventoryReference:
+    atoms = (
+        LigandMpnnContextAtom(1, "P", "P", 15, "D", "DC", 12, "", LigandMpnnContextPolymer.DNA),
+        LigandMpnnContextAtom(2, "P", "P", 15, "E", "G", 66, "", LigandMpnnContextPolymer.RNA),
+    )
+    inventory = LigandMpnnContextInventory(
+        request_id="generic_context_inventory",
+        request_sha256="b" * 64,
+        input_path=Path("inputs/target.pdb"),
+        input_sha256=pdb_sha256,
+        upstream_commit=_COMMIT,
+        parser_path=Path("data_utils.py"),
+        parser_sha256="c" * 64,
+        parser_callable="parse_PDB",
+        chains=(),
+        parse_all_atoms=False,
+        parse_atoms_with_zero_occupancy=False,
+        minimum_nucleotide_atoms=1,
+        required_polymer_types=(LigandMpnnContextPolymer.DNA, LigandMpnnContextPolymer.RNA),
+        atoms=atoms,
+    )
+    payload = (json.dumps(inventory.to_dict(), indent=2, sort_keys=True) + "\n").encode("utf-8")
+    path = root / "evidence/context-inventory.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(payload)
+    return LigandMpnnContextInventoryReference(
+        path=Path("evidence/context-inventory.json"),
+        sha256=_sha256(payload),
     )
 
 
@@ -134,7 +176,9 @@ def test_parser_binds_exact_request_commands_inputs_and_raw_probabilities(tmp_pa
     assert result.input_sha256 == f"sha256:{request.pdb_sha256}"
     assert result.provenance.upstream_commit == _COMMIT
     assert result.provenance.checkpoint_sha256 == f"sha256:{_CHECKPOINT_SHA256}"
-    assert result.atom_context == "on"
+    assert result.atom_context_requested is True
+    assert result.atom_context_status == "enabled_with_observed_nucleotide_context"
+    assert result.context_inventory.effective_nucleotide_atom_count == 2
     assert result.expected_draws_per_seed == 20
     assert [output.seed for output in result.outputs] == [7, 11]
     assert all(output.raw_probabilities.shape == (20, 3, 21) for output in result.outputs)
@@ -154,6 +198,7 @@ def test_parser_binds_exact_request_commands_inputs_and_raw_probabilities(tmp_pa
 
     receipt = result.to_dict()
     assert receipt["schema_id"] == "thread.ligandmpnn.score_result"
+    assert receipt["schema_version"] == 2
     assert receipt["status"] == "completed_validated"
     assert receipt["input"] == {
         "path": "inputs/target.pdb",
@@ -162,6 +207,9 @@ def test_parser_binds_exact_request_commands_inputs_and_raw_probabilities(tmp_pa
     assert receipt["outputs"][0]["command_sha256"].startswith("sha256:")
     assert receipt["outputs"][0]["output_sha256"].startswith("sha256:")
     assert "raw_x_probability" in receipt["outputs"][0]
+    assert receipt["context"]["atom_context_status"] == "enabled_with_observed_nucleotide_context"
+    assert receipt["context"]["inventory_reference"] == request.context_inventory.to_dict()
+    assert receipt["context"]["observed_inventory"]["observed"]["effective_nucleotide_atom_count"] == 2
 
 
 def test_request_digest_is_path_portable_and_context_off_is_explicit(tmp_path: Path) -> None:
@@ -171,7 +219,8 @@ def test_request_digest_is_path_portable_and_context_off_is_explicit(tmp_path: P
 
     result = _parse(tmp_path, context_off)
 
-    assert result.atom_context == "off"
+    assert result.atom_context_requested is False
+    assert result.atom_context_status == "disabled_control_with_observed_nucleotide_context"
     relocated = replace(
         context_off,
         pdb_path=Path("different/host/input.pdb"),
@@ -258,6 +307,76 @@ def test_parser_rejects_input_or_context_command_drift(tmp_path: Path) -> None:
             execution_root=tmp_path,
             trust=LigandMpnnScoreOutputTrust.PINNED_LOCAL_EXECUTION,
         )
+
+
+def test_parser_rejects_missing_or_non_nucleotide_observed_context(tmp_path: Path) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    _write_output(tmp_path, request, 7)
+    (tmp_path / request.context_inventory.path).unlink()
+    with pytest.raises(ValueError, match="context inventory does not exist"):
+        _parse(tmp_path, request)
+
+    inventory_path = tmp_path / request.context_inventory.path
+    payload = {
+        "schema_id": "thread.ligandmpnn.context_inventory",
+        "schema_version": 1,
+        "status": "completed_validated",
+        "request_id": "generic_context_inventory",
+        "request_sha256": f"sha256:{'b' * 64}",
+        "input": {"path": "inputs/target.pdb", "sha256": f"sha256:{request.pdb_sha256}"},
+        "upstream": {"repository": "https://github.com/dauparas/LigandMPNN", "commit": _COMMIT},
+        "parser": {
+            "path": "data_utils.py",
+            "sha256": f"sha256:{'c' * 64}",
+            "callable": "parse_PDB",
+            "chains": [],
+            "parse_all_atoms": False,
+            "parse_atoms_with_zero_occupancy": False,
+        },
+        "requirements": {"minimum_nucleotide_atoms": 1, "required_polymer_types": []},
+        "observed": {
+            "effective_nonprotein_atom_count": 1,
+            "effective_nucleotide_atom_count": 0,
+            "polymer_atom_counts": {"dna": 0, "rna": 0, "other": 1},
+            "element_counts": {"ZN": 1},
+            "chain_ids": ["Z"],
+            "residues": [
+                {
+                    "chain_id": "Z",
+                    "residue_name": "ZN",
+                    "residue_number": 1,
+                    "insertion_code": "",
+                    "polymer_type": "other",
+                    "effective_atom_count": 1,
+                    "elements": {"ZN": 1},
+                }
+            ],
+            "atoms": [
+                {
+                    "serial": 1,
+                    "atom_name": "ZN",
+                    "element": "ZN",
+                    "upstream_element_type": 30,
+                    "chain_id": "Z",
+                    "residue_name": "ZN",
+                    "residue_number": 1,
+                    "insertion_code": "",
+                    "polymer_type": "other",
+                }
+            ],
+        },
+    }
+    inventory_bytes = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    inventory_path.write_bytes(inventory_bytes)
+    zero_context = replace(
+        request,
+        context_inventory=LigandMpnnContextInventoryReference(
+            path=request.context_inventory.path,
+            sha256=_sha256(inventory_bytes),
+        ),
+    )
+    with pytest.raises(ValueError, match="expected at least 1 effective DNA/RNA context atoms"):
+        _parse(tmp_path, zero_context)
 
 
 def test_parser_requires_explicit_trust_and_still_uses_weights_only_loading(tmp_path: Path) -> None:

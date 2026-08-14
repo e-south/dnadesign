@@ -27,6 +27,7 @@ def test_preflight_accepts_exact_checkout_commit_and_checkpoint_hashes(tmp_path:
     (root / "model_params").mkdir(parents=True)
     (root / "run.py").write_text("# official entrypoint\n", encoding="utf-8")
     (root / "score.py").write_text("# official scoring entrypoint\n", encoding="utf-8")
+    (root / "data_utils.py").write_text("def parse_PDB(): ...\n", encoding="utf-8")
     model = b"ligand checkpoint"
     packing = b"packing checkpoint"
     (root / "model_params/ligandmpnn_v_32_010_25.pt").write_bytes(model)
@@ -62,6 +63,7 @@ def test_preflight_reports_each_pin_violation_without_running_upstream(tmp_path:
     assert {issue.check_id for issue in report.issues} == {
         "thread.ligandmpnn.missing_entrypoint",
         "thread.ligandmpnn.missing_score_entrypoint",
+        "thread.ligandmpnn.missing_parser_module",
         "thread.ligandmpnn.upstream_commit_mismatch",
         "thread.ligandmpnn.checkpoint_hash_mismatch",
     }

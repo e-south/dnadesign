@@ -18,6 +18,7 @@ from pathlib import Path
 
 from dnadesign.thread.adapters.ligandmpnn.models import (
     LigandMpnnCommand,
+    LigandMpnnContextInventoryReference,
     LigandMpnnResidue,
     LigandMpnnUpstreamPin,
 )
@@ -42,6 +43,7 @@ class LigandMpnnScoreRequest:
     pdb_sha256: str
     output_dir: Path
     upstream: LigandMpnnUpstreamPin
+    context_inventory: LigandMpnnContextInventoryReference
     fixed_residues: tuple[LigandMpnnResidue, ...] = field(default_factory=tuple)
     redesigned_residues: tuple[LigandMpnnResidue, ...] = field(default_factory=tuple)
     seeds: tuple[int, ...] = (1,)
@@ -64,6 +66,8 @@ class LigandMpnnScoreRequest:
             raise ValueError("output_dir must be a Path")
         if not isinstance(self.upstream, LigandMpnnUpstreamPin):
             raise ValueError("upstream must be a LigandMpnnUpstreamPin")
+        if not isinstance(self.context_inventory, LigandMpnnContextInventoryReference):
+            raise ValueError("context_inventory must be a LigandMpnnContextInventoryReference")
         if self.fixed_residues and self.redesigned_residues:
             raise ValueError("fixed_residues and redesigned_residues are mutually exclusive")
         _validate_residues(self.fixed_residues, field_name="fixed_residues")

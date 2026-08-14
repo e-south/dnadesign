@@ -57,6 +57,9 @@ def preflight_ligandmpnn(
     score_entrypoint = root / "score.py"
     if not score_entrypoint.is_file():
         issues.append(_issue("missing_score_entrypoint", "checkout is missing official score.py", score_entrypoint))
+    parser_module = root / "data_utils.py"
+    if not parser_module.is_file():
+        issues.append(_issue("missing_parser_module", "checkout is missing official data_utils.py", parser_module))
 
     observed_commit = _git_commit(root)
     if observed_commit is None:

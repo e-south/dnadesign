@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 from dnadesign.thread.adapters.ligandmpnn import (
+    LigandMpnnContextInventoryReference,
     LigandMpnnRequest,
     LigandMpnnResidue,
     LigandMpnnResidueAlphabet,
@@ -34,8 +35,12 @@ def _request(*alphabets: LigandMpnnResidueAlphabet) -> LigandMpnnRequest:
     return LigandMpnnRequest(
         request_id="generic_restricted_design",
         pdb_path=Path("inputs/target.pdb"),
+        pdb_sha256=_DIGEST,
         output_dir=Path("outputs/designs"),
         upstream=LigandMpnnUpstreamPin(commit=_COMMIT, checkpoint_sha256=_DIGEST),
+        context_inventory=LigandMpnnContextInventoryReference(
+            path=Path("evidence/context-inventory.json"), sha256=_DIGEST
+        ),
         redesigned_residues=(LigandMpnnResidue("B", 2), LigandMpnnResidue("A", 12)),
         residue_alphabets=tuple(alphabets),
     )

@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from dnadesign.thread.adapters.ligandmpnn import (
+    LigandMpnnContextInventoryReference,
     LigandMpnnPackingConfig,
     LigandMpnnRequest,
     LigandMpnnResidue,
@@ -33,11 +34,15 @@ def _request(**overrides: object) -> LigandMpnnRequest:
     values: dict[str, object] = {
         "request_id": "generic_binding_site_v1",
         "pdb_path": Path("inputs/target.pdb"),
+        "pdb_sha256": _DIGEST,
         "output_dir": Path("outputs/designs"),
         "upstream": LigandMpnnUpstreamPin(
             commit=_COMMIT,
             checkpoint_sha256=_DIGEST,
             packing_checkpoint_sha256=_PACKING_DIGEST,
+        ),
+        "context_inventory": LigandMpnnContextInventoryReference(
+            path=Path("evidence/context-inventory.json"), sha256=_DIGEST
         ),
         "fixed_residues": (
             LigandMpnnResidue(chain_id="A", residue_number=12),
@@ -163,6 +168,7 @@ def test_planned_receipt_is_normalized_and_records_no_execution_claim() -> None:
     assert payload["schema_id"] == "thread.ligandmpnn.run_receipt"
     assert payload["status"] == "planned_not_run"
     assert payload["model_type"] == "ligand_mpnn"
+    assert payload["schema_version"] == 2
     assert payload["expected_sequence_count"] == 12
     assert payload["provenance"] == {
         "upstream_repository": "https://github.com/dauparas/LigandMPNN",
@@ -171,3 +177,8 @@ def test_planned_receipt_is_normalized_and_records_no_execution_claim() -> None:
         "packing_checkpoint_sha256": f"sha256:{_PACKING_DIGEST}",
     }
     assert payload["commands"][0]["argv"][0] == "python"
+    assert payload["input"] == {"path": "inputs/target.pdb", "sha256": f"sha256:{_DIGEST}"}
+    assert payload["context_inventory"] == {
+        "path": "evidence/context-inventory.json",
+        "sha256": f"sha256:{_DIGEST}",
+    }

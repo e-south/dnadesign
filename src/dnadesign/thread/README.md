@@ -15,7 +15,7 @@ scientific interpretation.
 | Need | Public package |
 | --- | --- |
 | Prepare or normalize a fixed-backbone design run | `dnadesign.thread.adapters.proteinmpnn` |
-| Validate and declare a pinned atom-context design or probability-scoring run | `dnadesign.thread.adapters.ligandmpnn` |
+| Prove, validate, and declare a pinned atom-context design or probability-scoring run | `dnadesign.thread.adapters.ligandmpnn` |
 | Normalize accepted design samples into candidate rows | `dnadesign.thread.candidates` |
 | Parse completed fold outputs | `dnadesign.thread.adapters.colabfold` |
 | Define fold-check requests and reports without choosing a backend | `dnadesign.thread.foldcheck` |

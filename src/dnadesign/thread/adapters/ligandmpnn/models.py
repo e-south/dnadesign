@@ -125,13 +125,31 @@ class LigandMpnnPackingConfig:
 
 
 @dataclass(frozen=True)
+class LigandMpnnContextInventoryReference:
+    """Portable identity of one observed pinned-parser context inventory."""
+
+    path: Path
+    sha256: str
+
+    def __post_init__(self) -> None:
+        _require_relative_file(self.path, field_name="context inventory path")
+        _require_sha256(self.sha256, field_name="context inventory SHA256")
+        object.__setattr__(self, "sha256", self.sha256.lower())
+
+    def to_dict(self) -> dict[str, str]:
+        return {"path": self.path.as_posix(), "sha256": f"sha256:{self.sha256}"}
+
+
+@dataclass(frozen=True)
 class LigandMpnnRequest:
     """Validated request for deterministic official LigandMPNN CLI adaptation."""
 
     request_id: str
     pdb_path: Path
+    pdb_sha256: str
     output_dir: Path
     upstream: LigandMpnnUpstreamPin
+    context_inventory: LigandMpnnContextInventoryReference
     fixed_residues: tuple[LigandMpnnResidue, ...] = field(default_factory=tuple)
     redesigned_residues: tuple[LigandMpnnResidue, ...] = field(default_factory=tuple)
     residue_alphabets: tuple[LigandMpnnResidueAlphabet, ...] = field(default_factory=tuple)
@@ -175,8 +193,12 @@ class LigandMpnnRequest:
             raise ValueError("number_of_batches must be positive")
         if not isinstance(self.pdb_path, Path) or self.pdb_path.suffix.lower() != ".pdb":
             raise ValueError("pdb_path must be a Path ending in .pdb")
+        _require_sha256(self.pdb_sha256, field_name="pdb_sha256")
+        object.__setattr__(self, "pdb_sha256", self.pdb_sha256.lower())
         if not isinstance(self.output_dir, Path):
             raise ValueError("output_dir must be a Path")
+        if not isinstance(self.context_inventory, LigandMpnnContextInventoryReference):
+            raise ValueError("context_inventory must be a LigandMpnnContextInventoryReference")
         _require_bools(
             use_atom_context=self.use_atom_context,
             use_side_chain_context=self.use_side_chain_context,
@@ -238,6 +260,11 @@ def _require_relative_file(path: Path, *, field_name: str) -> None:
         raise ValueError(f"{field_name} must be a Path")
     if path.is_absolute() or not path.name or ".." in path.parts:
         raise ValueError(f"{field_name} must be a checkout-relative file path")
+
+
+def _require_sha256(value: str, *, field_name: str) -> None:
+    if not isinstance(value, str) or _HEX_64.fullmatch(value) is None:
+        raise ValueError(f"{field_name} must be a 64-character SHA256 digest")
 
 
 def _require_bools(**values: bool) -> None:

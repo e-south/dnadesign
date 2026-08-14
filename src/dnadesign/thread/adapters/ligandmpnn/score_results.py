@@ -27,6 +27,11 @@ from typing import Any
 import numpy as np
 import torch
 
+from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
+    LigandMpnnContextInventory,
+    load_ligandmpnn_context_inventory,
+    validate_context_inventory_for_input,
+)
 from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnCommand
 from dnadesign.thread.adapters.ligandmpnn.receipts import (
     LigandMpnnProvenance,
@@ -170,9 +175,13 @@ class LigandMpnnScoreResult:
     command_set_sha256: str
     provenance: LigandMpnnProvenance
     mode: str
-    atom_context: str
+    atom_context_requested: bool
+    atom_context_status: str
     side_chain_context: str
     use_sequence: bool
+    context_inventory: LigandMpnnContextInventory
+    context_inventory_path: Path
+    context_inventory_sha256: str
     batch_size: int
     number_of_batches: int
     outputs: tuple[LigandMpnnScoreOutput, ...]
@@ -184,7 +193,7 @@ class LigandMpnnScoreResult:
     def to_dict(self) -> dict[str, object]:
         return {
             "schema_id": "thread.ligandmpnn.score_result",
-            "schema_version": 1,
+            "schema_version": 2,
             "status": "completed_validated",
             "model_type": "ligand_mpnn",
             "request_id": self.request_id,
@@ -194,9 +203,15 @@ class LigandMpnnScoreResult:
             "provenance": self.provenance.to_dict(),
             "score_mode": self.mode,
             "context": {
-                "atom_context": self.atom_context,
+                "atom_context_requested": self.atom_context_requested,
+                "atom_context_status": self.atom_context_status,
                 "side_chain_context": self.side_chain_context,
                 "use_sequence": self.use_sequence,
+                "inventory_reference": {
+                    "path": self.context_inventory_path.as_posix(),
+                    "sha256": f"sha256:{self.context_inventory_sha256}",
+                },
+                "observed_inventory": self.context_inventory.to_dict(),
             },
             "batch_size": self.batch_size,
             "number_of_batches": self.number_of_batches,
@@ -212,7 +227,7 @@ def score_request_sha256(request: LigandMpnnScoreRequest) -> str:
 
     payload = {
         "schema_id": "thread.ligandmpnn.score_request",
-        "schema_version": 1,
+        "schema_version": 2,
         "request_id": request.request_id,
         "pdb_sha256": f"sha256:{request.pdb_sha256}",
         "upstream": {
@@ -230,6 +245,7 @@ def score_request_sha256(request: LigandMpnnScoreRequest) -> str:
         "use_sequence": request.use_sequence,
         "use_atom_context": request.use_atom_context,
         "use_side_chain_context": request.use_side_chain_context,
+        "context_inventory": request.context_inventory.to_dict(),
     }
     return _sha256_bytes(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8"))
 
@@ -263,6 +279,18 @@ def parse_ligandmpnn_score_outputs(
         raise ValueError(f"input SHA256 mismatch: expected {expected_input_sha256}, observed {observed_input_sha256}")
 
     _validate_commands(request, commands)
+    context_inventory = load_ligandmpnn_context_inventory(
+        request.context_inventory,
+        execution_root=root,
+    )
+    validate_context_inventory_for_input(
+        context_inventory,
+        pdb_path=request.pdb_path,
+        pdb_sha256=request.pdb_sha256,
+        upstream=request.upstream,
+        use_side_chain_context=request.use_side_chain_context,
+    )
+
     command_digests = tuple(_command_sha256(command) for command in commands)
     command_set_sha256 = _sha256_bytes(json.dumps(command_digests, separators=(",", ":")).encode("utf-8"))
 
@@ -321,9 +349,17 @@ def parse_ligandmpnn_score_outputs(
         command_set_sha256=command_set_sha256,
         provenance=LigandMpnnProvenance.from_pin(request.upstream),
         mode=request.mode.value,
-        atom_context="on" if request.use_atom_context else "off",
+        atom_context_requested=request.use_atom_context,
+        atom_context_status=(
+            "enabled_with_observed_nucleotide_context"
+            if request.use_atom_context
+            else "disabled_control_with_observed_nucleotide_context"
+        ),
         side_chain_context="on" if request.use_side_chain_context else "off",
         use_sequence=request.use_sequence,
+        context_inventory=context_inventory,
+        context_inventory_path=request.context_inventory.path,
+        context_inventory_sha256=request.context_inventory.sha256,
         batch_size=request.batch_size,
         number_of_batches=request.number_of_batches,
         outputs=tuple(outputs),
