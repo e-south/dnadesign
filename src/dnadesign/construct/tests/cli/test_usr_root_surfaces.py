@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from click import unstyle
 from typer.testing import CliRunner
 
 from dnadesign.construct.src.cli import app
@@ -34,7 +35,7 @@ def test_construct_execution_surfaces_expose_the_same_usr_root_option(command: l
     result = _RUNNER.invoke(app, command)
 
     assert result.exit_code == 0, result.stdout
-    assert "--usr-root" in result.stdout
+    assert "--usr-root" in unstyle(result.stdout)
 
 
 def test_validate_config_rejects_usr_root_without_runtime(tmp_path: Path) -> None:
