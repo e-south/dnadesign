@@ -157,6 +157,41 @@ def test_selection_view_performance_uses_square_large_type_panels(
     close_figure(figure)
 
 
+def test_selection_view_performance_separates_title_subtitle_and_panel_headings(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "selection-view-performance.svg"
+    pyplot = importlib.import_module("matplotlib.pyplot")
+    close_figure = pyplot.close
+    closed_figures: list[Figure] = []
+    monkeypatch.setattr(pyplot, "close", closed_figures.append)
+
+    render_selection_view_performance(
+        _observations(),
+        output_path=output,
+        title="Only one selected cohort had a diagonal median advantage",
+        subtitle="Every selection view contributed the same number of measured candidates.",
+        objective_value_label="Observed assay score",
+        view_labels={"ethanol": "Ethanol", "ciprofloxacin": "Ciprofloxacin"},
+    )
+
+    assert len(closed_figures) == 1
+    figure = closed_figures[0]
+    figure.canvas.draw()
+    renderer = figure.canvas.get_renderer()
+    subtitle = next(text for text in figure.texts if text.get_gid() == "figure-subtitle")
+    title_bounds = figure._suptitle.get_window_extent(renderer=renderer)
+    subtitle_bounds = subtitle.get_window_extent(renderer=renderer)
+    panel_title_top = max(axis.title.get_window_extent(renderer=renderer).y1 for axis in figure.axes)
+    assert title_bounds.y0 - subtitle_bounds.y1 >= 12
+    assert subtitle_bounds.y0 - panel_title_top >= 24
+    assert subtitle.get_fontsize() >= 16
+    assert min(label.get_fontsize() for axis in figure.axes for label in axis.get_xticklabels()) >= 15
+    assert min(label.get_fontsize() for axis in figure.axes for label in axis.get_yticklabels()) >= 15
+    close_figure(figure)
+
+
 def test_selection_view_performance_uses_neutral_round_labels(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
