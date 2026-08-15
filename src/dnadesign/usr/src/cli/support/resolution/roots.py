@@ -44,19 +44,6 @@ def normalize_usr_root(root: str | Path | None, *, pkg_root: Path | None = None)
     return target
 
 
-def require_explicit_usr_root(root: str | Path) -> Path:
-    """Validate an operator-supplied USR coordinate without path inference."""
-
-    target = Path(root).expanduser()
-    if not target.is_absolute():
-        raise ValueError("explicit USR root must be absolute")
-    if target.is_symlink():
-        raise ValueError("explicit USR root must not be a symbolic link")
-    if not target.is_dir():
-        raise ValueError("explicit USR root must name an existing directory")
-    return target.resolve(strict=True)
-
-
 def resolve_usr_root_from_env(*, env_var: str = "DNADESIGN_USR_ROOT", pkg_root: Path | None = None) -> Path | None:
     """Resolve the configured USR root from an environment variable, if present."""
     value = str(os.environ.get(env_var, "")).strip()
@@ -92,7 +79,6 @@ __all__ = [
     "default_usr_root",
     "normalize_usr_root",
     "pkg_usr_root",
-    "require_explicit_usr_root",
     "resolve_usr_root_from_config",
     "resolve_usr_root_from_env",
 ]
