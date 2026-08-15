@@ -16,7 +16,6 @@ from typing import Optional
 
 import typer
 
-from ...analysis.campaign import CampaignAnalysis
 from ...analysis.notebook_set_template import render_campaign_set_notebook
 from ...analysis.notebook_template import render_campaign_notebook
 from ...core.rounds import resolve_round_index_from_runs
@@ -26,7 +25,15 @@ from ...reporting.notebook import smoke_check_notebook
 from ...reporting.notebook_set import build_campaign_set_notebook_view_model
 from ..registry import cli_group
 from ..tui import tui_enabled
-from ._common import internal_error, json_error, json_out, opal_error, print_config_context, prompt_confirm
+from ._common import (
+    internal_error,
+    json_error,
+    json_out,
+    load_cli_analysis,
+    opal_error,
+    print_config_context,
+    prompt_confirm,
+)
 from .notebook_generation import (
     NOTEBOOK_GENERATE_SCHEMA_VERSION,
     notebook_generate_payload,
@@ -62,7 +69,7 @@ def notebook_root(
     if ctx.invoked_subcommand:
         return
     try:
-        analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
+        analysis = load_cli_analysis(config, allow_dir=True)
         ws = analysis.workspace
         notebooks_dir = ws.workdir / "notebooks"
         notebooks = list_notebooks(notebooks_dir)
@@ -220,7 +227,7 @@ def cmd_notebook_generate(
                 ExitCodes.BAD_ARGS,
             )
 
-        analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
+        analysis = load_cli_analysis(config, allow_dir=True)
         cfg = analysis.config
         ws = analysis.workspace
         store = analysis.records_store()
@@ -363,7 +370,7 @@ def _generate_campaign_set_notebook(
                 ExitCodes.BAD_ARGS,
             )
 
-    analyses = [CampaignAnalysis.from_config_path(path, allow_dir=True) for path in config_paths]
+    analyses = [load_cli_analysis(path, allow_dir=True) for path in config_paths]
     round_sel = parse_notebook_round_selector(round, allow_all=True)
 
     for analysis in analyses:
@@ -478,7 +485,7 @@ def cmd_notebook_run(
     headless: bool = typer.Option(False, "--headless", help="Run marimo without launching a browser."),
 ) -> None:
     try:
-        analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
+        analysis = load_cli_analysis(config, allow_dir=True)
         nb_path = resolve_notebook_path(analysis, path)
         print_stdout(f"Launching marimo app: {nb_path}")
         launch_marimo_notebook(mode="run", notebook_path=nb_path, host=host, port=port, headless=headless)
@@ -511,7 +518,7 @@ def cmd_notebook_edit(
     headless: bool = typer.Option(False, "--headless", help="Run marimo without launching a browser."),
 ) -> None:
     try:
-        analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
+        analysis = load_cli_analysis(config, allow_dir=True)
         nb_path = resolve_notebook_path(analysis, path)
         print_stdout(f"Launching marimo editor: {nb_path}")
         launch_marimo_notebook(mode="edit", notebook_path=nb_path, host=host, port=port, headless=headless)

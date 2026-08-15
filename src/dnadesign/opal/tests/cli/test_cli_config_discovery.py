@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
@@ -27,6 +28,36 @@ def _setup_workspace(tmp_path: Path) -> tuple[Path, Path]:
     campaign = workdir / "campaign.yaml"
     write_campaign_yaml(campaign, workdir=workdir, records_path=records)
     return workdir, campaign
+
+
+def _setup_usr_workspace(
+    tmp_path: Path,
+    *,
+    plots: list[dict[str, str]] | None = None,
+) -> tuple[Path, Path, Path]:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir()
+    operator_root = tmp_path / "operator-data"
+    dataset_root = operator_root / "demo_candidates"
+    dataset_root.mkdir(parents=True)
+    records = dataset_root / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(campaign, workdir=workdir, records_path=records, plots=plots)
+    payload = yaml.safe_load(campaign.read_text(encoding="utf-8"))
+    payload["ownership"] = {
+        "owner_scope": "study_campaign",
+        "study_id": "demo_study",
+        "dataset_id": "demo_candidates",
+        "portable": False,
+    }
+    payload["data"]["location"] = {
+        "kind": "usr",
+        "path": str(tmp_path / "stale-root"),
+        "dataset": "demo_candidates",
+    }
+    campaign.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    return operator_root, campaign, records
 
 
 def test_config_discovery_env_var(monkeypatch, tmp_path: Path) -> None:
@@ -130,6 +161,54 @@ def test_usr_root_is_an_explicit_global_cli_coordinate(tmp_path: Path) -> None:
 
     assert result.exit_code != 0
     assert "only valid when data.location.kind=usr" in result.output
+
+
+def test_usr_root_reaches_plot_campaign_analysis(tmp_path: Path) -> None:
+    operator_root, campaign, records = _setup_usr_workspace(
+        tmp_path,
+        plots=[{"name": "objective", "kind": "objective_scatter"}],
+    )
+
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "--usr-root",
+            str(operator_root),
+            "plot",
+            "--config",
+            str(campaign),
+            "--list-config",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert str(records) in result.output
+    assert "stale-root" not in result.output
+
+
+def test_usr_root_reaches_notebook_campaign_analysis(tmp_path: Path) -> None:
+    operator_root, campaign, _records = _setup_usr_workspace(tmp_path)
+    notebook = tmp_path / "campaign_notebook.py"
+
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "--usr-root",
+            str(operator_root),
+            "notebook",
+            "generate",
+            "--config",
+            str(campaign),
+            "--out",
+            str(notebook),
+            "--no-validate",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert notebook.is_file()
 
 
 def test_init_rejects_unknown_model_plugin(tmp_path: Path) -> None:

@@ -23,9 +23,14 @@ from ...storage.workspace import CampaignWorkspace
 from .data import CampaignData, CampaignPaths
 
 
-def load_campaign_data(config_opt: Path | None, *, allow_dir: bool = False) -> CampaignData:
+def load_campaign_data(
+    config_opt: Path | None,
+    *,
+    allow_dir: bool = False,
+    usr_root: Path | str | None = None,
+) -> CampaignData:
     cfg_path = resolve_campaign_config_path(config_opt, allow_dir=allow_dir)
-    cfg = load_config(cfg_path)
+    cfg = load_config(cfg_path, usr_root=usr_root)
     ws = CampaignWorkspace.from_config(cfg, cfg_path)
     cfg_dict = _load_config_dict(cfg_path)
     store = records_store_from_config(cfg)

@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from dnadesign.opal.src.analysis.campaign import CampaignAnalysis
 from dnadesign.opal.src.config.loader import load_config
 from dnadesign.opal.src.core.utils import ConfigError
 
@@ -91,6 +92,18 @@ def test_load_config_binds_usr_data_to_an_explicit_operator_root(tmp_path: Path)
     )
 
     assert Path(cfg.data.location.path) == operator_root.resolve()
+
+
+def test_campaign_analysis_binds_usr_data_to_an_explicit_operator_root(tmp_path: Path) -> None:
+    operator_root = tmp_path / "operator-data"
+    operator_root.mkdir()
+
+    analysis = CampaignAnalysis.from_config_path(
+        _write(tmp_path / "campaign.yaml", _payload()),
+        usr_root=operator_root,
+    )
+
+    assert Path(analysis.config.data.location.path) == operator_root.resolve()
 
 
 @pytest.mark.parametrize("root_kind", ["relative", "missing", "symlink"])
