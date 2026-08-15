@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,7 @@ from dnadesign.thread.adapters.ligandmpnn import (
     build_planned_receipt,
     materialize_residue_alphabet_sidecar,
 )
+from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import write_context_inventory
 
 _DIGEST = "a" * 64
 _COMMIT = "26ec57ac976ade5379920dbd43c7f97a91cf82de"  # pragma: allowlist secret
@@ -136,6 +138,16 @@ def test_sidecar_can_stage_bytes_while_binding_final_execution_path(tmp_path: Pa
 
 def test_planned_receipt_binds_the_sidecar_digest(tmp_path: Path) -> None:
     request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    request = replace(
+        request,
+        context_inventory=write_context_inventory(
+            tmp_path,
+            input_path=request.pdb_path,
+            input_sha256=request.pdb_sha256,
+            upstream_commit=request.upstream.commit,
+            parse_all_atoms=request.use_side_chain_context,
+        ),
+    )
     sidecar = materialize_residue_alphabet_sidecar(request, tmp_path / "omit.json")
     commands = build_ligandmpnn_commands(
         request,
@@ -143,9 +155,19 @@ def test_planned_receipt_binds_the_sidecar_digest(tmp_path: Path) -> None:
         residue_alphabet_sidecar=sidecar,
     )
 
-    payload = build_planned_receipt(request, commands, residue_alphabet_sidecar=sidecar).to_dict()
+    payload = build_planned_receipt(
+        request,
+        commands,
+        execution_root=tmp_path,
+        residue_alphabet_sidecar=sidecar,
+    ).to_dict()
 
     assert payload["residue_alphabet_sidecar"] == sidecar.to_dict()
 
     with pytest.raises(ValueError, match="commands do not reference exact residue alphabet sidecar"):
-        build_planned_receipt(request, (), residue_alphabet_sidecar=sidecar)
+        build_planned_receipt(
+            request,
+            (),
+            execution_root=tmp_path,
+            residue_alphabet_sidecar=sidecar,
+        )

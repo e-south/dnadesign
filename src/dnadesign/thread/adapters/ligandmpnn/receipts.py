@@ -17,6 +17,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dnadesign.thread.adapters.ligandmpnn.alphabets import LigandMpnnResidueAlphabetSidecar
+from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
+    load_ligandmpnn_context_inventory,
+    validate_context_inventory_for_input,
+)
 from dnadesign.thread.adapters.ligandmpnn.models import (
     UPSTREAM_REPOSITORY,
     LigandMpnnCommand,
@@ -92,10 +96,22 @@ def build_planned_receipt(
     request: LigandMpnnRequest,
     commands: tuple[LigandMpnnCommand, ...],
     *,
+    execution_root: Path,
     residue_alphabet_sidecar: LigandMpnnResidueAlphabetSidecar | None = None,
 ) -> LigandMpnnRunReceipt:
     """Normalize a validated request and its deterministic commands."""
 
+    context_inventory = load_ligandmpnn_context_inventory(
+        request.context_inventory,
+        execution_root=execution_root,
+    )
+    validate_context_inventory_for_input(
+        context_inventory,
+        pdb_path=request.pdb_path,
+        pdb_sha256=request.pdb_sha256,
+        upstream=request.upstream,
+        use_side_chain_context=request.use_side_chain_context,
+    )
     if request.residue_alphabets and residue_alphabet_sidecar is None:
         raise ValueError("residue alphabets require a typed residue alphabet sidecar")
     if residue_alphabet_sidecar is not None:

@@ -24,6 +24,7 @@ from dnadesign.thread.adapters.ligandmpnn import (
     build_ligandmpnn_commands,
     build_planned_receipt,
 )
+from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import write_context_inventory
 
 _DIGEST = "a" * 64
 _PACKING_DIGEST = "b" * 64
@@ -158,11 +159,18 @@ def test_residue_identifier_rejects_non_pdb_chain_or_insertion_codes() -> None:
         LigandMpnnResidue(chain_id="A", residue_number=1, insertion_code="BC")
 
 
-def test_planned_receipt_is_normalized_and_records_no_execution_claim() -> None:
-    request = _request()
+def test_planned_receipt_is_normalized_and_records_no_execution_claim(tmp_path: Path) -> None:
+    context_inventory = write_context_inventory(
+        tmp_path,
+        input_path=Path("inputs/target.pdb"),
+        input_sha256=_DIGEST,
+        upstream_commit=_COMMIT,
+        parse_all_atoms=True,
+    )
+    request = _request(context_inventory=context_inventory)
     commands = build_ligandmpnn_commands(request, checkout_root=Path("tool"))
 
-    receipt = build_planned_receipt(request, commands)
+    receipt = build_planned_receipt(request, commands, execution_root=tmp_path)
 
     payload = receipt.to_dict()
     assert payload["schema_id"] == "thread.ligandmpnn.run_receipt"
@@ -180,5 +188,53 @@ def test_planned_receipt_is_normalized_and_records_no_execution_claim() -> None:
     assert payload["input"] == {"path": "inputs/target.pdb", "sha256": f"sha256:{_DIGEST}"}
     assert payload["context_inventory"] == {
         "path": "evidence/context-inventory.json",
-        "sha256": f"sha256:{_DIGEST}",
+        "sha256": f"sha256:{context_inventory.sha256}",
     }
+
+
+@pytest.mark.parametrize(
+    ("input_path", "input_sha256", "upstream_commit", "parse_all_atoms", "message"),
+    [
+        (
+            Path("inputs/other.pdb"),
+            "d" * 64,
+            _COMMIT,
+            True,
+            "context inventory input identity does not match request",
+        ),
+        (
+            Path("inputs/target.pdb"),
+            _DIGEST,
+            "d" * 40,
+            True,
+            "context inventory upstream commit does not match request",
+        ),
+        (
+            Path("inputs/target.pdb"),
+            _DIGEST,
+            _COMMIT,
+            False,
+            "context inventory parse_all_atoms does not match side-chain-context mode",
+        ),
+    ],
+)
+def test_planned_receipt_rejects_context_inventory_for_different_request(
+    tmp_path: Path,
+    input_path: Path,
+    input_sha256: str,
+    upstream_commit: str,
+    parse_all_atoms: bool,
+    message: str,
+) -> None:
+    context_inventory = write_context_inventory(
+        tmp_path,
+        input_path=input_path,
+        input_sha256=input_sha256,
+        upstream_commit=upstream_commit,
+        parse_all_atoms=parse_all_atoms,
+    )
+    request = _request(context_inventory=context_inventory)
+    commands = build_ligandmpnn_commands(request, checkout_root=Path("tool"))
+
+    with pytest.raises(ValueError, match=message):
+        build_planned_receipt(request, commands, execution_root=tmp_path)

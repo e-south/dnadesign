@@ -383,12 +383,12 @@ def validate_context_inventory_for_input(
     upstream: LigandMpnnUpstreamPin,
     use_side_chain_context: bool,
 ) -> None:
-    """Require an inventory produced by the exact parser settings used by score.py."""
+    """Require an inventory produced for the exact input and context settings."""
 
     if inventory.input_path != pdb_path or inventory.input_sha256 != pdb_sha256:
-        raise ValueError("context inventory input identity does not match score request")
+        raise ValueError("context inventory input identity does not match request")
     if inventory.upstream_commit != upstream.commit:
-        raise ValueError("context inventory upstream commit does not match score request")
+        raise ValueError("context inventory upstream commit does not match request")
     if inventory.chains:
         raise ValueError("score requests require a context inventory parsed with all input chains")
     if inventory.parse_all_atoms is not use_side_chain_context:
