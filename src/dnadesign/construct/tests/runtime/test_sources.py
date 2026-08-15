@@ -25,6 +25,8 @@ from dnadesign.construct.src.sources.input_rows import (
     scan_usr_rows,
 )
 from dnadesign.construct.src.sources.templates import load_normalize_template, load_template_sequence
+from dnadesign.construct.tests.runtime.run_construct_helpers import write_registry
+from dnadesign.usr import Dataset
 
 
 @dataclass(frozen=True)
@@ -140,6 +142,31 @@ def test_load_normalize_template_reads_single_record_fasta(tmp_path: Path) -> No
     assert template.kind == "path"
     assert template.sequence == "AAAACCCC"
     assert template.source == str(fasta)
+
+
+def test_load_template_sequence_uses_exact_explicit_usr_root(tmp_path: Path) -> None:
+    usr_root = tmp_path / "operator_usr"
+    usr_root.mkdir()
+    (usr_root / "__init__.py").write_text("", encoding="utf-8")
+    write_registry(usr_root)
+    dataset = Dataset(usr_root, "templates")
+    dataset.init(source="test")
+    result = dataset.add_sequences(["AAAACCCC"], bio_type="dna", alphabet="dna_4", source="test")
+    record_id = result.ids[0]
+    cfg = _classic_cfg(
+        template_source={
+            "kind": "usr",
+            "dataset": "templates",
+            "field": "sequence",
+            "record_id": record_id,
+        },
+        usr_root=usr_root,
+    )
+
+    template = load_template_sequence(tmp_path, cfg, usr_root=usr_root)
+
+    assert template.sequence == "AAAACCCC"
+    assert template.record_id == record_id
 
 
 def test_scan_usr_rows_preserves_requested_id_order_and_overlays() -> None:

@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from dnadesign.usr import Dataset, normalize_usr_root
+from dnadesign.usr import Dataset, require_explicit_usr_root
 
 from ..contracts.config import JobConfig, NormalizeTemplateConfig
 from ..contracts.errors import ValidationError
@@ -77,7 +77,7 @@ def load_template_sequence(
         raise ValidationError(f"Unsupported template.source.kind '{template_source.kind}'.")
 
     template_root = (
-        normalize_usr_root(usr_root)
+        require_explicit_usr_root(usr_root)
         if usr_root is not None
         else resolve_usr_root(
             base_dir,
@@ -155,7 +155,7 @@ def load_normalize_template(
         )
 
     template_root = (
-        normalize_usr_root(usr_root)
+        require_explicit_usr_root(usr_root)
         if usr_root is not None
         else resolve_usr_root(base_dir, source.root, label="normalize_anchor.template.source.root")
     )
