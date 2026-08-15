@@ -54,6 +54,7 @@ PACKAGE_FILES = {
         "__init__.py",
         "errors.py",
         "normalize.py",
+        "roots.py",
         "schema.py",
         "types.py",
     },
