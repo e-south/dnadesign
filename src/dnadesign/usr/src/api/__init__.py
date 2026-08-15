@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from ..cli.support.resolution.roots import default_usr_root, normalize_usr_root, require_explicit_usr_root
+from ..cli.support.resolution.roots import default_usr_root, normalize_usr_root
 from ..contracts import (
     ARROW_SCHEMA,
     ID_HASH_SPEC,
@@ -34,6 +34,7 @@ from ..contracts import (
     validate_alphabet,
     validate_bio_type,
 )
+from ..contracts.roots import require_explicit_usr_root
 from ..dataset import Dataset
 from ..events import USR_EVENT_VERSION
 from ..registry import (

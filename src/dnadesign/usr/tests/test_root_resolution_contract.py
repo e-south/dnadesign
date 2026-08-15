@@ -18,6 +18,10 @@ import pytest
 import dnadesign.usr as usr_roots
 
 
+def test_explicit_operator_root_contract_is_owned_by_usr_contracts() -> None:
+    assert usr_roots.require_explicit_usr_root.__module__ == "dnadesign.usr.src.contracts.roots"
+
+
 def test_default_usr_root_matches_packaged_usr_datasets_dir() -> None:
     expected = (usr_roots.pkg_usr_root() / "datasets").resolve()
     assert usr_roots.default_usr_root() == expected
