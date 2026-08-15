@@ -157,6 +157,40 @@ def test_public_sequence_panel_title_preserves_adapter_record_label(monkeypatch)
     assert f"{title}\ndemoP" in captured_text
 
 
+def test_public_sequence_panel_preserves_title_matching_full_span_annotation(monkeypatch) -> None:
+    row = {
+        "id": "seq1",
+        "sequence": "AACCGGTTGACATTTTTTTTTATAATGGCC",
+        "usr_label__primary": "J23105",
+        "seq_annot__features": [
+            {
+                "feature_id": "feat_promoter",
+                "feature_order": 1,
+                "feature_type": "promoter",
+                "label": "J23105",
+                "role_hint": None,
+                "start_0": 0,
+                "end_0": 30,
+                "strand": 1,
+                "confidence": "high",
+            }
+        ],
+    }
+    captured_text = _capture_figure_text(monkeypatch)
+
+    result = baserender.render_sequence_panel_image(
+        row,
+        adapter_kind="usr_genbank_annotations_v1",
+        style_profile=_PROMOTER_PANEL_PROFILE,
+        target_width_px=420,
+        target_height_px=140,
+        title="J23105",
+    )
+
+    assert result.diagnostics.title == "J23105"
+    assert captured_text.count("J23105") == 2
+
+
 def test_sequence_panel_normalization_accepts_anchor_at_lower_image_boundary() -> None:
     source = np.full((20, 30, 4), 255, dtype=np.uint8)
     source[2:8, 4:26, :3] = 20
