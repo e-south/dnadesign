@@ -74,6 +74,8 @@ def _without_redundant_full_span_overlay(record: Record) -> Record:
     overlay = str(record.display.overlay_text or "").strip()
     if not overlay:
         return record
+    if record.meta.get("overlay_text_role") == "caller_header":
+        return record
     repeats_full_span = any(
         feature.kind == "interval_annotation"
         and feature.span.start == 0
