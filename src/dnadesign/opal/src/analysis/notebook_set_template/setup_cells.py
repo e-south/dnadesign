@@ -87,6 +87,7 @@ def _import_cell() -> str:
                 resolve_notebook_baserender_selection_view_id,
                 resolve_notebook_baserender_candidate_record,
                 resolve_notebook_baserender_selection_batch_scope,
+                resolve_notebook_usr_root,
                 resolve_notebook_selection_view,
                 select_notebook_plot_scope,
             )
@@ -130,6 +131,7 @@ def _import_cell() -> str:
                 resolve_notebook_baserender_selection_view_id,
                 resolve_notebook_baserender_candidate_record,
                 resolve_notebook_baserender_selection_batch_scope,
+                resolve_notebook_usr_root,
                 resolve_notebook_selection_view,
                 select_notebook_plot_scope,
             )
@@ -141,11 +143,12 @@ def _view_model_cell() -> str:
     return block(
         """
         @app.cell
-        def _(Path):
+        def _(Path, resolve_notebook_usr_root):
             config_paths = [Path(path) for path in __CONFIG_PATHS__]
+            usr_root = resolve_notebook_usr_root(__USR_ROOT__)
             collection_manifest_path = __COLLECTION_MANIFEST_PATH__
             collection_visual_index_path = __COLLECTION_VISUAL_INDEX_PATH__
-            return collection_manifest_path, collection_visual_index_path, config_paths
+            return collection_manifest_path, collection_visual_index_path, config_paths, usr_root
 
 
         @app.cell
@@ -154,6 +157,7 @@ def _view_model_cell() -> str:
             collection_manifest_path,
             collection_visual_index_path,
             config_paths,
+            usr_root,
         ):
             selected_round_selector = __DEFAULT_ROUND__
             campaign_set_view_model = build_campaign_set_notebook_view_model(
@@ -162,6 +166,7 @@ def _view_model_cell() -> str:
                 run_id=__DEFAULT_RUN_ID__,
                 collection_manifest_path=collection_manifest_path,
                 collection_visual_index_path=collection_visual_index_path,
+                usr_root=usr_root,
             )
             campaigns = campaign_set_view_model["campaigns"]
             collection = campaign_set_view_model.get("collection")

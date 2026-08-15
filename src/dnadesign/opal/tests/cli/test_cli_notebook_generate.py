@@ -801,6 +801,7 @@ def test_notebook_run_selects_single_notebook(tmp_path: Path, monkeypatch) -> No
             "host": "127.0.0.1",
             "port": 28510,
             "headless": True,
+            "usr_root": None,
         }
     ]
 
@@ -850,6 +851,7 @@ def test_notebook_edit_selects_single_notebook(tmp_path: Path, monkeypatch) -> N
             "host": None,
             "port": None,
             "headless": False,
+            "usr_root": None,
         }
     ]
 

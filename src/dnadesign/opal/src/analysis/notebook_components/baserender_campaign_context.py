@@ -27,7 +27,11 @@ def load_notebook_baserender_campaign_context(
     import polars as pl
 
     campaign = campaign_model.get("campaign") or {}
-    analysis = CampaignAnalysis.from_config_path(Path(campaign["config_path"]), allow_dir=True)
+    analysis = CampaignAnalysis.from_config_path(
+        Path(campaign["config_path"]),
+        allow_dir=True,
+        usr_root=campaign.get("usr_root"),
+    )
     store = analysis.records_store()
     metadata = campaign.get("metadata") or {}
     metadata_path = str(metadata.get("baserender_metadata_records_path") or "").strip() or None

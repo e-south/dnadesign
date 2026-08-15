@@ -92,9 +92,16 @@ def test_notebook_view_model_loads_run_scoped_selection_batch(tmp_path: Path, mo
 
     calls: list[tuple[str, str | None]] = []
 
-    def fake_load_selection_batch(config: Path, *, round_selector: str, run_id: str | None):
+    def fake_load_selection_batch(
+        config: Path,
+        *,
+        round_selector: str,
+        run_id: str | None,
+        usr_root: str | Path | None,
+    ):
         calls.append((round_selector, run_id))
         assert config == config_path.resolve()
+        assert usr_root is None
         return {
             "schema_version": "opal.selection_batch.v3",
             "as_of_round": 0,
@@ -127,9 +134,16 @@ def test_notebook_view_model_loads_latest_selection_batch_without_run_pin(
 
     calls: list[tuple[str, str | None]] = []
 
-    def fake_load_selection_batch(config: Path, *, round_selector: str, run_id: str | None):
+    def fake_load_selection_batch(
+        config: Path,
+        *,
+        round_selector: str,
+        run_id: str | None,
+        usr_root: str | Path | None,
+    ):
         calls.append((round_selector, run_id))
         assert config == config_path.resolve()
+        assert usr_root is None
         return {
             "schema_version": "opal.selection_batch.v3",
             "as_of_round": 0,
