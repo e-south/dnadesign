@@ -28,6 +28,7 @@ def render_selection_view_performance(
     output_path: Path,
     objective_value_label: str,
     title: str | None = None,
+    subtitle: str | None = None,
     view_labels: Mapping[str, str] | None = None,
 ) -> None:
     """Render candidate points and medians within each objective-view panel."""
@@ -38,6 +39,10 @@ def render_selection_view_performance(
         raise ValueError("selection-view performance output must be PNG or SVG")
     if not objective_value_label.strip():
         raise ValueError("selection-view performance objective-value label must be non-empty")
+    if subtitle is not None and not subtitle.strip():
+        raise ValueError("selection-view performance subtitle must be non-empty when provided")
+    if subtitle and not title:
+        raise ValueError("selection-view performance subtitle requires a title")
     labels = dict(view_labels or {})
     rounds = sorted(performance.observations["observed_round"].unique().tolist())
     objectives = sorted(performance.observations["objective_view_id"].unique().tolist())
@@ -50,11 +55,11 @@ def render_selection_view_performance(
     style = matplotlib.rc_context(
         {
             "font.family": "DejaVu Sans",
-            "font.size": 15,
-            "axes.labelsize": 17,
-            "axes.titlesize": 19,
-            "xtick.labelsize": 14,
-            "ytick.labelsize": 14,
+            "font.size": 16,
+            "axes.labelsize": 19,
+            "axes.titlesize": 21,
+            "xtick.labelsize": 16,
+            "ytick.labelsize": 16,
             "axes.spines.top": False,
             "axes.spines.right": False,
             "svg.fonttype": "path",
@@ -65,10 +70,9 @@ def render_selection_view_performance(
         fig, axes = plt.subplots(
             len(rounds),
             len(objectives),
-            figsize=(6.2 * len(objectives), 7.2 * len(rounds)),
+            figsize=(6.4 * len(objectives), 7.6 * len(rounds)),
             squeeze=False,
             sharey=True,
-            layout="constrained",
         )
         for row_index, observed_round in enumerate(rounds):
             for column_index, objective_view in enumerate(objectives):
@@ -107,9 +111,20 @@ def render_selection_view_performance(
                 ax.set_yticklabels([f"Selected: {labels.get(view, view)}" for view in selected_views])
                 ax.set_xlabel(objective_value_label)
                 round_label = f"Round {observed_round}"
-                ax.set_title(f"{labels.get(objective_view, objective_view)} objective\n{round_label}", pad=14)
+                ax.set_title(f"{labels.get(objective_view, objective_view)} objective\n{round_label}", pad=18)
         if title:
-            fig.suptitle(title, fontsize=23, fontweight="bold", x=0.5)
+            fig.suptitle(title, fontsize=25, fontweight="bold", x=0.5, y=0.975, ha="center")
+        if subtitle:
+            fig.text(
+                0.5,
+                0.895,
+                subtitle,
+                ha="center",
+                va="center",
+                fontsize=16.5,
+                color="#5E6A73",
+                gid="figure-subtitle",
+            )
         handles = [
             Line2D(
                 [],
@@ -125,11 +140,15 @@ def render_selection_view_performance(
         fig.legend(
             handles,
             ["Measured candidate", "Cohort median"],
-            loc="outside lower center",
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.025),
             ncol=2,
             frameon=False,
-            fontsize=15,
+            fontsize=16,
         )
+        top = 0.74 if subtitle else (0.82 if title else 0.90)
+        fig.subplots_adjust(left=0.12, right=0.985, top=top, bottom=0.22, wspace=0.18, hspace=0.40)
+        fig.align_titles()
         output.parent.mkdir(parents=True, exist_ok=True)
         metadata = {"Date": None} if output.suffix.lower() == ".svg" else {"Software": "dnadesign.opal"}
         fig.savefig(output, dpi=240, facecolor="white", metadata=metadata)
