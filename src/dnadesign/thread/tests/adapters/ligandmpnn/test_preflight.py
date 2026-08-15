@@ -114,6 +114,53 @@ def test_preflight_rejects_assume_unchanged_entrypoints(tmp_path: Path, entrypoi
     ]
 
 
+def test_preflight_reads_pinned_blobs_without_replacement_refs(tmp_path: Path) -> None:
+    root, pin = _pinned_checkout(tmp_path)
+    (root / "run.py").write_text("# replacement entrypoint\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(root), "add", "run.py"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-qm",
+            "replacement tree",
+        ],
+        check=True,
+    )
+    replacement_commit = subprocess.check_output(
+        ["git", "-C", str(root), "rev-parse", "HEAD"],
+        text=True,
+    ).strip()
+    subprocess.run(["git", "-C", str(root), "replace", pin.commit, replacement_commit], check=True)
+    subprocess.run(["git", "-C", str(root), "checkout", "-q", "--detach", pin.commit], check=True)
+    assert (
+        subprocess.check_output(
+            ["git", "-C", str(root), "rev-parse", "HEAD"],
+            text=True,
+        ).strip()
+        == pin.commit
+    )
+    assert (
+        subprocess.check_output(
+            ["git", "-C", str(root), "show", f"{pin.commit}:run.py"],
+        )
+        == (root / "run.py").read_bytes()
+    )
+
+    report = preflight_ligandmpnn(root, pin)
+
+    assert not report.ok
+    assert [(issue.check_id, issue.path) for issue in report.issues] == [
+        ("thread.ligandmpnn.dirty_entrypoint", str(root / "run.py"))
+    ]
+
+
 def _pinned_checkout(tmp_path: Path) -> tuple[Path, LigandMpnnUpstreamPin]:
     root = tmp_path / "LigandMPNN"
     (root / "model_params").mkdir(parents=True)

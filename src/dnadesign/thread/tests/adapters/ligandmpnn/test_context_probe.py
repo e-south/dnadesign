@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import py_compile
 import subprocess
 import sys
 from pathlib import Path
@@ -224,6 +226,33 @@ def test_probe_rejects_assume_unchanged_modified_parser(tmp_path: Path) -> None:
         materialize_ligandmpnn_context_inventory(request, execution_root=tmp_path, checkout_root=checkout)
 
     assert not (tmp_path / request.output_path).exists()
+
+
+def test_probe_executes_attested_source_instead_of_valid_cached_bytecode(tmp_path: Path) -> None:
+    checkout, commit = _fake_upstream_checkout(tmp_path)
+    request = _request(tmp_path, checkout, commit)
+    parser_path = checkout / "data_utils.py"
+    clean_source = parser_path.read_text(encoding="utf-8")
+    cached_source = clean_source.replace(
+        "types = [15, 6, 15, 7, 30]",
+        "types = [30, 6, 15, 7, 30]",
+    )
+    assert len(cached_source) == len(clean_source)
+    timestamp = 1_700_000_000
+    parser_path.write_text(cached_source, encoding="utf-8")
+    os.utime(parser_path, (timestamp, timestamp))
+    py_compile.compile(str(parser_path), doraise=True)
+    parser_path.write_text(clean_source, encoding="utf-8")
+    os.utime(parser_path, (timestamp, timestamp))
+
+    reference = materialize_ligandmpnn_context_inventory(
+        request,
+        execution_root=tmp_path,
+        checkout_root=checkout,
+    )
+    inventory = load_ligandmpnn_context_inventory(reference, execution_root=tmp_path)
+
+    assert inventory.effective_nucleotide_atom_count == 4
 
 
 def test_probe_command_is_explicit_and_portable(tmp_path: Path) -> None:

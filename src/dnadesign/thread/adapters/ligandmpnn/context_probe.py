@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib.util
 import json
 import subprocess
 import sys
@@ -33,7 +32,7 @@ from dnadesign.thread.adapters.ligandmpnn.models import (
     LigandMpnnContextInventoryReference,
     LigandMpnnUpstreamPin,
 )
-from dnadesign.thread.adapters.ligandmpnn.pinned_checkout import working_tree_path_matches_commit
+from dnadesign.thread.adapters.ligandmpnn.pinned_checkout import attested_working_tree_path_bytes
 
 _DNA_RESIDUE_NAMES = frozenset({"DA", "DC", "DG", "DI", "DT", "DU"})
 _RNA_RESIDUE_NAMES = frozenset({"A", "C", "G", "I", "U", "RA", "RC", "RG", "RI", "RU"})
@@ -206,12 +205,13 @@ def _load_pinned_upstream_parser(
     tracked = _git(checkout, "ls-files", "--error-unmatch", "data_utils.py")
     if tracked != "data_utils.py":
         raise ValueError("pinned LigandMPNN checkout does not track data_utils.py")
-    if working_tree_path_matches_commit(checkout, expected_commit, "data_utils.py") is not True:
+    source_bytes = attested_working_tree_path_bytes(checkout, expected_commit, "data_utils.py")
+    if source_bytes is None:
         raise ValueError("data_utils.py must be clean at the pinned commit")
     source_path = checkout / "data_utils.py"
     if source_path.is_symlink() or not source_path.is_file():
         raise ValueError("pinned LigandMPNN data_utils.py must be a regular file")
-    module = _import_upstream_module(source_path, checkout)
+    module = _import_upstream_module(source_bytes, source_path=source_path, checkout=checkout)
     parser = getattr(module, "parse_PDB", None)
     if not callable(parser):
         raise ValueError("pinned LigandMPNN data_utils.py does not expose parse_PDB")
@@ -220,18 +220,16 @@ def _load_pinned_upstream_parser(
         not isinstance(key, int) or not isinstance(value, str) for key, value in element_dict_rev.items()
     ):
         raise ValueError("pinned LigandMPNN data_utils.py does not expose element_dict_rev")
-    return parser, element_dict_rev, _sha256_file(source_path)
+    return parser, element_dict_rev, hashlib.sha256(source_bytes).hexdigest()
 
 
-def _import_upstream_module(source_path: Path, checkout: Path) -> ModuleType:
-    module_name = f"_dnadesign_ligandmpnn_data_utils_{_sha256_file(source_path)[:12]}"
-    spec = importlib.util.spec_from_file_location(module_name, source_path)
-    if spec is None or spec.loader is None:
-        raise ValueError("could not load pinned LigandMPNN data_utils.py")
-    module = importlib.util.module_from_spec(spec)
+def _import_upstream_module(source_bytes: bytes, *, source_path: Path, checkout: Path) -> ModuleType:
+    module_name = f"_dnadesign_ligandmpnn_data_utils_{hashlib.sha256(source_bytes).hexdigest()[:12]}"
+    module = ModuleType(module_name)
+    module.__file__ = str(source_path)
     sys.path.insert(0, str(checkout))
     try:
-        spec.loader.exec_module(module)
+        exec(compile(source_bytes, str(source_path), "exec"), module.__dict__)
     except Exception as error:
         raise ValueError(f"could not import pinned LigandMPNN data_utils.py: {error}") from error
     finally:
