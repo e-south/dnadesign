@@ -33,6 +33,7 @@ from dnadesign.thread.adapters.ligandmpnn.models import (
     LigandMpnnContextInventoryReference,
     LigandMpnnUpstreamPin,
 )
+from dnadesign.thread.adapters.ligandmpnn.pinned_checkout import working_tree_path_matches_commit
 
 _DNA_RESIDUE_NAMES = frozenset({"DA", "DC", "DG", "DI", "DT", "DU"})
 _RNA_RESIDUE_NAMES = frozenset({"A", "C", "G", "I", "U", "RA", "RC", "RG", "RI", "RU"})
@@ -205,8 +206,7 @@ def _load_pinned_upstream_parser(
     tracked = _git(checkout, "ls-files", "--error-unmatch", "data_utils.py")
     if tracked != "data_utils.py":
         raise ValueError("pinned LigandMPNN checkout does not track data_utils.py")
-    status = _git(checkout, "status", "--porcelain", "--", "data_utils.py")
-    if status:
+    if working_tree_path_matches_commit(checkout, expected_commit, "data_utils.py") is not True:
         raise ValueError("data_utils.py must be clean at the pinned commit")
     source_path = checkout / "data_utils.py"
     if source_path.is_symlink() or not source_path.is_file():

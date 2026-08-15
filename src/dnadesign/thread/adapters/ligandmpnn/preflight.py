@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnUpstreamPin
+from dnadesign.thread.adapters.ligandmpnn.pinned_checkout import working_tree_path_matches_commit
 from dnadesign.thread.adapters.ligandmpnn.receipts import LigandMpnnProvenance
 
 
@@ -72,7 +73,7 @@ def preflight_ligandmpnn(
         for entrypoint_path in (entrypoint, score_entrypoint):
             if not entrypoint_path.is_file():
                 continue
-            matches_pin = _git_path_matches_commit(root, pin.commit, entrypoint_path.name)
+            matches_pin = working_tree_path_matches_commit(root, pin.commit, entrypoint_path.name)
             if matches_pin is None:
                 issues.append(
                     _issue(
@@ -121,17 +122,6 @@ def _git_commit(root: Path) -> str | None:
             observed = observed.decode("ascii")
         return observed.strip().lower()
     except (OSError, subprocess.CalledProcessError):
-        return None
-
-
-def _git_path_matches_commit(root: Path, commit: str, path: str) -> bool | None:
-    try:
-        pinned_bytes = subprocess.check_output(
-            ["git", "-C", str(root), "show", f"{commit}:{path}"],
-            stderr=subprocess.DEVNULL,
-        )
-        return (root / path).read_bytes() == pinned_bytes
-    except (OSError, subprocess.CalledProcessError, UnicodeError):
         return None
 
 

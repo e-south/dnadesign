@@ -46,6 +46,7 @@ _LIGANDMPNN_FILES = {
     "context_probe.py",
     "context_probe_cli.py",
     "models.py",
+    "pinned_checkout.py",
     "preflight.py",
     "receipts.py",
     "score_results.py",
