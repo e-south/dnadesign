@@ -56,3 +56,24 @@ def test_resolve_usr_root_from_config_rejects_empty_string(tmp_path: Path) -> No
             config_path=config_path,
             label="job.input.root",
         )
+
+
+def test_explicit_operator_root_requires_an_absolute_existing_directory(tmp_path: Path) -> None:
+    existing = tmp_path / "operator-data"
+    existing.mkdir()
+
+    assert usr_roots.require_explicit_usr_root(existing) == existing.resolve()
+    with pytest.raises(ValueError, match="must be absolute"):
+        usr_roots.require_explicit_usr_root(Path("relative-data"))
+    with pytest.raises(ValueError, match="existing directory"):
+        usr_roots.require_explicit_usr_root(tmp_path / "missing")
+
+
+def test_explicit_operator_root_rejects_symbolic_links(tmp_path: Path) -> None:
+    existing = tmp_path / "operator-data"
+    existing.mkdir()
+    linked = tmp_path / "linked-data"
+    linked.symlink_to(existing, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="must not be a symbolic link"):
+        usr_roots.require_explicit_usr_root(linked)

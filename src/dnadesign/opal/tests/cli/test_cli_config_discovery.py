@@ -118,6 +118,20 @@ def test_config_discovery_explicit_flag(monkeypatch, tmp_path: Path) -> None:
     assert res.exit_code == 0, res.output
 
 
+def test_usr_root_is_an_explicit_global_cli_coordinate(tmp_path: Path) -> None:
+    operator_root = tmp_path / "operator-data"
+    operator_root.mkdir()
+    _, campaign = _setup_workspace(tmp_path)
+
+    result = CliRunner().invoke(
+        _build(),
+        ["--no-color", "--usr-root", str(operator_root), "validate", "--config", str(campaign)],
+    )
+
+    assert result.exit_code != 0
+    assert "only valid when data.location.kind=usr" in result.output
+
+
 def test_init_rejects_unknown_model_plugin(tmp_path: Path) -> None:
     _, campaign = _setup_workspace(tmp_path)
     text = campaign.read_text()

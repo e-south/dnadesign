@@ -29,12 +29,17 @@ def run(
         "--dry-run",
         help="Validate inputs and build outputs without writing USR data.",
     ),
+    usr_root: Path | None = typer.Option(
+        None,
+        "--usr-root",
+        help="Absolute operator-managed USR root used for inputs and outputs.",
+    ),
     output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
     format_requested = str(output_format or "").strip().lower()
     try:
         format_norm = validate_output_format(output_format)
-        result = run_from_config(config, dry_run=dry_run)
+        result = run_from_config(config, dry_run=dry_run, usr_root=usr_root)
     except (ConstructError, OSError) as exc:
         exit_with_error(exc, code=1, output_format=format_requested)
 

@@ -152,6 +152,34 @@ def test_find_undeclared_cross_tool_imports_allows_construct_to_usr_default_edge
     assert violations == []
 
 
+def test_find_undeclared_cross_tool_imports_allows_opal_to_usr_public_facade(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "opal" / "config.py", "from dnadesign.usr import require_explicit_usr_root\n"
+    )
+    _write(tmp_path / "src" / "dnadesign" / "usr" / "__init__.py", "def require_explicit_usr_root():\n    pass\n")
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert violations == []
+
+
+def test_find_undeclared_cross_tool_imports_rejects_opal_to_usr_internal_surface(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src" / "dnadesign" / "opal" / "config.py",
+        "from dnadesign.usr.src.cli.support.resolution.roots import require_explicit_usr_root\n",
+    )
+    _write(
+        tmp_path / "src" / "dnadesign" / "usr" / "src" / "cli" / "support" / "resolution" / "roots.py",
+        "def require_explicit_usr_root():\n    pass\n",
+    )
+
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+
+    assert len(violations) == 1
+    assert violations[0].owner_tool == "opal"
+    assert violations[0].imported_tool == "usr"
+
+
 def test_find_undeclared_cross_tool_imports_allows_construct_to_folding_public_facade(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "dnadesign" / "construct" / "runtime.py", "import dnadesign.folding as folding\n")
     _write(tmp_path / "src" / "dnadesign" / "folding" / "__init__.py", "def run():\n    return 1\n")

@@ -19,6 +19,8 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from typing_extensions import Literal
 
+from dnadesign.usr import require_explicit_usr_root
+
 from ..core.config_resolve import resolve_campaign_root
 from ..core.utils import ConfigError
 from .plugin_schemas import validate_params
@@ -421,7 +423,14 @@ def _validate_registered_plugin_names(pyd: PRoot) -> None:
         )
 
 
-def load_config(path: Path | str) -> RootConfig:
+def _resolve_explicit_usr_root(value: Path | str) -> Path:
+    try:
+        return require_explicit_usr_root(value)
+    except ValueError as exc:
+        raise ConfigError(f"Invalid explicit USR root: {exc}.") from exc
+
+
+def load_config(path: Path | str, *, usr_root: Path | str | None = None) -> RootConfig:
     cfg_path = Path(path).resolve()
     campaign_root = resolve_campaign_root(cfg_path)
     try:
@@ -544,11 +553,19 @@ def load_config(path: Path | str) -> RootConfig:
     def _abs(v: str, *, base_dir: Path | None = None) -> str:
         return str(resolve_path_like(cfg_path, v, base_dir=base_dir))
 
+    if usr_root is not None and not isinstance(pyd.data.location, PLocationUSR):
+        raise ConfigError("An explicit USR root is only valid when data.location.kind=usr.")
+
     if isinstance(pyd.data.location, PLocationUSR):
+        resolved_usr_root = (
+            _resolve_explicit_usr_root(usr_root)
+            if usr_root is not None
+            else resolve_path_like(cfg_path, pyd.data.location.path, base_dir=campaign_root)
+        )
         loc_dc = LocationUSR(
             kind="usr",
             dataset=pyd.data.location.dataset,
-            path=_abs(pyd.data.location.path, base_dir=campaign_root),
+            path=str(resolved_usr_root),
         )
     else:
         loc_dc = LocationLocal(kind="local", path=_abs(pyd.data.location.path, base_dir=campaign_root))

@@ -15,6 +15,7 @@ import dataclasses as _dc
 import json
 import os
 import sys
+from contextvars import ContextVar
 from pathlib import Path
 from pathlib import Path as _Path
 from typing import Optional
@@ -32,6 +33,14 @@ from ...config import RootConfig
 from ...core.config_resolve import resolve_campaign_config_path
 from ...storage.data_access import RecordsStore
 from ...storage.store_factory import records_store_from_config
+
+_CLI_USR_ROOT: ContextVar[Path | None] = ContextVar("opal_cli_usr_root", default=None)
+
+
+def set_cli_usr_root(path: Path | None) -> None:
+    """Bind the operator-supplied USR root for one CLI invocation."""
+
+    _CLI_USR_ROOT.set(path)
 
 
 def prompt_confirm(prompt: str, *, non_interactive_hint: str) -> bool:
@@ -148,7 +157,7 @@ def load_cli_config(config_opt: Optional[Path]) -> RootConfig:
     try:
         from ...config import load_config as _load_config
 
-        cfg = _load_config(cfg_path)
+        cfg = _load_config(cfg_path, usr_root=_CLI_USR_ROOT.get())
         return cfg
     except Exception as e:
         if isinstance(e, ConfigError):

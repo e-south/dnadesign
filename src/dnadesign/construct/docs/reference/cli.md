@@ -1,23 +1,28 @@
 ## Construct CLI reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-24
+**Last verified:** 2026-08-15
 
 ### Command map
 
-- `uv run construct run --config <path> [--dry-run] [--format text|json]`
+- `uv run construct run --config <path> [--usr-root <absolute-path>] [--dry-run] [--format text|json]`
 - `uv run construct compose validate --config <path> [--format text|json]`
 - `uv run construct compose run --config <path> [--format text|json]`
 - `uv run construct compose review --bundle <artifact-bundle> [--nucleotide-font-size-px <float>] [--format text|json]`
-- `uv run construct validate config --config <path> [--runtime] [--format text|json]`
+- `uv run construct validate config --config <path> [--usr-root <absolute-path>] [--runtime] [--format text|json]`
 - `uv run construct seed import-manifest --manifest <path> [--root <usr-root>]`
 - `uv run construct seed anchor-template-demo [--root <usr-root>] [--manifest <path>]`
 - `uv run construct workspace where [--root <workspace-root>] [--profile <profile>]`
 - `uv run construct workspace init --id <workspace-id> [--root <workspace-root>] [--profile <profile>]`
 - `uv run construct workspace show --workspace <workspace-dir> [--format text|json]`
 - `uv run construct workspace doctor --workspace <workspace-dir> [--format text|json]`
-- `uv run construct workspace validate-project --workspace <workspace-dir> --project <id> [--runtime] [--format text|json]`
-- `uv run construct workspace run-project --workspace <workspace-dir> --project <id> [--dry-run] [--format text|json]`
+- `uv run construct workspace validate-project --workspace <workspace-dir> --project <id> [--usr-root <absolute-path>] [--runtime] [--format text|json]`
+- `uv run construct workspace run-project --workspace <workspace-dir> --project <id> [--usr-root <absolute-path>] [--dry-run] [--format text|json]`
+
+`--usr-root` is one coordinate for validation, dry-run, and persisted execution.
+It must name an absolute, existing directory that is not a symbolic link. When
+present, it supplies the input, template, and output USR root; the command does
+not return to roots declared in the job config between preflight and execution.
 
 ### `validate config`
 

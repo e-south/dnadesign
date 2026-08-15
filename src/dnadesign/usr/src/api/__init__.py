@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from ..cli.support.resolution.roots import default_usr_root, normalize_usr_root
+from ..cli.support.resolution.roots import default_usr_root, normalize_usr_root, require_explicit_usr_root
 from ..contracts import (
     ARROW_SCHEMA,
     ID_HASH_SPEC,
@@ -91,6 +91,7 @@ __all__ = [
     "default_usr_root",
     "normalize_sequence",
     "normalize_usr_root",
+    "require_explicit_usr_root",
     "validate_bio_type",
     "validate_alphabet",
     "ARROW_SCHEMA",

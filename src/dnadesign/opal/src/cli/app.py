@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
 import typer
 
@@ -40,6 +41,14 @@ def _root_callback(
         "--color/--no-color",
         help="Enable/disable styled output (Rich). JSON output is never styled.",
     ),
+    usr_root: Path | None = typer.Option(
+        None,
+        "--usr-root",
+        file_okay=False,
+        dir_okay=True,
+        resolve_path=False,
+        help="Absolute operator-managed USR dataset root for campaigns with data.location.kind=usr.",
+    ),
 ) -> None:
     """
     Root callback sets global debug + CLI styling behavior via env flags.
@@ -49,6 +58,10 @@ def _root_callback(
     # Rich styling is opt-in via environment; default on for TTY.
     os.environ["OPAL_CLI_RICH"] = "1" if color else "0"
     os.environ["OPAL_CLI_MARKUP"] = "1" if color else "0"
+
+    from .commands._common import set_cli_usr_root
+
+    set_cli_usr_root(usr_root)
 
     # Pretty tracebacks if Rich is enabled
     if color:

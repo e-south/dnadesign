@@ -1,7 +1,7 @@
 ## Dependency maintenance
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-08-15
 
 This document is the canonical home for dependency management, including Python packages (`uv`) and system binaries (`pixi`).
 
@@ -11,7 +11,7 @@ These constraints come from repository configuration and define supported depend
 | Source | Constraint | Operational meaning |
 | --- | --- | --- |
 | `pyproject.toml` `[project] requires-python` | `>=3.12,<3.13` | Use Python 3.12 for all local/CI environments. |
-| `pyproject.toml` `[tool.uv] required-version` | `>=0.9.18,<0.10` | Keep `uv` within the pinned resolver/runtime range. |
+| `pyproject.toml` `[tool.uv] required-version` | `>=0.12.3,<0.13` | Keep `uv` within the pinned resolver/runtime range. |
 | `pyproject.toml` `[tool.uv] environments` | `darwin`, `linux x86_64` | `uv.lock` is resolved for macOS and Linux x86_64. |
 | `pixi.toml` `[workspace] platforms` | `osx-arm64`, `osx-64`, `linux-64` | `pixi` environments are supported on macOS and Linux. |
 
