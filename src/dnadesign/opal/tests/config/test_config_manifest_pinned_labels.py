@@ -81,6 +81,37 @@ def test_load_config_preserves_manifest_pinned_label_source(tmp_path: Path) -> N
     assert cfg.labels.source.manifest_path == "_opal/observed_labels.manifest.json"
 
 
+def test_load_config_binds_usr_data_to_an_explicit_operator_root(tmp_path: Path) -> None:
+    operator_root = tmp_path / "operator-data"
+    operator_root.mkdir()
+
+    cfg = load_config(
+        _write(tmp_path / "campaign.yaml", _payload()),
+        usr_root=operator_root.resolve(),
+    )
+
+    assert Path(cfg.data.location.path) == operator_root.resolve()
+
+
+@pytest.mark.parametrize("root_kind", ["relative", "missing", "symlink"])
+def test_load_config_rejects_ambiguous_operator_roots(tmp_path: Path, root_kind: str) -> None:
+    real_root = tmp_path / "real-data"
+    real_root.mkdir()
+    if root_kind == "relative":
+        operator_root = Path("operator-data")
+    elif root_kind == "missing":
+        operator_root = tmp_path / "missing-data"
+    else:
+        operator_root = tmp_path / "linked-data"
+        operator_root.symlink_to(real_root, target_is_directory=True)
+
+    with pytest.raises(ConfigError, match="explicit USR root"):
+        load_config(
+            _write(tmp_path / "campaign.yaml", _payload()),
+            usr_root=operator_root,
+        )
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [

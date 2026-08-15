@@ -54,3 +54,11 @@ def test_opal_usr_infer_x_workflow_keeps_upstream_preconditions_explicit() -> No
     assert "x_column_name" in workflow
     assert "infer-derived `X` column" in workflow
     assert "../../../usr/docs/operations/promoter/characterization-feature-matrix.md" in workflow
+
+
+def test_opal_cli_reference_documents_the_explicit_usr_coordinate() -> None:
+    cli = _read("src/dnadesign/opal/docs/reference/cli.md")
+
+    assert "opal --usr-root <absolute-path> <command>" in cli
+    assert "existing directory that is not a symbolic link" in cli
+    assert "same coordinate for validation and round execution" in cli

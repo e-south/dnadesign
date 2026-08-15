@@ -313,7 +313,7 @@ job:
     )
     monkeypatch.setattr(
         "dnadesign.construct.src.interfaces.api._runtime_preflight_from_config",
-        lambda path: (_ for _ in ()).throw(USRSchemaError("registry schema mismatch")),
+        lambda path, *, usr_root=None: (_ for _ in ()).throw(USRSchemaError("registry schema mismatch")),
     )
 
     result = _RUNNER.invoke(app, ["validate", "config", "--config", config_path.as_posix(), "--runtime"])

@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
-from dnadesign.usr import Dataset
+from dnadesign.usr import Dataset, require_explicit_usr_root
 
 from ..contracts.config import (
     JobConfig,
@@ -173,6 +173,7 @@ def _plan_classic_loaded_config(
     config_path: Path,
     input_root: Path,
     output_root: Path,
+    usr_root: Path | None = None,
 ) -> tuple[PreflightResult, List[_BuiltRecord]]:
     if cfg.job.template is None or cfg.job.realize is None:
         raise ValidationError("job.template and job.realize are required when job.mode='realize_template'.")
@@ -183,7 +184,7 @@ def _plan_classic_loaded_config(
         raise ValidationError(f"Input dataset not initialized: {input_ds.records_path}")
     _require_distinct_input_output_or_opt_in(cfg=cfg, input_root=input_root, output_root=output_root)
 
-    template = _load_template_sequence(base_dir, cfg)
+    template = _load_template_sequence(base_dir, cfg, usr_root=usr_root)
     resolved_sites = _resolved_placement_sites(template, cfg.job.parts)
     ordered_placements = _validate_placements(len(template.sequence), cfg.job.parts, resolved_sites=resolved_sites)
     template_sha256 = hashlib.sha256(template.sequence.encode("utf-8")).hexdigest()
@@ -293,6 +294,7 @@ def _plan_normalize_loaded_config(
     config_path: Path,
     input_root: Path,
     output_root: Path,
+    usr_root: Path | None = None,
 ) -> tuple[PreflightResult, List[_BuiltRecord]]:
     if cfg.job.normalize_anchor is None:
         raise ValidationError("job.normalize_anchor is required when job.mode='normalize_anchor'.")
@@ -313,7 +315,11 @@ def _plan_normalize_loaded_config(
             cfg=cfg,
             spec_id=spec_id,
             output_dataset_id=cfg.job.output.target.dataset,
-            load_template=lambda template_cfg: _load_normalize_template(base_dir=base_dir, cfg=template_cfg),
+            load_template=lambda template_cfg: _load_normalize_template(
+                base_dir=base_dir,
+                cfg=template_cfg,
+                usr_root=usr_root,
+            ),
         )
         for row in rows
     ]
@@ -325,7 +331,11 @@ def _plan_normalize_loaded_config(
         on_conflict=cfg.job.output.on_conflict,
     )
     policy = normalize_cfg.under_length_policy
-    template = _load_normalize_template(base_dir=base_dir, cfg=policy.template) if policy is not None else None
+    template = (
+        _load_normalize_template(base_dir=base_dir, cfg=policy.template, usr_root=usr_root)
+        if policy is not None
+        else None
+    )
     template_sha256 = hashlib.sha256(template.sequence.encode("utf-8")).hexdigest() if template is not None else ""
     preflight = PreflightResult(
         job_id=cfg.job.id,
@@ -375,10 +385,15 @@ def _plan_loaded_config(
     cfg: JobConfig,
     *,
     config_path: Path,
+    usr_root: str | Path | None = None,
 ) -> tuple[PreflightResult, List[_BuiltRecord]]:
     base_dir = config_path.parent
-    input_root = _resolve_usr_root(base_dir, cfg.job.input.source.root, label="job.input.source.root")
-    output_root = _resolve_usr_root(
+    try:
+        root_override = require_explicit_usr_root(usr_root) if usr_root is not None else None
+    except ValueError as exc:
+        raise ValidationError(f"Invalid explicit USR root: {exc}") from exc
+    input_root = root_override or _resolve_usr_root(base_dir, cfg.job.input.source.root, label="job.input.source.root")
+    output_root = root_override or _resolve_usr_root(
         base_dir,
         cfg.job.output.target.root or cfg.job.input.source.root,
         label="job.output.target.root or job.input.source.root",
@@ -389,24 +404,21 @@ def _plan_loaded_config(
             config_path=config_path,
             input_root=input_root,
             output_root=output_root,
+            usr_root=root_override,
         )
     return _plan_classic_loaded_config(
         cfg,
         config_path=config_path,
         input_root=input_root,
         output_root=output_root,
+        usr_root=root_override,
     )
 
 
-def _planned_run_from_config(path: str | Path) -> _PlannedRun:
+def _planned_run_from_config(path: str | Path, *, usr_root: str | Path | None = None) -> _PlannedRun:
     cfg, config_path = load_job_config(path)
-    preflight, built = _plan_loaded_config(cfg, config_path=config_path)
+    preflight, built = _plan_loaded_config(cfg, config_path=config_path, usr_root=usr_root)
     return _PlannedRun(cfg=cfg, preflight=preflight, built=built)
-
-
-def _plan_from_config(path: str | Path) -> tuple[PreflightResult, List[_BuiltRecord]]:
-    planned = _planned_run_from_config(path)
-    return planned.preflight, planned.built
 
 
 def _dry_run_result(planned: _PlannedRun) -> RunResult:
@@ -458,12 +470,5 @@ def _persist_construct_run(planned: _PlannedRun) -> RunResult:
     )
 
 
-def preflight_from_config(path: str | Path) -> PreflightResult:
-    return _planned_run_from_config(path).preflight
-
-
-def run_from_config(path: str | Path, *, dry_run: bool = False) -> RunResult:
-    planned = _planned_run_from_config(path)
-    if dry_run:
-        return _dry_run_result(planned)
-    return _persist_construct_run(planned)
+def preflight_from_config(path: str | Path, *, usr_root: str | Path | None = None) -> PreflightResult:
+    return _planned_run_from_config(path, usr_root=usr_root).preflight

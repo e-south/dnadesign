@@ -3,7 +3,7 @@ id: opal-reference-cli
 title: OPAL Command Line Interface
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-08-15
 audience:
   - operator
   - maintainer
@@ -19,6 +19,17 @@ The OPAL CLI initializes campaigns, ingests labels, executes rounds, inspects
 records and models, validates data contracts, and generates plots.
 
 Commands are registry-driven and plugin‑agnostic: they operate on the configured plugin names and enforce only declared contracts.
+
+For operator-managed datasets, use one explicit coordinate for the complete
+command lifecycle:
+
+```bash
+opal --usr-root <absolute-path> <command> --config <yaml>
+```
+
+The root must name an absolute, existing directory that is not a symbolic link.
+Use the same coordinate for validation and round execution so candidate, label,
+and writeback paths cannot drift between commands.
 
 ### Command overview
 

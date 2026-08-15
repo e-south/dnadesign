@@ -81,6 +81,7 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("notify", "densegen"),
     ("notify", "infer"),
     ("opal", "ops"),
+    ("opal", "usr"),
     ("ops", "construct"),
     ("ops", "densegen"),
     ("ops", "infer"),
@@ -96,6 +97,7 @@ _ALLOWED_CROSS_TOOL_EXACT_IMPORT_TARGETS: dict[tuple[str, str], tuple[str, ...]]
     ("ops", "infer"): ("dnadesign.infer", "dnadesign.infer.contracts"),
     ("ops", "notify"): ("dnadesign.notify",),
     ("ops", "usr"): ("dnadesign.usr",),
+    ("opal", "usr"): ("dnadesign.usr",),
     ("permuter", "infer"): ("dnadesign.infer",),
     ("construct", "folding"): ("dnadesign.folding",),
     ("devtools", "ops"): (

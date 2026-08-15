@@ -18,7 +18,7 @@ from pathlib import Path
 import typer
 
 from ...contracts.errors import ConstructError
-from ...orchestration.runtime import preflight_from_config, run_from_config
+from ...interfaces.api import preflight_from_config, run_from_config
 from ...workspaces.registry import (
     doctor_workspace_registry,
     init_workspace,
@@ -267,11 +267,18 @@ def validate_project(
         "--runtime",
         help="Resolve template and input dataset, then report the planned runtime summary.",
     ),
+    usr_root: Path | None = typer.Option(
+        None,
+        "--usr-root",
+        help="Operator-managed USR root used for every dataset during runtime validation.",
+    ),
     output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
     format_requested = str(output_format or "").strip().lower()
     try:
         format_norm = validate_output_format(output_format)
+        if usr_root is not None and not runtime:
+            raise ConstructError("--usr-root requires --runtime.")
         resolution = resolve_workspace_project(workspace, project_id=project)
     except (ConstructError, OSError) as exc:
         exit_with_error(exc, code=2, output_format=format_requested)
@@ -279,7 +286,7 @@ def validate_project(
     preflight = None
     if runtime:
         try:
-            preflight = preflight_from_config(resolution.config_path)
+            preflight = preflight_from_config(resolution.config_path, usr_root=usr_root)
         except (ConstructError, OSError) as exc:
             exit_with_error(exc, code=1, output_format=format_norm)
     echo_validate_result(
@@ -303,13 +310,18 @@ def run_project(
         "--dry-run",
         help="Validate inputs and build outputs without writing USR data.",
     ),
+    usr_root: Path | None = typer.Option(
+        None,
+        "--usr-root",
+        help="Absolute operator-managed USR root used for inputs and outputs.",
+    ),
     output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
     format_requested = str(output_format or "").strip().lower()
     try:
         format_norm = validate_output_format(output_format)
         resolution = resolve_workspace_project(workspace, project_id=project)
-        result = run_from_config(resolution.config_path, dry_run=dry_run)
+        result = run_from_config(resolution.config_path, dry_run=dry_run, usr_root=usr_root)
     except (ConstructError, OSError) as exc:
         exit_with_error(exc, code=1, output_format=format_requested)
     echo_run_result(result, output_format=format_norm)
