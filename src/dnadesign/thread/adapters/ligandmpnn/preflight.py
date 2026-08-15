@@ -72,16 +72,16 @@ def preflight_ligandmpnn(
         for entrypoint_path in (entrypoint, score_entrypoint):
             if not entrypoint_path.is_file():
                 continue
-            status = _git_path_status(root, entrypoint_path.name)
-            if status is None:
+            matches_pin = _git_path_matches_commit(root, pin.commit, entrypoint_path.name)
+            if matches_pin is None:
                 issues.append(
                     _issue(
-                        "unreadable_entrypoint_status",
-                        "checkout entrypoint Git status could not be read",
+                        "unreadable_entrypoint_blob",
+                        "pinned checkout entrypoint bytes could not be read",
                         entrypoint_path,
                     )
                 )
-            elif status:
+            elif not matches_pin:
                 issues.append(
                     _issue(
                         "dirty_entrypoint",
@@ -124,17 +124,14 @@ def _git_commit(root: Path) -> str | None:
         return None
 
 
-def _git_path_status(root: Path, path: str) -> str | None:
+def _git_path_matches_commit(root: Path, commit: str, path: str) -> bool | None:
     try:
-        observed = subprocess.check_output(
-            ["git", "-C", str(root), "status", "--porcelain=v1", "--untracked-files=all", "--", path],
+        pinned_bytes = subprocess.check_output(
+            ["git", "-C", str(root), "show", f"{commit}:{path}"],
             stderr=subprocess.DEVNULL,
-            text=True,
         )
-        if isinstance(observed, bytes):
-            observed = observed.decode("utf-8")
-        return observed.strip()
-    except (OSError, subprocess.CalledProcessError):
+        return (root / path).read_bytes() == pinned_bytes
+    except (OSError, subprocess.CalledProcessError, UnicodeError):
         return None
 
 
