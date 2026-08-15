@@ -68,6 +68,27 @@ def preflight_ligandmpnn(
         issues.append(
             _issue("upstream_commit_mismatch", f"expected commit {pin.commit}, observed {observed_commit}", root)
         )
+    if observed_commit == pin.commit:
+        for entrypoint_path in (entrypoint, score_entrypoint):
+            if not entrypoint_path.is_file():
+                continue
+            status = _git_path_status(root, entrypoint_path.name)
+            if status is None:
+                issues.append(
+                    _issue(
+                        "unreadable_entrypoint_status",
+                        "checkout entrypoint Git status could not be read",
+                        entrypoint_path,
+                    )
+                )
+            elif status:
+                issues.append(
+                    _issue(
+                        "dirty_entrypoint",
+                        "checkout entrypoint differs from the pinned commit",
+                        entrypoint_path,
+                    )
+                )
 
     _check_digest(root / pin.checkpoint_path, pin.checkpoint_sha256, "checkpoint", issues)
     if require_packing_checkpoint:
@@ -99,6 +120,20 @@ def _git_commit(root: Path) -> str | None:
         if isinstance(observed, bytes):
             observed = observed.decode("ascii")
         return observed.strip().lower()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def _git_path_status(root: Path, path: str) -> str | None:
+    try:
+        observed = subprocess.check_output(
+            ["git", "-C", str(root), "status", "--porcelain=v1", "--untracked-files=all", "--", path],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        if isinstance(observed, bytes):
+            observed = observed.decode("utf-8")
+        return observed.strip()
     except (OSError, subprocess.CalledProcessError):
         return None
 
