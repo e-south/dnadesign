@@ -70,24 +70,29 @@ def preflight_ligandmpnn(
             _issue("upstream_commit_mismatch", f"expected commit {pin.commit}, observed {observed_commit}", root)
         )
     if observed_commit == pin.commit:
-        for entrypoint_path in (entrypoint, score_entrypoint):
-            if not entrypoint_path.is_file():
+        declared_sources = (
+            (entrypoint, "entrypoint", "unreadable_entrypoint_blob", "dirty_entrypoint"),
+            (score_entrypoint, "entrypoint", "unreadable_entrypoint_blob", "dirty_entrypoint"),
+            (parser_module, "parser module", "unreadable_parser_blob", "dirty_parser_module"),
+        )
+        for source_path, label, unreadable_issue, dirty_issue in declared_sources:
+            if not source_path.is_file():
                 continue
-            matches_pin = working_tree_path_matches_commit(root, pin.commit, entrypoint_path.name)
+            matches_pin = working_tree_path_matches_commit(root, pin.commit, source_path.name)
             if matches_pin is None:
                 issues.append(
                     _issue(
-                        "unreadable_entrypoint_blob",
-                        "pinned checkout entrypoint bytes could not be read",
-                        entrypoint_path,
+                        unreadable_issue,
+                        f"pinned checkout {label} bytes could not be read",
+                        source_path,
                     )
                 )
             elif not matches_pin:
                 issues.append(
                     _issue(
-                        "dirty_entrypoint",
-                        "checkout entrypoint differs from the pinned commit",
-                        entrypoint_path,
+                        dirty_issue,
+                        f"checkout {label} differs from the pinned commit",
+                        source_path,
                     )
                 )
 

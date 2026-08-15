@@ -114,6 +114,18 @@ def test_preflight_rejects_assume_unchanged_entrypoints(tmp_path: Path, entrypoi
     ]
 
 
+def test_preflight_rejects_dirty_parser_after_context_evidence(tmp_path: Path) -> None:
+    root, pin = _pinned_checkout(tmp_path)
+    (root / "data_utils.py").write_text("def parse_PDB(): return 'modified'\n", encoding="utf-8")
+
+    report = preflight_ligandmpnn(root, pin)
+
+    assert not report.ok
+    assert [(issue.check_id, issue.path) for issue in report.issues] == [
+        ("thread.ligandmpnn.dirty_parser_module", str(root / "data_utils.py"))
+    ]
+
+
 def test_preflight_reads_pinned_blobs_without_replacement_refs(tmp_path: Path) -> None:
     root, pin = _pinned_checkout(tmp_path)
     (root / "run.py").write_text("# replacement entrypoint\n", encoding="utf-8")
