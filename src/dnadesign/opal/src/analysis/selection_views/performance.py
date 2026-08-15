@@ -85,7 +85,7 @@ def _validated_observations(frame: pd.DataFrame) -> pd.DataFrame:
         raise ValueError("selection-view performance objective values must be finite")
     observations["observed_round"] = rounds.astype(int)
     observations["objective_value"] = objective_values
-    if observations.duplicated(["observed_round", "candidate_id", "objective_view_id"]).any():
+    if observations.duplicated(["observed_round", "candidate_id", "selected_for_view_id", "objective_view_id"]).any():
         raise ValueError("selection-view performance contains duplicate candidate/objective rows")
 
     expected_views: set[str] | None = None
@@ -100,14 +100,12 @@ def _validated_observations(frame: pd.DataFrame) -> pd.DataFrame:
             expected_views = objective_views
         elif objective_views != expected_views:
             raise ValueError("selection-view performance requires the same objective and selection views across rounds")
-        for candidate_id, candidate_rows in round_rows.groupby("candidate_id", sort=True):
+        for (candidate_id, _selected_view), candidate_rows in round_rows.groupby(
+            ["candidate_id", "selected_for_view_id"], sort=True
+        ):
             if set(candidate_rows["objective_view_id"]) != objective_views:
                 raise ValueError(
                     "selection-view performance requires a complete objective grid for every round/candidate"
-                )
-            if candidate_rows["selected_for_view_id"].nunique() != 1:
-                raise ValueError(
-                    f"selection-view performance candidate {candidate_id!r} has inconsistent selection provenance"
                 )
     return observations.sort_values(
         ["observed_round", "objective_view_id", "selected_for_view_id", "candidate_id"],
