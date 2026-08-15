@@ -83,6 +83,18 @@ def test_selection_view_performance_rejects_duplicate_candidate_objectives() -> 
         selection_view_performance(duplicate)
 
 
+def test_selection_view_performance_preserves_logical_union_memberships() -> None:
+    observations = _observations()
+    shared_membership = observations.loc[observations["candidate_id"].eq("candidate-a")].copy()
+    shared_membership["selected_for_view_id"] = "ciprofloxacin"
+
+    result = selection_view_performance(pd.concat((observations, shared_membership), ignore_index=True))
+
+    assert len(result.observations) == 10
+    summary = result.summary.set_index(["objective_view_id", "selected_for_view_id"])
+    assert summary.loc[("ethanol", "ciprofloxacin"), "candidate_count"] == 3
+
+
 def test_selection_view_performance_requires_one_view_universe_across_rounds() -> None:
     second_round = (
         _observations()
@@ -143,6 +155,49 @@ def test_selection_view_performance_uses_square_large_type_panels(
     assert all(axis.get_xlabel() == "Observed assay score" for axis in panels)
     assert min(label.get_fontsize() for axis in panels for label in axis.get_yticklabels()) >= 14
     close_figure(figure)
+
+
+def test_selection_view_performance_uses_neutral_round_labels(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "selection-view-performance.svg"
+    pyplot = importlib.import_module("matplotlib.pyplot")
+    close_figure = pyplot.close
+    closed_figures: list[Figure] = []
+    monkeypatch.setattr(pyplot, "close", closed_figures.append)
+
+    render_selection_view_performance(
+        _observations(),
+        output_path=output,
+        objective_value_label="Observed objective score",
+    )
+
+    assert {axis.get_title().splitlines()[-1] for axis in closed_figures[0].axes} == {"Round 1"}
+    close_figure(closed_figures[0])
+
+
+def test_selection_view_performance_uses_candidate_neutral_legend(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "selection-view-performance.svg"
+    pyplot = importlib.import_module("matplotlib.pyplot")
+    close_figure = pyplot.close
+    closed_figures: list[Figure] = []
+    monkeypatch.setattr(pyplot, "close", closed_figures.append)
+
+    render_selection_view_performance(
+        _observations(),
+        output_path=output,
+        objective_value_label="Observed objective score",
+    )
+
+    assert [text.get_text() for text in closed_figures[0].legends[0].get_texts()] == [
+        "Measured candidate",
+        "Cohort median",
+    ]
+    close_figure(closed_figures[0])
 
 
 def test_selection_view_performance_svg_is_deterministic_and_has_no_date(tmp_path: Path) -> None:

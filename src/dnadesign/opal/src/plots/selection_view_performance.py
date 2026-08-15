@@ -20,7 +20,6 @@ import pandas as pd
 from ..analysis.selection_views.performance import selection_view_performance
 
 _COLORS = ("#2A6F97", "#2F7F74", "#D97757", "#6F5B7E", "#767676")
-_ROUND_LABELS = {0: "Initial observations", 1: "First selected round"}
 
 
 def render_selection_view_performance(
@@ -107,7 +106,7 @@ def render_selection_view_performance(
                 ax.set_yticks(range(len(selected_views)))
                 ax.set_yticklabels([f"Selected: {labels.get(view, view)}" for view in selected_views])
                 ax.set_xlabel(objective_value_label)
-                round_label = _ROUND_LABELS.get(int(observed_round), f"Round {observed_round}")
+                round_label = f"Round {observed_round}"
                 ax.set_title(f"{labels.get(objective_view, objective_view)} objective\n{round_label}", pad=14)
         if title:
             fig.suptitle(title, fontsize=23, fontweight="bold", x=0.5)
@@ -125,7 +124,7 @@ def render_selection_view_performance(
         ]
         fig.legend(
             handles,
-            ["Measured promoter", "Cohort median"],
+            ["Measured candidate", "Cohort median"],
             loc="outside lower center",
             ncol=2,
             frameon=False,
