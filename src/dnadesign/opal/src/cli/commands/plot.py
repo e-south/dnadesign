@@ -16,7 +16,6 @@ from typing import List, Optional
 
 import typer
 
-from ...analysis.campaign import CampaignAnalysis
 from ...analysis.ledger import parse_round_selector, round_suffix
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...plots.config import list_configured_plot_specs, list_configured_plots, load_plot_config
@@ -25,7 +24,7 @@ from ...registries.objectives import get_objective_family
 from ...registries.plots import describe_plot_kind, get_plot_meta, list_plots
 from ..formatting import bullet_list
 from ..registry import cli_command
-from ._common import json_error, json_out, opal_error, print_config_context
+from ._common import json_error, json_out, load_cli_analysis, opal_error, print_config_context
 
 
 @cli_command("plot", help="Generate plots from the campaign plot_config or an explicit plot-config path.")
@@ -172,7 +171,7 @@ def _run_plot_command(
         print_stdout(bullet_list("Registered plots", rows))
         return
 
-    analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
+    analysis = load_cli_analysis(config, allow_dir=True)
     cfg_path = analysis.config_path
     campaign_yaml = cfg_path
     campaign_dir = analysis.workspace.workdir

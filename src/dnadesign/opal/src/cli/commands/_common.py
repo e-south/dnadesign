@@ -43,6 +43,18 @@ def set_cli_usr_root(path: Path | None) -> None:
     _CLI_USR_ROOT.set(path)
 
 
+def load_cli_analysis(config_opt: Optional[Path], *, allow_dir: bool = False):
+    """Load one campaign analysis with the invocation's explicit USR coordinate."""
+
+    from ...analysis.campaign import CampaignAnalysis
+
+    return CampaignAnalysis.from_config_path(
+        config_opt,
+        allow_dir=allow_dir,
+        usr_root=_CLI_USR_ROOT.get(),
+    )
+
+
 def prompt_confirm(prompt: str, *, non_interactive_hint: str) -> bool:
     """
     Prompt for a yes/no confirmation. Raises OpalError if stdin is not interactive.

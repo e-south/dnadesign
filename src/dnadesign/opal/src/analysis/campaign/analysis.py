@@ -47,8 +47,14 @@ class CampaignAnalysis:
     data: CampaignData
 
     @classmethod
-    def from_config_path(cls, config_opt: Path | None, *, allow_dir: bool = False) -> "CampaignAnalysis":
-        data = load_campaign_data(config_opt, allow_dir=allow_dir)
+    def from_config_path(
+        cls,
+        config_opt: Path | None,
+        *,
+        allow_dir: bool = False,
+        usr_root: Path | str | None = None,
+    ) -> "CampaignAnalysis":
+        data = load_campaign_data(config_opt, allow_dir=allow_dir, usr_root=usr_root)
         return cls(data=data)
 
     @property
