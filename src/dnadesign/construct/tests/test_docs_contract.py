@@ -69,3 +69,18 @@ def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
     assert "promoter/characterization-feature-matrix.md" in source_of_truth_workspace
     assert "unified [Construct docs](README.md) index" in index_doc
     assert "Open the Construct docs index" in index_doc
+
+
+def test_construct_cli_reference_binds_the_explicit_usr_root_across_execution() -> None:
+    cli = _read("src/dnadesign/construct/docs/reference/cli.md")
+
+    for command in (
+        "construct run --config <path>",
+        "construct validate config --config <path>",
+        "construct workspace validate-project",
+        "construct workspace run-project",
+    ):
+        line = next(line for line in cli.splitlines() if command in line)
+        assert "--usr-root <absolute-path>" in line
+    assert "one coordinate for validation, dry-run, and persisted execution" in cli
+    assert "existing directory that is not a symbolic link" in cli

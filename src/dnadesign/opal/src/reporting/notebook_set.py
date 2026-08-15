@@ -30,6 +30,7 @@ def build_campaign_set_notebook_view_model(
     run_id: str | None = None,
     collection_manifest_path: str | Path | None = None,
     collection_visual_index_path: str | Path | None = None,
+    usr_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Build a manifest-backed view model for one or more OPAL campaigns."""
 
@@ -49,6 +50,7 @@ def build_campaign_set_notebook_view_model(
             path,
             round_selector=round_selector,
             run_id=run_id if len(paths) == 1 else None,
+            usr_root=usr_root,
         )
         for path in paths
     ]

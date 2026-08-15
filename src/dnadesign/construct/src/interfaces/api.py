@@ -53,9 +53,9 @@ def load_job_config(path: str | Path) -> tuple[JobConfig, Path]:
     return _load_job_config(path)
 
 
-def preflight_from_config(path: str | Path) -> PreflightResult:
+def preflight_from_config(path: str | Path, *, usr_root: str | Path | None = None) -> PreflightResult:
     try:
-        return _runtime_preflight_from_config(path)
+        return _runtime_preflight_from_config(path, usr_root=usr_root)
     except USRSequencesError as exc:
         _wrap_usr_error(
             exc,
@@ -64,9 +64,14 @@ def preflight_from_config(path: str | Path) -> PreflightResult:
         )
 
 
-def run_from_config(path: str | Path, *, dry_run: bool = False) -> RunResult:
+def run_from_config(
+    path: str | Path,
+    *,
+    dry_run: bool = False,
+    usr_root: str | Path | None = None,
+) -> RunResult:
     try:
-        planned = _planned_run_from_config(path)
+        planned = _planned_run_from_config(path, usr_root=usr_root)
     except USRSequencesError as exc:
         _wrap_usr_error(
             exc,

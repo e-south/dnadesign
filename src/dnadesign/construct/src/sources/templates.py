@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from dnadesign.usr import Dataset
+from dnadesign.usr import Dataset, require_explicit_usr_root
 
 from ..contracts.config import JobConfig, NormalizeTemplateConfig
 from ..contracts.errors import ValidationError
@@ -35,7 +35,12 @@ class ResolvedTemplate:
     circular: bool
 
 
-def load_template_sequence(base_dir: Path, cfg: JobConfig) -> ResolvedTemplate:
+def load_template_sequence(
+    base_dir: Path,
+    cfg: JobConfig,
+    *,
+    usr_root: str | Path | None = None,
+) -> ResolvedTemplate:
     template = cfg.job.template
     if template is None:
         raise ValidationError("job.template is required for classic construct jobs.")
@@ -71,10 +76,14 @@ def load_template_sequence(base_dir: Path, cfg: JobConfig) -> ResolvedTemplate:
     if template_source.kind != "usr":
         raise ValidationError(f"Unsupported template.source.kind '{template_source.kind}'.")
 
-    template_root = resolve_usr_root(
-        base_dir,
-        template_source.root or cfg.job.input.source.root,
-        label="template.source.root or job.input.source.root",
+    template_root = (
+        require_explicit_usr_root(usr_root)
+        if usr_root is not None
+        else resolve_usr_root(
+            base_dir,
+            template_source.root or cfg.job.input.source.root,
+            label="template.source.root or job.input.source.root",
+        )
     )
     template_ds = Dataset(template_root, str(template_source.dataset))
     if not template_ds.records_path.exists():
@@ -110,7 +119,12 @@ def load_template_sequence(base_dir: Path, cfg: JobConfig) -> ResolvedTemplate:
     )
 
 
-def load_normalize_template(*, base_dir: Path, cfg: NormalizeTemplateConfig) -> ResolvedTemplate:
+def load_normalize_template(
+    *,
+    base_dir: Path,
+    cfg: NormalizeTemplateConfig,
+    usr_root: str | Path | None = None,
+) -> ResolvedTemplate:
     template_id = str(cfg.id or "").strip()
     source = cfg.source
     if source.kind == "literal":
@@ -140,7 +154,11 @@ def load_normalize_template(*, base_dir: Path, cfg: NormalizeTemplateConfig) -> 
             fasta_message_prefix="Normalize-anchor template FASTA files",
         )
 
-    template_root = resolve_usr_root(base_dir, source.root, label="normalize_anchor.template.source.root")
+    template_root = (
+        require_explicit_usr_root(usr_root)
+        if usr_root is not None
+        else resolve_usr_root(base_dir, source.root, label="normalize_anchor.template.source.root")
+    )
     dataset = Dataset(template_root, source.dataset)
     if not dataset.records_path.exists():
         raise ValidationError(f"Normalize-anchor template dataset not initialized: {dataset.records_path}")

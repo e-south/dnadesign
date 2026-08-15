@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import replace
 from pathlib import Path
 
@@ -166,6 +167,45 @@ def test_run_preflight_command_captures_native_gate_failure_text(tmp_path: Path)
     assert execution.returncode == 2
     assert execution.stdout == ""
     assert "template_missing=/tmp/does-not-exist.qsub" in execution.stderr
+
+
+def test_run_preflight_command_binds_explicit_environment(tmp_path: Path) -> None:
+    execution = run_preflight_command(
+        (sys.executable, "-c", "import os; print(os.environ['DNADESIGN_USR_ROOT'])"),
+        cwd=tmp_path,
+        env={"DNADESIGN_USR_ROOT": str(tmp_path)},
+    )
+
+    assert execution.returncode == 0
+    assert execution.stdout.strip() == str(tmp_path)
+
+
+def test_run_preflight_command_binds_environment_for_native_gate(tmp_path: Path) -> None:
+    qstat = tmp_path / "qstat"
+    qstat.write_text(
+        "#!/bin/sh\n"
+        'test "$1" = -u || exit 91\n'
+        'test "$2" = stress-operator || exit 92\n'
+        "printf 'job-ID prior name user state submit/start at queue slots ja-task-ID\\n'\n",
+        encoding="utf-8",
+    )
+    qstat.chmod(0o755)
+
+    execution = run_preflight_command(
+        (
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "dnadesign.ops.orchestrator.gates",
+            "session-counts",
+        ),
+        cwd=tmp_path,
+        env={"PATH": str(tmp_path), "USER": "stress-operator"},
+    )
+
+    assert execution.returncode == 0, execution.stderr
+    assert execution.stdout == ("queue_probe=ok qstat_source=live running_jobs=0 queued_jobs=0 eqw_jobs=0\n")
 
 
 def test_supported_preflight_kinds_are_generic_only() -> None:

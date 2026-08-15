@@ -126,7 +126,11 @@ def render_sequence_panel_image(
         header_lines = [normalized_title]
         if record_label is not None and record_label.strip() and record_label.strip() != normalized_title:
             header_lines.append(record_label.strip())
-        record = replace(record, display=replace(record.display, overlay_text="\n".join(header_lines)))
+        record = replace(
+            record,
+            display=replace(record.display, overlay_text="\n".join(header_lines)),
+            meta={**record.meta, "overlay_text_role": "caller_header"},
+        )
     fig = render_record_figure(
         record,
         renderer_name=config.renderer_name,

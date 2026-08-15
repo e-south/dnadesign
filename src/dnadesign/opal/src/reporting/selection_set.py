@@ -225,11 +225,12 @@ def load_selection_batch(
     round_selector: str | int | None = None,
     run_id: str | None = None,
     selection_batch_path: str | Path | None = None,
+    usr_root: str | Path | None = None,
 ) -> dict[str, Any]:
     """Load the final deduplicated selection batch for one run."""
 
     cfg_path = Path(config_path).resolve()
-    cfg = load_config(cfg_path)
+    cfg = load_config(cfg_path, usr_root=usr_root)
     ws = CampaignWorkspace.from_config(cfg, cfg_path)
     reader = LedgerReader(ws)
     _, run_row = _resolve_run(reader, round_selector=round_selector, run_id=run_id)

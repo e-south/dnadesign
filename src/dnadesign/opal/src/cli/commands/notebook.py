@@ -16,7 +16,6 @@ from typing import Optional
 
 import typer
 
-from ...analysis.campaign import CampaignAnalysis
 from ...analysis.notebook_set_template import render_campaign_set_notebook
 from ...analysis.notebook_template import render_campaign_notebook
 from ...core.rounds import resolve_round_index_from_runs
@@ -26,7 +25,16 @@ from ...reporting.notebook import smoke_check_notebook
 from ...reporting.notebook_set import build_campaign_set_notebook_view_model
 from ..registry import cli_group
 from ..tui import tui_enabled
-from ._common import internal_error, json_error, json_out, opal_error, print_config_context, prompt_confirm
+from ._common import (
+    get_cli_usr_root,
+    internal_error,
+    json_error,
+    json_out,
+    load_cli_analysis,
+    opal_error,
+    print_config_context,
+    prompt_confirm,
+)
 from .notebook_generation import (
     NOTEBOOK_GENERATE_SCHEMA_VERSION,
     notebook_generate_payload,
@@ -62,7 +70,7 @@ def notebook_root(
     if ctx.invoked_subcommand:
         return
     try:
-        analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
+        analysis = load_cli_analysis(config, allow_dir=True)
         ws = analysis.workspace
         notebooks_dir = ws.workdir / "notebooks"
         notebooks = list_notebooks(notebooks_dir)
@@ -220,7 +228,7 @@ def cmd_notebook_generate(
                 ExitCodes.BAD_ARGS,
             )
 
-        analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
+        analysis = load_cli_analysis(config, allow_dir=True)
         cfg = analysis.config
         ws = analysis.workspace
         store = analysis.records_store()
@@ -276,7 +284,12 @@ def cmd_notebook_generate(
                     print_stdout("Aborted.")
                 return
 
-        content = render_campaign_notebook(analysis.config_path, round_selector=round_sel, run_id=resolved_run_id)
+        content = render_campaign_notebook(
+            analysis.config_path,
+            round_selector=round_sel,
+            run_id=resolved_run_id,
+            usr_root=get_cli_usr_root(),
+        )
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(content)
         smoke_check_notebook(out_path, run_marimo_check=True)
@@ -363,7 +376,7 @@ def _generate_campaign_set_notebook(
                 ExitCodes.BAD_ARGS,
             )
 
-    analyses = [CampaignAnalysis.from_config_path(path, allow_dir=True) for path in config_paths]
+    analyses = [load_cli_analysis(path, allow_dir=True) for path in config_paths]
     round_sel = parse_notebook_round_selector(round, allow_all=True)
 
     for analysis in analyses:
@@ -405,6 +418,7 @@ def _generate_campaign_set_notebook(
             run_id=None,
             collection_manifest_path=collection,
             collection_visual_index_path=collection_visual_index,
+            usr_root=get_cli_usr_root(),
         )
 
     collection_visual_index_path: Path | None = collection_visual_index
@@ -413,6 +427,7 @@ def _generate_campaign_set_notebook(
             [analysis.config_path for analysis in analyses],
             round_selector=round_sel,
             collection_manifest_path=collection,
+            usr_root=get_cli_usr_root(),
         )
         visual_index = materialize_campaign_set_collection_visuals(
             view_model["campaigns"],
@@ -426,6 +441,7 @@ def _generate_campaign_set_notebook(
         round_selector=round_sel,
         collection_manifest_path=collection,
         collection_visual_index_path=collection_visual_index_path,
+        usr_root=get_cli_usr_root(),
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(content)
@@ -478,10 +494,17 @@ def cmd_notebook_run(
     headless: bool = typer.Option(False, "--headless", help="Run marimo without launching a browser."),
 ) -> None:
     try:
-        analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
+        analysis = load_cli_analysis(config, allow_dir=True)
         nb_path = resolve_notebook_path(analysis, path)
         print_stdout(f"Launching marimo app: {nb_path}")
-        launch_marimo_notebook(mode="run", notebook_path=nb_path, host=host, port=port, headless=headless)
+        launch_marimo_notebook(
+            mode="run",
+            notebook_path=nb_path,
+            host=host,
+            port=port,
+            headless=headless,
+            usr_root=get_cli_usr_root(),
+        )
     except OpalError as e:
         opal_error("notebook.run", e)
         raise typer.Exit(code=e.exit_code)
@@ -511,10 +534,17 @@ def cmd_notebook_edit(
     headless: bool = typer.Option(False, "--headless", help="Run marimo without launching a browser."),
 ) -> None:
     try:
-        analysis = CampaignAnalysis.from_config_path(config, allow_dir=True)
+        analysis = load_cli_analysis(config, allow_dir=True)
         nb_path = resolve_notebook_path(analysis, path)
         print_stdout(f"Launching marimo editor: {nb_path}")
-        launch_marimo_notebook(mode="edit", notebook_path=nb_path, host=host, port=port, headless=headless)
+        launch_marimo_notebook(
+            mode="edit",
+            notebook_path=nb_path,
+            host=host,
+            port=port,
+            headless=headless,
+            usr_root=get_cli_usr_root(),
+        )
     except OpalError as e:
         opal_error("notebook.edit", e)
         raise typer.Exit(code=e.exit_code)

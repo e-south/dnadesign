@@ -63,6 +63,12 @@ from .selection_allocation import (
     SelectionAllocationPreview,
     preview_round_robin_next_best_unallocated,
 )
+from .selection_view_performance import (
+    SELECTION_VIEW_PERFORMANCE_API_VERSION,
+    SelectionViewPerformance,
+    render_selection_view_performance,
+    selection_view_performance,
+)
 from .sfxi import (
     SFXI_API_VERSION,
     SFXI_REFERENCE_OVERLAY_FIELDS,
@@ -99,6 +105,7 @@ __all__ = [
     "ResponseMagnitudeFeasibilityScore",
     "RUN_SERIES_SCHEMA_VERSION",
     "SELECTION_ALLOCATION_PREVIEW_API_VERSION",
+    "SELECTION_VIEW_PERFORMANCE_API_VERSION",
     "SFXI_API_VERSION",
     "SFXI_REFERENCE_OVERLAY_FIELDS",
     "SFXI_REFERENCE_OVERLAY_NAMESPACE",
@@ -108,6 +115,7 @@ __all__ = [
     "SFXIScoringConfig",
     "SFXIScoringResult",
     "SelectionAllocationPreview",
+    "SelectionViewPerformance",
     "VerifiedObservedLabelPromotion",
     "VerifiedObservedLabelSnapshot",
     "binary_target_mask",
@@ -121,12 +129,14 @@ __all__ = [
     "register_reader_evidence_artifact_adapter",
     "observed_objective_run_contract_sha256",
     "preview_round_robin_next_best_unallocated",
+    "render_selection_view_performance",
     "multistate_response_behavior_clearances",
     "response_magnitude_feasibility_components",
     "score_response_magnitude_feasibility",
     "score_multistate_response_behavior",
     "score_vec8",
     "score_vec8_with_denom",
+    "selection_view_performance",
     "to_sfxi_reference_overlay_records",
     "validate_sfxi_reference_overlay_records",
     "validated_response_magnitude",

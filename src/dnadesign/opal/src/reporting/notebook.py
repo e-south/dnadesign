@@ -55,8 +55,13 @@ def build_notebook_view_model(
     run_id: str | None = None,
     review_manifest_path: str | Path | None = None,
     plot_manifest_path: str | Path | None = None,
+    usr_root: str | Path | None = None,
 ) -> dict[str, Any]:
-    analysis = CampaignAnalysis.from_config_path(Path(config_path) if config_path is not None else None, allow_dir=True)
+    analysis = CampaignAnalysis.from_config_path(
+        Path(config_path) if config_path is not None else None,
+        allow_dir=True,
+        usr_root=usr_root,
+    )
     cfg = analysis.config
     ws = analysis.workspace
     store = analysis.records_store()
@@ -72,6 +77,7 @@ def build_notebook_view_model(
             analysis.config_path,
             round_selector=resolved_round_selector,
             run_id=resolved_run_id,
+            usr_root=usr_root,
         )
     except Exception as exc:
         progress = {
@@ -150,13 +156,14 @@ def build_notebook_view_model(
                 analysis.config_path,
                 round_selector=resolved_round_selector,
                 run_id=resolved_run_id,
+                usr_root=usr_root,
             )
         except OpalError as exc:
             warnings.append(_warning("SelectionBatchWarning", str(exc)))
 
     artifact_garden = None
     try:
-        artifact_garden = build_artifact_garden_audit(analysis.config_path)
+        artifact_garden = build_artifact_garden_audit(analysis.config_path, usr_root=usr_root)
     except Exception as exc:
         warnings.append(_warning("ArtifactGardenWarning", str(exc)))
 
@@ -171,6 +178,7 @@ def build_notebook_view_model(
             "metadata": dict(getattr(cfg.campaign, "metadata", {}) or {}),
             "workdir": str(ws.workdir),
             "config_path": str(analysis.config_path),
+            "usr_root": None if usr_root is None else str(Path(usr_root).expanduser().resolve()),
             "records_path": str(store.records_path),
             "x_column": cfg.data.x_column_name,
             "y_column": cfg.data.y_column_name,

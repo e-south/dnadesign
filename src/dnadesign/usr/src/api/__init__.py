@@ -34,6 +34,7 @@ from ..contracts import (
     validate_alphabet,
     validate_bio_type,
 )
+from ..contracts.roots import require_explicit_usr_root
 from ..dataset import Dataset
 from ..events import USR_EVENT_VERSION
 from ..registry import (
@@ -91,6 +92,7 @@ __all__ = [
     "default_usr_root",
     "normalize_sequence",
     "normalize_usr_root",
+    "require_explicit_usr_root",
     "validate_bio_type",
     "validate_alphabet",
     "ARROW_SCHEMA",

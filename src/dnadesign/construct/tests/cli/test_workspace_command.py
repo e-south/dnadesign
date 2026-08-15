@@ -534,6 +534,44 @@ def test_workspace_validate_project_runtime_json_reports_registry_project(tmp_pa
     assert payload["runtime_preflight"]["placements"][0]["locator_kind"] == "coordinates"
 
 
+def test_workspace_validate_project_runtime_uses_explicit_usr_root(tmp_path: Path) -> None:
+    root = tmp_path / "ws_root"
+    init_result = _RUNNER.invoke(
+        app,
+        ["workspace", "init", "--id", "demo_construct", "--root", root.as_posix(), "--profile", "anchor-template-demo"],
+    )
+    assert init_result.exit_code == 0, init_result.stdout
+
+    workspace_dir = root / "demo_construct"
+    usr_root = tmp_path / "operator-data"
+    bootstrap_anchor_template_demo(
+        root=usr_root,
+        manifest=workspace_dir / "inputs" / "seed_manifest.yaml",
+    )
+
+    result = _RUNNER.invoke(
+        app,
+        [
+            "workspace",
+            "validate-project",
+            "--workspace",
+            workspace_dir.as_posix(),
+            "--project",
+            "slot_a_window",
+            "--runtime",
+            "--usr-root",
+            usr_root.as_posix(),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["runtime_preflight"]["input_root"] == usr_root.resolve().as_posix()
+    assert payload["runtime_preflight"]["output_root"] == usr_root.resolve().as_posix()
+
+
 def test_workspace_validate_project_runtime_json_reports_missing_dataset_error(tmp_path: Path) -> None:
     root = tmp_path / "ws_root"
     init_result = _RUNNER.invoke(
@@ -705,8 +743,9 @@ def test_workspace_run_project_dry_run_resolves_registry_project(tmp_path: Path)
     assert init_result.exit_code == 0, init_result.stdout
 
     workspace_dir = root / "demo_construct"
+    usr_root = tmp_path / "operator-data"
     bootstrap_anchor_template_demo(
-        root=workspace_dir / "outputs" / "usr_datasets",
+        root=usr_root,
         manifest=workspace_dir / "inputs" / "seed_manifest.yaml",
     )
 
@@ -719,6 +758,8 @@ def test_workspace_run_project_dry_run_resolves_registry_project(tmp_path: Path)
             workspace_dir.as_posix(),
             "--project",
             "slot_a_window",
+            "--usr-root",
+            usr_root.as_posix(),
             "--dry-run",
         ],
     )
@@ -726,6 +767,7 @@ def test_workspace_run_project_dry_run_resolves_registry_project(tmp_path: Path)
     assert result.exit_code == 0, result.stdout
     output = result.stdout or ""
     assert "Config validated (dry run): job=anchor_template_slot_a_window_1kb" in output
+    assert f"output_root: {usr_root.resolve()}" in output
     assert "output_dataset: anchor_template_slot_a_window_1kb_demo" in output
 
 

@@ -21,6 +21,70 @@ from dnadesign.construct.tests.runtime.run_construct_helpers import write_regist
 from dnadesign.usr import Dataset
 
 
+def test_preflight_uses_one_explicit_usr_root_for_all_dataset_roles(tmp_path: Path) -> None:
+    usr_root = tmp_path / "operator-data"
+    usr_root.mkdir()
+    _write_registry(usr_root)
+    input_dataset = Dataset(usr_root, "anchors")
+    input_dataset.init(source="test", notes="runtime test")
+    input_dataset.add_sequences(["AC"], bio_type="dna", alphabet="dna_4", source="test")
+    template_dataset = Dataset(usr_root, "templates")
+    template_dataset.init(source="test", notes="runtime test")
+    template_dataset.add_sequences(["AAAACCCC"], bio_type="dna", alphabet="dna_4", source="test")
+    template_id = str(template_dataset.head(n=1).iloc[0]["id"])
+    config_path = tmp_path / "construct.yaml"
+    config_path.write_text(
+        f"""
+job:
+  id: operator_root_contract
+  input:
+    source:
+      kind: usr
+      dataset: anchors
+      root: stale/usr
+    field: sequence
+  template:
+    id: template
+    source:
+      kind: usr
+      dataset: templates
+      root: stale/usr
+      field: sequence
+      record_id: {template_id}
+    circular: false
+  parts:
+    - name: anchor
+      role: anchor
+      sequence:
+        source: input_field
+        field: sequence
+      placement:
+        kind: replace
+        orientation: forward
+        locator:
+          kind: coordinates
+          start: 4
+          end: 6
+        guards:
+          replaced_sequence: CC
+  realize:
+    mode: full_construct
+  output:
+    target:
+      kind: usr
+      dataset: outputs
+      root: stale/usr
+""",
+        encoding="utf-8",
+    )
+
+    preflight = preflight_from_config(config_path, usr_root=usr_root)
+
+    assert preflight.input_root == usr_root
+    assert preflight.output_root == usr_root
+    assert preflight.template_dataset == "templates"
+
+
 def test_run_construct_rejects_registry_type_drift_before_write(tmp_path: Path) -> None:
     usr_root = tmp_path / "usr_root"
     usr_root.mkdir(parents=True, exist_ok=True)

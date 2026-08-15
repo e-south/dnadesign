@@ -1,7 +1,7 @@
 ## Installation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-08-15
 
 This guide is the first-run setup sequence for local development and CLI usage: confirm platform/version contracts, run the required install and baseline verification, then run additional sections only when required by the workload.
 
@@ -22,7 +22,7 @@ Reason:
 Treat these as installation requirements:
 
 - Python: `>=3.12,<3.13` (`pyproject.toml` `[project] requires-python`)
-- uv: `>=0.9.18,<0.10` (`pyproject.toml` `[tool.uv] required-version`)
+- uv: `>=0.12.3,<0.13` (`pyproject.toml` `[tool.uv] required-version`)
 
 ### 2a) UV dependency model
 

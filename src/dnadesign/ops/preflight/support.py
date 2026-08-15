@@ -12,8 +12,9 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -54,9 +55,18 @@ def build_infer_notify_setup_command(*, config_path: Path) -> str:
     )
 
 
-def run_preflight_command(argv: Sequence[str], *, cwd: Path, timeout_seconds: int = 180) -> CommandExecution:
+def run_preflight_command(
+    argv: Sequence[str],
+    *,
+    cwd: Path,
+    timeout_seconds: int = 180,
+    env: Mapping[str, str] | None = None,
+) -> CommandExecution:
     if gates_module.is_native_gate_command(tuple(str(token) for token in argv)):
-        returncode, stdout, stderr = gates_module.run_native_gate_command(tuple(str(token) for token in argv))
+        returncode, stdout, stderr = gates_module.run_native_gate_command(
+            tuple(str(token) for token in argv),
+            env=dict(env or {}),
+        )
         return CommandExecution(
             argv=tuple(str(token) for token in argv),
             cwd=str(cwd),
@@ -69,6 +79,7 @@ def run_preflight_command(argv: Sequence[str], *, cwd: Path, timeout_seconds: in
         completed = subprocess.run(
             list(argv),
             cwd=str(cwd),
+            env={**os.environ, **dict(env or {})},
             capture_output=True,
             text=True,
             timeout=timeout_seconds,

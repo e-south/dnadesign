@@ -25,6 +25,7 @@ from ...src.analysis.campaign_progress import (
     x_provenance_status_lines,
 )
 from ...src.analysis.ledger import available_rounds, latest_round, latest_run_id, require_columns
+from ...src.analysis.notebook_scope import resolve_notebook_usr_root
 from ...src.plots.config import list_configured_plot_specs, load_plot_config, parse_enabled, parse_tags
 from ...src.reporting.campaign_collection import load_campaign_collection_manifest
 from ...src.reporting.notebook import build_notebook_view_model
@@ -53,6 +54,7 @@ __all__ = [
     "read_optional_table",
     "records_status_lines",
     "require_columns",
+    "resolve_notebook_usr_root",
     "table_status_lines",
     "unavailable_table",
     "x_provenance_status_lines",

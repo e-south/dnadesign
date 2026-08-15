@@ -24,9 +24,17 @@ ARTIFACT_GARDEN_SCHEMA_VERSION = "opal.artifact_garden.v1"
 _STALE_EXTENSIONS = {".csv", ".json", ".pdf", ".png", ".svg"}
 
 
-def build_artifact_garden_audit(config_path: str | Path | None) -> dict[str, Any]:
+def build_artifact_garden_audit(
+    config_path: str | Path | None,
+    *,
+    usr_root: str | Path | None = None,
+) -> dict[str, Any]:
     """Inventory manifest-backed artifact roots without reading records.parquet."""
-    analysis = CampaignAnalysis.from_config_path(Path(config_path) if config_path is not None else None, allow_dir=True)
+    analysis = CampaignAnalysis.from_config_path(
+        Path(config_path) if config_path is not None else None,
+        allow_dir=True,
+        usr_root=usr_root,
+    )
     cfg = analysis.config
     ws = analysis.workspace
     workdir = ws.workdir.resolve()

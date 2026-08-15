@@ -27,6 +27,7 @@ _ATTR_SOURCES: dict[str, tuple[str, str]] = {
     "default_usr_root": (".src.api", "default_usr_root"),
     "normalize_sequence": (".src.api", "normalize_sequence"),
     "normalize_usr_root": (".src.api", "normalize_usr_root"),
+    "require_explicit_usr_root": (".src.api", "require_explicit_usr_root"),
     "validate_bio_type": (".src.api", "validate_bio_type"),
     "validate_alphabet": (".src.api", "validate_alphabet"),
     "ARROW_SCHEMA": (".src.api", "ARROW_SCHEMA"),
