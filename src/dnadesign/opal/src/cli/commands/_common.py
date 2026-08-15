@@ -43,6 +43,12 @@ def set_cli_usr_root(path: Path | None) -> None:
     _CLI_USR_ROOT.set(path)
 
 
+def get_cli_usr_root() -> Path | None:
+    """Return the operator-supplied USR coordinate for this CLI invocation."""
+
+    return _CLI_USR_ROOT.get()
+
+
 def load_cli_analysis(config_opt: Optional[Path], *, allow_dir: bool = False):
     """Load one campaign analysis with the invocation's explicit USR coordinate."""
 
@@ -51,7 +57,7 @@ def load_cli_analysis(config_opt: Optional[Path], *, allow_dir: bool = False):
     return CampaignAnalysis.from_config_path(
         config_opt,
         allow_dir=allow_dir,
-        usr_root=_CLI_USR_ROOT.get(),
+        usr_root=get_cli_usr_root(),
     )
 
 

@@ -31,8 +31,9 @@ def build_campaign_progress(
     *,
     round_selector: str | None = "latest",
     run_id: str | None = None,
+    usr_root: str | Path | None = None,
 ) -> dict[str, Any]:
-    analysis = CampaignAnalysis.from_config_path(config_path, allow_dir=True)
+    analysis = CampaignAnalysis.from_config_path(config_path, allow_dir=True, usr_root=usr_root)
     cfg = analysis.config
     ws = analysis.workspace
     round_indices = _resolve_progress_rounds(ws, round_selector)
@@ -59,7 +60,10 @@ def build_campaign_progress(
             }
         )
     warnings.extend(_event_contract_warnings(rounds))
-    artifact_garden, stale_artifacts, artifact_warnings = _artifact_garden_progress(analysis.config_path)
+    artifact_garden, stale_artifacts, artifact_warnings = _artifact_garden_progress(
+        analysis.config_path,
+        usr_root=usr_root,
+    )
     warnings.extend(artifact_warnings)
     return {
         "schema_version": PROGRESS_SCHEMA_VERSION,
@@ -288,9 +292,13 @@ def _event_contract_warnings(rounds: list[dict[str, Any]]) -> list[dict[str, Any
     return warnings
 
 
-def _artifact_garden_progress(config_path: Path) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+def _artifact_garden_progress(
+    config_path: Path,
+    *,
+    usr_root: str | Path | None,
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
     try:
-        audit = build_artifact_garden_audit(config_path)
+        audit = build_artifact_garden_audit(config_path, usr_root=usr_root)
     except Exception as exc:
         return (
             {

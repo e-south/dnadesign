@@ -26,6 +26,7 @@ from ...reporting.notebook_set import build_campaign_set_notebook_view_model
 from ..registry import cli_group
 from ..tui import tui_enabled
 from ._common import (
+    get_cli_usr_root,
     internal_error,
     json_error,
     json_out,
@@ -283,7 +284,12 @@ def cmd_notebook_generate(
                     print_stdout("Aborted.")
                 return
 
-        content = render_campaign_notebook(analysis.config_path, round_selector=round_sel, run_id=resolved_run_id)
+        content = render_campaign_notebook(
+            analysis.config_path,
+            round_selector=round_sel,
+            run_id=resolved_run_id,
+            usr_root=get_cli_usr_root(),
+        )
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(content)
         smoke_check_notebook(out_path, run_marimo_check=True)
@@ -412,6 +418,7 @@ def _generate_campaign_set_notebook(
             run_id=None,
             collection_manifest_path=collection,
             collection_visual_index_path=collection_visual_index,
+            usr_root=get_cli_usr_root(),
         )
 
     collection_visual_index_path: Path | None = collection_visual_index
@@ -420,6 +427,7 @@ def _generate_campaign_set_notebook(
             [analysis.config_path for analysis in analyses],
             round_selector=round_sel,
             collection_manifest_path=collection,
+            usr_root=get_cli_usr_root(),
         )
         visual_index = materialize_campaign_set_collection_visuals(
             view_model["campaigns"],
@@ -433,6 +441,7 @@ def _generate_campaign_set_notebook(
         round_selector=round_sel,
         collection_manifest_path=collection,
         collection_visual_index_path=collection_visual_index_path,
+        usr_root=get_cli_usr_root(),
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(content)
@@ -488,7 +497,14 @@ def cmd_notebook_run(
         analysis = load_cli_analysis(config, allow_dir=True)
         nb_path = resolve_notebook_path(analysis, path)
         print_stdout(f"Launching marimo app: {nb_path}")
-        launch_marimo_notebook(mode="run", notebook_path=nb_path, host=host, port=port, headless=headless)
+        launch_marimo_notebook(
+            mode="run",
+            notebook_path=nb_path,
+            host=host,
+            port=port,
+            headless=headless,
+            usr_root=get_cli_usr_root(),
+        )
     except OpalError as e:
         opal_error("notebook.run", e)
         raise typer.Exit(code=e.exit_code)
@@ -521,7 +537,14 @@ def cmd_notebook_edit(
         analysis = load_cli_analysis(config, allow_dir=True)
         nb_path = resolve_notebook_path(analysis, path)
         print_stdout(f"Launching marimo editor: {nb_path}")
-        launch_marimo_notebook(mode="edit", notebook_path=nb_path, host=host, port=port, headless=headless)
+        launch_marimo_notebook(
+            mode="edit",
+            notebook_path=nb_path,
+            host=host,
+            port=port,
+            headless=headless,
+            usr_root=get_cli_usr_root(),
+        )
     except OpalError as e:
         opal_error("notebook.edit", e)
         raise typer.Exit(code=e.exit_code)

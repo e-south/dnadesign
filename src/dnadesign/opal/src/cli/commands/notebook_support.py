@@ -12,10 +12,14 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import importlib.util
+import os
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Optional
+
+from dnadesign.usr import require_explicit_usr_root
 
 from ...analysis.campaign import CampaignAnalysis
 from ...core.pretty import console_out
@@ -171,6 +175,7 @@ def launch_marimo_notebook(
     host: str | None,
     port: int | None,
     headless: bool,
+    usr_root: str | Path | None = None,
 ) -> None:
     """Launch a marimo notebook with a local marimo installation."""
 
@@ -189,7 +194,21 @@ def launch_marimo_notebook(
             headless=headless,
         ),
         check=True,
+        env=marimo_subprocess_environment(usr_root),
     )
+
+
+def marimo_subprocess_environment(
+    usr_root: str | Path | None,
+    *,
+    base_environment: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Bind an explicit USR coordinate into a marimo child process."""
+
+    environment = dict(os.environ if base_environment is None else base_environment)
+    if usr_root is not None:
+        environment["OPAL_NOTEBOOK_USR_ROOT"] = str(require_explicit_usr_root(usr_root))
+    return environment
 
 
 def resolve_notebook_name(name: Optional[str], default_name: str) -> str:
@@ -227,6 +246,7 @@ def parse_notebook_round_selector(round_value: str | None, *, allow_all: bool) -
 __all__ = [
     "format_notebook_choices",
     "launch_marimo_notebook",
+    "marimo_subprocess_environment",
     "list_notebooks",
     "notebook_rows",
     "parse_notebook_round_selector",

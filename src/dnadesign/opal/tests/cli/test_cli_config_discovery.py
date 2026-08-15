@@ -11,12 +11,15 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import yaml
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
+from dnadesign.opal.src.cli.commands.notebook_support import marimo_subprocess_environment
+from dnadesign.opal.src.reporting.notebook_set import build_campaign_set_notebook_view_model
 from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records
 
 
@@ -188,7 +191,7 @@ def test_usr_root_reaches_plot_campaign_analysis(tmp_path: Path) -> None:
 
 
 def test_usr_root_reaches_notebook_campaign_analysis(tmp_path: Path) -> None:
-    operator_root, campaign, _records = _setup_usr_workspace(tmp_path)
+    operator_root, campaign, records = _setup_usr_workspace(tmp_path)
     notebook = tmp_path / "campaign_notebook.py"
 
     result = CliRunner().invoke(
@@ -209,6 +212,35 @@ def test_usr_root_reaches_notebook_campaign_analysis(tmp_path: Path) -> None:
 
     assert result.exit_code == 0, result.output
     assert notebook.is_file()
+    text = notebook.read_text(encoding="utf-8")
+    usr_root_assignment = next(
+        node
+        for node in ast.walk(ast.parse(text))
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "usr_root" for target in node.targets)
+    )
+    assert isinstance(usr_root_assignment.value, ast.Call)
+    assert ast.literal_eval(usr_root_assignment.value.args[0]) == str(operator_root)
+    assert "usr_root=usr_root" in text
+    runtime_model = build_campaign_set_notebook_view_model(
+        [campaign],
+        round_selector="latest",
+        usr_root=operator_root,
+    )
+    assert runtime_model["campaigns"][0]["campaign"]["records_path"] == str(records)
+    assert runtime_model["campaigns"][0]["campaign"]["usr_root"] == str(operator_root)
+
+
+def test_marimo_subprocess_environment_attests_exact_usr_root(tmp_path: Path) -> None:
+    operator_root = tmp_path / "operator-data"
+    operator_root.mkdir()
+
+    environment = marimo_subprocess_environment(operator_root, base_environment={"PATH": "/bin"})
+
+    assert environment == {
+        "PATH": "/bin",
+        "OPAL_NOTEBOOK_USR_ROOT": str(operator_root.resolve()),
+    }
 
 
 def test_init_rejects_unknown_model_plugin(tmp_path: Path) -> None:
