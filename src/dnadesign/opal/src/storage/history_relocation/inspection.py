@@ -334,8 +334,8 @@ def inspect_campaign_history(
 
 
 def _assert_candidate_lineage(runs: list[RunHistory]) -> None:
-    prior: pd.DataFrame | None = None
-    prior_is_full = False
+    known_sequences: dict[str, str] = {}
+    last_full_ids: set[str] | None = None
     for run in sorted(runs, key=lambda item: item.round_index):
         current = prediction_rows_for_run(
             run.prediction_parts,
@@ -347,25 +347,27 @@ def _assert_candidate_lineage(runs: list[RunHistory]) -> None:
         current["sequence"] = current["sequence"].astype(str)
         if current["id"].duplicated().any():
             raise OpalError(f"Round {run.round_index} prediction ledger contains duplicate candidate IDs.")
-        if prior is not None:
-            prior_by_id = prior.set_index("id")["sequence"]
-            current_by_id = current.set_index("id")["sequence"]
-            additions = sorted(set(current_by_id.index) - set(prior_by_id.index))
-            if prior_is_full and additions:
-                raise OpalError(
-                    f"Round {run.round_index} introduces candidate IDs absent from the prior campaign universe "
-                    f"(sample={additions[:5]}).",
-                    ExitCodes.CONTRACT_VIOLATION,
-                )
-            shared = current_by_id.index.intersection(prior_by_id.index)
-            changed = shared[current_by_id.loc[shared].to_numpy() != prior_by_id.loc[shared].to_numpy()].tolist()
-            if changed:
-                raise OpalError(
-                    f"Round {run.round_index} changes candidate sequences for existing IDs (sample={changed[:5]}).",
-                    ExitCodes.CONTRACT_VIOLATION,
-                )
-        prior = current
-        prior_is_full = run.prediction_retention == FULL
+        current_by_id = current.set_index("id")["sequence"].to_dict()
+        additions = sorted(set(current_by_id) - last_full_ids) if last_full_ids is not None else []
+        if additions:
+            raise OpalError(
+                f"Round {run.round_index} introduces candidate IDs absent from the prior campaign universe "
+                f"(sample={additions[:5]}).",
+                ExitCodes.CONTRACT_VIOLATION,
+            )
+        changed = sorted(
+            candidate_id
+            for candidate_id, sequence in current_by_id.items()
+            if candidate_id in known_sequences and known_sequences[candidate_id] != sequence
+        )
+        if changed:
+            raise OpalError(
+                f"Round {run.round_index} changes candidate sequences for existing IDs (sample={changed[:5]}).",
+                ExitCodes.CONTRACT_VIOLATION,
+            )
+        known_sequences.update(current_by_id)
+        if run.prediction_retention == FULL:
+            last_full_ids = set(current_by_id)
 
 
 def plan_history_relocation(
