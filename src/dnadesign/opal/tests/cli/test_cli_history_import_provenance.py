@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 import pandas as pd
@@ -20,6 +21,7 @@ from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
 from dnadesign.opal.src.storage.history_relocation.inspection import inspect_campaign_history
+from dnadesign.opal.src.storage.ledger import compact_runs_ledger
 from dnadesign.opal.src.storage.parquet_io import read_parquet_df
 from dnadesign.opal.tests.cli.test_cli_history_import import _workspace
 
@@ -194,9 +196,16 @@ def test_history_import_preserves_distinct_artifact_receipt_keys_in_both_run_row
     target_receipt = rows.at["run-1", "artifacts"]["analysis/target-only.json"]
     assert source_receipt[0] == hashlib.sha256(source_payload).hexdigest()
     assert target_receipt[0] == hashlib.sha256(target_payload).hexdigest()
+    runs_path = target / "outputs" / "ledger" / "runs.parquet"
+    shutil.copyfile(next(runs_path.glob("*.parquet")), runs_path / "part-duplicate.parquet")
+    assert compact_runs_ledger(runs_path) == {
+        "duplicates_removed": 1,
+        "rows_after": 2,
+        "rows_before": 3,
+    }
     history = inspect_campaign_history(target, label="Relocated campaign")
     assert history.rounds == (0, 1)
-    assert len(list((target / "outputs" / "ledger" / "runs.parquet").glob("*.parquet"))) == 2
+    assert len(list(runs_path.glob("*.parquet"))) == 1
 
 
 def test_history_import_keeps_inspection_fields_out_of_canonical_run_rows(tmp_path: Path) -> None:
