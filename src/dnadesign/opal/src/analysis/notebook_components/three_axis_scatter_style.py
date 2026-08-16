@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 THREE_AXIS_TITLE_FONTSIZE = 23
@@ -34,6 +35,19 @@ SELECTION_COLORS = ("#F59E0B", "#DB2777", "#7C3AED", "#0891B2", "#059669", "#DC2
 SELECTION_SYMBOLS = ("diamond", "square", "x", "cross", "triangle-up", "triangle-down")
 
 
+def selection_marker(index: int) -> dict[str, str]:
+    """Return one distinct categorical marker for a declared selection round."""
+
+    if index < 0 or index >= len(SELECTION_COLORS) * len(SELECTION_SYMBOLS):
+        raise ValueError(
+            f"Three-axis scatter supports at most {len(SELECTION_COLORS) * len(SELECTION_SYMBOLS)} selection rounds."
+        )
+    return {
+        "color": SELECTION_COLORS[index % len(SELECTION_COLORS)],
+        "symbol": SELECTION_SYMBOLS[(index + index // len(SELECTION_COLORS)) % len(SELECTION_SYMBOLS)],
+    }
+
+
 def apply_three_axis_layout(
     figure: Any,
     *,
@@ -49,6 +63,10 @@ def apply_three_axis_layout(
 ) -> Any:
     """Apply the stable publication layout to an interactive three-axis figure."""
 
+    legend_rows = max(1, math.ceil(len(figure.data) / 3))
+    additional_legend_height = max(0, legend_rows - 2) * 34
+    bottom_margin = 84 + additional_legend_height
+    figure_height = 800 + additional_legend_height
     axis_style = {
         "showbackground": True,
         "backgroundcolor": "#FAFAFA",
@@ -110,8 +128,8 @@ def apply_three_axis_layout(
         font={"family": "Arial, Helvetica, sans-serif", "size": THREE_AXIS_BASE_FONTSIZE, "color": "#252525"},
         paper_bgcolor="white",
         plot_bgcolor="white",
-        height=800,
-        margin={"l": 8, "r": 8, "t": 82, "b": 84, "autoexpand": False},
+        height=figure_height,
+        margin={"l": 8, "r": 8, "t": 82, "b": bottom_margin, "autoexpand": False},
         hovermode="closest",
         uirevision=camera_revision,
         meta={
@@ -127,6 +145,7 @@ __all__ = [
     "OBSERVED_COLORS",
     "SELECTION_COLORS",
     "SELECTION_SYMBOLS",
+    "selection_marker",
     "apply_three_axis_layout",
     "THREE_AXIS_AXIS_TITLE_FONTSIZE",
     "THREE_AXIS_BASE_FONTSIZE",

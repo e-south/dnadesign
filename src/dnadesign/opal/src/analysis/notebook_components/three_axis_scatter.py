@@ -110,6 +110,7 @@ def build_notebook_three_axis_scatter_figure(
             raise ValueError(f"Three-axis scatter selection round {round_k} is absent from the contract.")
         index = round_palette_index[round_k]
         round_selected = selected.loc[selected[selection_round_column].astype(int).eq(round_k)]
+        categorical_marker = style.selection_marker(index)
         traces.append(
             _trace(
                 go,
@@ -118,9 +119,9 @@ def build_notebook_three_axis_scatter_figure(
                 name=f"Selected for Round {round_k} (n={len(round_selected):,})",
                 marker={
                     "size": 7.2,
-                    "color": style.SELECTION_COLORS[index % len(style.SELECTION_COLORS)],
+                    "color": categorical_marker["color"],
                     "opacity": 1.0,
-                    "symbol": style.SELECTION_SYMBOLS[index % len(style.SELECTION_SYMBOLS)],
+                    "symbol": categorical_marker["symbol"],
                     "line": {"color": "#111827", "width": 1.5},
                 },
                 showlegend=True,
