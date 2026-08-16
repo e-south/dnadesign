@@ -13,18 +13,20 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from ...core.utils import ExitCodes, OpalError
+from ...core.utils import ExitCodes, OpalError, file_sha256
 from ..parquet_io import read_parquet_df
 from ..state import CampaignState
 from .contracts import CampaignHistory, HistoryRelocationPlan, RunHistory
 
 _RUN_INVARIANT_FIELDS = (
+    "data__x_column_name",
+    "data__y_column_name",
     "x_transform__name",
     "x_transform__params",
     "y_ingest__name",
@@ -100,6 +102,97 @@ def _read_round_context(round_dir: Path) -> dict[str, Any]:
     return payload
 
 
+def _read_run_column_contract(round_dir: Path, *, round_index: int) -> tuple[str, str]:
+    path = round_dir / "logs" / "round.log.jsonl"
+    try:
+        events = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    except (OSError, json.JSONDecodeError) as exc:
+        raise OpalError(f"Invalid round log at {path}: {exc}", ExitCodes.CONTRACT_VIOLATION) from exc
+    starts = [event for event in events if isinstance(event, dict) and event.get("stage") == "start"]
+    if len(starts) != 1:
+        raise OpalError(
+            f"Round {round_index} log must contain exactly one start event with data column identities.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    event = starts[0]
+    data = event.get("data")
+    if int(event.get("round", -1)) != round_index or not isinstance(data, dict):
+        raise OpalError(
+            f"Round {round_index} start event does not match its run identity.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    x_column = str(data.get("x_column") or "").strip()
+    y_column = str(data.get("y_column") or "").strip()
+    if not x_column or not y_column:
+        raise OpalError(
+            f"Round {round_index} start event has no X/Y column identities.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    return x_column, y_column
+
+
+def run_artifact_root(round_dir: Path, *, run_id: str) -> Path:
+    root = round_dir / "run_artifacts"
+    candidates = sorted(path for path in root.iterdir() if path.is_dir()) if root.is_dir() else []
+    matches: list[Path] = []
+    for candidate in candidates:
+        labels_path = candidate / "labels" / "labels_used.parquet"
+        if not labels_path.is_file():
+            continue
+        frame = read_parquet_df(labels_path, columns=["run_id"])
+        if set(frame["run_id"].astype(str).tolist()) == {run_id}:
+            matches.append(candidate)
+    if len(matches) != 1:
+        raise OpalError(f"Round directory must contain one immutable artifact snapshot for run_id={run_id}.")
+    return matches[0].resolve()
+
+
+def _verified_artifact_path(root: Path, *, artifact_key: str) -> Path:
+    key = str(artifact_key)
+    logical = PurePosixPath(key)
+    if (
+        not key
+        or key != key.strip()
+        or logical.is_absolute()
+        or "\\" in key
+        or any(part in {"", ".", ".."} for part in logical.parts)
+    ):
+        raise OpalError(f"Run artifact key must be a canonical relative path: {artifact_key!r}.")
+    path = (root / Path(*logical.parts)).resolve()
+    try:
+        path.relative_to(root)
+    except ValueError as exc:
+        raise OpalError(f"Run artifact path is outside its immutable snapshot: {path}.") from exc
+    return path
+
+
+def _verify_run_artifacts(round_dir: Path, *, run_id: str, artifacts: Any, label: str) -> None:
+    recorded = jsonable(artifacts)
+    if not isinstance(recorded, dict) or not recorded:
+        raise OpalError(f"{label} run metadata has no immutable artifact receipts.", ExitCodes.CONTRACT_VIOLATION)
+    artifact_root = run_artifact_root(round_dir, run_id=run_id)
+    for artifact_key, receipt in recorded.items():
+        if not isinstance(receipt, list) or len(receipt) != 2:
+            raise OpalError(
+                f"{label} artifact receipt is invalid for {artifact_key!r}.",
+                ExitCodes.CONTRACT_VIOLATION,
+            )
+        expected_sha256 = str(receipt[0])
+        artifact_path = _verified_artifact_path(artifact_root, artifact_key=str(artifact_key))
+        if not artifact_path.is_file():
+            raise OpalError(
+                f"{label} immutable artifact is missing for {artifact_key!r}.",
+                ExitCodes.CONTRACT_VIOLATION,
+            )
+        observed_sha256 = file_sha256(artifact_path)
+        if observed_sha256 != expected_sha256:
+            raise OpalError(
+                f"{label} artifact digest differs from run metadata for {artifact_key!r}: "
+                f"expected={expected_sha256}, observed={observed_sha256}.",
+                ExitCodes.CONTRACT_VIOLATION,
+            )
+
+
 def inspect_campaign_history(workdir: Path, *, label: str) -> CampaignHistory:
     root = _canonical_root(workdir, label=label)
     outputs = root / "outputs"
@@ -143,6 +236,12 @@ def inspect_campaign_history(workdir: Path, *, label: str) -> CampaignHistory:
         round_dir = outputs / "rounds" / f"round_{round_index}"
         if not round_dir.is_dir():
             raise OpalError(f"{label} round directory not found: {round_dir}", ExitCodes.CONTRACT_VIOLATION)
+        _verify_run_artifacts(
+            round_dir,
+            run_id=run_id,
+            artifacts=run_row.get("artifacts"),
+            label=f"{label} round {round_index}",
+        )
         context = _read_round_context(round_dir)
         context_slug = str(context.get("core/campaign_slug") or "").strip()
         if not context_slug:
@@ -156,6 +255,9 @@ def inspect_campaign_history(workdir: Path, *, label: str) -> CampaignHistory:
                 f"{label} round {round_index} context does not match its ledger identity.",
                 ExitCodes.CONTRACT_VIOLATION,
             )
+        x_column_name, y_column_name = _read_run_column_contract(round_dir, round_index=round_index)
+        run_row["data__x_column_name"] = x_column_name
+        run_row["data__y_column_name"] = y_column_name
         invariant = {field: run_row.get(field) for field in _RUN_INVARIANT_FIELDS}
         runs.append(
             RunHistory(

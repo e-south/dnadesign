@@ -22,7 +22,7 @@ from ...config.types import RootConfig
 from ...core.utils import OpalError, file_sha256
 from ..state import BACKLOG_COUNT_KEY, CampaignState, RoundEntry
 from .contracts import HistoryRelocationPlan, RunHistory
-from .inspection import canonical_sha256, jsonable
+from .inspection import canonical_sha256, jsonable, run_artifact_root
 
 
 def _definitions(value: Any, *, field: str) -> list[dict[str, Any]]:
@@ -53,6 +53,10 @@ def require_target_config_matches_run_history(plan: HistoryRelocationPlan, cfg: 
     run_x_name = str(run.run_row.get("x_transform__name") or "")
     run_y_name = str(run.run_row.get("y_ingest__name") or "")
     run_contract = {
+        "columns": {
+            "x": str(run.run_row.get("data__x_column_name") or ""),
+            "y": str(run.run_row.get("data__y_column_name") or ""),
+        },
         "x_transform": {
             "name": run_x_name,
             "params": _validated_plugin_params(
@@ -72,6 +76,10 @@ def require_target_config_matches_run_history(plan: HistoryRelocationPlan, cfg: 
         "objectives": run_objectives,
     }
     config_contract = {
+        "columns": {
+            "x": cfg.data.x_column_name,
+            "y": cfg.data.y_column_name,
+        },
         "x_transform": {
             "name": cfg.data.transforms_x.name,
             "params": dict(cfg.data.transforms_x.params),
@@ -93,24 +101,6 @@ def require_target_config_matches_run_history(plan: HistoryRelocationPlan, cfg: 
         raise OpalError("Target campaign config differs from the verified run history X/Y/objective contract.")
 
 
-def _run_artifact_root(run: RunHistory) -> Path:
-    root = run.round_dir / "run_artifacts"
-    candidates = sorted(path for path in root.iterdir() if path.is_dir()) if root.is_dir() else []
-    matches: list[Path] = []
-    for candidate in candidates:
-        labels_path = candidate / "labels" / "labels_used.parquet"
-        if not labels_path.is_file():
-            continue
-        frame = pd.read_parquet(labels_path, columns=["run_id"])
-        if set(frame["run_id"].astype(str).tolist()) == {run.run_id}:
-            matches.append(candidate)
-    if len(matches) != 1:
-        raise OpalError(
-            f"Round {run.round_index} must contain one immutable artifact snapshot for run_id={run.run_id}."
-        )
-    return matches[0]
-
-
 def _state_entry(plan: HistoryRelocationPlan, *, round_index: int) -> RoundEntry | None:
     for history in (plan.source, plan.target):
         if history.state is None:
@@ -125,7 +115,7 @@ def _round_entry(plan: HistoryRelocationPlan, run: RunHistory) -> RoundEntry:
     row = run.run_row
     context = run.round_context
     target_round_dir = plan.target.workdir / "outputs" / "rounds" / f"round_{run.round_index}"
-    source_artifact_root = _run_artifact_root(run)
+    source_artifact_root = run_artifact_root(run.round_dir, run_id=run.run_id)
     target_artifact_root = target_round_dir / "run_artifacts" / source_artifact_root.name
     labels_used = pd.read_parquet(source_artifact_root / "labels" / "labels_used.parquet")
     labels_used_rounds = sorted({int(value) for value in labels_used["observed_round"].tolist()})
@@ -230,7 +220,7 @@ def _pending_selection_count(plan: HistoryRelocationPlan) -> int:
         batch = pd.read_parquet(run.round_dir / "selection" / "selection_batch.parquet", columns=["id"])
         selected_ids.update(batch["id"].astype(str).tolist())
     latest = all_runs[-1]
-    artifact_root = _run_artifact_root(latest)
+    artifact_root = run_artifact_root(latest.round_dir, run_id=latest.run_id)
     observed = pd.read_parquet(artifact_root / "labels" / "observed_events.parquet", columns=["id"])
     return len(selected_ids - set(observed["id"].astype(str).tolist()))
 
