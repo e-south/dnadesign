@@ -68,6 +68,23 @@ def _apply_selected_history_retention(campaign: Path) -> None:
     apply_runtime_artifact_retention(cfg, CampaignWorkspace.from_config(cfg, campaign))
 
 
+def _apply_audit_full_retention_with_selected_history_policy(campaign: Path) -> None:
+    payload = yaml.safe_load(campaign.read_text(encoding="utf-8"))
+    payload["artifact_retention"] = {
+        "mode": "audit_full",
+        "prediction_ledger": "selected_history_only",
+        "plot_tidy_data": "full",
+        "model_artifacts": "all",
+        "tabular_format": "parquet",
+        "max_estimated_bytes": 1_000_000,
+        "fail_if_estimate_exceeds": True,
+        "final_round": None,
+    }
+    campaign.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    cfg = load_config(campaign)
+    apply_runtime_artifact_retention(cfg, CampaignWorkspace.from_config(cfg, campaign))
+
+
 def _add_artifact_receipt(workdir: Path, *, round_index: int, run_id: str, key: str) -> bytes:
     payload = f"{run_id}:{key}".encode()
     artifact = workdir / "outputs" / "rounds" / f"round_{round_index}" / "run_artifacts" / run_id / key
@@ -279,6 +296,46 @@ def test_history_import_accepts_retention_selected_prediction_history(tmp_path: 
         (1, "selected_history"),
         (2, "full"),
     ]
+
+
+def test_history_import_treats_audit_full_prediction_history_as_full(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source_campaign, _ = _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    _apply_audit_full_retention_with_selected_history_policy(source_campaign)
+    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=False)
+
+    result = _invoke_import(source, target_campaign)
+
+    assert result.exit_code == 0, result.output
+    history = inspect_campaign_history(target, label="Relocated campaign")
+    assert [(run.round_index, run.prediction_retention) for run in history.runs] == [
+        (0, "full"),
+        (1, "full"),
+    ]
+
+
+def test_history_import_rejects_selected_history_that_disagrees_with_selection_artifact(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source_campaign, _ = _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    _apply_selected_history_retention(source_campaign)
+    selection = source / "outputs/rounds/round_0/run_artifacts/run-0/selection/selections.parquet"
+    frame = read_parquet_df(selection)
+    frame.loc[:, "id"] = "b"
+    frame.to_parquet(selection, index=False)
+    run_part = next((source / "outputs/ledger/runs.parquet").glob("*.parquet"))
+    run_frame = read_parquet_df(run_part)
+    receipts = dict(run_frame.at[0, "artifacts"])
+    receipts["selection/selections.parquet"] = (_sha256(selection), str(selection.resolve()))
+    run_frame.at[0, "artifacts"] = receipts
+    run_frame.to_parquet(run_part, index=False)
+    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=False)
+
+    result = _invoke_import(source, target_campaign)
+
+    assert result.exit_code == 4
+    assert "retained prediction memberships differ from immutable selections" in result.output.lower()
 
 
 def test_history_import_preserves_round_scoped_mixed_retention(tmp_path: Path) -> None:

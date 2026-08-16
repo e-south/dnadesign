@@ -246,7 +246,7 @@ def inspect_campaign_history(
             (item[0] for item in prediction_parts[round_index]),
             round_index=round_index,
             run_id=run_id,
-            columns=("pred__selection_views",),
+            columns=("id", "pred__selection_views"),
         )
         predicted_rows = len(prediction_frame)
         expected_rows = int(run_row["stats__n_scored"])
@@ -257,12 +257,6 @@ def inspect_campaign_history(
             raise OpalError(f"{label} round {round_index} retention scored rows differ from the run ledger.")
         if retention.retained_rows_by_round.get(round_index, predicted_rows) != predicted_rows:
             raise OpalError(f"{label} round {round_index} retention rows differ from the prediction ledger.")
-        validate_prediction_retention(
-            prediction_frame,
-            expected_scored_rows=expected_rows,
-            mode=retention_mode,
-            label=f"{label} round {round_index}",
-        )
         round_dir = outputs / "rounds" / f"round_{round_index}"
         if not round_dir.is_dir():
             raise OpalError(f"{label} round directory not found: {round_dir}", ExitCodes.CONTRACT_VIOLATION)
@@ -273,6 +267,13 @@ def inspect_campaign_history(
             label=f"{label} round {round_index}",
         )
         artifact_root = run_artifact_root(round_dir, run_id=run_id)
+        validate_prediction_retention(
+            prediction_frame,
+            expected_scored_rows=expected_rows,
+            mode=retention_mode,
+            label=f"{label} round {round_index}",
+            selections=read_parquet_df(artifact_root / "selection" / "selections.parquet"),
+        )
         round_context_path = artifact_root / "metadata" / "round_ctx.json"
         context = _read_round_context(artifact_root)
         context_slug = str(context.get("core/campaign_slug") or "").strip()

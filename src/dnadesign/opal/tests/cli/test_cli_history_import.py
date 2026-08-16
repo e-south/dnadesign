@@ -114,7 +114,7 @@ def _write_round(workdir: Path, *, round_index: int, run_id: str) -> None:
             "selection_view_id": ["primary"],
             "selection_name": ["top_n"],
             "objective_name": ["sfxi_v1"],
-            "id": [f"selected-{round_index}"],
+            "id": ["a"],
             "score_ref": ["primary/sfxi"],
         }
     )
@@ -126,7 +126,7 @@ def _write_round(workdir: Path, *, round_index: int, run_id: str) -> None:
             "run_id": [run_id],
             "as_of_round": [round_index],
             "campaign_slug": ["demo"],
-            "id": [f"selected-{round_index}"],
+            "id": ["a"],
             "deduplicate_by": ["id"],
             "allocation_view_id": ["primary"],
         }
