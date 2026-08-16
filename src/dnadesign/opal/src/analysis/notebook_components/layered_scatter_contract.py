@@ -123,7 +123,7 @@ def build_notebook_layered_scatter_contract(choice: Mapping[str, Any]) -> dict[s
         extent=shared_display["color_extent"],
         context=(
             shared_display["color_contexts"][0]
-            if len(shared_display["color_contexts"]) == 1
+            if len(round_options) == 1
             else "shared across loaded rounds; endpoint values remain in the plotted data"
         ),
         extend=shared_colorbar_extend(
