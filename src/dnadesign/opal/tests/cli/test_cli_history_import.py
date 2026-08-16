@@ -417,7 +417,7 @@ def test_history_import_consolidates_the_append_only_label_ledger(tmp_path: Path
     label_paths = {
         entry["path"] for entry in receipt["canonical_files"] if "outputs/ledger/labels.parquet/" in entry["path"]
     }
-    assert len(label_paths) == 2
+    assert label_paths == {"outputs/ledger/labels.parquet/part-history-consolidated.parquet"}
 
 
 def test_history_import_merges_identical_label_event_keys_once(tmp_path: Path) -> None:

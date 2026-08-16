@@ -172,7 +172,12 @@ def _stage_history(
     staged_runs, run_transformations = stage_canonical_run_ledger(plan, staging_root=staging_root)
     transformations.extend(run_transformations)
     staged_replacements.append((staged_runs, plan.target.workdir / "outputs" / "ledger" / "runs.parquet"))
-    staged_destinations.extend(stage_label_ledger(plan, staging_root=staging_root))
+    staged_labels = stage_label_ledger(plan, staging_root=staging_root)
+    if staged_labels is not None:
+        if staged_labels[1].exists():
+            staged_replacements.append(staged_labels)
+        else:
+            staged_destinations.append(staged_labels)
     state = build_canonical_state(plan, cfg=cfg, records_path=records_path)
     staged_state = staging_root / "state.json"
     staged_state.write_text(
@@ -189,7 +194,9 @@ def _stage_history(
         [
             entry
             for entry in existing_target_entries
-            if entry["path"] != "state.json" and not str(entry["path"]).startswith("outputs/ledger/runs.parquet/")
+            if entry["path"] != "state.json"
+            and not str(entry["path"]).startswith("outputs/ledger/runs.parquet/")
+            and not (staged_labels is not None and str(entry["path"]).startswith("outputs/ledger/labels.parquet/"))
         ]
         + imported_target_entries
         + [_file_entry(staged_state, root=staging_root)]
