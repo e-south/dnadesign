@@ -19,6 +19,7 @@ import pandas as pd
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
+from dnadesign.opal.src.storage.history_relocation.inspection import inspect_campaign_history
 from dnadesign.opal.src.storage.parquet_io import read_parquet_df
 from dnadesign.opal.tests.cli.test_cli_history_import import _workspace
 
@@ -56,6 +57,29 @@ def _add_artifact_receipt(workdir: Path, *, round_index: int, run_id: str, key: 
     frame.at[0, "artifacts"] = receipts
     frame.to_parquet(run_part, index=False)
     return payload
+
+
+def _remove_embedded_columns(workdir: Path, *, round_index: int, run_id: str) -> dict[str, object]:
+    round_dir = workdir / "outputs" / "rounds" / f"round_{round_index}"
+    mirror = round_dir / "metadata" / "round_ctx.json"
+    snapshot = round_dir / "run_artifacts" / run_id / "metadata" / "round_ctx.json"
+    context = json.loads(snapshot.read_text(encoding="utf-8"))
+    context.pop("core/data/x_column_name")
+    context.pop("core/data/y_column_name")
+    payload = json.dumps(context, sort_keys=True).encode()
+    mirror.write_bytes(payload)
+    snapshot.write_bytes(payload)
+    run_part = next((workdir / "outputs" / "ledger" / "runs.parquet").glob("*.parquet"))
+    frame = read_parquet_df(run_part)
+    receipts = dict(frame.at[0, "artifacts"])
+    receipts["metadata/round_ctx.json"] = (_sha256(snapshot), str(mirror.resolve()))
+    frame.at[0, "artifacts"] = receipts
+    frame.to_parquet(run_part, index=False)
+    return {
+        "round_index": round_index,
+        "run_id": run_id,
+        "round_context_sha256": _sha256(snapshot),
+    }
 
 
 def test_history_import_reconstructs_mutable_round_mirrors_from_the_verified_snapshot(tmp_path: Path) -> None:
@@ -98,6 +122,52 @@ def test_history_import_reads_x_and_y_identity_from_the_verified_snapshot(tmp_pa
     assert result.exit_code == 0, result.output
 
 
+def test_history_import_uses_an_explicit_contract_for_pre_column_identity_snapshots(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=False)
+    evidence = [
+        _remove_embedded_columns(source, round_index=0, run_id="run-0"),
+        _remove_embedded_columns(target, round_index=1, run_id="run-1"),
+    ]
+    contract = tmp_path / "history-column-contract.json"
+    contract.write_text(
+        json.dumps(
+            {
+                "schema_version": "opal.history_column_contract.v1",
+                "campaign_slug": "demo",
+                "x_column_name": "X",
+                "y_column_name": "Y",
+                "rounds": evidence,
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "history",
+            "import",
+            "-c",
+            str(target_campaign),
+            "--source-workdir",
+            str(source),
+            "--column-contract",
+            str(contract),
+            "--apply",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    receipt = json.loads(Path(json.loads(result.output)["receipt_path"]).read_text(encoding="utf-8"))
+    assert receipt["column_contract_sha256"] == _sha256(contract)
+
+
 def test_history_import_preserves_distinct_artifact_receipt_keys_in_both_run_rows(tmp_path: Path) -> None:
     source = tmp_path / "source"
     target = tmp_path / "target"
@@ -124,3 +194,6 @@ def test_history_import_preserves_distinct_artifact_receipt_keys_in_both_run_row
     target_receipt = rows.at["run-1", "artifacts"]["analysis/target-only.json"]
     assert source_receipt[0] == hashlib.sha256(source_payload).hexdigest()
     assert target_receipt[0] == hashlib.sha256(target_payload).hexdigest()
+    history = inspect_campaign_history(target, label="Relocated campaign")
+    assert history.rounds == (0, 1)
+    assert len(list((target / "outputs" / "ledger" / "runs.parquet").glob("*.parquet"))) == 2

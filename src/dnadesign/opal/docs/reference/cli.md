@@ -31,6 +31,17 @@ The root must name an absolute, existing directory that is not a symbolic link.
 Use the same coordinate for validation and round execution so candidate, label,
 and writeback paths cannot drift between commands.
 
+Campaign snapshots that predate embedded X/Y column identities require an
+explicit, digest-receipted migration contract during `history import`:
+
+```bash
+opal history import --config <campaign-yaml> --source-workdir <prior-runtime> \
+  --column-contract <history-column-contract.json>
+```
+
+The contract binds the campaign, X/Y columns, and exact immutable round-context
+digests. OPAL does not infer these identities from mutable logs.
+
 ### Command overview
 
 Each command has one operational purpose. Usage blocks show required arguments;

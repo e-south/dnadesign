@@ -55,18 +55,20 @@ def stage_canonical_run_ledger(
     frame = frame.sort_values(["as_of_round", "run_id"], kind="stable").reset_index(drop=True)
     output_dir = staging_root / "outputs" / "ledger" / "runs.parquet"
     output_dir.mkdir(parents=True, exist_ok=True)
-    output = output_dir / f"part-history-r{runs[0].round_index}-r{runs[-1].round_index}.parquet"
-    write_parquet_table(output, table_from_pandas(frame))
-    transformations = [
-        {
-            "path": run.run_part.relative_to(
-                plan.source.workdir if run.round_index in plan.source.rounds else plan.target.workdir
-            ).as_posix(),
-            "target_path": output.relative_to(staging_root).as_posix(),
-            "kind": "run_ledger_schema_union",
-            "source_sha256": file_sha256(run.run_part),
-            "target_sha256": file_sha256(output),
-        }
-        for run in runs
-    ]
+    schema = table_from_pandas(frame).schema
+    transformations: list[dict[str, object]] = []
+    for index, run in enumerate(runs):
+        output = output_dir / f"part-history-r{run.round_index}-{file_sha256(run.run_part)[:16]}.parquet"
+        write_parquet_table(output, table_from_pandas(frame.iloc[[index]], schema=schema))
+        transformations.append(
+            {
+                "path": run.run_part.relative_to(
+                    plan.source.workdir if run.round_index in plan.source.rounds else plan.target.workdir
+                ).as_posix(),
+                "target_path": output.relative_to(staging_root).as_posix(),
+                "kind": "run_ledger_schema_union",
+                "source_sha256": file_sha256(run.run_part),
+                "target_sha256": file_sha256(output),
+            }
+        )
     return output_dir, transformations

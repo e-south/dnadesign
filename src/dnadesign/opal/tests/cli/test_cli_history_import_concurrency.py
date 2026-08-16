@@ -123,3 +123,46 @@ def test_history_import_rolls_back_to_the_state_seen_under_lock(
     assert json.loads(state_path.read_text(encoding="utf-8"))["updated_at"] == concurrent_state["updated_at"]
     assert _tree_digest(runs_path) == runs_before
     assert not (target / "outputs" / "rounds" / "round_0").exists()
+
+
+def test_history_import_rolls_back_the_run_ledger_when_the_operator_interrupts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=True)
+    runs_path = target / "outputs" / "ledger" / "runs.parquet"
+    runs_before = _tree_digest(runs_path)
+
+    from dnadesign.opal.src.storage.history_relocation import materialization
+
+    replace = materialization.os.replace
+    imported_round = target / "outputs" / "rounds" / "round_0"
+
+    def replace_then_interrupt(source_path, target_path):
+        if Path(target_path) == imported_round:
+            raise KeyboardInterrupt
+        return replace(source_path, target_path)
+
+    monkeypatch.setattr(materialization.os, "replace", replace_then_interrupt)
+
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "history",
+            "import",
+            "-c",
+            str(target_campaign),
+            "--source-workdir",
+            str(source),
+            "--apply",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 130
+    assert _tree_digest(runs_path) == runs_before
+    assert not imported_round.exists()

@@ -114,7 +114,9 @@ def _stage_verified_round(*, run, staging_root: Path) -> Path:
         staged_round / "run_artifacts" / artifact_root.name,
         copy_function=shutil.copy2,
     )
-    for artifact_key in jsonable(run.run_row["artifacts"]):
+    for artifact_key, receipt in jsonable(run.run_row["artifacts"]).items():
+        if receipt is None:
+            continue
         if not str(artifact_key).startswith(("metadata/", "model/", "selection/")):
             continue
         source = verified_artifact_path(artifact_root, artifact_key=str(artifact_key))
@@ -200,6 +202,7 @@ def _stage_history(
         "existing_rounds": list(plan.existing_rounds),
         "canonical_rounds": list(plan.canonical_rounds),
         "run_invariant_sha256": plan.invariant_sha256,
+        "column_contract_sha256": (None if plan.column_contract is None else plan.column_contract.sha256),
         "imported_source_history_sha256": canonical_sha256(imported_source_entries),
         "existing_target_history_sha256": canonical_sha256(existing_target_entries),
         "canonical_history_sha256": canonical_sha256(canonical_entries),
@@ -249,6 +252,7 @@ def apply_history_relocation(
                 source_workdir=plan.source.workdir,
                 target_workdir=plan.target.workdir,
                 expected_slug=plan.campaign_slug,
+                column_contract=plan.column_contract,
             )
             if current.canonical_rounds != plan.canonical_rounds or current.invariant_sha256 != plan.invariant_sha256:
                 raise OpalError("Campaign history changed before relocation apply.")
@@ -278,7 +282,7 @@ def apply_history_relocation(
                     target_path.parent.mkdir(parents=True, exist_ok=True)
                     os.replace(staged_path, target_path)
                     created.append(target_path)
-            except Exception:
+            except BaseException:
                 for path in reversed(created):
                     if path.is_dir():
                         shutil.rmtree(path)

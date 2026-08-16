@@ -17,6 +17,7 @@ from typing import Optional
 import typer
 
 from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...storage.history_relocation.column_contract import load_history_column_contract
 from ...storage.history_relocation.inspection import plan_history_relocation
 from ...storage.history_relocation.materialization import apply_history_relocation
 from ...storage.history_relocation.state_projection import require_target_config_matches_run_history
@@ -40,6 +41,13 @@ cli_group("history", help="Inspect and relocate one campaign history.")(history_
 def history_import(
     config: Optional[Path] = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG", help="Target campaign.yaml."),
     source_workdir: Path = typer.Option(..., "--source-workdir", file_okay=False, dir_okay=True),
+    column_contract: Optional[Path] = typer.Option(
+        None,
+        "--column-contract",
+        file_okay=True,
+        dir_okay=False,
+        help="Explicit X/Y identity evidence for snapshots that predate embedded column identities.",
+    ),
     apply: bool = typer.Option(False, "--apply", help="Apply the verified relocation plan."),
     json: bool = typer.Option(False, "--json/--text", help="Output format."),
 ) -> None:
@@ -47,10 +55,12 @@ def history_import(
         cfg_path = resolve_config_path(config)
         cfg = load_cli_config(cfg_path)
         target_workdir = Path(cfg.campaign.workdir)
+        loaded_column_contract = None if column_contract is None else load_history_column_contract(column_contract)
         plan = plan_history_relocation(
             source_workdir=source_workdir,
             target_workdir=target_workdir,
             expected_slug=cfg.campaign.slug,
+            column_contract=loaded_column_contract,
         )
         require_target_config_matches_run_history(plan, cfg)
         payload: dict[str, object] = {

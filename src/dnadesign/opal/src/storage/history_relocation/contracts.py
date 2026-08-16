@@ -31,6 +31,22 @@ class RunHistory:
 
 
 @dataclass(frozen=True)
+class RoundColumnEvidence:
+    round_index: int
+    run_id: str
+    round_context_sha256: str
+
+
+@dataclass(frozen=True)
+class HistoryColumnContract:
+    campaign_slug: str
+    x_column_name: str
+    y_column_name: str
+    rounds: tuple[RoundColumnEvidence, ...]
+    sha256: str
+
+
+@dataclass(frozen=True)
 class CampaignHistory:
     workdir: Path
     campaign_slug: str
@@ -49,6 +65,7 @@ class HistoryRelocationPlan:
     campaign_slug: str
     canonical_rounds: tuple[int, ...]
     invariant_sha256: str
+    column_contract: HistoryColumnContract | None
 
     @property
     def imported_rounds(self) -> tuple[int, ...]:
