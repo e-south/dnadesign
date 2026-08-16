@@ -174,14 +174,19 @@ def validate_prediction_retention(
 def _prediction_memberships(frame: pd.DataFrame, *, label: str) -> set[tuple[str, str]]:
     if "id" not in frame:
         raise OpalError(f"{label} selected prediction history is missing candidate IDs.")
-    memberships: set[tuple[str, str]] = set()
+    memberships: list[tuple[str, str]] = []
     for candidate_id, payload in zip(frame["id"], frame["pred__selection_views"], strict=True):
         if hasattr(payload, "tolist"):
             payload = payload.tolist()
         for item in payload:
             if bool(item["is_selected"]):
-                memberships.add((str(candidate_id), str(item["selection_view_id"])))
-    return memberships
+                memberships.append((str(candidate_id), str(item["selection_view_id"])))
+    if len(memberships) != len(set(memberships)):
+        raise OpalError(
+            f"{label} retained prediction memberships must be unique.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+    return set(memberships)
 
 
 def _selection_memberships(frame: pd.DataFrame, *, label: str) -> set[tuple[str, str]]:
@@ -190,10 +195,10 @@ def _selection_memberships(frame: pd.DataFrame, *, label: str) -> set[tuple[str,
     if missing:
         raise OpalError(f"{label} immutable selections are missing columns: {missing}.")
     pairs = [
-        (str(candidate_id).strip(), str(view_id).strip())
+        (str(candidate_id), str(view_id))
         for candidate_id, view_id in frame[["id", "selection_view_id"]].itertuples(index=False, name=None)
     ]
-    if any(not candidate_id or not view_id for candidate_id, view_id in pairs):
+    if any(not candidate_id.strip() or not view_id.strip() for candidate_id, view_id in pairs):
         raise OpalError(f"{label} immutable selection memberships cannot be blank.")
     if len(pairs) != len(set(pairs)):
         raise OpalError(f"{label} immutable selection memberships must be unique.")
