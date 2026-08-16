@@ -261,12 +261,17 @@ def test_three_axis_widget_uses_marimo_plotly_happy_path() -> None:
 
     captured: dict[str, object] = {}
 
+    class _PlotlyWidget(SimpleNamespace):
+        def style(self, style):
+            captured["style"] = style
+            return SimpleNamespace(points=self.points, style=style)
+
     class _Ui:
         @staticmethod
         def plotly(figure, **kwargs):
             captured["figure"] = figure
             captured["kwargs"] = kwargs
-            return SimpleNamespace(points=[])
+            return _PlotlyWidget(points=[])
 
     class _Mo:
         ui = _Ui()
@@ -289,15 +294,20 @@ def test_three_axis_widget_uses_marimo_plotly_happy_path() -> None:
         mo=_Mo(),
     )
 
-    assert widget["items"][0].points == []
-    assert widget["items"][1]["kind"] == "html"
-    assert "plotly_relayout" in widget["items"][1]["text"]
-    assert "scene.camera" in widget["items"][1]["text"]
-    restore_position = widget["items"][1]["text"].index("if (saved && !cameraMatches")
-    binding_position = widget["items"][1]["text"].index("if (plot.dataset.opalCameraRevision")
+    assert widget["items"][0]["kind"] == "html"
+    assert widget["items"][1].points == []
+    assert captured["style"] == {"width": "min(100%, 900px)", "margin": "0 auto"}
+    assert "MutationObserver" in widget["items"][0]["text"]
+    assert "observer.disconnect()" in widget["items"][0]["text"]
+    assert 'plot.on?.("plotly_beforeplot"' in widget["items"][0]["text"]
+    assert 'plot.style.visibility = "hidden"' in widget["items"][0]["text"]
+    assert "plotly_relayout" in widget["items"][0]["text"]
+    assert "scene.camera" in widget["items"][0]["text"]
+    restore_position = widget["items"][0]["text"].index("if (saved && !cameraMatches")
+    binding_position = widget["items"][0]["text"].index("if (plot.dataset.opalCameraRevision")
     assert restore_position < binding_position
-    assert widget["items"][1]["width"] == "0"
-    assert widget["items"][1]["height"] == "0"
+    assert widget["items"][0]["width"] == "0"
+    assert widget["items"][0]["height"] == "0"
     assert "deterministic SHA-256-ID sample" in widget["items"][2]["text"]
     assert "rendering error" not in widget["items"][2]["text"]
     assert captured["figure"].data[0].type == "scatter3d"

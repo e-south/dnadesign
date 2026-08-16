@@ -228,6 +228,41 @@ def test_selection_view_performance_keeps_long_view_labels_inside_the_canvas(
     close_figure(figure)
 
 
+def test_selection_view_performance_wraps_unbroken_view_identifiers_inside_the_canvas(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    matplotlib = importlib.import_module("matplotlib")
+    pyplot = importlib.import_module("matplotlib.pyplot")
+    close_figure = pyplot.close
+    closed_figures: list[Figure] = []
+    monkeypatch.setattr(pyplot, "close", closed_figures.append)
+    monkeypatch.setitem(matplotlib.rcParams, "axes.titleweight", "semibold")
+    view_labels = {
+        "ethanol": "ethanol_response_program_with_delayed_evidence_and_no_breaks",
+        "ciprofloxacin": "ciprofloxacin_response_program_with_complete_evidence_no_breaks",
+    }
+
+    render_selection_view_performance(
+        _observations(),
+        output_path=tmp_path / "unbroken-labels.svg",
+        objective_value_label="Observed assay score",
+        view_labels=view_labels,
+    )
+
+    figure = closed_figures[0]
+    figure.canvas.draw()
+    renderer = figure.canvas.get_renderer()
+    bounds = [
+        text.get_window_extent(renderer=renderer)
+        for axis in figure.axes
+        for text in (*axis.get_yticklabels(), axis.title)
+    ]
+    assert min(box.x0 for box in bounds) >= figure.bbox.x0
+    assert max(box.x1 for box in bounds) <= figure.bbox.x1
+    close_figure(figure)
+
+
 def test_selection_view_performance_keeps_a_fixed_physical_header_band_across_round_counts(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 from ...plots._mpl_utils import NOTEBOOK_ANNOTATION_FONTSIZE
+from .selection_round_encoding import selection_round_palette_index
 
 
 def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, Any]):
@@ -87,6 +88,7 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
     pool = rows.loc[kinds.eq(prediction_value) & selection_rounds.isna()] if show_pool else rows.iloc[0:0]
     selected = rows.loc[kinds.eq(prediction_value) & selection_rounds.notna()] if show_selected else rows.iloc[0:0]
     observed = rows.loc[kinds.eq(observed_value)]
+    round_palette_index = selection_round_palette_index(contract)
     if not pool.empty:
         scatter_smart(
             ax,
@@ -102,7 +104,10 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
             zorder=2,
         )
     selection_markers = ("D", "P", "X", "s", "^", "v", "<", ">")
-    for index, round_k in enumerate(sorted(selected[selection_round_column].astype(int).unique())):
+    for round_k in sorted(selected[selection_round_column].astype(int).unique()):
+        if round_k not in round_palette_index:
+            raise ValueError(f"Layered-scatter selection round {round_k} is absent from the contract.")
+        index = round_palette_index[round_k]
         round_selected = selected.loc[selected[selection_round_column].astype(int).eq(round_k)]
         ax.scatter(
             round_selected[x_column],
