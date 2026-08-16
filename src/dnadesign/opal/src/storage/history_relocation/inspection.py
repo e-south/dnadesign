@@ -68,16 +68,15 @@ def _canonical_root(path: Path, *, label: str) -> Path:
     return resolved
 
 
-def _part_identity(path: Path, *, label: str) -> tuple[int, str, int]:
+def _part_identities(path: Path, *, label: str) -> list[tuple[int, str, int]]:
     frame = read_parquet_df(path, columns=["as_of_round", "run_id"])
-    rounds = sorted({int(value) for value in frame["as_of_round"].tolist()})
-    run_ids = sorted({str(value) for value in frame["run_id"].tolist()})
-    if len(rounds) != 1 or len(run_ids) != 1:
-        raise OpalError(
-            f"{label} part must contain exactly one run and round: {path}",
-            ExitCodes.CONTRACT_VIOLATION,
-        )
-    return rounds[0], run_ids[0], len(frame)
+    if frame.empty:
+        raise OpalError(f"{label} part is empty: {path}", ExitCodes.CONTRACT_VIOLATION)
+    counts: dict[tuple[int, str], int] = {}
+    for round_value, run_value in zip(frame["as_of_round"], frame["run_id"], strict=True):
+        identity = (int(round_value), str(run_value))
+        counts[identity] = counts.get(identity, 0) + 1
+    return [(round_index, run_id, counts[(round_index, run_id)]) for round_index, run_id in sorted(counts)]
 
 
 def _parts_by_round(root: Path, *, label: str) -> dict[int, list[tuple[Path, str, int]]]:
@@ -85,8 +84,8 @@ def _parts_by_round(root: Path, *, label: str) -> dict[int, list[tuple[Path, str
         raise OpalError(f"{label} dataset not found: {root}", ExitCodes.CONTRACT_VIOLATION)
     result: dict[int, list[tuple[Path, str, int]]] = {}
     for path in sorted(root.rglob("*.parquet")):
-        round_index, run_id, row_count = _part_identity(path, label=label)
-        result.setdefault(round_index, []).append((path, run_id, row_count))
+        for round_index, run_id, row_count in _part_identities(path, label=label):
+            result.setdefault(round_index, []).append((path, run_id, row_count))
     if not result:
         raise OpalError(f"{label} dataset is empty: {root}", ExitCodes.CONTRACT_VIOLATION)
     return result
@@ -230,7 +229,16 @@ def inspect_campaign_history(
                     f"{label} round {round_index} run_id differs between run and prediction ledgers.",
                     ExitCodes.CONTRACT_VIOLATION,
                 )
-        run_row = read_parquet_df(run_part).iloc[0].to_dict()
+        run_frame = read_parquet_df(run_part)
+        matching_runs = run_frame.loc[
+            run_frame["as_of_round"].astype(int).eq(round_index) & run_frame["run_id"].astype(str).eq(run_id)
+        ]
+        if len(matching_runs) != 1:
+            raise OpalError(
+                f"{label} round {round_index} run ledger must contain one metadata row for run_id={run_id}.",
+                ExitCodes.CONTRACT_VIOLATION,
+            )
+        run_row = matching_runs.iloc[0].to_dict()
         predicted_rows = sum(item[2] for item in prediction_parts[round_index])
         expected_rows = int(run_row["stats__n_scored"])
         if predicted_rows != expected_rows:
