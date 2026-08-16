@@ -38,6 +38,8 @@ def _rebase_artifact_paths(value: Any, *, source_root: str, target_root: str) ->
 
 def _run_frame(plan: HistoryRelocationPlan, run: RunHistory) -> pd.DataFrame:
     row = dict(run.run_row)
+    row.pop("data__x_column_name", None)
+    row.pop("data__y_column_name", None)
     if run.round_index in plan.source.rounds:
         row["artifacts"] = _rebase_artifact_paths(
             jsonable(row["artifacts"]),

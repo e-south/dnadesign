@@ -197,3 +197,18 @@ def test_history_import_preserves_distinct_artifact_receipt_keys_in_both_run_row
     history = inspect_campaign_history(target, label="Relocated campaign")
     assert history.rounds == (0, 1)
     assert len(list((target / "outputs" / "ledger" / "runs.parquet").glob("*.parquet"))) == 2
+
+
+def test_history_import_keeps_inspection_fields_out_of_canonical_run_rows(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=False)
+
+    result = _invoke_import(source, target_campaign)
+
+    assert result.exit_code == 0, result.output
+    for part in sorted((target / "outputs" / "ledger" / "runs.parquet").glob("*.parquet")):
+        columns = set(read_parquet_df(part).columns)
+        assert "data__x_column_name" not in columns
+        assert "data__y_column_name" not in columns
