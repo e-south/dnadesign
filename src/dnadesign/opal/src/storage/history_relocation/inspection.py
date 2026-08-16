@@ -22,7 +22,8 @@ import pandas as pd
 from ...core.utils import ExitCodes, OpalError, file_sha256
 from ..parquet_io import read_parquet_df
 from ..state import CampaignState
-from .contracts import CampaignHistory, HistoryRelocationPlan, RunHistory
+from .column_contract import columns_for_round
+from .contracts import CampaignHistory, HistoryColumnContract, HistoryRelocationPlan, RunHistory
 
 _RUN_INVARIANT_FIELDS = (
     "data__x_column_name",
@@ -102,15 +103,31 @@ def _read_round_context(round_dir: Path) -> dict[str, Any]:
     return payload
 
 
-def _read_run_column_contract(context: dict[str, Any], *, round_index: int) -> tuple[str, str]:
+def _read_run_column_contract(
+    context: dict[str, Any],
+    *,
+    round_index: int,
+    run_id: str,
+    round_context_sha256: str,
+    column_contract: HistoryColumnContract | None,
+) -> tuple[str, str]:
     x_column = str(context.get("core/data/x_column_name") or "").strip()
     y_column = str(context.get("core/data/y_column_name") or "").strip()
-    if not x_column or not y_column:
+    if x_column and y_column:
+        return x_column, y_column
+    if x_column or y_column:
+        raise OpalError(f"Round {round_index} immutable context has an incomplete X/Y column identity.")
+    if column_contract is None:
         raise OpalError(
-            f"Round {round_index} immutable context has no X/Y column identities.",
+            f"Round {round_index} predates embedded X/Y identity; pass an explicit history column contract.",
             ExitCodes.CONTRACT_VIOLATION,
         )
-    return x_column, y_column
+    return columns_for_round(
+        column_contract,
+        round_index=round_index,
+        run_id=run_id,
+        round_context_sha256=round_context_sha256,
+    )
 
 
 def run_artifact_root(round_dir: Path, *, run_id: str) -> Path:
@@ -154,6 +171,8 @@ def _verify_run_artifacts(round_dir: Path, *, run_id: str, artifacts: Any, label
         raise OpalError(f"{label} run metadata has no immutable artifact receipts.", ExitCodes.CONTRACT_VIOLATION)
     artifact_root = run_artifact_root(round_dir, run_id=run_id)
     for artifact_key, receipt in recorded.items():
+        if receipt is None:
+            continue
         if not isinstance(receipt, list) or len(receipt) != 2:
             raise OpalError(
                 f"{label} artifact receipt is invalid for {artifact_key!r}.",
@@ -175,7 +194,12 @@ def _verify_run_artifacts(round_dir: Path, *, run_id: str, artifacts: Any, label
             )
 
 
-def inspect_campaign_history(workdir: Path, *, label: str) -> CampaignHistory:
+def inspect_campaign_history(
+    workdir: Path,
+    *,
+    label: str,
+    column_contract: HistoryColumnContract | None = None,
+) -> CampaignHistory:
     root = _canonical_root(workdir, label=label)
     outputs = root / "outputs"
     run_parts = _parts_by_round(outputs / "ledger" / "runs.parquet", label=f"{label} run ledger")
@@ -225,6 +249,7 @@ def inspect_campaign_history(workdir: Path, *, label: str) -> CampaignHistory:
             label=f"{label} round {round_index}",
         )
         artifact_root = run_artifact_root(round_dir, run_id=run_id)
+        round_context_path = artifact_root / "metadata" / "round_ctx.json"
         context = _read_round_context(artifact_root)
         context_slug = str(context.get("core/campaign_slug") or "").strip()
         if not context_slug:
@@ -238,7 +263,13 @@ def inspect_campaign_history(workdir: Path, *, label: str) -> CampaignHistory:
                 f"{label} round {round_index} context does not match its ledger identity.",
                 ExitCodes.CONTRACT_VIOLATION,
             )
-        x_column_name, y_column_name = _read_run_column_contract(context, round_index=round_index)
+        x_column_name, y_column_name = _read_run_column_contract(
+            context,
+            round_index=round_index,
+            run_id=run_id,
+            round_context_sha256=file_sha256(round_context_path),
+            column_contract=column_contract,
+        )
         run_row["data__x_column_name"] = x_column_name
         run_row["data__y_column_name"] = y_column_name
         invariant = {field: run_row.get(field) for field in _RUN_INVARIANT_FIELDS}
@@ -305,9 +336,23 @@ def _assert_candidate_lineage(runs: list[RunHistory]) -> None:
         prior = current
 
 
-def plan_history_relocation(*, source_workdir: Path, target_workdir: Path, expected_slug: str) -> HistoryRelocationPlan:
-    source = inspect_campaign_history(source_workdir, label="Source campaign history")
-    target = inspect_campaign_history(target_workdir, label="Target campaign history")
+def plan_history_relocation(
+    *,
+    source_workdir: Path,
+    target_workdir: Path,
+    expected_slug: str,
+    column_contract: HistoryColumnContract | None = None,
+) -> HistoryRelocationPlan:
+    source = inspect_campaign_history(
+        source_workdir,
+        label="Source campaign history",
+        column_contract=column_contract,
+    )
+    target = inspect_campaign_history(
+        target_workdir,
+        label="Target campaign history",
+        column_contract=column_contract,
+    )
     if source.workdir == target.workdir:
         raise OpalError("Source and target campaign histories must be different directories.", ExitCodes.BAD_ARGS)
     if source.campaign_slug != expected_slug or target.campaign_slug != expected_slug:
@@ -328,6 +373,26 @@ def plan_history_relocation(*, source_workdir: Path, target_workdir: Path, expec
             ExitCodes.CONTRACT_VIOLATION,
         )
     all_runs = sorted((*source.runs, *target.runs), key=lambda item: item.round_index)
+    if column_contract is not None:
+        if column_contract.campaign_slug != expected_slug:
+            raise OpalError("History column contract campaign slug differs from the relocation campaign.")
+        observed = {
+            (
+                run.round_index,
+                run.run_id,
+                file_sha256(run_artifact_root(run.round_dir, run_id=run.run_id) / "metadata" / "round_ctx.json"),
+            )
+            for run in all_runs
+        }
+        declared = {(item.round_index, item.run_id, item.round_context_sha256) for item in column_contract.rounds}
+        if observed != declared:
+            raise OpalError("History column contract does not exactly cover the relocated round contexts.")
+        if any(
+            str(run.run_row["data__x_column_name"]) != column_contract.x_column_name
+            or str(run.run_row["data__y_column_name"]) != column_contract.y_column_name
+            for run in all_runs
+        ):
+            raise OpalError("History column contract X/Y identities differ from the relocated runs.")
     invariant_digests = {run.invariant_sha256 for run in all_runs}
     if len(invariant_digests) != 1:
         raise OpalError(
@@ -341,4 +406,5 @@ def plan_history_relocation(*, source_workdir: Path, target_workdir: Path, expec
         campaign_slug=expected_slug,
         canonical_rounds=canonical_rounds,
         invariant_sha256=next(iter(invariant_digests)),
+        column_contract=column_contract,
     )
