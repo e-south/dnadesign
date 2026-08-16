@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
@@ -248,3 +249,47 @@ def test_history_import_consolidates_disjoint_rounds_without_retraining(tmp_path
     target_log = target / "outputs" / "rounds" / "round_0" / "logs" / "round.log.jsonl"
     assert str(source.resolve()) not in target_log.read_text(encoding="utf-8")
     assert (source / "state.json").is_file()
+
+
+def test_history_import_does_not_restore_stale_state_after_concurrent_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=True)
+    state_path = target / "state.json"
+    concurrent_state = json.loads(state_path.read_text(encoding="utf-8"))
+    concurrent_state["updated_at"] = "2026-08-15T23:59:59+00:00"
+
+    from dnadesign.opal.src.storage.history_relocation import materialization
+
+    stage_history = materialization._stage_history
+
+    def stage_then_drift(*args, **kwargs):
+        staged = stage_history(*args, **kwargs)
+        state_path.write_text(json.dumps(concurrent_state, sort_keys=True), encoding="utf-8")
+        return staged
+
+    monkeypatch.setattr(materialization, "_stage_history", stage_then_drift)
+
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "history",
+            "import",
+            "-c",
+            str(target_campaign),
+            "--source-workdir",
+            str(source),
+            "--apply",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "changed while the relocation was staged" in result.output
+    assert json.loads(state_path.read_text(encoding="utf-8"))["updated_at"] == concurrent_state["updated_at"]
+    assert not (target / "outputs" / "rounds" / "round_0").exists()

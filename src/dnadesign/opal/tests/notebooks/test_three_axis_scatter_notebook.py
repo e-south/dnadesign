@@ -150,6 +150,28 @@ def test_three_axis_selected_cohorts_are_separate_round_categories() -> None:
     assert figure.data[1].marker.color != figure.data[2].marker.color
 
 
+def test_three_axis_round_encoding_is_stable_when_an_earlier_round_is_hidden() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    rows = _rows()
+    round_zero = rows.loc[rows["id"].eq("selected-b")].copy()
+    round_zero["id"] = "selected-a"
+    round_zero["__notebook_selection_round"] = 0
+    both_rounds = pd.concat([rows, round_zero], ignore_index=True)
+    contract = _contract()
+    contract["selection_rounds"] = [0, 1]
+
+    combined = build_notebook_three_axis_scatter_figure(both_rounds, contract=contract)
+    round_one_only = build_notebook_three_axis_scatter_figure(rows, contract=contract)
+    combined_round_one = next(trace for trace in combined.data if trace.name.startswith("Selected for Round 1"))
+    visible_round_one = next(trace for trace in round_one_only.data if trace.name.startswith("Selected for Round 1"))
+
+    assert visible_round_one.marker.color == combined_round_one.marker.color
+    assert visible_round_one.marker.symbol == combined_round_one.marker.symbol
+
+
 def test_three_axis_camera_orientation_is_stable_across_evidence_choices() -> None:
     from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
         build_notebook_three_axis_scatter_figure,
