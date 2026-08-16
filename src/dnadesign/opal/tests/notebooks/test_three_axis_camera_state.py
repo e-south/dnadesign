@@ -12,7 +12,6 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
-import re
 import subprocess
 
 
@@ -27,12 +26,13 @@ def test_camera_restore_failure_reveals_plot_and_allows_later_binding() -> None:
             return {"text": text, "width": width, "height": height}
 
     rendered = render_three_axis_camera_state(mo=_Mo(), revision="three_axis_scatter_v1:camera")
-    match = re.search(r"<script>\s*(.*?)\s*</script>", rendered["text"], flags=re.DOTALL)
-    assert match is not None
+    _prefix, opening, tail = rendered["text"].partition("<script>")
+    script, closing, _suffix = tail.rpartition("</script>")
+    assert opening and closing
 
     completed = subprocess.run(
         ("node", "-e", _NODE_HARNESS),
-        input=match.group(1),
+        input=script.strip(),
         check=True,
         capture_output=True,
         text=True,
