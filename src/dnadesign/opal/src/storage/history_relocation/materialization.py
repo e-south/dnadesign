@@ -18,15 +18,19 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
-
 from ...config.types import RootConfig
 from ...core.utils import OpalError, file_sha256
 from ..locks import CampaignLock
-from ..parquet_io import dataset_from_dir, table_from_pandas, write_parquet_table
 from .contracts import CampaignHistory, HistoryRelocationPlan
-from .inspection import canonical_sha256, jsonable, plan_history_relocation
+from .inspection import (
+    canonical_sha256,
+    jsonable,
+    plan_history_relocation,
+    run_artifact_root,
+    verified_artifact_path,
+)
 from .label_ledger import label_ledger_parts, stage_label_ledger
+from .run_ledger import stage_canonical_run_ledger
 from .state_projection import build_canonical_state
 
 RECEIPT_SCHEMA_VERSION = "opal.history_relocation.v1"
@@ -102,27 +106,25 @@ def _rebase_json_file(path: Path, *, source_root: str, target_root: str) -> bool
     return True
 
 
-def _write_rebased_run_part(plan: HistoryRelocationPlan, *, staging_root: Path, round_index: int) -> Path:
-    run = next(item for item in plan.source.runs if item.round_index == round_index)
-    row = dict(run.run_row)
-    row["artifacts"] = _rebase_value(
-        jsonable(row["artifacts"]),
-        source_root=str(plan.source.workdir),
-        target_root=str(plan.target.workdir),
+def _stage_verified_round(*, run, staging_root: Path) -> Path:
+    staged_round = staging_root / "outputs" / "rounds" / f"round_{run.round_index}"
+    artifact_root = run_artifact_root(run.round_dir, run_id=run.run_id)
+    shutil.copytree(
+        artifact_root,
+        staged_round / "run_artifacts" / artifact_root.name,
+        copy_function=shutil.copy2,
     )
-    frame = pd.DataFrame([row])
-    target_runs = plan.target.workdir / "outputs" / "ledger" / "runs.parquet"
-    schema = dataset_from_dir(target_runs).schema
-    output = (
-        staging_root
-        / "outputs"
-        / "ledger"
-        / "runs.parquet"
-        / (f"part-history-r{round_index}-{file_sha256(run.run_part)[:16]}.parquet")
-    )
-    output.parent.mkdir(parents=True, exist_ok=True)
-    write_parquet_table(output, table_from_pandas(frame, schema=schema))
-    return output
+    for artifact_key in jsonable(run.run_row["artifacts"]):
+        if not str(artifact_key).startswith(("metadata/", "model/", "selection/")):
+            continue
+        source = verified_artifact_path(artifact_root, artifact_key=str(artifact_key))
+        target = staged_round / str(artifact_key)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+    source_logs = run.round_dir / "logs"
+    if source_logs.is_dir():
+        shutil.copytree(source_logs, staged_round / "logs", copy_function=shutil.copy2)
+    return staged_round
 
 
 def _stage_history(
@@ -135,10 +137,10 @@ def _stage_history(
     imported_target_entries: list[dict[str, object]] = []
     transformations: list[dict[str, object]] = []
     staged_destinations: list[tuple[Path, Path]] = []
+    staged_replacements: list[tuple[Path, Path]] = []
     for run in plan.source.runs:
-        staged_round = staging_root / "outputs" / "rounds" / f"round_{run.round_index}"
-        shutil.copytree(run.round_dir, staged_round, copy_function=shutil.copy2)
-        for path in _files_under(staged_round):
+        staged_round = _stage_verified_round(run=run, staging_root=staging_root)
+        for path in _files_under(staged_round / "logs"):
             if path.suffix not in {".json", ".jsonl"}:
                 continue
             source_relative = path.relative_to(staging_root)
@@ -165,17 +167,9 @@ def _stage_history(
             staged_destinations.append(
                 (staged_prediction, plan.target.workdir / staged_prediction.relative_to(staging_root))
             )
-        staged_run_part = _write_rebased_run_part(plan, staging_root=staging_root, round_index=run.round_index)
-        transformations.append(
-            {
-                "path": run.run_part.relative_to(plan.source.workdir).as_posix(),
-                "target_path": staged_run_part.relative_to(staging_root).as_posix(),
-                "kind": "run_artifact_path_rebase",
-                "source_sha256": file_sha256(run.run_part),
-                "target_sha256": file_sha256(staged_run_part),
-            }
-        )
-        staged_destinations.append((staged_run_part, plan.target.workdir / staged_run_part.relative_to(staging_root)))
+    staged_runs, run_transformations = stage_canonical_run_ledger(plan, staging_root=staging_root)
+    transformations.extend(run_transformations)
+    staged_replacements.append((staged_runs, plan.target.workdir / "outputs" / "ledger" / "runs.parquet"))
     staged_destinations.extend(stage_label_ledger(plan, staging_root=staging_root))
     state = build_canonical_state(plan, cfg=cfg, records_path=records_path)
     staged_state = staging_root / "state.json"
@@ -183,14 +177,18 @@ def _stage_history(
         json.dumps(state.to_dict(), indent=2, sort_keys=True, ensure_ascii=True) + "\n", encoding="utf-8"
     )
     staged_destinations.append((staged_state, plan.target.workdir / "state.json"))
-    for staged_path, target_path in staged_destinations:
+    for staged_path, target_path in [*staged_destinations, *staged_replacements]:
         if staged_path.is_file() and staged_path != staged_state:
             imported_target_entries.append(_file_entry(staged_path, root=staging_root))
         elif staged_path.is_dir():
             imported_target_entries.extend(_file_entry(path, root=staging_root) for path in _files_under(staged_path))
     imported_target_entries = sorted(imported_target_entries, key=lambda item: str(item["path"]))
     canonical_by_path = _entries_by_path(
-        [entry for entry in existing_target_entries if entry["path"] != "state.json"]
+        [
+            entry
+            for entry in existing_target_entries
+            if entry["path"] != "state.json" and not str(entry["path"]).startswith("outputs/ledger/runs.parquet/")
+        ]
         + imported_target_entries
         + [_file_entry(staged_state, root=staging_root)]
     )
@@ -220,6 +218,7 @@ def _stage_history(
         "receipt": receipt,
         "receipt_path": plan.target.workdir / staged_receipt.relative_to(staging_root),
         "moves": staged_destinations,
+        "replacements": staged_replacements,
     }
 
 
@@ -238,6 +237,7 @@ def apply_history_relocation(
     target_parent = plan.target.workdir.parent
     staging_root = Path(tempfile.mkdtemp(prefix=f".{plan.campaign_slug}-history-import-", dir=target_parent))
     created: list[Path] = []
+    replaced: list[tuple[Path, Path]] = []
     state_path = plan.target.workdir / "state.json"
     try:
         staged = _stage_history(plan, cfg=cfg, records_path=records_path, staging_root=staging_root)
@@ -256,6 +256,17 @@ def apply_history_relocation(
             state_backup = state_path.read_bytes() if state_path.is_file() else None
             state_replaced = False
             try:
+                for staged_path, target_path in staged["replacements"]:
+                    backup = target_path.with_name(f".{target_path.name}.{staging_root.name}.backup")
+                    if backup.exists():
+                        raise OpalError(f"History relocation backup destination already exists: {backup}")
+                    os.replace(target_path, backup)
+                    try:
+                        os.replace(staged_path, target_path)
+                    except Exception:
+                        os.replace(backup, target_path)
+                        raise
+                    replaced.append((target_path, backup))
                 for staged_path, target_path in staged["moves"]:
                     if target_path == state_path:
                         target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -278,7 +289,13 @@ def apply_history_relocation(
                         state_path.unlink(missing_ok=True)
                     else:
                         state_path.write_bytes(state_backup)
+                for target_path, backup in reversed(replaced):
+                    if target_path.exists():
+                        shutil.rmtree(target_path)
+                    os.replace(backup, target_path)
                 raise
+            for _, backup in replaced:
+                shutil.rmtree(backup)
         return Path(staged["receipt_path"])
     finally:
         shutil.rmtree(staging_root, ignore_errors=True)

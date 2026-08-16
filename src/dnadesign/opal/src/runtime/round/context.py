@@ -50,6 +50,8 @@ def build_round_ctx(
             "core/plugins/selection/name": reg.selection,
             "core/data/y_dim": int(y_dim),
             "core/data/n_train": int(n_train),
+            "core/data/x_column_name": cfg.data.x_column_name,
+            "core/data/y_column_name": cfg.data.y_column_name,
         },
         registry=reg,
     )

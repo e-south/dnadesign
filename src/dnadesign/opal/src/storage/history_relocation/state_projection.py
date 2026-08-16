@@ -119,8 +119,8 @@ def _round_entry(plan: HistoryRelocationPlan, run: RunHistory) -> RoundEntry:
     target_artifact_root = target_round_dir / "run_artifacts" / source_artifact_root.name
     labels_used = pd.read_parquet(source_artifact_root / "labels" / "labels_used.parquet")
     labels_used_rounds = sorted({int(value) for value in labels_used["observed_round"].tolist()})
-    selections = pd.read_parquet(run.round_dir / "selection" / "selections.parquet")
-    batch = pd.read_parquet(run.round_dir / "selection" / "selection_batch.parquet")
+    selections = pd.read_parquet(source_artifact_root / "selection" / "selections.parquet")
+    batch = pd.read_parquet(source_artifact_root / "selection" / "selection_batch.parquet")
     objective_defs = {
         str(item["selection_view_id"]): item
         for item in _definitions(row["objective__defs_json"], field="objective__defs_json")
@@ -142,7 +142,7 @@ def _round_entry(plan: HistoryRelocationPlan, run: RunHistory) -> RoundEntry:
     if len(deduplicate_values) != 1:
         raise OpalError(f"Round {run.round_index} selection batch has multiple deduplication keys.")
     model_path = target_round_dir / "model" / "model.joblib"
-    source_model_path = run.round_dir / "model" / "model.joblib"
+    source_model_path = source_artifact_root / "model" / "model.joblib"
     prior_entry = _state_entry(plan, round_index=run.round_index)
     artifact_paths = {
         "selections_parquet": str((target_round_dir / "selection" / "selections.parquet").resolve()),
@@ -158,7 +158,7 @@ def _round_entry(plan: HistoryRelocationPlan, run: RunHistory) -> RoundEntry:
         "round_log_jsonl": str((target_round_dir / "logs" / "round.log.jsonl").resolve()),
     }
     allocation_trace = target_round_dir / "selection" / "allocation_trace.parquet"
-    if (run.round_dir / "selection" / "allocation_trace.parquet").is_file():
+    if (source_artifact_root / "selection" / "allocation_trace.parquet").is_file():
         artifact_paths["selection_allocation_trace_parquet"] = str(allocation_trace.resolve())
     return RoundEntry(
         round_index=run.round_index,
@@ -217,7 +217,8 @@ def _pending_selection_count(plan: HistoryRelocationPlan) -> int:
     selected_ids: set[str] = set()
     all_runs = sorted((*plan.source.runs, *plan.target.runs), key=lambda item: item.round_index)
     for run in all_runs:
-        batch = pd.read_parquet(run.round_dir / "selection" / "selection_batch.parquet", columns=["id"])
+        artifact_root = run_artifact_root(run.round_dir, run_id=run.run_id)
+        batch = pd.read_parquet(artifact_root / "selection" / "selection_batch.parquet", columns=["id"])
         selected_ids.update(batch["id"].astype(str).tolist())
     latest = all_runs[-1]
     artifact_root = run_artifact_root(latest.round_dir, run_id=latest.run_id)

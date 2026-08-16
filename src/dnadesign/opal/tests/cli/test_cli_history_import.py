@@ -60,6 +60,8 @@ def _write_round(workdir: Path, *, round_index: int, run_id: str) -> None:
                 "core/data/n_train": 2,
                 "core/data/n_scored": 2,
                 "core/data/x_dim": 2,
+                "core/data/x_column_name": "X",
+                "core/data/y_column_name": "Y",
                 "core/plugins/selection_views/ids": ["primary"],
                 "core/selection_batch/allocation": {
                     "strategy": "round_robin_next_best_unallocated",
@@ -137,6 +139,7 @@ def _write_round(workdir: Path, *, round_index: int, run_id: str) -> None:
     artifact_model = artifact_root / "model"
     artifact_model.mkdir(parents=True, exist_ok=True)
     artifact_model.joinpath("model.joblib").write_bytes(model.read_bytes())
+    artifact_model.joinpath("model_meta.json").write_bytes((round_dir / "model" / "model_meta.json").read_bytes())
     artifact_metadata = artifact_root / "metadata"
     artifact_metadata.mkdir(parents=True, exist_ok=True)
     artifact_metadata.joinpath("round_ctx.json").write_bytes((metadata / "round_ctx.json").read_bytes())
@@ -172,7 +175,37 @@ def _write_round(workdir: Path, *, round_index: int, run_id: str) -> None:
         workdir,
         run_id=run_id,
         round_index=round_index,
-        artifact_paths_and_hashes={"model/model.joblib": (_sha256(model), str(model.resolve()))},
+        artifact_paths_and_hashes={
+            "model/model.joblib": (_sha256(artifact_model / "model.joblib"), str(model.resolve())),
+            "model/model_meta.json": (
+                _sha256(artifact_model / "model_meta.json"),
+                str((round_dir / "model" / "model_meta.json").resolve()),
+            ),
+            "selection/selections.parquet": (
+                _sha256(artifact_selection / "selections.parquet"),
+                str((selection_dir / "selections.parquet").resolve()),
+            ),
+            "selection/selection_batch.parquet": (
+                _sha256(artifact_selection / "selection_batch.parquet"),
+                str((selection_dir / "selection_batch.parquet").resolve()),
+            ),
+            "metadata/round_ctx.json": (
+                _sha256(artifact_metadata / "round_ctx.json"),
+                str((metadata / "round_ctx.json").resolve()),
+            ),
+            "metadata/objective_meta.json": (
+                _sha256(artifact_metadata / "objective_meta.json"),
+                str((metadata / "objective_meta.json").resolve()),
+            ),
+            "labels/labels_used.parquet": (
+                _sha256(labels_dir / "labels_used.parquet"),
+                str((labels_dir / "labels_used.parquet").resolve()),
+            ),
+            "labels/observed_events.parquet": (
+                _sha256(labels_dir / "observed_events.parquet"),
+                str((labels_dir / "observed_events.parquet").resolve()),
+            ),
+        },
     )
 
 

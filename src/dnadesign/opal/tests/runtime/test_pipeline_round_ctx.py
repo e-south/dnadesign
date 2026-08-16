@@ -233,6 +233,8 @@ def test_run_round_writes_round_ctx_and_ledger(tmp_path):
     assert ctx_path.exists()
     snap = json.loads(ctx_path.read_text())
     assert "core/data/x_dim" in snap
+    assert snap["core/data/x_column_name"] == "X"
+    assert snap["core/data/y_column_name"] == "Y"
     assert "transform_x/identity/x_dim" in snap
     produced = snap.get("core/contracts/transform_x/identity/produced", [])
     assert "transform_x/identity/x_dim" in produced
