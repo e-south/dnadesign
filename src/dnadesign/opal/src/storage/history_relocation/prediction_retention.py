@@ -73,6 +73,17 @@ def load_prediction_retention(*, workdir: Path, rounds: set[int]) -> PredictionR
     if payload.get("schema_version") != RETENTION_MANIFEST_SCHEMA_VERSION:
         raise OpalError("Prediction retention manifest schema is unsupported.")
     policy = _mapping(payload.get("policy"), label="retention policy")
+    retention_mode = str(policy.get("mode") or "")
+    if retention_mode == "audit_full":
+        if _list(payload.get("actions"), label="retention actions"):
+            raise OpalError("audit_full retention cannot declare artifact compaction actions.")
+        return PredictionRetentionEvidence(
+            mode_by_round={round_index: FULL for round_index in rounds},
+            manifest_path=manifest_path,
+            run_id_by_round={},
+            scored_rows_by_round={},
+            retained_rows_by_round={},
+        )
     prediction_policy = str(policy.get("prediction_ledger") or "")
     if prediction_policy == "all_rounds_full":
         return PredictionRetentionEvidence(
@@ -126,6 +137,7 @@ def validate_prediction_retention(
     expected_scored_rows: int,
     mode: str,
     label: str,
+    selections: pd.DataFrame | None = None,
 ) -> None:
     """Validate one run against its declared prediction-retention mode."""
 
@@ -150,6 +162,42 @@ def validate_prediction_retention(
         raise OpalError(f"{label} selected prediction history is missing selection memberships.")
     if not frame["pred__selection_views"].map(selected_by_any_view).all():
         raise OpalError(f"{label} selected prediction history contains an unselected candidate.")
+    if selections is None:
+        raise OpalError(f"{label} selected prediction history requires immutable selections.")
+    if _prediction_memberships(frame, label=label) != _selection_memberships(selections, label=label):
+        raise OpalError(
+            f"{label} retained prediction memberships differ from immutable selections.",
+            ExitCodes.CONTRACT_VIOLATION,
+        )
+
+
+def _prediction_memberships(frame: pd.DataFrame, *, label: str) -> set[tuple[str, str]]:
+    if "id" not in frame:
+        raise OpalError(f"{label} selected prediction history is missing candidate IDs.")
+    memberships: set[tuple[str, str]] = set()
+    for candidate_id, payload in zip(frame["id"], frame["pred__selection_views"], strict=True):
+        if hasattr(payload, "tolist"):
+            payload = payload.tolist()
+        for item in payload:
+            if bool(item["is_selected"]):
+                memberships.add((str(candidate_id), str(item["selection_view_id"])))
+    return memberships
+
+
+def _selection_memberships(frame: pd.DataFrame, *, label: str) -> set[tuple[str, str]]:
+    required = {"id", "selection_view_id"}
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise OpalError(f"{label} immutable selections are missing columns: {missing}.")
+    pairs = [
+        (str(candidate_id).strip(), str(view_id).strip())
+        for candidate_id, view_id in frame[["id", "selection_view_id"]].itertuples(index=False, name=None)
+    ]
+    if any(not candidate_id or not view_id for candidate_id, view_id in pairs):
+        raise OpalError(f"{label} immutable selection memberships cannot be blank.")
+    if len(pairs) != len(set(pairs)):
+        raise OpalError(f"{label} immutable selection memberships must be unique.")
+    return set(pairs)
 
 
 def stage_prediction_retention_manifest(
