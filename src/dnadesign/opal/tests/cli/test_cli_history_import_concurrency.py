@@ -166,3 +166,56 @@ def test_history_import_rolls_back_the_run_ledger_when_the_operator_interrupts(
     assert result.exit_code == 130
     assert _tree_digest(runs_path) == runs_before
     assert not imported_round.exists()
+
+
+@pytest.mark.parametrize("interruption_target", ["run_ledger", "round", "state"])
+def test_history_import_rolls_back_when_interrupted_after_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    interruption_target: str,
+) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=True)
+    tree_before = _tree_digest(target)
+    destinations = {
+        "run_ledger": target / "outputs" / "ledger" / "runs.parquet",
+        "round": target / "outputs" / "rounds" / "round_0",
+        "state": target / "state.json",
+    }
+
+    from dnadesign.opal.src.storage.history_relocation import materialization
+
+    replace = materialization.os.replace
+    expected_target = destinations[interruption_target]
+    interrupted = False
+
+    def replace_then_interrupt(source_path, target_path):
+        nonlocal interrupted
+        result = replace(source_path, target_path)
+        if not interrupted and Path(target_path) == expected_target:
+            interrupted = True
+            raise KeyboardInterrupt
+        return result
+
+    monkeypatch.setattr(materialization.os, "replace", replace_then_interrupt)
+
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "history",
+            "import",
+            "-c",
+            str(target_campaign),
+            "--source-workdir",
+            str(source),
+            "--apply",
+            "--json",
+        ],
+    )
+
+    assert interrupted is True
+    assert result.exit_code == 130
+    assert _tree_digest(target) == tree_before
