@@ -132,6 +132,7 @@ def build_notebook_three_axis_scatter_figure(
         batch = observed.loc[observed[batch_column].astype(str).eq(batch_id)]
         if batch.empty:
             continue
+        categorical_marker = style.observed_marker(index)
         traces.append(
             _trace(
                 go,
@@ -140,9 +141,9 @@ def build_notebook_three_axis_scatter_figure(
                 name=f"Observed · {compact_batch_label(batch_id)} (n={len(batch):,})",
                 marker={
                     "size": 5.8,
-                    "color": style.OBSERVED_COLORS[index % len(style.OBSERVED_COLORS)],
+                    "color": categorical_marker["color"],
                     "opacity": 0.95,
-                    "symbol": "circle",
+                    "symbol": categorical_marker["symbol"],
                     "line": {"color": "#111827", "width": 1.0},
                 },
                 showlegend=True,

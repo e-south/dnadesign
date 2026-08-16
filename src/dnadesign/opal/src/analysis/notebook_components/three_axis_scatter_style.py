@@ -31,6 +31,7 @@ OBSERVED_COLORS = (
     "#4F46E5",
     "#0F766E",
 )
+OBSERVED_SYMBOLS = ("circle", "square")
 SELECTION_COLORS = ("#F59E0B", "#DB2777", "#7C3AED", "#0891B2", "#059669", "#DC2626")
 SELECTION_SYMBOLS = ("diamond", "square", "x", "cross", "triangle-up", "triangle-down")
 
@@ -45,6 +46,17 @@ def selection_marker(index: int) -> dict[str, str]:
     return {
         "color": SELECTION_COLORS[index % len(SELECTION_COLORS)],
         "symbol": SELECTION_SYMBOLS[(index + index // len(SELECTION_COLORS)) % len(SELECTION_SYMBOLS)],
+    }
+
+
+def observed_marker(index: int) -> dict[str, str]:
+    """Return one distinct marker for a bounded observed-batch index."""
+
+    if index < 0 or index >= len(OBSERVED_COLORS) * len(OBSERVED_SYMBOLS):
+        raise ValueError("Three-axis scatter observed-batch index exceeds the supported marker set.")
+    return {
+        "color": OBSERVED_COLORS[index % len(OBSERVED_COLORS)],
+        "symbol": OBSERVED_SYMBOLS[index // len(OBSERVED_COLORS)],
     }
 
 
@@ -143,8 +155,10 @@ def apply_three_axis_layout(
 
 __all__ = [
     "OBSERVED_COLORS",
+    "OBSERVED_SYMBOLS",
     "SELECTION_COLORS",
     "SELECTION_SYMBOLS",
+    "observed_marker",
     "selection_marker",
     "apply_three_axis_layout",
     "THREE_AXIS_AXIS_TITLE_FONTSIZE",
