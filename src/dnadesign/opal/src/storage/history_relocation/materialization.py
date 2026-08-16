@@ -21,6 +21,7 @@ from typing import Any
 from ...config.types import RootConfig
 from ...core.utils import OpalError, file_sha256
 from ..locks import CampaignLock
+from ..parquet_io import table_from_pandas, write_parquet_table
 from .contracts import CampaignHistory, HistoryRelocationPlan
 from .inspection import (
     canonical_sha256,
@@ -30,6 +31,7 @@ from .inspection import (
     verified_artifact_path,
 )
 from .label_ledger import label_ledger_parts, stage_label_ledger
+from .prediction_ledger import prediction_part_is_run_specific, prediction_rows_for_run
 from .run_ledger import stage_canonical_run_ledger
 from .state_projection import build_canonical_state
 
@@ -160,12 +162,37 @@ def _stage_history(
         staged_destinations.append((staged_round, plan.target.workdir / staged_round.relative_to(staging_root)))
         for prediction_part in run.prediction_parts:
             destination_name = prediction_part.name
+            project_run = not prediction_part_is_run_specific(
+                prediction_part,
+                round_index=run.round_index,
+                run_id=run.run_id,
+            )
+            if project_run:
+                destination_name = f"part-history-r{run.round_index}-{file_sha256(prediction_part)[:16]}.parquet"
             target_prediction = plan.target.workdir / "outputs" / "ledger" / "predictions" / destination_name
             if target_prediction.exists():
                 destination_name = f"part-history-r{run.round_index}-{file_sha256(prediction_part)[:16]}.parquet"
             staged_prediction = staging_root / "outputs" / "ledger" / "predictions" / destination_name
             staged_prediction.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(prediction_part, staged_prediction)
+            if project_run:
+                rows = prediction_rows_for_run(
+                    (prediction_part,),
+                    round_index=run.round_index,
+                    run_id=run.run_id,
+                )
+                write_parquet_table(staged_prediction, table_from_pandas(rows))
+                transformations.append(
+                    {
+                        "path": prediction_part.relative_to(plan.source.workdir).as_posix(),
+                        "kind": "prediction_run_projection",
+                        "round_index": run.round_index,
+                        "run_id": run.run_id,
+                        "source_sha256": file_sha256(prediction_part),
+                        "target_sha256": file_sha256(staged_prediction),
+                    }
+                )
+            else:
+                shutil.copy2(prediction_part, staged_prediction)
             staged_destinations.append(
                 (staged_prediction, plan.target.workdir / staged_prediction.relative_to(staging_root))
             )
