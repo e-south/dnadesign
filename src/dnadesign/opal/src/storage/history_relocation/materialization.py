@@ -258,44 +258,44 @@ def apply_history_relocation(
                 raise OpalError("Campaign history changed before relocation apply.")
             _assert_history_unchanged(plan.target, existing_target_files, label="Target")
             state_backup = state_path.read_bytes() if state_path.is_file() else None
-            state_replaced = False
+            state_change_started = False
             try:
                 for staged_path, target_path in staged["replacements"]:
                     backup = target_path.with_name(f".{target_path.name}.{staging_root.name}.backup")
                     if backup.exists():
                         raise OpalError(f"History relocation backup destination already exists: {backup}")
-                    os.replace(target_path, backup)
-                    try:
-                        os.replace(staged_path, target_path)
-                    except Exception:
-                        os.replace(backup, target_path)
-                        raise
                     replaced.append((target_path, backup))
+                    os.replace(target_path, backup)
+                    os.replace(staged_path, target_path)
                 for staged_path, target_path in staged["moves"]:
                     if target_path == state_path:
                         target_path.parent.mkdir(parents=True, exist_ok=True)
+                        state_change_started = True
                         os.replace(staged_path, target_path)
-                        state_replaced = True
                         continue
                     if target_path.exists():
                         raise OpalError(f"History relocation destination already exists: {target_path}")
                     target_path.parent.mkdir(parents=True, exist_ok=True)
-                    os.replace(staged_path, target_path)
                     created.append(target_path)
+                    os.replace(staged_path, target_path)
             except BaseException:
                 for path in reversed(created):
                     if path.is_dir():
                         shutil.rmtree(path)
                     elif path.exists():
                         path.unlink()
-                if state_replaced:
+                if state_change_started:
                     if state_backup is None:
                         state_path.unlink(missing_ok=True)
                     else:
                         state_path.write_bytes(state_backup)
                 for target_path, backup in reversed(replaced):
-                    if target_path.exists():
+                    if not backup.exists():
+                        continue
+                    if target_path.is_dir():
                         shutil.rmtree(target_path)
+                    elif target_path.exists():
+                        target_path.unlink()
                     os.replace(backup, target_path)
                 raise
             for _, backup in replaced:
