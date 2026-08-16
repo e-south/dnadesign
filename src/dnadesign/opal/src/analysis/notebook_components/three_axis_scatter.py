@@ -102,7 +102,7 @@ def build_notebook_three_axis_scatter_figure(
                 go,
                 predictions,
                 contract=contract,
-                name=(f"Deterministic prediction sample (n={len(predictions):,} of {complete_background:,})"),
+                name=f"Prediction sample ({len(predictions):,} / {complete_background:,})",
                 marker={"size": 2.4, "color": "#2563EB", "opacity": 0.20},
                 showlegend=True,
             )
@@ -152,70 +152,20 @@ def build_notebook_three_axis_scatter_figure(
     if not traces:
         raise ValueError("Three-axis scatter requires at least one visible row.")
 
-    axis_style = {
-        "showbackground": True,
-        "backgroundcolor": "#FAFAFA",
-        "gridcolor": "#D1D5DB",
-        "gridwidth": 1.0,
-        "zeroline": True,
-        "zerolinecolor": "#6B7280",
-        "zerolinewidth": 1.5,
-        "showspikes": False,
-        "tickfont": {"size": style.THREE_AXIS_TICK_FONTSIZE, "color": "#252525"},
-        "title": {"font": {"size": style.THREE_AXIS_AXIS_TITLE_FONTSIZE, "color": "#111827"}},
-    }
     title = _title(runtime)
-    figure = go.Figure(data=traces)
-    figure.update_layout(
-        title={
-            "text": title,
-            "x": 0.5,
-            "xanchor": "center",
-            "y": 0.96,
-            "yanchor": "top",
-            "font": {"size": style.THREE_AXIS_TITLE_FONTSIZE, "color": "#111827"},
-        },
-        scene={
-            "uirevision": THREE_AXIS_CAMERA_REVISION,
-            "xaxis": {
-                **axis_style,
-                "title": {**axis_style["title"], "text": _plotly_axis_label(runtime["x_label"])},
-            },
-            "yaxis": {
-                **axis_style,
-                "title": {**axis_style["title"], "text": _plotly_axis_label(runtime["y_label"])},
-            },
-            "zaxis": {
-                **axis_style,
-                "title": {**axis_style["title"], "text": _plotly_axis_label(runtime["color_label"])},
-            },
-            "aspectmode": "cube",
-            "camera": {"eye": {"x": 1.55, "y": 1.55, "z": 1.2}},
-            "bgcolor": "white",
-        },
-        legend={
-            "orientation": "h",
-            "x": 0.5,
-            "xanchor": "center",
-            "y": -0.08,
-            "yanchor": "top",
-            "font": {"size": style.THREE_AXIS_LEGEND_FONTSIZE},
-            "bgcolor": "rgba(255,255,255,0.88)",
-        },
-        font={"family": "Arial, Helvetica, sans-serif", "size": style.THREE_AXIS_BASE_FONTSIZE, "color": "#252525"},
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        height=800,
-        margin={"l": 16, "r": 16, "t": 104, "b": 92},
-        hovermode="closest",
-        uirevision=THREE_AXIS_CAMERA_REVISION,
-        meta={
-            "complete_row_count": int(len(rows)),
-            "displayed_row_count": int(len(displayed)),
-            "background_sample_limit": int(interactive["prediction_sample_limit"]),
-        },
+    subtitle = _subtitle(runtime)
+    return style.apply_three_axis_layout(
+        go.Figure(data=traces),
+        title=title,
+        subtitle=subtitle,
+        xaxis_title=_plotly_axis_label(runtime["x_label"]),
+        yaxis_title=_plotly_axis_label(runtime["y_label"]),
+        zaxis_title=_plotly_axis_label(runtime["color_label"]),
+        camera_revision=THREE_AXIS_CAMERA_REVISION,
+        complete_row_count=len(rows),
+        displayed_row_count=len(displayed),
+        background_sample_limit=int(interactive["prediction_sample_limit"]),
     )
-    return figure
 
 
 def render_notebook_three_axis_scatter(
@@ -312,8 +262,11 @@ def _trace(
 
 def _title(runtime: Mapping[str, Any]) -> str:
     title = str(runtime.get("title") or "Three-family candidate landscape").strip()
-    context = str(runtime.get("context") or "").strip()
-    return f"{title}<br><sup>{context}</sup>" if context else title
+    return _plotly_label(title)
+
+
+def _subtitle(runtime: Mapping[str, Any]) -> str:
+    return _plotly_label(runtime.get("context") or "")
 
 
 def _plotly_label(value: object) -> str:

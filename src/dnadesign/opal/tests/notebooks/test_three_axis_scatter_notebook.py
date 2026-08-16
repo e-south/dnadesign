@@ -79,7 +79,7 @@ def test_three_axis_figure_uses_exact_family_axes_and_campaign_layers() -> None:
 
     assert [trace.type for trace in figure.data] == ["scatter3d", "scatter3d", "scatter3d"]
     assert [trace.name for trace in figure.data] == [
-        "Deterministic prediction sample (n=1 of 1)",
+        "Prediction sample (1 / 1)",
         "Selected for Round 1 (n=1)",
         "Observed · Batch 0 (n=1)",
     ]
@@ -89,6 +89,12 @@ def test_three_axis_figure_uses_exact_family_axes_and_campaign_layers() -> None:
     assert figure.layout.scene.xaxis.title.text == "Response-ordering family score, <i>S</i><sub>R</sub>"
     assert figure.layout.scene.yaxis.title.text == "Intended-ON signal family score, <i>S</i><sub>ON</sub>"
     assert figure.layout.scene.zaxis.title.text == "Intended-OFF suppression family score, <i>S</i><sub>OFF</sub>"
+    assert figure.layout.title.text == "Multistate response behavior · Example view"
+    assert [annotation.text for annotation in figure.layout.annotations] == [
+        "Target ON: State B, State D | OFF: State A, State C"
+    ]
+    assert figure.layout.annotations[0].font.size >= 16
+    assert figure.layout.annotations[0].y == pytest.approx(1.035)
     assert figure.layout.title.x == pytest.approx(0.5)
     assert float(figure.layout.title.y) <= 0.96
     assert figure.layout.paper_bgcolor == "white"
@@ -118,7 +124,7 @@ def test_three_axis_selected_overlay_hides_the_categorical_trace_without_droppin
     figure = build_notebook_three_axis_scatter_figure(rows, contract=_contract())
 
     assert [trace.name for trace in figure.data] == [
-        "Deterministic prediction sample (n=2 of 2)",
+        "Prediction sample (2 / 2)",
         "Observed · Batch 0 (n=1)",
     ]
     assert list(figure.data[0].x) == [0.2, 1.1]
@@ -141,7 +147,7 @@ def test_three_axis_selected_cohorts_are_separate_round_categories() -> None:
     figure = build_notebook_three_axis_scatter_figure(rows, contract=contract)
 
     assert [trace.name for trace in figure.data] == [
-        "Deterministic prediction sample (n=1 of 1)",
+        "Prediction sample (1 / 1)",
         "Selected for Round 0 (n=1)",
         "Selected for Round 1 (n=1)",
         "Observed · Batch 0 (n=1)",
@@ -187,6 +193,33 @@ def test_three_axis_camera_orientation_is_stable_across_evidence_choices() -> No
 
     assert first.layout.uirevision == second.layout.uirevision
     assert first.layout.scene.uirevision == second.layout.scene.uirevision
+
+
+def test_three_axis_legend_keeps_a_fixed_viewport_across_scope_counts() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    round_zero = build_notebook_three_axis_scatter_figure(_rows(), contract=_contract())
+    rows = _rows()
+    later_observation = rows.loc[rows["id"].eq("observed-c")].copy()
+    later_observation["id"] = "observed-d"
+    later_observation["batch_key"] = "batch_1"
+    later_observation["display_label"] = "Observed D"
+    rows = pd.concat([rows, later_observation], ignore_index=True)
+    contract = _contract()
+    contract["observed_batches"] = [
+        {"id": "batch_0", "label": "Batch 0"},
+        {"id": "batch_1", "label": "Batch 1"},
+    ]
+    round_one = build_notebook_three_axis_scatter_figure(rows, contract=contract)
+
+    assert len(round_zero.data) == 3
+    assert len(round_one.data) == 4
+    assert round_zero.layout.margin == round_one.layout.margin
+    assert round_zero.layout.margin.autoexpand is False
+    assert round_zero.layout.legend.entrywidthmode == "fraction"
+    assert round_zero.layout.legend.entrywidth == pytest.approx(0.32)
 
 
 def test_three_axis_hover_identity_is_ledger_backed() -> None:
