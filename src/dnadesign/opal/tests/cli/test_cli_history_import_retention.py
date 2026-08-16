@@ -15,8 +15,11 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
+from dnadesign.opal.src.core.utils import OpalError
 from dnadesign.opal.src.storage.history_relocation.prediction_retention import (
+    FULL,
     SELECTED_HISTORY,
     prediction_dataset_sha256,
     validate_prediction_retention,
@@ -90,3 +93,47 @@ def test_selected_history_compares_candidate_ids_verbatim() -> None:
         label="Round 0",
         selections=selections,
     )
+
+
+def test_full_history_rejects_memberships_that_disagree_with_immutable_selections() -> None:
+    predictions = pd.DataFrame(
+        {
+            "id": ["candidate-a"],
+            "pred__selection_views": [[{"selection_view_id": "primary", "is_selected": True}]],
+        }
+    )
+    selections = pd.DataFrame({"id": ["candidate-b"], "selection_view_id": ["primary"]})
+
+    with pytest.raises(OpalError, match="retained prediction memberships differ from immutable selections"):
+        validate_prediction_retention(
+            predictions,
+            expected_scored_rows=1,
+            mode=FULL,
+            label="Round 0",
+            selections=selections,
+        )
+
+
+def test_history_import_rejects_duplicate_unselected_view_memberships() -> None:
+    predictions = pd.DataFrame(
+        {
+            "id": ["candidate-a"],
+            "pred__selection_views": [
+                [
+                    {"selection_view_id": "primary", "is_selected": True},
+                    {"selection_view_id": "secondary", "is_selected": False},
+                    {"selection_view_id": "secondary", "is_selected": False},
+                ]
+            ],
+        }
+    )
+    selections = pd.DataFrame({"id": ["candidate-a"], "selection_view_id": ["primary"]})
+
+    with pytest.raises(OpalError, match="retained prediction memberships must be unique"):
+        validate_prediction_retention(
+            predictions,
+            expected_scored_rows=3,
+            mode=SELECTED_HISTORY,
+            label="Round 0",
+            selections=selections,
+        )
