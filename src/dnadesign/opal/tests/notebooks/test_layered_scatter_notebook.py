@@ -913,6 +913,20 @@ def test_layered_scatter_round_overlay_allows_round_specific_display_limits(tmp_
     assert contract["selection_rounds"] == [0, 1]
 
 
+def test_layered_scatter_round_overlay_uses_one_shared_color_extent(tmp_path: Path) -> None:
+    round_zero = _choice(tmp_path, filename="frontier_r0.csv")
+    round_one = _choice(tmp_path, filename="frontier_r1.csv")
+    round_zero["manifest"].update({"run_id": "r0", "rounds": [0]})
+    round_one["manifest"].update({"run_id": "r1", "rounds": [1]})
+    round_zero["manifest"]["artifact_metadata"]["notebook_view"]["color_scale"]["extent"] = 2.5
+
+    contract = build_notebook_layered_scatter_contract({**round_one, "scope_options": [round_zero, round_one]})
+
+    assert contract is not None
+    assert contract["runtime"]["color_scale"]["extent"] == pytest.approx(2.5)
+    assert contract["selection_rounds"] == [0, 1]
+
+
 def test_layered_scatter_can_overlay_selected_cohorts_categorically_by_round(tmp_path: Path) -> None:
     round_zero = _choice(tmp_path, filename="frontier_r0.csv")
     round_one = _choice(tmp_path, filename="frontier_r1.csv")
@@ -940,6 +954,18 @@ def test_layered_scatter_can_overlay_selected_cohorts_categorically_by_round(tmp
         },
     )
     figure = render_layered_scatter_figure(visible, contract=contract)
+    round_one_visible = filter_notebook_layered_scatter_rows(
+        contract["rows"],
+        contract=contract,
+        state={
+            "show_prediction_pool": False,
+            "show_selected": True,
+            "selection_rounds": [1],
+            "observed_batches": [],
+            "label_scope": "none",
+        },
+    )
+    round_one_figure = render_layered_scatter_figure(round_one_visible, contract=contract)
     try:
         assert visible[["id", "__notebook_selection_round"]].to_dict("records") == [
             {"id": "selected-r0", "__notebook_selection_round": 0},
@@ -949,8 +975,13 @@ def test_layered_scatter_can_overlay_selected_cohorts_categorically_by_round(tmp
             "Selected for Round 0 (n=1)",
             "Selected for Round 1 (n=1)",
         ]
+        np.testing.assert_allclose(
+            _marker_vertices(figure, "Selected for Round 1"),
+            _marker_vertices(round_one_figure, "Selected for Round 1"),
+        )
     finally:
         plt.close(figure)
+        plt.close(round_one_figure)
 
 
 def test_layered_scatter_controls_offer_exact_manifest_backed_selection_rounds() -> None:

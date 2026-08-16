@@ -108,7 +108,7 @@ def build_notebook_layered_scatter_contract(choice: Mapping[str, Any]) -> dict[s
     observed_batch_marker_map(tuple(batch_ids), universe_batch_ids=tuple(batch_ids))
     batch_labels = _unique_observed_batch_labels(batch_ids)
     active_selection_round, round_options = resolve_layered_scatter_selection_rounds(choice, active_manifest=manifest)
-    selection_rows = _load_selection_round_rows(
+    selection_rows, shared_color_extent = _load_selection_round_rows(
         round_options,
         active_manifest=manifest,
         view=view,
@@ -116,13 +116,17 @@ def build_notebook_layered_scatter_contract(choice: Mapping[str, Any]) -> dict[s
         interactive=interactive,
         columns=columns,
     )
+    shared_runtime = dict(runtime)
+    shared_color_scale = dict(_mapping(runtime["color_scale"]))
+    shared_color_scale["extent"] = shared_color_extent
+    shared_runtime["color_scale"] = shared_color_scale
     return {
         "adapter": "layered_scatter_v1",
         "key": _layered_scatter_memory_key(manifest, workdir=workdir),
         "tidy_path": tidy_path,
         "rows": tidy,
         "view": dict(view),
-        "runtime": dict(runtime),
+        "runtime": shared_runtime,
         "interactive": dict(interactive),
         "active_selection_round": active_selection_round,
         "selection_rounds": sorted(round_options),
@@ -139,13 +143,14 @@ def _load_selection_round_rows(
     runtime: Mapping[str, Any],
     interactive: Mapping[str, Any],
     columns: list[str],
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, float]:
     selected_column = str(view["selection_column"])
     record_column = str(view["record_kind_column"])
     prediction_value = str(view["prediction_value"])
     active_kind = str(active_manifest.get("kind") or "")
     active_selection_view = str(active_manifest.get("selection_view_id") or "")
     cohorts: list[pd.DataFrame] = []
+    color_extents: list[float] = []
     for round_k, option in sorted(round_options.items()):
         option_manifest = _mapping(option.get("manifest"))
         if str(option_manifest.get("kind") or "") != active_kind:
@@ -159,6 +164,7 @@ def _load_selection_round_rows(
         _validate_runtime_semantics(option_runtime)
         if _round_overlay_coordinate_contract(option_runtime) != _round_overlay_coordinate_contract(runtime):
             raise ValueError("Layered-scatter round overlays must use the same coordinate display contract.")
+        color_extents.append(float(_mapping(option_runtime["color_scale"])["extent"]))
         workdir = str(option.get("workdir") or "").strip()
         if not workdir:
             raise ValueError("Layered-scatter round overlay requires the campaign workdir.")
@@ -179,11 +185,15 @@ def _load_selection_round_rows(
             raise ValueError(f"Layered-scatter selection round {round_k} contains no selected candidates.")
         selected["__notebook_selection_round"] = round_k
         cohorts.append(selected)
-    return pd.concat(cohorts, ignore_index=True)
+    return pd.concat(cohorts, ignore_index=True), max(color_extents)
 
 
 def _round_overlay_coordinate_contract(runtime: Mapping[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in runtime.items() if key not in {"x_limits", "y_limits"}}
+    contract = {key: value for key, value in runtime.items() if key not in {"x_limits", "y_limits"}}
+    color_scale = dict(_mapping(contract["color_scale"]))
+    color_scale.pop("extent", None)
+    contract["color_scale"] = color_scale
+    return contract
 
 
 def _layered_scatter_memory_key(manifest: Mapping[str, Any], *, workdir: str) -> str:

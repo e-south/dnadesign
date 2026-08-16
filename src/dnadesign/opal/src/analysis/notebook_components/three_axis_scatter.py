@@ -20,6 +20,7 @@ import pandas as pd
 
 from ...plots._mpl_utils import compact_batch_label
 from . import three_axis_scatter_style as style
+from .selection_round_encoding import selection_round_palette_index
 from .three_axis_camera_state import render_three_axis_camera_state
 from .three_axis_scatter_data import (
     THREE_AXIS_SCATTER_ADAPTER,
@@ -89,10 +90,7 @@ def build_notebook_three_axis_scatter_figure(
         displayed.loc[kinds.eq(prediction_value) & selection_rounds.notna()] if show_selected else displayed.iloc[0:0]
     )
     observed = displayed.loc[kinds.eq(observed_value)]
-    round_order = [int(value) for value in contract.get("selection_rounds") or []]
-    if len(round_order) != len(set(round_order)):
-        raise ValueError("Three-axis scatter selection rounds must be unique.")
-    round_palette_index = {round_k: index for index, round_k in enumerate(round_order)}
+    round_palette_index = selection_round_palette_index(contract)
 
     traces: list[Any] = []
     if not predictions.empty:
@@ -186,6 +184,7 @@ def render_notebook_three_axis_scatter(
         },
         label="Interactive three-family candidate landscape",
     )
+    plot_frame = widget.style({"width": "min(100%, 900px)", "margin": "0 auto"})
     camera_state = render_three_axis_camera_state(
         mo=mo,
         revision=THREE_AXIS_CAMERA_REVISION,
@@ -201,7 +200,7 @@ def render_notebook_three_axis_scatter(
         "candidate identity and family scores. The 2D figure remains the complete publication artifact; "
         "use the selected-candidate control for sequence inspection."
     )
-    return mo.vstack([widget, camera_state, caption], gap=0.2)
+    return mo.vstack([camera_state, plot_frame, caption], gap=0.2)
 
 
 def _trace(

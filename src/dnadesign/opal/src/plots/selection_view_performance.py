@@ -42,6 +42,15 @@ def _display_view_label(view_id: str, labels: Mapping[str, str]) -> str:
     return value
 
 
+def _wrapped_view_label(view_id: str, labels: Mapping[str, str], *, prefix: str = "") -> str:
+    return textwrap.fill(
+        f"{prefix}{_display_view_label(view_id, labels)}",
+        width=_VIEW_LABEL_WIDTH,
+        break_long_words=True,
+        break_on_hyphens=False,
+    )
+
+
 def _header_layout(*, round_count: int, title: str | None, subtitle: str | None) -> dict[str, float]:
     header_height = 2.0 if subtitle else (1.15 if title else 0.85)
     bottom_height = 1.35
@@ -101,6 +110,7 @@ def render_selection_view_performance(
             "font.size": 16,
             "axes.labelsize": 19,
             "axes.titlesize": 21,
+            "axes.titleweight": "semibold",
             "xtick.labelsize": 16,
             "ytick.labelsize": 16,
             "axes.spines.top": False,
@@ -154,25 +164,10 @@ def render_selection_view_performance(
                 ax.set_box_aspect(1)
                 ax.set_anchor("N")
                 ax.set_yticks(range(len(selected_views)))
-                ax.set_yticklabels(
-                    [
-                        textwrap.fill(
-                            f"Selected: {_display_view_label(view, labels)}",
-                            width=_VIEW_LABEL_WIDTH,
-                            break_long_words=False,
-                            break_on_hyphens=False,
-                        )
-                        for view in selected_views
-                    ]
-                )
+                ax.set_yticklabels([_wrapped_view_label(view, labels, prefix="Selected: ") for view in selected_views])
                 ax.set_xlabel(objective_value_label)
                 round_label = f"Round {observed_round}"
-                objective_label = textwrap.fill(
-                    _display_view_label(objective_view, labels),
-                    width=_VIEW_LABEL_WIDTH,
-                    break_long_words=False,
-                    break_on_hyphens=False,
-                )
+                objective_label = _wrapped_view_label(objective_view, labels)
                 ax.set_title(f"{objective_label} objective\n{round_label}", pad=18)
         if title:
             fig.suptitle(title, fontsize=25, fontweight="bold", x=0.5, y=layout["title_y"], ha="center")
@@ -211,7 +206,7 @@ def render_selection_view_performance(
         left = min(2.0 / figure_width, 0.24)
         fig.subplots_adjust(
             left=left,
-            right=1.0 - 0.2 / figure_width,
+            right=1.0 - 0.5 / figure_width,
             top=layout["top"],
             bottom=layout["bottom"],
             wspace=0.18,
