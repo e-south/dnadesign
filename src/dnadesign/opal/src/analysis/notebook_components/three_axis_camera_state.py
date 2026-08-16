@@ -42,12 +42,17 @@ def render_three_axis_camera_state(*, mo: Any, revision: str) -> Any:
   const bind = (plot) => {{
     if (plot.layout?.scene?.uirevision !== revision) return;
     const saved = cameras[revision];
-    if (saved && !cameraMatches(plot._fullLayout?.scene?.camera, saved) && host.Plotly?.relayout) {{
+    const activeCamera = plot._fullLayout?.scene?.camera;
+    if (saved && activeCamera && !cameraMatches(activeCamera, saved) && host.Plotly?.relayout) {{
       plot.style.visibility = "hidden";
-      Promise.resolve(host.Plotly.relayout(plot, {{"scene.camera": saved}})).then(
-        () => reveal(plot),
-        () => reveal(plot),
-      );
+      try {{
+        Promise.resolve(host.Plotly.relayout(plot, {{"scene.camera": saved}})).then(
+          () => reveal(plot),
+          () => reveal(plot),
+        );
+      }} catch {{
+        reveal(plot);
+      }}
     }} else {{
       reveal(plot);
     }}
@@ -77,18 +82,21 @@ def render_three_axis_camera_state(*, mo: Any, revision: str) -> Any:
   const scan = () => {{
     if (scanning) return;
     scanning = true;
-    observe(host.document);
-    const visit = (root) => {{
-      for (const element of root.querySelectorAll("*")) {{
-        if (element.classList?.contains("js-plotly-plot")) bind(element);
-        if (element.shadowRoot) {{
-          observe(element.shadowRoot);
-          visit(element.shadowRoot);
+    try {{
+      observe(host.document);
+      const visit = (root) => {{
+        for (const element of root.querySelectorAll("*")) {{
+          if (element.classList?.contains("js-plotly-plot")) bind(element);
+          if (element.shadowRoot) {{
+            observe(element.shadowRoot);
+            visit(element.shadowRoot);
+          }}
         }}
-      }}
-    }};
-    visit(host.document);
-    scanning = false;
+      }};
+      visit(host.document);
+    }} finally {{
+      scanning = false;
+    }}
   }};
 
   let attempts = 40;
