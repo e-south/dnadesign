@@ -357,7 +357,8 @@ def test_three_axis_widget_uses_marimo_plotly_happy_path() -> None:
     assert 'plot.style.visibility = "hidden"' in widget["items"][0]["text"]
     assert "plotly_relayout" in widget["items"][0]["text"]
     assert "scene.camera" in widget["items"][0]["text"]
-    restore_position = widget["items"][0]["text"].index("if (saved && !cameraMatches")
+    assert "plot._fullLayout?.scene?.camera" in widget["items"][0]["text"]
+    restore_position = widget["items"][0]["text"].index("if (saved && activeCamera")
     binding_position = widget["items"][0]["text"].index("if (plot.dataset.opalCameraRevision")
     assert restore_position < binding_position
     assert widget["items"][0]["width"] == "0"
