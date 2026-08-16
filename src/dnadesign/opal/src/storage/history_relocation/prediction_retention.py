@@ -149,21 +149,21 @@ def validate_prediction_retention(
                 f"predictions={observed_rows}, expected={expected_scored_rows}.",
                 ExitCodes.CONTRACT_VIOLATION,
             )
-        return
-    if mode != SELECTED_HISTORY:
+    elif mode == SELECTED_HISTORY:
+        if observed_rows <= 0 or observed_rows > expected_scored_rows:
+            raise OpalError(
+                f"{label} selected prediction history has an invalid row count: "
+                f"predictions={observed_rows}, originally_scored={expected_scored_rows}.",
+                ExitCodes.CONTRACT_VIOLATION,
+            )
+    else:
         raise OpalError(f"{label} has an unsupported prediction retention mode: {mode!r}.")
-    if observed_rows <= 0 or observed_rows > expected_scored_rows:
-        raise OpalError(
-            f"{label} selected prediction history has an invalid row count: "
-            f"predictions={observed_rows}, originally_scored={expected_scored_rows}.",
-            ExitCodes.CONTRACT_VIOLATION,
-        )
     if "pred__selection_views" not in frame:
-        raise OpalError(f"{label} selected prediction history is missing selection memberships.")
-    if not frame["pred__selection_views"].map(selected_by_any_view).all():
+        raise OpalError(f"{label} prediction history is missing selection memberships.")
+    if mode == SELECTED_HISTORY and not frame["pred__selection_views"].map(selected_by_any_view).all():
         raise OpalError(f"{label} selected prediction history contains an unselected candidate.")
     if selections is None:
-        raise OpalError(f"{label} selected prediction history requires immutable selections.")
+        raise OpalError(f"{label} prediction history requires immutable selections.")
     if _prediction_memberships(frame, label=label) != _selection_memberships(selections, label=label):
         raise OpalError(
             f"{label} retained prediction memberships differ from immutable selections.",
@@ -174,19 +174,22 @@ def validate_prediction_retention(
 def _prediction_memberships(frame: pd.DataFrame, *, label: str) -> set[tuple[str, str]]:
     if "id" not in frame:
         raise OpalError(f"{label} selected prediction history is missing candidate IDs.")
-    memberships: list[tuple[str, str]] = []
+    all_memberships: list[tuple[str, str]] = []
+    selected_memberships: set[tuple[str, str]] = set()
     for candidate_id, payload in zip(frame["id"], frame["pred__selection_views"], strict=True):
         if hasattr(payload, "tolist"):
             payload = payload.tolist()
         for item in payload:
+            membership = (str(candidate_id), str(item["selection_view_id"]))
+            all_memberships.append(membership)
             if bool(item["is_selected"]):
-                memberships.append((str(candidate_id), str(item["selection_view_id"])))
-    if len(memberships) != len(set(memberships)):
+                selected_memberships.add(membership)
+    if len(all_memberships) != len(set(all_memberships)):
         raise OpalError(
             f"{label} retained prediction memberships must be unique.",
             ExitCodes.CONTRACT_VIOLATION,
         )
-    return set(memberships)
+    return selected_memberships
 
 
 def _selection_memberships(frame: pd.DataFrame, *, label: str) -> set[tuple[str, str]]:
