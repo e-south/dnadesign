@@ -108,7 +108,7 @@ def build_notebook_layered_scatter_contract(choice: Mapping[str, Any]) -> dict[s
     observed_batch_marker_map(tuple(batch_ids), universe_batch_ids=tuple(batch_ids))
     batch_labels = _unique_observed_batch_labels(batch_ids)
     active_selection_round, round_options = resolve_layered_scatter_selection_rounds(choice, active_manifest=manifest)
-    selection_rows, shared_color_extent = _load_selection_round_rows(
+    selection_rows, shared_display = _load_selection_round_rows(
         round_options,
         active_manifest=manifest,
         view=view,
@@ -118,8 +118,23 @@ def build_notebook_layered_scatter_contract(choice: Mapping[str, Any]) -> dict[s
     )
     shared_runtime = dict(runtime)
     shared_color_scale = dict(_mapping(runtime["color_scale"]))
-    shared_color_scale["extent"] = shared_color_extent
+    shared_color_scale.update(
+        extent=shared_display["color_extent"],
+        context=(
+            shared_display["color_contexts"][0]
+            if len(shared_display["color_contexts"]) == 1
+            else "shared across loaded rounds; endpoint values remain in the plotted data"
+        ),
+        extend=_shared_colorbar_extend(
+            minimum=shared_display["color_min"],
+            maximum=shared_display["color_max"],
+            center=float(shared_color_scale["center"]),
+            extent=shared_display["color_extent"],
+        ),
+    )
     shared_runtime["color_scale"] = shared_color_scale
+    shared_runtime["x_limits"] = shared_display["x_limits"]
+    shared_runtime["y_limits"] = shared_display["y_limits"]
     return {
         "adapter": "layered_scatter_v1",
         "key": _layered_scatter_memory_key(manifest, workdir=workdir),
@@ -143,7 +158,7 @@ def _load_selection_round_rows(
     runtime: Mapping[str, Any],
     interactive: Mapping[str, Any],
     columns: list[str],
-) -> tuple[pd.DataFrame, float]:
+) -> tuple[pd.DataFrame, dict[str, Any]]:
     selected_column = str(view["selection_column"])
     record_column = str(view["record_kind_column"])
     prediction_value = str(view["prediction_value"])
@@ -151,6 +166,11 @@ def _load_selection_round_rows(
     active_selection_view = str(active_manifest.get("selection_view_id") or "")
     cohorts: list[pd.DataFrame] = []
     color_extents: list[float] = []
+    color_contexts: set[str] = set()
+    color_minima: list[float] = []
+    color_maxima: list[float] = []
+    x_limits: list[tuple[float, float]] = []
+    y_limits: list[tuple[float, float]] = []
     for round_k, option in sorted(round_options.items()):
         option_manifest = _mapping(option.get("manifest"))
         if str(option_manifest.get("kind") or "") != active_kind:
@@ -164,7 +184,11 @@ def _load_selection_round_rows(
         _validate_runtime_semantics(option_runtime)
         if _round_overlay_coordinate_contract(option_runtime) != _round_overlay_coordinate_contract(runtime):
             raise ValueError("Layered-scatter round overlays must use the same coordinate display contract.")
-        color_extents.append(float(_mapping(option_runtime["color_scale"])["extent"]))
+        option_color_scale = _mapping(option_runtime["color_scale"])
+        color_extents.append(float(option_color_scale["extent"]))
+        color_contexts.add(str(option_color_scale["context"]))
+        x_limits.append(_runtime_limits(option_runtime, "x_limits"))
+        y_limits.append(_runtime_limits(option_runtime, "y_limits"))
         workdir = str(option.get("workdir") or "").strip()
         if not workdir:
             raise ValueError("Layered-scatter round overlay requires the campaign workdir.")
@@ -177,6 +201,9 @@ def _load_selection_round_rows(
         if missing:
             raise ValueError(f"Layered-scatter round overlay is missing columns: {missing}.")
         _validate_tidy_semantics(tidy, view=view, interactive=interactive)
+        color_values = pd.to_numeric(tidy[str(view["color_column"])], errors="raise")
+        color_minima.append(float(color_values.min()))
+        color_maxima.append(float(color_values.max()))
         selected = tidy.loc[
             tidy[record_column].astype(str).eq(prediction_value) & tidy[selected_column].fillna(False).astype(bool),
             columns,
@@ -185,15 +212,45 @@ def _load_selection_round_rows(
             raise ValueError(f"Layered-scatter selection round {round_k} contains no selected candidates.")
         selected["__notebook_selection_round"] = round_k
         cohorts.append(selected)
-    return pd.concat(cohorts, ignore_index=True), max(color_extents)
+    return pd.concat(cohorts, ignore_index=True), {
+        "color_extent": max(color_extents),
+        "color_contexts": sorted(color_contexts),
+        "color_min": min(color_minima),
+        "color_max": max(color_maxima),
+        "x_limits": [min(lower for lower, _ in x_limits), max(upper for _, upper in x_limits)],
+        "y_limits": [min(lower for lower, _ in y_limits), max(upper for _, upper in y_limits)],
+    }
 
 
 def _round_overlay_coordinate_contract(runtime: Mapping[str, Any]) -> dict[str, Any]:
     contract = {key: value for key, value in runtime.items() if key not in {"x_limits", "y_limits"}}
     color_scale = dict(_mapping(contract["color_scale"]))
-    color_scale.pop("extent", None)
+    for field in ("context", "extend", "extent"):
+        color_scale.pop(field, None)
     contract["color_scale"] = color_scale
     return contract
+
+
+def _runtime_limits(runtime: Mapping[str, Any], field: str) -> tuple[float, float]:
+    value = runtime[field]
+    if not isinstance(value, list) or len(value) != 2:
+        raise ValueError(f"Layered-scatter {field} must contain two values.")
+    lower, upper = (float(item) for item in value)
+    if not np.isfinite([lower, upper]).all() or lower >= upper:
+        raise ValueError(f"Layered-scatter {field} must be finite and increasing.")
+    return lower, upper
+
+
+def _shared_colorbar_extend(*, minimum: float, maximum: float, center: float, extent: float) -> str:
+    below = minimum < center - extent
+    above = maximum > center + extent
+    if below and above:
+        return "both"
+    if below:
+        return "min"
+    if above:
+        return "max"
+    return "neither"
 
 
 def _layered_scatter_memory_key(manifest: Mapping[str, Any], *, workdir: str) -> str:
