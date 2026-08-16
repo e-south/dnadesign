@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+import yaml
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
@@ -25,6 +26,7 @@ from dnadesign.opal.src.storage.state import CampaignState
 from dnadesign.opal.tests._cli_helpers import (
     write_campaign_yaml,
     write_ledger,
+    write_ledger_labels,
     write_records,
     write_state,
 )
@@ -251,6 +253,67 @@ def test_history_import_consolidates_disjoint_rounds_without_retraining(tmp_path
     assert (source / "state.json").is_file()
 
 
+def test_history_import_rejects_a_target_config_that_diverges_from_run_history(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=True)
+    config = yaml.safe_load(target_campaign.read_text(encoding="utf-8"))
+    config["selection_views"][0]["objective"]["params"]["setpoint_vector"] = [1, 0, 0, 0]
+    target_campaign.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "history",
+            "import",
+            "-c",
+            str(target_campaign),
+            "--source-workdir",
+            str(source),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "target campaign config differs from the verified run history" in result.output.lower()
+    assert not (target / "outputs" / "rounds" / "round_0").exists()
+
+
+def test_history_import_consolidates_the_append_only_label_ledger(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=True)
+    write_ledger_labels(source, round_index=0)
+    write_ledger_labels(target, round_index=1)
+
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "history",
+            "import",
+            "-c",
+            str(target_campaign),
+            "--source-workdir",
+            str(source),
+            "--apply",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    labels = read_parquet_df(target / "outputs" / "ledger" / "labels.parquet")
+    assert sorted(labels["observed_round"].astype(int).tolist()) == [0, 1]
+    receipt = json.loads(Path(json.loads(result.output)["receipt_path"]).read_text(encoding="utf-8"))
+    label_paths = {
+        entry["path"] for entry in receipt["canonical_files"] if "outputs/ledger/labels.parquet/" in entry["path"]
+    }
+    assert len(label_paths) == 2
+
+
 def test_history_import_does_not_restore_stale_state_after_concurrent_drift(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -291,5 +354,52 @@ def test_history_import_does_not_restore_stale_state_after_concurrent_drift(
 
     assert result.exit_code == 2
     assert "changed while the relocation was staged" in result.output
+    assert json.loads(state_path.read_text(encoding="utf-8"))["updated_at"] == concurrent_state["updated_at"]
+    assert not (target / "outputs" / "rounds" / "round_0").exists()
+
+
+def test_history_import_rolls_back_to_the_state_seen_under_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=True)
+    state_path = target / "state.json"
+    concurrent_state = json.loads(state_path.read_text(encoding="utf-8"))
+    concurrent_state["updated_at"] = "2026-08-16T00:00:00+00:00"
+
+    from dnadesign.opal.src.storage.history_relocation import materialization
+
+    stage_history = materialization._stage_history
+
+    def stage_after_concurrent_update(*args, **kwargs):
+        state_path.write_text(json.dumps(concurrent_state, sort_keys=True), encoding="utf-8")
+        staged = stage_history(*args, **kwargs)
+        receipt_path = Path(staged["receipt_path"])
+        receipt_path.parent.mkdir(parents=True, exist_ok=True)
+        receipt_path.write_text("collision", encoding="utf-8")
+        return staged
+
+    monkeypatch.setattr(materialization, "_stage_history", stage_after_concurrent_update)
+
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "history",
+            "import",
+            "-c",
+            str(target_campaign),
+            "--source-workdir",
+            str(source),
+            "--apply",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "destination already exists" in result.output
     assert json.loads(state_path.read_text(encoding="utf-8"))["updated_at"] == concurrent_state["updated_at"]
     assert not (target / "outputs" / "rounds" / "round_0").exists()

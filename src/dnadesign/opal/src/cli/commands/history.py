@@ -19,6 +19,7 @@ import typer
 from ...core.utils import ExitCodes, OpalError, print_stdout
 from ...storage.history_relocation.inspection import plan_history_relocation
 from ...storage.history_relocation.materialization import apply_history_relocation
+from ...storage.history_relocation.state_projection import require_target_config_matches_run_history
 from ..formatting import kv_block
 from ..registry import cli_group
 from ._common import (
@@ -51,6 +52,7 @@ def history_import(
             target_workdir=target_workdir,
             expected_slug=cfg.campaign.slug,
         )
+        require_target_config_matches_run_history(plan, cfg)
         payload: dict[str, object] = {
             "schema_version": "opal.history_import.v1",
             "campaign_slug": plan.campaign_slug,
