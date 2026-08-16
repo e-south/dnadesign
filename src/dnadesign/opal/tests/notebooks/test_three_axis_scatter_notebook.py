@@ -178,6 +178,28 @@ def test_three_axis_round_encoding_is_stable_when_an_earlier_round_is_hidden() -
     assert visible_round_one.marker.symbol == combined_round_one.marker.symbol
 
 
+def test_three_axis_round_encodings_remain_distinct_after_six_rounds() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    template = _rows().loc[_rows()["id"].eq("selected-b")]
+    round_zero = template.assign(id="selected-zero", __notebook_selection_round=0)
+    round_six = template.assign(id="selected-six", __notebook_selection_round=6)
+    rows = pd.concat([_rows().loc[_rows()["id"].ne("selected-b")], round_zero, round_six], ignore_index=True)
+    contract = _contract()
+    contract["selection_rounds"] = list(range(7))
+
+    figure = build_notebook_three_axis_scatter_figure(rows, contract=contract)
+    selected_traces = [trace for trace in figure.data if trace.name.startswith("Selected for Round")]
+
+    assert [trace.name for trace in selected_traces] == ["Selected for Round 0 (n=1)", "Selected for Round 6 (n=1)"]
+    assert (selected_traces[0].marker.color, selected_traces[0].marker.symbol) != (
+        selected_traces[1].marker.color,
+        selected_traces[1].marker.symbol,
+    )
+
+
 def test_three_axis_camera_orientation_is_stable_across_evidence_choices() -> None:
     from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
         build_notebook_three_axis_scatter_figure,
@@ -220,6 +242,36 @@ def test_three_axis_legend_keeps_a_fixed_viewport_across_scope_counts() -> None:
     assert round_zero.layout.margin.autoexpand is False
     assert round_zero.layout.legend.entrywidthmode == "fraction"
     assert round_zero.layout.legend.entrywidth == pytest.approx(0.32)
+
+
+def test_three_axis_legend_reserves_rows_for_mature_campaigns_without_shrinking_the_scene() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    baseline = build_notebook_three_axis_scatter_figure(_rows(), contract=_contract())
+    observed_template = _rows().loc[_rows()["id"].eq("observed-c")]
+    observed = pd.concat(
+        [
+            observed_template.assign(
+                id=f"observed-{index}",
+                batch_key=f"batch_{index}",
+                display_label=f"Observed {index}",
+            )
+            for index in range(10)
+        ],
+        ignore_index=True,
+    )
+    rows = pd.concat([_rows().loc[_rows()["record_kind"].ne("observed_label")], observed], ignore_index=True)
+    contract = _contract()
+    contract["observed_batches"] = [{"id": f"batch_{index}", "label": f"Batch {index}"} for index in range(10)]
+
+    mature = build_notebook_three_axis_scatter_figure(rows, contract=contract)
+
+    assert len(mature.data) == 12
+    assert mature.layout.margin.b > baseline.layout.margin.b
+    assert mature.layout.height > baseline.layout.height
+    assert mature.layout.height - mature.layout.margin.b == baseline.layout.height - baseline.layout.margin.b
 
 
 def test_three_axis_hover_identity_is_ledger_backed() -> None:
