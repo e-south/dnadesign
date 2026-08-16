@@ -267,8 +267,10 @@ def test_three_axis_legend_reserves_rows_for_mature_campaigns_without_shrinking_
     contract["observed_batches"] = [{"id": f"batch_{index}", "label": f"Batch {index}"} for index in range(10)]
 
     mature = build_notebook_three_axis_scatter_figure(rows, contract=contract)
+    observed_traces = [trace for trace in mature.data if trace.name.startswith("Observed ·")]
 
     assert len(mature.data) == 12
+    assert len({(trace.marker.color, trace.marker.symbol) for trace in observed_traces}) == 10
     assert mature.layout.margin.b > baseline.layout.margin.b
     assert mature.layout.height > baseline.layout.height
     assert mature.layout.height - mature.layout.margin.b == baseline.layout.height - baseline.layout.margin.b
