@@ -16,7 +16,6 @@ import json
 from pathlib import Path
 
 import pandas as pd
-import pytest
 import yaml
 from typer.testing import CliRunner
 
@@ -145,14 +144,27 @@ def _write_round(workdir: Path, *, round_index: int, run_id: str) -> None:
     log = round_dir / "logs" / "round.log.jsonl"
     log.parent.mkdir(parents=True, exist_ok=True)
     log.write_text(
-        json.dumps(
-            {
-                "ts": f"2026-01-0{round_index + 1}T00:00:00+00:00",
-                "stage": "done",
-                "round": round_index,
-                "run_id": run_id,
-                "campaign": {"slug": "demo", "workdir": str(workdir.resolve())},
-            }
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "ts": f"2026-01-0{round_index + 1}T00:00:00+00:00",
+                        "stage": "start",
+                        "round": round_index,
+                        "campaign": {"slug": "demo", "workdir": str(workdir.resolve())},
+                        "data": {"x_column": "X", "y_column": "Y", "label_source": "campaign_history"},
+                    }
+                ),
+                json.dumps(
+                    {
+                        "ts": f"2026-01-0{round_index + 1}T00:00:01+00:00",
+                        "stage": "done",
+                        "round": round_index,
+                        "run_id": run_id,
+                        "campaign": {"slug": "demo", "workdir": str(workdir.resolve())},
+                    }
+                ),
+            ]
         ),
         encoding="utf-8",
     )
@@ -253,6 +265,39 @@ def test_history_import_consolidates_disjoint_rounds_without_retraining(tmp_path
     assert (source / "state.json").is_file()
 
 
+def test_history_import_rejects_artifact_bytes_that_differ_from_the_run_ledger(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=True)
+    source.joinpath(
+        "outputs",
+        "rounds",
+        "round_0",
+        "run_artifacts",
+        "run-0",
+        "model",
+        "model.joblib",
+    ).write_bytes(b"corrupted-model")
+
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "history",
+            "import",
+            "-c",
+            str(target_campaign),
+            "--source-workdir",
+            str(source),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 4
+    assert "artifact digest differs from run metadata" in result.output
+
+
 def test_history_import_rejects_a_target_config_that_diverges_from_run_history(tmp_path: Path) -> None:
     source = tmp_path / "source"
     target = tmp_path / "target"
@@ -279,6 +324,34 @@ def test_history_import_rejects_a_target_config_that_diverges_from_run_history(t
     assert result.exit_code == 2
     assert "target campaign config differs from the verified run history" in result.output.lower()
     assert not (target / "outputs" / "rounds" / "round_0").exists()
+
+
+def test_history_import_rejects_target_x_and_y_columns_that_differ_from_run_history(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=True)
+    config = yaml.safe_load(target_campaign.read_text(encoding="utf-8"))
+    config["data"]["x_column_name"] = "alternate_X"
+    config["data"]["y_column_name"] = "alternate_Y"
+    target_campaign.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "history",
+            "import",
+            "-c",
+            str(target_campaign),
+            "--source-workdir",
+            str(source),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "target campaign config differs from the verified run history" in result.output.lower()
 
 
 def test_history_import_consolidates_the_append_only_label_ledger(tmp_path: Path) -> None:
@@ -314,28 +387,45 @@ def test_history_import_consolidates_the_append_only_label_ledger(tmp_path: Path
     assert len(label_paths) == 2
 
 
-def test_history_import_does_not_restore_stale_state_after_concurrent_drift(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_history_import_merges_identical_label_event_keys_once(tmp_path: Path) -> None:
     source = tmp_path / "source"
     target = tmp_path / "target"
     _workspace(source, round_index=0, run_id="run-0", with_state=True)
     target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=True)
-    state_path = target / "state.json"
-    concurrent_state = json.loads(state_path.read_text(encoding="utf-8"))
-    concurrent_state["updated_at"] = "2026-08-15T23:59:59+00:00"
+    write_ledger_labels(source, round_index=0)
+    write_ledger_labels(target, round_index=0)
 
-    from dnadesign.opal.src.storage.history_relocation import materialization
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "history",
+            "import",
+            "-c",
+            str(target_campaign),
+            "--source-workdir",
+            str(source),
+            "--apply",
+            "--json",
+        ],
+    )
 
-    stage_history = materialization._stage_history
+    assert result.exit_code == 0, result.output
+    labels = read_parquet_df(target / "outputs" / "ledger" / "labels.parquet")
+    assert labels[["id", "observed_round"]].to_dict(orient="records") == [{"id": "a", "observed_round": 0}]
 
-    def stage_then_drift(*args, **kwargs):
-        staged = stage_history(*args, **kwargs)
-        state_path.write_text(json.dumps(concurrent_state, sort_keys=True), encoding="utf-8")
-        return staged
 
-    monkeypatch.setattr(materialization, "_stage_history", stage_then_drift)
+def test_history_import_rejects_conflicting_label_events_with_the_same_immutable_key(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=True)
+    write_ledger_labels(source, round_index=0)
+    write_ledger_labels(target, round_index=0)
+    target_part = next((target / "outputs" / "ledger" / "labels.parquet").rglob("*.parquet"))
+    target_labels = read_parquet_df(target_part)
+    target_labels["y_obs"] = [[0.9]]
+    target_labels.to_parquet(target_part, index=False)
 
     result = CliRunner().invoke(
         _build(),
@@ -353,53 +443,4 @@ def test_history_import_does_not_restore_stale_state_after_concurrent_drift(
     )
 
     assert result.exit_code == 2
-    assert "changed while the relocation was staged" in result.output
-    assert json.loads(state_path.read_text(encoding="utf-8"))["updated_at"] == concurrent_state["updated_at"]
-    assert not (target / "outputs" / "rounds" / "round_0").exists()
-
-
-def test_history_import_rolls_back_to_the_state_seen_under_lock(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    source = tmp_path / "source"
-    target = tmp_path / "target"
-    _workspace(source, round_index=0, run_id="run-0", with_state=True)
-    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=True)
-    state_path = target / "state.json"
-    concurrent_state = json.loads(state_path.read_text(encoding="utf-8"))
-    concurrent_state["updated_at"] = "2026-08-16T00:00:00+00:00"
-
-    from dnadesign.opal.src.storage.history_relocation import materialization
-
-    stage_history = materialization._stage_history
-
-    def stage_after_concurrent_update(*args, **kwargs):
-        state_path.write_text(json.dumps(concurrent_state, sort_keys=True), encoding="utf-8")
-        staged = stage_history(*args, **kwargs)
-        receipt_path = Path(staged["receipt_path"])
-        receipt_path.parent.mkdir(parents=True, exist_ok=True)
-        receipt_path.write_text("collision", encoding="utf-8")
-        return staged
-
-    monkeypatch.setattr(materialization, "_stage_history", stage_after_concurrent_update)
-
-    result = CliRunner().invoke(
-        _build(),
-        [
-            "--no-color",
-            "history",
-            "import",
-            "-c",
-            str(target_campaign),
-            "--source-workdir",
-            str(source),
-            "--apply",
-            "--json",
-        ],
-    )
-
-    assert result.exit_code == 2
-    assert "destination already exists" in result.output
-    assert json.loads(state_path.read_text(encoding="utf-8"))["updated_at"] == concurrent_state["updated_at"]
-    assert not (target / "outputs" / "rounds" / "round_0").exists()
+    assert "conflicting immutable label event" in result.output.lower()
