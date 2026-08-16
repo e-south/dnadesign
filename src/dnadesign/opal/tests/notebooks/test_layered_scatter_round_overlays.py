@@ -55,17 +55,19 @@ def test_layered_scatter_contract_loads_exact_selected_cohorts_for_every_round(t
     ]
 
 
-def test_layered_scatter_round_overlay_allows_round_specific_display_limits(tmp_path: Path) -> None:
+def test_layered_scatter_round_overlay_unions_round_specific_display_limits(tmp_path: Path) -> None:
     round_zero = _choice(tmp_path, filename="frontier_r0.csv")
     round_one = _choice(tmp_path, filename="frontier_r1.csv")
     round_zero["manifest"].update({"run_id": "r0", "rounds": [0]})
     round_one["manifest"].update({"run_id": "r1", "rounds": [1]})
+    round_zero["manifest"]["artifact_metadata"]["notebook_view"]["x_limits"] = [-2.0, 3.0]
     round_zero["manifest"]["artifact_metadata"]["notebook_view"]["y_limits"] = [-3.0, 4.0]
 
     contract = build_notebook_layered_scatter_contract({**round_one, "scope_options": [round_zero, round_one]})
 
     assert contract is not None
-    assert contract["runtime"]["y_limits"] == [-0.5, 1.8]
+    assert contract["runtime"]["x_limits"] == [-2.0, 3.0]
+    assert contract["runtime"]["y_limits"] == [-3.0, 4.0]
     assert contract["selection_rounds"] == [0, 1]
 
 
@@ -81,6 +83,23 @@ def test_layered_scatter_round_overlay_uses_one_shared_color_extent(tmp_path: Pa
     assert contract is not None
     assert contract["runtime"]["color_scale"]["extent"] == pytest.approx(2.5)
     assert contract["selection_rounds"] == [0, 1]
+
+
+def test_layered_scatter_round_overlay_derives_one_combined_color_disclosure(tmp_path: Path) -> None:
+    round_zero = _choice(tmp_path, filename="frontier_r0.csv")
+    round_one = _choice(tmp_path, filename="frontier_r1.csv")
+    round_zero["manifest"].update({"run_id": "r0", "rounds": [0]})
+    round_one["manifest"].update({"run_id": "r1", "rounds": [1]})
+    round_zero_color = round_zero["manifest"]["artifact_metadata"]["notebook_view"]["color_scale"]
+    round_zero_color["context"] += "; 1 visible value saturates at the color endpoint"
+    round_zero_color["extend"] = "max"
+
+    contract = build_notebook_layered_scatter_contract({**round_one, "scope_options": [round_zero, round_one]})
+
+    assert contract is not None
+    shared_color = contract["runtime"]["color_scale"]
+    assert shared_color["context"] == "shared across loaded rounds; endpoint values remain in the plotted data"
+    assert shared_color["extend"] == "neither"
 
 
 def test_layered_scatter_can_overlay_selected_cohorts_categorically_by_round(tmp_path: Path) -> None:
