@@ -244,28 +244,53 @@ def _lane_layout(
     upper: float,
     prefer_right: bool,
 ) -> list[tuple[list[int], bool, list[float]]]:
+    if max_lanes == 2 and len(horizontal_order) >= 4:
+        return _two_lane_layout(
+            desired_y,
+            heights,
+            horizontal_order=horizontal_order,
+            lower=lower,
+            upper=upper,
+        )
     try:
         centers = _spread_centers(desired_y, heights, lower=lower, upper=upper, gap=3.0)
     except OpalError:
         if max_lanes == 1:
             raise
-        split = (len(horizontal_order) + 1) // 2
-        specifications = ((list(horizontal_order[:split]), False), (list(horizontal_order[split:]), True))
-        return [
-            (
-                indexes,
-                use_right,
-                _spread_centers(
-                    [desired_y[index] for index in indexes],
-                    [heights[index] for index in indexes],
-                    lower=lower,
-                    upper=upper,
-                    gap=3.0,
-                ),
-            )
-            for indexes, use_right in specifications
-        ]
+        return _two_lane_layout(
+            desired_y,
+            heights,
+            horizontal_order=horizontal_order,
+            lower=lower,
+            upper=upper,
+        )
     return [(list(range(len(desired_y))), prefer_right, centers)]
+
+
+def _two_lane_layout(
+    desired_y: Sequence[float],
+    heights: Sequence[float],
+    *,
+    horizontal_order: Sequence[int],
+    lower: float,
+    upper: float,
+) -> list[tuple[list[int], bool, list[float]]]:
+    split = (len(horizontal_order) + 1) // 2
+    specifications = ((list(horizontal_order[:split]), False), (list(horizontal_order[split:]), True))
+    return [
+        (
+            indexes,
+            use_right,
+            _spread_centers(
+                [desired_y[index] for index in indexes],
+                [heights[index] for index in indexes],
+                lower=lower,
+                upper=upper,
+                gap=3.0,
+            ),
+        )
+        for indexes, use_right in specifications
+    ]
 
 
 def _spread_centers(

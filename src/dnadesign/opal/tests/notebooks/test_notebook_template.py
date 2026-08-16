@@ -74,7 +74,6 @@ from dnadesign.opal.src.analysis.notebook_components import (
     render_notebook_baserender_record,
     render_notebook_campaign_set_metric_comparison_image,
     render_notebook_campaign_set_selection_overlap_image,
-    render_notebook_review_control_surface,
     render_notebook_visual_panel,
     render_visual_surface_cells,
     resolve_notebook_baserender_preferred_record_id,
@@ -89,14 +88,6 @@ from dnadesign.opal.src.analysis.notebook_set_template import render_campaign_se
 from dnadesign.opal.src.analysis.notebook_template import render_campaign_notebook
 from dnadesign.opal.src.core.utils import OpalError
 from dnadesign.opal.src.registries.plots import describe_plot_kind, get_plot, list_plot_kinds
-
-
-class _ControlSurfaceFakeMo:
-    def hstack(self, items: list[object], **_: object) -> dict[str, object]:
-        return {"kind": "hstack", "items": items}
-
-    def vstack(self, items: list[object], *, gap: float) -> dict[str, object]:
-        return {"kind": "vstack", "items": items, "gap": gap}
 
 
 def test_notebook_template_data_source_options() -> None:
@@ -363,161 +354,10 @@ def test_notebook_template_keeps_three_axis_inspector_single_purpose() -> None:
 
     assert "baserender_record_selector=baserender_record_selector" in text
     assert 'baserender_record_selector if figure_mode == "interactive_3d" else None' not in control_text
-    assert 'mo.hstack(controls, justify="start", align="end", wrap=True, gap=0.35)' in control_text
+    assert 'widths="equal"' in control_text
     assert "mo.hstack([baserender_record_selector]" not in sequence_panel_text
     assert "render_notebook_three_axis_sequence_companion" not in visual_panel_text
     assert 'in {"baserender", "campaign_set_baserender"}' in layout_text
-
-
-def test_notebook_review_control_surface_groups_plot_controls_by_semantics() -> None:
-    mo = _ControlSurfaceFakeMo()
-    rendered = render_notebook_review_control_surface(
-        active_view_mode="Campaign",
-        campaign_ui="campaign",
-        selection_view_ui="selection-view",
-        view_mode_ui="view",
-        visual_group_ui="section",
-        plot_ui="plot",
-        plot_scope_ui="plot-scope",
-        reader_evidence_artifact_ui="reader-artifact",
-        selected_visual_choice={"surface_kind": "plot"},
-        mo=mo,
-    )
-
-    assert rendered == {
-        "kind": "hstack",
-        "items": [
-            "campaign",
-            "selection-view",
-            "view",
-            "section",
-            "plot",
-            "plot-scope",
-        ],
-    }
-
-
-def test_notebook_review_control_surface_hides_selection_view_for_campaign_scoped_visual() -> None:
-    rendered = render_notebook_review_control_surface(
-        active_view_mode="Campaign",
-        campaign_ui="campaign",
-        selection_view_ui="selection-view",
-        view_mode_ui="view",
-        visual_group_ui="section",
-        plot_ui="deliverable",
-        selected_visual_choice={
-            "surface_kind": "selection_batch",
-            "selection_scope": "campaign",
-        },
-        mo=_ControlSurfaceFakeMo(),
-    )
-
-    assert rendered["items"] == ["campaign", "view", "section", "deliverable"]
-
-
-def test_notebook_review_control_surface_groups_reader_controls_with_deliverable() -> None:
-    mo = _ControlSurfaceFakeMo()
-    rendered = render_notebook_review_control_surface(
-        active_view_mode="Campaign",
-        campaign_ui="campaign",
-        view_mode_ui="view",
-        visual_group_ui="section",
-        plot_ui="deliverable",
-        reader_evidence_artifact_ui="reader-artifact",
-        selected_visual_choice={"surface_kind": "reader_evidence"},
-        mo=mo,
-    )
-
-    assert rendered == {
-        "kind": "hstack",
-        "items": ["campaign", "view", "section", "deliverable", "reader-artifact"],
-    }
-
-
-def test_notebook_review_control_surface_only_shows_baserender_scope_controls_with_choices() -> None:
-    mo = _ControlSurfaceFakeMo()
-    singleton_scope = render_notebook_review_control_surface(
-        active_view_mode="Campaign",
-        selection_view_ui="selection-view",
-        visual_group_ui="section",
-        plot_ui="deliverable",
-        baserender_round_ui=None,
-        baserender_run_ui=None,
-        baserender_record_selector="selected-sequence",
-        selected_visual_choice={"surface_kind": "baserender"},
-        mo=mo,
-    )
-    multiple_scope = render_notebook_review_control_surface(
-        active_view_mode="Campaign",
-        selection_view_ui="selection-view",
-        visual_group_ui="section",
-        plot_ui="deliverable",
-        baserender_selection_view_ui="render-selection-view",
-        baserender_round_ui="selection-round",
-        baserender_run_ui="selection-run",
-        baserender_record_selector="selected-sequence",
-        selected_visual_choice={"surface_kind": "baserender"},
-        mo=mo,
-    )
-
-    assert singleton_scope["items"] == ["selection-view", "section", "deliverable", "selected-sequence"]
-    assert multiple_scope["items"] == [
-        "selection-view",
-        "section",
-        "deliverable",
-        "render-selection-view",
-        "selection-round",
-        "selection-run",
-        "selected-sequence",
-    ]
-
-
-def test_notebook_review_control_surface_excludes_sequence_lookup_from_three_axis_controls() -> None:
-    class _ResponsiveMo:
-        def hstack(self, items: list[object], **kwargs: object) -> dict[str, object]:
-            return {"kind": "hstack", "items": items, "kwargs": kwargs}
-
-    figure_control = SimpleNamespace(value="interactive_3d")
-    rendered = render_notebook_review_control_surface(
-        active_view_mode="Campaign",
-        selection_view_ui="selection-view",
-        visual_group_ui="section",
-        plot_ui="deliverable",
-        layered_scatter_controls={
-            "figure": figure_control,
-            "prediction_pool": "prediction-pool",
-            "selected": "selected-layer",
-            "observed_batches": "observed-layer",
-        },
-        baserender_record_selector="selected-sequence",
-        selected_visual_choice={"surface_kind": "plot"},
-        mo=_ResponsiveMo(),
-    )
-
-    assert rendered["items"] == [
-        "selection-view",
-        "section",
-        "deliverable",
-        figure_control,
-        "prediction-pool",
-        "selected-layer",
-        "observed-layer",
-    ]
-    assert rendered["kwargs"] == {
-        "justify": "start",
-        "align": "end",
-        "wrap": True,
-        "gap": 0.35,
-    }
-
-
-def test_notebook_review_control_surface_rejects_unknown_view_mode() -> None:
-    with pytest.raises(ValueError, match="active_view_mode must be 'Campaign' or 'Campaign set'"):
-        render_notebook_review_control_surface(
-            active_view_mode="Legacy",
-            campaign_ui="campaign",
-            mo=_ControlSurfaceFakeMo(),
-        )
 
 
 def test_notebook_visual_hierarchy_groups_without_hiding_deliverables() -> None:
@@ -1783,8 +1623,8 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
     scope_choice = scope_surface["choices"][0]
     assert scope_choice["scope_count"] == 2
     scope_options = build_notebook_plot_scope_options(scope_choice)
-    assert [option["label"] for option in scope_options] == ["all rounds", "round 3; run run-3"]
-    assert select_notebook_plot_scope(scope_choice, "round 3; run run-3")["path_label"] == "plots/score_r3.png"
+    assert [option["label"] for option in scope_options] == ["all rounds", "round 3"]
+    assert select_notebook_plot_scope(scope_choice, "round 3")["path_label"] == "plots/score_r3.png"
 
     inventory_rows = build_notebook_plot_inventory_rows(visual_surface)
     assert {
@@ -1850,7 +1690,7 @@ def test_notebook_component_primitives_build_shared_evidence_models() -> None:
     assert any(row["field"] == "capability" and "objective_family=generic" in row["value"] for row in card_rows)
     assert {"field": "tidy data", "value": "plots/score.csv"} in card_rows
     assert any(row["field"] == "source data" for row in card_rows)
-    per_round_card_rows = build_notebook_plot_card_rows(select_notebook_plot_scope(scope_choice, "round 3; run run-3"))
+    per_round_card_rows = build_notebook_plot_card_rows(select_notebook_plot_scope(scope_choice, "round 3"))
     assert {"field": "rounds", "value": "round 3"} in per_round_card_rows
     assert {"field": "warnings", "value": "0"} in per_round_card_rows
     method_rows = build_notebook_plot_method_rows(visual_surface["choices"][0])

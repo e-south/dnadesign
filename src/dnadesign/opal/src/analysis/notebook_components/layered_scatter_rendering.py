@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 from ...plots._mpl_utils import NOTEBOOK_ANNOTATION_FONTSIZE
+from .selection_round_encoding import selection_round_marker, selection_round_palette_index
 
 
 def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, Any]):
@@ -50,7 +51,6 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
     view = _mapping(contract["view"])
     runtime = _mapping(contract["runtime"])
     record_column = str(view["record_kind_column"])
-    selected_column = str(view["selection_column"])
     batch_column = str(view["batch_column"])
     label_column = str(view["label_column"])
     x_column = str(view["x_column"])
@@ -79,12 +79,16 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
     fig, ax = plt.subplots(figsize=(7.2, 7.2), layout="constrained")
     apply_notebook_axes_style(ax, square=True)
     kinds = rows[record_column].astype(str)
-    selected_flags = rows[selected_column].fillna(False).astype(bool)
+    selection_round_column = "__notebook_selection_round"
+    if selection_round_column not in rows:
+        raise ValueError("Layered-scatter rows are missing categorical selection-round provenance.")
+    selection_rounds = rows[selection_round_column]
     show_pool = bool(rows.attrs.get("show_prediction_pool", True))
     show_selected = bool(rows.attrs.get("show_selected", True))
-    pool = rows.loc[kinds.eq(prediction_value)] if show_pool else rows.iloc[0:0]
-    selected = rows.loc[kinds.eq(prediction_value) & selected_flags] if show_selected else rows.iloc[0:0]
+    pool = rows.loc[kinds.eq(prediction_value) & selection_rounds.isna()] if show_pool else rows.iloc[0:0]
+    selected = rows.loc[kinds.eq(prediction_value) & selection_rounds.notna()] if show_selected else rows.iloc[0:0]
     observed = rows.loc[kinds.eq(observed_value)]
+    round_palette_index = selection_round_palette_index(contract)
     if not pool.empty:
         scatter_smart(
             ax,
@@ -99,18 +103,22 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
             label=_legend_label(f"Predicted pool (n={len(pool):,})"),
             zorder=2,
         )
-    if not selected.empty:
+    for round_k in sorted(selected[selection_round_column].astype(int).unique()):
+        if round_k not in round_palette_index:
+            raise ValueError(f"Layered-scatter selection round {round_k} is absent from the contract.")
+        index = round_palette_index[round_k]
+        round_selected = selected.loc[selected[selection_round_column].astype(int).eq(round_k)]
         ax.scatter(
-            selected[x_column],
-            selected[y_column],
-            c=selected[color_column],
+            round_selected[x_column],
+            round_selected[y_column],
+            c=round_selected[color_column],
             cmap=cmap,
             norm=norm,
-            marker="D",
+            marker=selection_round_marker(round_index=round_k, palette_index=index),
             s=42,
             edgecolors="#111111",
             linewidths=1.1,
-            label=_legend_label(f"Selected (n={len(selected)})"),
+            label=_legend_label(f"Selected for Round {round_k} (n={len(round_selected)})"),
             zorder=7,
         )
     batch_labels = {str(item["id"]): str(item["label"]) for item in contract["observed_batches"]}
@@ -170,7 +178,7 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
         loc="upper center",
         bbox_to_anchor=(0.5, -0.14),
         fontsize=NOTEBOOK_LEGEND_FONTSIZE,
-        ncol=3 if len(handles) == 3 else min(2, max(1, len(handles))),
+        ncol=min(2, max(1, len(handles))),
         frameon=False,
         handletextpad=0.4,
         columnspacing=0.7,
@@ -199,6 +207,7 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
         label_column=label_column,
         batch_column=batch_column,
         batch_labels=batch_labels,
+        selection_round_column=selection_round_column,
         annotate_candidate_aliases=annotate_candidate_aliases,
     )
     return fig
@@ -213,6 +222,7 @@ def _annotate_visible_rows(
     label_column: str,
     batch_column: str,
     batch_labels: Mapping[str, str],
+    selection_round_column: str,
     annotate_candidate_aliases: Any,
 ) -> None:
     annotation_positions = tuple(rows.attrs.get("annotate_row_positions") or ())
@@ -228,7 +238,11 @@ def _annotate_visible_rows(
         label = str(getattr(row, label_column))
         if repeats[source_id] > 1:
             batch_id = getattr(row, batch_column)
-            suffix = batch_labels.get(str(batch_id), "Selected") if pd.notna(batch_id) else "Selected"
+            round_k = getattr(row, selection_round_column)
+            if pd.notna(round_k):
+                suffix = f"Round {int(round_k)}"
+            else:
+                suffix = batch_labels.get(str(batch_id), "Observed")
             label = f"{label} · {suffix}"
         synthetic_ids.append(synthetic_id)
         synthetic_aliases[synthetic_id] = label

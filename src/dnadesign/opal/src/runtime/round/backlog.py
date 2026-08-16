@@ -16,10 +16,8 @@ from pathlib import Path
 import pandas as pd
 
 from ...core.utils import OpalError
-from ...storage.state import CampaignState
+from ...storage.state import BACKLOG_COUNT_KEY, CampaignState
 from ...storage.workspace import CampaignWorkspace
-
-BACKLOG_COUNT_KEY = "number_of_selected_but_not_yet_labeled_candidates_total"
 
 
 def _candidate_ids(frame: pd.DataFrame, *, source: str) -> set[str]:

@@ -209,10 +209,7 @@ def _append_run_meta_dataset(path: Path, df: pd.DataFrame) -> None:
         incoming_artifact_keys = _artifact_map_keys(df["artifacts"])
         if not incoming_artifact_keys.issubset(existing_artifact_keys):
             existing = read_parquet_df(path)
-            all_artifact_keys = sorted(existing_artifact_keys | incoming_artifact_keys)
-            existing = _with_artifact_keys(existing, keys=all_artifact_keys)
-            incoming = _with_artifact_keys(df, keys=all_artifact_keys)
-            out = pd.concat([existing, incoming], ignore_index=True)
+            out = merge_run_meta_frames(existing, df)
             _rewrite_dataset(path, out)
             return
     table = table_from_pandas(df, schema=schema) if schema is not None else table_from_pandas(df)
@@ -244,6 +241,13 @@ def _with_artifact_keys(frame: pd.DataFrame, *, keys: list[str]) -> pd.DataFrame
         for value in out["artifacts"].tolist()
     ]
     return out
+
+
+def merge_run_meta_frames(*frames: pd.DataFrame) -> pd.DataFrame:
+    """Return run metadata rows with one lossless artifact-receipt schema."""
+
+    keys = sorted({key for frame in frames for key in _artifact_map_keys(frame["artifacts"])})
+    return pd.concat([_with_artifact_keys(frame, keys=keys) for frame in frames], ignore_index=True)
 
 
 def compact_runs_ledger(path: Path) -> dict[str, int]:

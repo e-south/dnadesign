@@ -3,7 +3,7 @@ id: opal-reference-cli
 title: OPAL Command Line Interface
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-15
+last_verified: 2026-08-16
 audience:
   - operator
   - maintainer
@@ -30,6 +30,17 @@ opal --usr-root <absolute-path> <command> --config <yaml>
 The root must name an absolute, existing directory that is not a symbolic link.
 Use the same coordinate for validation and round execution so candidate, label,
 and writeback paths cannot drift between commands.
+
+Campaign snapshots that predate embedded X/Y column identities require an
+explicit, digest-receipted migration contract during `history import`:
+
+```bash
+opal history import --config <campaign-yaml> --source-workdir <prior-runtime> \
+  --column-contract <history-column-contract.json>
+```
+
+The contract binds the campaign, X/Y columns, and exact immutable round-context
+digests. OPAL does not infer these identities from mutable logs.
 
 ### Command overview
 
@@ -104,6 +115,41 @@ opal init --config <yaml> [--json]
 
 * Ensures the campaign `workdir` has `outputs/`.
 * Writes/updates `state.json` with campaign identity, data location, and settings.
+* Rejects a workdir that already contains round history but lacks `state.json`.
+  Consolidate that history explicitly instead of initializing a second ledger.
+
+---
+
+### `history import`
+
+Consolidate disjoint prior rounds into the configured campaign workdir without
+retraining or rescoring.
+
+**Usage**
+
+```bash
+opal history import --config <target-yaml> \
+  --source-workdir <prior-workdir> [--apply] [--json]
+```
+
+**Flags**
+
+* `--config, -c`: Canonical campaign configuration whose workdir receives the
+  prior rounds.
+* `--source-workdir`: Existing workdir containing the earlier rounds.
+* `--apply`: Materialize the verified plan. Without this flag, the command
+  previews without writing.
+* `--json`: Emit the plan or applied receipt coordinate as machine-readable
+  JSON.
+
+**Contract**
+
+* Both histories must have the same campaign slug, X/Y/objective contract, and candidate lineage.
+* The combined round sequence must be disjoint and contiguous from round zero.
+* The applied receipt binds the source history, existing target history,
+  path-only transformations, and final canonical history.
+* The command does not retrain, rescore, or retain a second active runtime.
+  Quarantine the source only after independent receipt and notebook verification.
 
 ---
 
@@ -806,7 +852,7 @@ Generate or run OPAL marimo artifact viewers.
 
 ```bash
 uv run opal notebook
-uv run opal notebook generate --config <yaml-or-dir> [--round <latest|k>] [--run-id <id>] [--out <path>] [--name <file>] [--force] [--validate/--no-validate] [--json]
+uv run opal notebook generate --config <yaml-or-dir> [--round <latest|all|k>] [--run-id <id>] [--out <path>] [--name <file>] [--force] [--validate/--no-validate] [--json]
 uv run opal notebook generate --campaign <yaml-or-dir> --campaign <yaml-or-dir> [--config <anchor-yaml-or-dir>] [--out <path>] [--round <latest|k>] [--json]
 uv run opal notebook run --config <yaml-or-dir> [--path <notebook.py>] [--host <host>] [--port <port>] [--headless]
 uv run opal notebook edit --config <yaml-or-dir> [--path <notebook.py>] [--host <host>] [--port <port>] [--headless]

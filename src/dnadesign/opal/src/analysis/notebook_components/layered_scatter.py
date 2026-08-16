@@ -48,6 +48,17 @@ def filter_notebook_layered_scatter_rows(
 
     show_pool = _state_bool(state, "show_prediction_pool", True)
     show_selected = _state_bool(state, "show_selected", True)
+    known_selection_rounds = {int(value) for value in contract.get("selection_rounds") or []}
+    default_selection_rounds = [int(contract["active_selection_round"])]
+    requested_selection_rounds = state.get("selection_rounds")
+    selected_rounds = {
+        int(value)
+        for value in (default_selection_rounds if requested_selection_rounds is None else requested_selection_rounds)
+        if not isinstance(value, bool)
+    }
+    unknown_rounds = sorted(selected_rounds - known_selection_rounds)
+    if unknown_rounds:
+        raise ValueError(f"Unknown selected rounds: {unknown_rounds}.")
     known_batches = {str(item["id"]) for item in contract.get("observed_batches") or []}
     selected_batches = {
         str(value) for value in state.get("observed_batches", sorted(known_batches)) if str(value).strip()
@@ -65,16 +76,28 @@ def filter_notebook_layered_scatter_rows(
     )
 
     kinds = rows[record_column].astype(str)
-    selected_flags = rows[selected_column].fillna(False).astype(bool)
     prediction_mask = kinds.eq(prediction_value)
     pool_mask = prediction_mask & show_pool
-    selection_mask = kinds.eq(prediction_value) & selected_flags & show_selected
     observed_mask = kinds.eq(observed_value) & rows[batch_column].astype(str).isin(selected_batches)
-    filtered = rows.loc[pool_mask | selection_mask | observed_mask].copy()
+    pool_rows = rows.loc[pool_mask].copy()
+    observed_rows = rows.loc[observed_mask].copy()
+    pool_rows["__notebook_selection_round"] = pd.NA
+    observed_rows["__notebook_selection_round"] = pd.NA
+    visible_parts = [pool_rows]
+    selection_rows = contract.get("selection_rows")
+    if not isinstance(selection_rows, pd.DataFrame):
+        raise ValueError("Layered-scatter contract is missing manifest-backed selection rows.")
+    if show_selected and selected_rounds:
+        overlay = selection_rows.loc[
+            selection_rows["__notebook_selection_round"].astype(int).isin(selected_rounds)
+        ].copy()
+        visible_parts.append(overlay)
+    visible_parts.append(observed_rows)
+    filtered = pd.concat(visible_parts, ignore_index=True)
 
     annotate = pd.Series(False, index=filtered.index)
     filtered_kinds = filtered[record_column].astype(str)
-    filtered_selected = filtered[selected_column].fillna(False).astype(bool)
+    filtered_selected = filtered["__notebook_selection_round"].notna()
     if effective_label_scope in {"selected", "both"}:
         annotate |= filtered_kinds.eq(prediction_value) & filtered_selected
     if effective_label_scope in {"observed", "both"}:
@@ -89,6 +112,7 @@ def filter_notebook_layered_scatter_rows(
     result.attrs["effective_label_scope"] = effective_label_scope
     result.attrs["show_prediction_pool"] = show_pool
     result.attrs["show_selected"] = show_selected
+    result.attrs["selection_rounds"] = tuple(sorted(selected_rounds))
     result.attrs["annotate_row_positions"] = tuple(
         position for position, should_annotate in enumerate(annotate.to_numpy(dtype=bool)) if should_annotate
     )
@@ -123,7 +147,7 @@ def render_notebook_layered_scatter_image(
         )
     figure = render_layered_scatter_figure(filtered, contract=prepared)
     payload = BytesIO()
-    figure.savefig(payload, format="png", dpi=180, facecolor="white", bbox_inches="tight", pad_inches=0.08)
+    figure.savefig(payload, format="png", dpi=180, facecolor="white")
     import matplotlib.pyplot as plt
 
     plt.close(figure)

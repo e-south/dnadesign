@@ -19,6 +19,9 @@ from typing import Any
 import pandas as pd
 
 from ...plots._mpl_utils import compact_batch_label
+from . import three_axis_scatter_style as style
+from .selection_round_encoding import selection_round_palette_index
+from .three_axis_camera_state import render_three_axis_camera_state
 from .three_axis_scatter_data import (
     THREE_AXIS_SCATTER_ADAPTER,
     require_finite_three_axis_rows,
@@ -28,22 +31,7 @@ from .three_axis_scatter_data import (
 
 THREE_AXIS_PUBLICATION_MODE = "publication_2d"
 THREE_AXIS_INTERACTIVE_MODE = "interactive_3d"
-THREE_AXIS_TITLE_FONTSIZE = 23
-THREE_AXIS_AXIS_TITLE_FONTSIZE = 17
-THREE_AXIS_TICK_FONTSIZE = 14
-THREE_AXIS_LEGEND_FONTSIZE = 14
-THREE_AXIS_BASE_FONTSIZE = 15
-
-_OBSERVED_COLORS = (
-    "#7C3AED",
-    "#059669",
-    "#DC2626",
-    "#0891B2",
-    "#A16207",
-    "#DB2777",
-    "#4F46E5",
-    "#0F766E",
-)
+THREE_AXIS_CAMERA_REVISION = f"{THREE_AXIS_SCATTER_ADAPTER}:camera"
 
 
 def build_notebook_three_axis_scatter_figure(
@@ -88,14 +76,21 @@ def build_notebook_three_axis_scatter_figure(
         raise RuntimeError("Interactive three-axis plots require the project plotly dependency.") from exc
 
     record_column = str(view["record_kind_column"])
-    selection_column = str(view["selection_column"])
     batch_column = str(view["batch_column"])
     prediction_value = str(view["prediction_value"])
     observed_value = str(view["observed_value"])
     kinds = displayed[record_column].astype(str)
-    predictions = displayed.loc[kinds.eq(prediction_value) & ~displayed[selection_column].fillna(False).astype(bool)]
-    selected = displayed.loc[kinds.eq(prediction_value) & displayed[selection_column].fillna(False).astype(bool)]
+    selection_round_column = "__notebook_selection_round"
+    if selection_round_column not in displayed:
+        raise ValueError("Three-axis scatter rows are missing categorical selection-round provenance.")
+    selection_rounds = displayed[selection_round_column]
+    show_selected = bool(displayed.attrs.get("show_selected", True))
+    predictions = displayed.loc[kinds.eq(prediction_value) & selection_rounds.isna()]
+    selected = (
+        displayed.loc[kinds.eq(prediction_value) & selection_rounds.notna()] if show_selected else displayed.iloc[0:0]
+    )
     observed = displayed.loc[kinds.eq(observed_value)]
+    round_palette_index = selection_round_palette_index(contract)
 
     traces: list[Any] = []
     if not predictions.empty:
@@ -105,23 +100,28 @@ def build_notebook_three_axis_scatter_figure(
                 go,
                 predictions,
                 contract=contract,
-                name=(f"Deterministic prediction sample (n={len(predictions):,} of {complete_background:,})"),
+                name=f"Prediction sample ({len(predictions):,} / {complete_background:,})",
                 marker={"size": 2.4, "color": "#2563EB", "opacity": 0.20},
                 showlegend=True,
             )
         )
-    if not selected.empty:
+    for round_k in sorted(selected[selection_round_column].astype(int).unique()):
+        if round_k not in round_palette_index:
+            raise ValueError(f"Three-axis scatter selection round {round_k} is absent from the contract.")
+        index = round_palette_index[round_k]
+        round_selected = selected.loc[selected[selection_round_column].astype(int).eq(round_k)]
+        categorical_marker = style.selection_marker(index)
         traces.append(
             _trace(
                 go,
-                selected,
+                round_selected,
                 contract=contract,
-                name=f"Selected (n={len(selected):,})",
+                name=f"Selected for Round {round_k} (n={len(round_selected):,})",
                 marker={
                     "size": 7.2,
-                    "color": "#F59E0B",
+                    "color": categorical_marker["color"],
                     "opacity": 1.0,
-                    "symbol": "diamond",
+                    "symbol": categorical_marker["symbol"],
                     "line": {"color": "#111827", "width": 1.5},
                 },
                 showlegend=True,
@@ -132,6 +132,7 @@ def build_notebook_three_axis_scatter_figure(
         batch = observed.loc[observed[batch_column].astype(str).eq(batch_id)]
         if batch.empty:
             continue
+        categorical_marker = style.observed_marker(index)
         traces.append(
             _trace(
                 go,
@@ -140,9 +141,9 @@ def build_notebook_three_axis_scatter_figure(
                 name=f"Observed · {compact_batch_label(batch_id)} (n={len(batch):,})",
                 marker={
                     "size": 5.8,
-                    "color": _OBSERVED_COLORS[index % len(_OBSERVED_COLORS)],
+                    "color": categorical_marker["color"],
                     "opacity": 0.95,
-                    "symbol": "circle",
+                    "symbol": categorical_marker["symbol"],
                     "line": {"color": "#111827", "width": 1.0},
                 },
                 showlegend=True,
@@ -151,69 +152,20 @@ def build_notebook_three_axis_scatter_figure(
     if not traces:
         raise ValueError("Three-axis scatter requires at least one visible row.")
 
-    axis_style = {
-        "showbackground": True,
-        "backgroundcolor": "#FAFAFA",
-        "gridcolor": "#D1D5DB",
-        "gridwidth": 1.0,
-        "zeroline": True,
-        "zerolinecolor": "#6B7280",
-        "zerolinewidth": 1.5,
-        "showspikes": False,
-        "tickfont": {"size": THREE_AXIS_TICK_FONTSIZE, "color": "#252525"},
-        "title": {"font": {"size": THREE_AXIS_AXIS_TITLE_FONTSIZE, "color": "#111827"}},
-    }
     title = _title(runtime)
-    figure = go.Figure(data=traces)
-    figure.update_layout(
-        title={
-            "text": title,
-            "x": 0.5,
-            "xanchor": "center",
-            "y": 0.96,
-            "yanchor": "top",
-            "font": {"size": THREE_AXIS_TITLE_FONTSIZE, "color": "#111827"},
-        },
-        scene={
-            "xaxis": {
-                **axis_style,
-                "title": {**axis_style["title"], "text": _plotly_axis_label(runtime["x_label"])},
-            },
-            "yaxis": {
-                **axis_style,
-                "title": {**axis_style["title"], "text": _plotly_axis_label(runtime["y_label"])},
-            },
-            "zaxis": {
-                **axis_style,
-                "title": {**axis_style["title"], "text": _plotly_axis_label(runtime["color_label"])},
-            },
-            "aspectmode": "cube",
-            "camera": {"eye": {"x": 1.55, "y": 1.55, "z": 1.2}},
-            "bgcolor": "white",
-        },
-        legend={
-            "orientation": "h",
-            "x": 0.5,
-            "xanchor": "center",
-            "y": -0.08,
-            "yanchor": "top",
-            "font": {"size": THREE_AXIS_LEGEND_FONTSIZE},
-            "bgcolor": "rgba(255,255,255,0.88)",
-        },
-        font={"family": "Arial, Helvetica, sans-serif", "size": THREE_AXIS_BASE_FONTSIZE, "color": "#252525"},
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        height=800,
-        margin={"l": 16, "r": 16, "t": 104, "b": 92},
-        hovermode="closest",
-        uirevision=str(contract.get("key") or THREE_AXIS_SCATTER_ADAPTER),
-        meta={
-            "complete_row_count": int(len(rows)),
-            "displayed_row_count": int(len(displayed)),
-            "background_sample_limit": int(interactive["prediction_sample_limit"]),
-        },
+    subtitle = _subtitle(runtime)
+    return style.apply_three_axis_layout(
+        go.Figure(data=traces),
+        title=title,
+        subtitle=subtitle,
+        xaxis_title=_plotly_axis_label(runtime["x_label"]),
+        yaxis_title=_plotly_axis_label(runtime["y_label"]),
+        zaxis_title=_plotly_axis_label(runtime["color_label"]),
+        camera_revision=THREE_AXIS_CAMERA_REVISION,
+        complete_row_count=len(rows),
+        displayed_row_count=len(displayed),
+        background_sample_limit=int(interactive["prediction_sample_limit"]),
     )
-    return figure
 
 
 def render_notebook_three_axis_scatter(
@@ -234,6 +186,11 @@ def render_notebook_three_axis_scatter(
         },
         label="Interactive three-family candidate landscape",
     )
+    plot_frame = widget.style({"width": "min(100%, 900px)", "margin": "0 auto"})
+    camera_state = render_three_axis_camera_state(
+        mo=mo,
+        revision=THREE_AXIS_CAMERA_REVISION,
+    )
     meta = dict(figure.layout.meta or {})
     displayed = int(meta.get("displayed_row_count") or 0)
     complete = int(meta.get("complete_row_count") or 0)
@@ -245,7 +202,7 @@ def render_notebook_three_axis_scatter(
         "candidate identity and family scores. The 2D figure remains the complete publication artifact; "
         "use the selected-candidate control for sequence inspection."
     )
-    return mo.vstack([widget, caption], gap=0.2)
+    return mo.vstack([camera_state, plot_frame, caption], gap=0.2)
 
 
 def _trace(
@@ -306,8 +263,11 @@ def _trace(
 
 def _title(runtime: Mapping[str, Any]) -> str:
     title = str(runtime.get("title") or "Three-family candidate landscape").strip()
-    context = str(runtime.get("context") or "").strip()
-    return f"{title}<br><sup>{context}</sup>" if context else title
+    return _plotly_label(title)
+
+
+def _subtitle(runtime: Mapping[str, Any]) -> str:
+    return _plotly_label(runtime.get("context") or "")
 
 
 def _plotly_label(value: object) -> str:
