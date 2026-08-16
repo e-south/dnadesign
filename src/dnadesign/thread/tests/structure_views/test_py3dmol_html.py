@@ -102,6 +102,38 @@ HETATM 6 P P . DA D 2 1 4.000 0.000 0.000 D 1 ? 1.00 80.00 1
 #
 """
 
+_MIXED_POLYMER_MMCIF_WITH_UNQUOTED_PRIME_ATOMS = """\
+data_mixed_polymer
+loop_
+_atom_site.group_PDB
+_atom_site.id
+_atom_site.type_symbol
+_atom_site.label_atom_id
+_atom_site.label_alt_id
+_atom_site.label_comp_id
+_atom_site.label_asym_id
+_atom_site.label_entity_id
+_atom_site.label_seq_id
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+_atom_site.auth_asym_id
+_atom_site.auth_seq_id
+_atom_site.pdbx_PDB_ins_code
+_atom_site.occupancy
+_atom_site.B_iso_or_equiv
+_atom_site.pdbx_PDB_model_num
+ATOM 1 N N . GLY A 1 1 0.000 0.000 0.000 A 1 ? 1.00 80.00 1
+ATOM 2 C CA . GLY A 1 1 1.458 0.000 0.000 A 1 ? 1.00 80.00 1
+ATOM 3 C C . GLY A 1 1 2.000 1.400 0.000 A 1 ? 1.00 80.00 1
+ATOM 4 O O . GLY A 1 1 1.300 2.300 0.000 A 1 ? 1.00 80.00 1
+ATOM 5 P P . DG B 2 1 4.000 0.000 0.000 D 1 ? 1.00 80.00 1
+ATOM 6 O O5' . DG B 2 1 4.200 0.200 0.000 D 1 ? 1.00 80.00 1
+ATOM 7 C C4' . DG B 2 1 4.400 0.400 0.000 D 1 ? 1.00 80.00 1
+ATOM 8 N N9 . DG B 2 1 4.900 0.900 0.000 D 1 ? 1.00 80.00 1
+#
+"""
+
 _DNA_RESIDUE_SELECTION = '"resn":["DA","DC","DG","DT"]'
 _RNA_RESIDUE_SELECTION = '"resn":["A","C","G","I","U"]'
 
@@ -661,26 +693,28 @@ def test_py3dmol_backend_keeps_surface_highlight_at_the_declared_surface_alpha()
     assert '"stick":{"color":"#C00000","radius":0.22}' in unescaped_html
 
 
-def test_py3dmol_backend_maps_mmcif_contract_to_3dmol_cif_loader() -> None:
+def test_py3dmol_backend_serializes_mmcif_for_3dmol_without_prime_token_ambiguity() -> None:
     html = render_structure_view_html(
         StructureViewSpec(
             title="CIF reference review",
             models=(
                 StructureViewModel(
                     "reference",
-                    _SIDECHAIN_MMCIF,
+                    _MIXED_POLYMER_MMCIF_WITH_UNQUOTED_PRIME_ATOMS,
                     structure_format="mmcif",
                     label="Reference",
                     color="#d6d6d6",
                     show_sidechains=True,
                 ),
             ),
-            hidden_molecule_classes=("dna", "rna"),
         )
     )
 
-    unescaped_html = html_lib.unescape(html).replace(" ", "")
-    assert 'addModel("data_fixture\\nloop_\\n_atom_site.group_PDB' in unescaped_html
+    unescaped_html = html_lib.unescape(html)
+    assert 'addModel("data_dnadesign_browser\\nloop_\\n_atom_site.group_pdb' in unescaped_html
+    assert '\\"O5\'\\"' in unescaped_html
+    assert '\\"C4\'\\"' in unescaped_html
+    assert "data_mixed_polymer" not in unescaped_html
     assert '","cif");' in unescaped_html
     assert '","mmcif");' not in unescaped_html
 
