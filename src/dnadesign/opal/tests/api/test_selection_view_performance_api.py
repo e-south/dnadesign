@@ -56,6 +56,13 @@ def _observations() -> pd.DataFrame:
     return pd.DataFrame.from_records(rows)
 
 
+def _rounds(count: int) -> pd.DataFrame:
+    return pd.concat(
+        [_observations().assign(observed_round=round_index) for round_index in range(1, count + 1)],
+        ignore_index=True,
+    )
+
+
 def test_selection_view_performance_compares_selected_cohorts_within_each_objective() -> None:
     result = selection_view_performance(_observations())
 
@@ -190,6 +197,90 @@ def test_selection_view_performance_separates_title_subtitle_and_panel_headings(
     assert min(label.get_fontsize() for axis in figure.axes for label in axis.get_xticklabels()) >= 15
     assert min(label.get_fontsize() for axis in figure.axes for label in axis.get_yticklabels()) >= 15
     close_figure(figure)
+
+
+def test_selection_view_performance_keeps_long_view_labels_inside_the_canvas(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pyplot = importlib.import_module("matplotlib.pyplot")
+    close_figure = pyplot.close
+    closed_figures: list[Figure] = []
+    monkeypatch.setattr(pyplot, "close", closed_figures.append)
+
+    render_selection_view_performance(
+        _observations(),
+        output_path=tmp_path / "long-labels.svg",
+        objective_value_label="Observed assay score",
+        view_labels={
+            "ethanol": "Ethanol response program with delayed prior-era evidence",
+            "ciprofloxacin": "Ciprofloxacin response program with complete Batch 1 evidence",
+        },
+    )
+
+    figure = closed_figures[0]
+    figure.canvas.draw()
+    renderer = figure.canvas.get_renderer()
+    label_bounds = [
+        label.get_window_extent(renderer=renderer) for axis in figure.axes for label in axis.get_yticklabels()
+    ]
+    assert min(bounds.x0 for bounds in label_bounds) >= figure.bbox.x0
+    close_figure(figure)
+
+
+def test_selection_view_performance_keeps_a_fixed_physical_header_band_across_round_counts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pyplot = importlib.import_module("matplotlib.pyplot")
+    close_figure = pyplot.close
+    closed_figures: list[Figure] = []
+    monkeypatch.setattr(pyplot, "close", closed_figures.append)
+
+    for round_count in (1, 4):
+        render_selection_view_performance(
+            _rounds(round_count),
+            output_path=tmp_path / f"rounds-{round_count}.svg",
+            title="Selection changes the measured score distribution by objective view",
+            subtitle="Round-scoped cohorts are compared under every objective.",
+            objective_value_label="Observed assay score",
+        )
+
+    gaps_in = []
+    for figure in closed_figures:
+        figure.canvas.draw()
+        renderer = figure.canvas.get_renderer()
+        subtitle = next(text for text in figure.texts if text.get_gid() == "figure-subtitle")
+        subtitle_bottom = subtitle.get_window_extent(renderer=renderer).y0
+        panel_title_top = max(axis.title.get_window_extent(renderer=renderer).y1 for axis in figure.axes[:2])
+        gaps_in.append((subtitle_bottom - panel_title_top) / figure.dpi)
+    assert gaps_in[0] == pytest.approx(gaps_in[1], abs=0.15)
+    for figure in closed_figures:
+        close_figure(figure)
+
+
+@pytest.mark.parametrize(
+    ("title", "subtitle", "message"),
+    [
+        ("   ", "Visible subtitle", "title must be non-empty"),
+        ("Line one\nLine two", None, "title must be one line"),
+        ("Visible title", "Line one\nLine two", "subtitle must be one line"),
+    ],
+)
+def test_selection_view_performance_rejects_ambiguous_figure_headers(
+    tmp_path: Path,
+    title: str,
+    subtitle: str | None,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        render_selection_view_performance(
+            _observations(),
+            output_path=tmp_path / "invalid-header.svg",
+            title=title,
+            subtitle=subtitle,
+            objective_value_label="Observed assay score",
+        )
 
 
 def test_selection_view_performance_uses_neutral_round_labels(
