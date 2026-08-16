@@ -169,11 +169,7 @@ def dedupe_scope_labels(choices: Iterable[Mapping[str, Any]]) -> list[dict[str, 
 
 
 def plot_scope_label(value: Mapping[str, Any]) -> str:
-    label = rounds_text(value.get("rounds"))
-    run_id = value.get("run_id")
-    if run_id not in (None, ""):
-        label = f"{label}; run {run_id}"
-    return label
+    return rounds_text(value.get("rounds"))
 
 
 def plot_scope_control_label(values: Iterable[Mapping[str, Any]]) -> str:

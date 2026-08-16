@@ -65,7 +65,8 @@ def _campaign_selector_cell() -> str:
             _preferred = campaign_label_memory()
             _preferred = _preferred if _preferred in campaign_labels else campaign_labels[0]
             campaign_ui = None if len(campaigns) == 1 else mo.ui.dropdown(
-                campaign_labels, value=_preferred, label="Campaign", on_change=set_campaign_label_memory
+                campaign_labels, value=_preferred, label="Campaign",
+                on_change=set_campaign_label_memory, full_width=True,
             )
             campaign_summary_df = pl.DataFrame(_rows)
             return campaign_labels, campaign_summary_df, campaign_ui
@@ -104,10 +105,8 @@ def _selection_view_selector_cell() -> str:
                 next(iter(_labels)),
             )
             selection_view_ui = mo.ui.dropdown(
-                options=_labels,
-                value=_preferred_label,
-                label="Selection view",
-                on_change=set_selection_view_id_memory,
+                options=_labels, value=_preferred_label, label="Selection view",
+                on_change=set_selection_view_id_memory, full_width=True,
             )
             return selection_view_ui,
         """
