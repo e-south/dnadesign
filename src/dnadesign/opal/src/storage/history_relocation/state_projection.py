@@ -17,11 +17,12 @@ from typing import Any
 
 import pandas as pd
 
+from ...config.plugin_schemas import validate_params
 from ...config.types import RootConfig
 from ...core.utils import OpalError, file_sha256
 from ..state import BACKLOG_COUNT_KEY, CampaignState, RoundEntry
 from .contracts import HistoryRelocationPlan, RunHistory
-from .inspection import jsonable
+from .inspection import canonical_sha256, jsonable
 
 
 def _definitions(value: Any, *, field: str) -> list[dict[str, Any]]:
@@ -29,6 +30,67 @@ def _definitions(value: Any, *, field: str) -> list[dict[str, Any]]:
     if not isinstance(payload, list) or not all(isinstance(item, dict) for item in payload):
         raise OpalError(f"Run metadata field {field} must contain a list of objects.")
     return payload
+
+
+def _validated_plugin_params(category: str, name: str, value: Any) -> dict[str, Any]:
+    return validate_params(category, name, dict(value or {}))
+
+
+def require_target_config_matches_run_history(plan: HistoryRelocationPlan, cfg: RootConfig) -> None:
+    run = min((*plan.source.runs, *plan.target.runs), key=lambda item: item.round_index)
+    run_objectives = [
+        {
+            "selection_view_id": str(item.get("selection_view_id") or ""),
+            "objective_name": str(item.get("objective_name") or ""),
+            "params": _validated_plugin_params(
+                "objective",
+                str(item.get("objective_name") or ""),
+                item.get("params"),
+            ),
+        }
+        for item in _definitions(run.run_row["objective__defs_json"], field="objective__defs_json")
+    ]
+    run_x_name = str(run.run_row.get("x_transform__name") or "")
+    run_y_name = str(run.run_row.get("y_ingest__name") or "")
+    run_contract = {
+        "x_transform": {
+            "name": run_x_name,
+            "params": _validated_plugin_params(
+                "transform_x",
+                run_x_name,
+                run.run_row.get("x_transform__params"),
+            ),
+        },
+        "y_ingest": {
+            "name": run_y_name,
+            "params": _validated_plugin_params(
+                "transform_y",
+                run_y_name,
+                run.run_row.get("y_ingest__params"),
+            ),
+        },
+        "objectives": run_objectives,
+    }
+    config_contract = {
+        "x_transform": {
+            "name": cfg.data.transforms_x.name,
+            "params": dict(cfg.data.transforms_x.params),
+        },
+        "y_ingest": {
+            "name": cfg.data.transforms_y.name,
+            "params": dict(cfg.data.transforms_y.params),
+        },
+        "objectives": [
+            {
+                "selection_view_id": view.id,
+                "objective_name": view.objective.name,
+                "params": jsonable(view.objective.params),
+            }
+            for view in cfg.selection_views
+        ],
+    }
+    if canonical_sha256(config_contract) != canonical_sha256(run_contract):
+        raise OpalError("Target campaign config differs from the verified run history X/Y/objective contract.")
 
 
 def _run_artifact_root(run: RunHistory) -> Path:
@@ -179,6 +241,7 @@ def build_canonical_state(
     cfg: RootConfig,
     records_path: Path,
 ) -> CampaignState:
+    require_target_config_matches_run_history(plan, cfg)
     created_at, updated_at = _history_timestamps(plan)
     location = cfg.data.location
     if hasattr(location, "dataset"):

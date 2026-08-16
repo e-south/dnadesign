@@ -26,6 +26,7 @@ from ..locks import CampaignLock
 from ..parquet_io import dataset_from_dir, table_from_pandas, write_parquet_table
 from .contracts import CampaignHistory, HistoryRelocationPlan
 from .inspection import canonical_sha256, jsonable, plan_history_relocation
+from .label_ledger import label_ledger_parts, stage_label_ledger
 from .state_projection import build_canonical_state
 
 RECEIPT_SCHEMA_VERSION = "opal.history_relocation.v1"
@@ -49,6 +50,7 @@ def _history_entries(history: CampaignHistory) -> list[dict[str, object]]:
         paths.extend(_files_under(run.round_dir))
         paths.append(run.run_part)
         paths.extend(run.prediction_parts)
+    paths.extend(label_ledger_parts(history))
     state_path = history.workdir / "state.json"
     if state_path.is_file():
         paths.append(state_path)
@@ -174,6 +176,7 @@ def _stage_history(
             }
         )
         staged_destinations.append((staged_run_part, plan.target.workdir / staged_run_part.relative_to(staging_root)))
+    staged_destinations.extend(stage_label_ledger(plan, staging_root=staging_root))
     state = build_canonical_state(plan, cfg=cfg, records_path=records_path)
     staged_state = staging_root / "state.json"
     staged_state.write_text(
@@ -236,7 +239,6 @@ def apply_history_relocation(
     staging_root = Path(tempfile.mkdtemp(prefix=f".{plan.campaign_slug}-history-import-", dir=target_parent))
     created: list[Path] = []
     state_path = plan.target.workdir / "state.json"
-    state_backup = state_path.read_bytes() if state_path.is_file() else None
     try:
         staged = _stage_history(plan, cfg=cfg, records_path=records_path, staging_root=staging_root)
         imported_source_files = staged["receipt"]["imported_source_files"]
@@ -251,6 +253,7 @@ def apply_history_relocation(
             if current.canonical_rounds != plan.canonical_rounds or current.invariant_sha256 != plan.invariant_sha256:
                 raise OpalError("Campaign history changed before relocation apply.")
             _assert_history_unchanged(plan.target, existing_target_files, label="Target")
+            state_backup = state_path.read_bytes() if state_path.is_file() else None
             state_replaced = False
             try:
                 for staged_path, target_path in staged["moves"]:
