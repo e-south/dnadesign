@@ -24,6 +24,7 @@ from ..parquet_io import read_parquet_df
 from ..state import CampaignState
 from .column_contract import columns_for_round
 from .contracts import CampaignHistory, HistoryColumnContract, HistoryRelocationPlan, RunHistory
+from .prediction_ledger import prediction_rows_for_run
 
 _RUN_INVARIANT_FIELDS = (
     "data__x_column_name",
@@ -316,9 +317,11 @@ def inspect_campaign_history(
 def _assert_candidate_lineage(runs: list[RunHistory]) -> None:
     prior: pd.DataFrame | None = None
     for run in sorted(runs, key=lambda item: item.round_index):
-        current = pd.concat(
-            [read_parquet_df(part, columns=["id", "sequence"]) for part in run.prediction_parts],
-            ignore_index=True,
+        current = prediction_rows_for_run(
+            run.prediction_parts,
+            round_index=run.round_index,
+            run_id=run.run_id,
+            columns=("id", "sequence"),
         )
         current["id"] = current["id"].astype(str)
         current["sequence"] = current["sequence"].astype(str)

@@ -47,6 +47,17 @@ def _invoke_import(source: Path, target_campaign: Path):
     )
 
 
+def _compact_prediction_parts(workdir: Path) -> Path:
+    predictions = workdir / "outputs" / "ledger" / "predictions"
+    parts = sorted(predictions.glob("*.parquet"))
+    compacted = pd.concat([read_parquet_df(path) for path in parts], ignore_index=True)
+    for path in parts:
+        path.unlink()
+    output = predictions / "part-compacted.parquet"
+    compacted.to_parquet(output, index=False)
+    return output
+
+
 def _add_artifact_receipt(workdir: Path, *, round_index: int, run_id: str, key: str) -> bytes:
     payload = f"{run_id}:{key}".encode()
     artifact = workdir / "outputs" / "rounds" / f"round_{round_index}" / "run_artifacts" / run_id / key
@@ -206,6 +217,33 @@ def test_history_import_preserves_distinct_artifact_receipt_keys_in_both_run_row
     history = inspect_campaign_history(target, label="Relocated campaign")
     assert history.rounds == (0, 1)
     assert len(list(runs_path.glob("*.parquet"))) == 1
+
+
+def test_history_import_projects_compacted_prediction_parts_by_run(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    canonical = tmp_path / "canonical"
+    future = tmp_path / "future"
+    _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    canonical_campaign, _ = _workspace(canonical, round_index=1, run_id="run-1", with_state=False)
+    first_import = _invoke_import(source, canonical_campaign)
+    assert first_import.exit_code == 0, first_import.output
+    _compact_prediction_parts(canonical)
+    future_campaign, _ = _workspace(future, round_index=2, run_id="run-2", with_state=False)
+
+    result = _invoke_import(canonical, future_campaign)
+
+    assert result.exit_code == 0, result.output
+    receipt = json.loads(Path(json.loads(result.output)["receipt_path"]).read_text(encoding="utf-8"))
+    projections = [item for item in receipt["transformations"] if item["kind"] == "prediction_run_projection"]
+    assert {(item["round_index"], item["run_id"]) for item in projections} == {(0, "run-0"), (1, "run-1")}
+    history = inspect_campaign_history(future, label="Relocated campaign")
+    assert history.rounds == (0, 1, 2)
+    for run in history.runs:
+        frame = pd.concat([read_parquet_df(part) for part in run.prediction_parts], ignore_index=True)
+        assert set(zip(frame["as_of_round"].astype(int), frame["run_id"].astype(str), strict=True)) == {
+            (run.round_index, run.run_id)
+        }
+        assert len(frame) == 2
 
 
 def test_history_import_keeps_inspection_fields_out_of_canonical_run_rows(tmp_path: Path) -> None:
