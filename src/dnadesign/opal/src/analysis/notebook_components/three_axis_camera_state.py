@@ -42,7 +42,7 @@ def render_three_axis_camera_state(*, mo: Any, revision: str) -> Any:
   const bind = (plot) => {{
     if (plot.layout?.scene?.uirevision !== revision) return;
     const saved = cameras[revision];
-    if (saved && !cameraMatches(plot.layout.scene.camera, saved) && host.Plotly?.relayout) {{
+    if (saved && !cameraMatches(plot._fullLayout?.scene?.camera, saved) && host.Plotly?.relayout) {{
       plot.style.visibility = "hidden";
       Promise.resolve(host.Plotly.relayout(plot, {{"scene.camera": saved}})).then(
         () => reveal(plot),
