@@ -82,6 +82,9 @@ def test_layered_scatter_round_overlay_uses_one_shared_color_extent(tmp_path: Pa
 
     assert contract is not None
     assert contract["runtime"]["color_scale"]["extent"] == pytest.approx(2.5)
+    assert contract["runtime"]["color_scale"]["context"] == (
+        "shared across loaded rounds; endpoint values remain in the plotted data"
+    )
     assert contract["selection_rounds"] == [0, 1]
 
 
