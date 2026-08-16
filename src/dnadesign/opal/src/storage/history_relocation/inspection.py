@@ -25,6 +25,7 @@ from ..state import CampaignState
 from .column_contract import columns_for_round
 from .contracts import CampaignHistory, HistoryColumnContract, HistoryRelocationPlan, RunHistory
 from .prediction_ledger import prediction_rows_for_run
+from .prediction_retention import FULL, load_prediction_retention, validate_prediction_retention
 
 _RUN_INVARIANT_FIELDS = (
     "data__x_column_name",
@@ -209,6 +210,7 @@ def inspect_campaign_history(
             f"{label} run/prediction rounds differ: runs={sorted(run_parts)}, predictions={sorted(prediction_parts)}",
             ExitCodes.CONTRACT_VIOLATION,
         )
+    retention = load_prediction_retention(workdir=root, rounds=set(run_parts))
     runs: list[RunHistory] = []
     campaign_slug: str | None = None
     for round_index in sorted(run_parts):
@@ -240,14 +242,27 @@ def inspect_campaign_history(
                 ExitCodes.CONTRACT_VIOLATION,
             )
         run_row = matching_runs.iloc[0].to_dict()
-        predicted_rows = sum(item[2] for item in prediction_parts[round_index])
+        prediction_frame = prediction_rows_for_run(
+            (item[0] for item in prediction_parts[round_index]),
+            round_index=round_index,
+            run_id=run_id,
+            columns=("pred__selection_views",),
+        )
+        predicted_rows = len(prediction_frame)
         expected_rows = int(run_row["stats__n_scored"])
-        if predicted_rows != expected_rows:
-            raise OpalError(
-                f"{label} round {round_index} prediction count differs from run metadata: "
-                f"predictions={predicted_rows}, expected={expected_rows}.",
-                ExitCodes.CONTRACT_VIOLATION,
-            )
+        retention_mode = retention.mode_by_round[round_index]
+        if retention.run_id_by_round.get(round_index, run_id) != run_id:
+            raise OpalError(f"{label} round {round_index} retention run_id differs from the run ledger.")
+        if retention.scored_rows_by_round.get(round_index, expected_rows) != expected_rows:
+            raise OpalError(f"{label} round {round_index} retention scored rows differ from the run ledger.")
+        if retention.retained_rows_by_round.get(round_index, predicted_rows) != predicted_rows:
+            raise OpalError(f"{label} round {round_index} retention rows differ from the prediction ledger.")
+        validate_prediction_retention(
+            prediction_frame,
+            expected_scored_rows=expected_rows,
+            mode=retention_mode,
+            label=f"{label} round {round_index}",
+        )
         round_dir = outputs / "rounds" / f"round_{round_index}"
         if not round_dir.is_dir():
             raise OpalError(f"{label} round directory not found: {round_dir}", ExitCodes.CONTRACT_VIOLATION)
@@ -292,6 +307,8 @@ def inspect_campaign_history(
                 run_row=run_row,
                 round_context=context,
                 invariant_sha256=canonical_sha256(invariant),
+                prediction_row_count=predicted_rows,
+                prediction_retention=retention_mode,
             )
         )
     state_path = root / "state.json"
@@ -311,11 +328,13 @@ def inspect_campaign_history(
         campaign_slug=str(campaign_slug),
         runs=tuple(runs),
         state=state,
+        retention_manifest=retention.manifest_path,
     )
 
 
 def _assert_candidate_lineage(runs: list[RunHistory]) -> None:
     prior: pd.DataFrame | None = None
+    prior_is_full = False
     for run in sorted(runs, key=lambda item: item.round_index):
         current = prediction_rows_for_run(
             run.prediction_parts,
@@ -330,14 +349,14 @@ def _assert_candidate_lineage(runs: list[RunHistory]) -> None:
         if prior is not None:
             prior_by_id = prior.set_index("id")["sequence"]
             current_by_id = current.set_index("id")["sequence"]
-            missing = sorted(set(current_by_id.index) - set(prior_by_id.index))
-            if missing:
+            additions = sorted(set(current_by_id.index) - set(prior_by_id.index))
+            if prior_is_full and additions:
                 raise OpalError(
                     f"Round {run.round_index} introduces candidate IDs absent from the prior campaign universe "
-                    f"(sample={missing[:5]}).",
+                    f"(sample={additions[:5]}).",
                     ExitCodes.CONTRACT_VIOLATION,
                 )
-            shared = current_by_id.index
+            shared = current_by_id.index.intersection(prior_by_id.index)
             changed = shared[current_by_id.loc[shared].to_numpy() != prior_by_id.loc[shared].to_numpy()].tolist()
             if changed:
                 raise OpalError(
@@ -345,6 +364,7 @@ def _assert_candidate_lineage(runs: list[RunHistory]) -> None:
                     ExitCodes.CONTRACT_VIOLATION,
                 )
         prior = current
+        prior_is_full = run.prediction_retention == FULL
 
 
 def plan_history_relocation(
