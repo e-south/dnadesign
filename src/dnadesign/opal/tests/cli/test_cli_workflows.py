@@ -158,6 +158,20 @@ def test_run_rejects_a_missing_predecessor_before_writing_round_artifacts(tmp_pa
     assert not (workdir / "outputs" / "rounds" / "round_1").exists()
 
 
+def test_run_rejects_a_missing_predecessor_when_state_is_absent(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+
+    result = CliRunner().invoke(
+        _build(),
+        ["--no-color", "run", "-c", str(campaign), "--round", "1", "--quiet", "--json"],
+    )
+
+    assert result.exit_code == 2
+    output = _plain_output(f"{result.stdout}\n{result.stderr}")
+    assert "requires completed predecessor rounds [0]" in output
+    assert not (workdir / "outputs" / "rounds" / "round_1").exists()
+
+
 def test_validate_json_writes_machine_readable_contract(tmp_path: Path) -> None:
     workdir, campaign, records = _setup_workspace(tmp_path, include_opal_cols=True)
     app = _build()

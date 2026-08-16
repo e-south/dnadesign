@@ -89,6 +89,10 @@ def build_notebook_three_axis_scatter_figure(
         displayed.loc[kinds.eq(prediction_value) & selection_rounds.notna()] if show_selected else displayed.iloc[0:0]
     )
     observed = displayed.loc[kinds.eq(observed_value)]
+    round_order = [int(value) for value in contract.get("selection_rounds") or []]
+    if len(round_order) != len(set(round_order)):
+        raise ValueError("Three-axis scatter selection rounds must be unique.")
+    round_palette_index = {round_k: index for index, round_k in enumerate(round_order)}
 
     traces: list[Any] = []
     if not predictions.empty:
@@ -103,7 +107,10 @@ def build_notebook_three_axis_scatter_figure(
                 showlegend=True,
             )
         )
-    for index, round_k in enumerate(sorted(selected[selection_round_column].astype(int).unique())):
+    for round_k in sorted(selected[selection_round_column].astype(int).unique()):
+        if round_k not in round_palette_index:
+            raise ValueError(f"Three-axis scatter selection round {round_k} is absent from the contract.")
+        index = round_palette_index[round_k]
         round_selected = selected.loc[selected[selection_round_column].astype(int).eq(round_k)]
         traces.append(
             _trace(

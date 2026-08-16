@@ -203,7 +203,6 @@ def cmd_run(
                 st = CampaignState.load(st_path)
             except Exception as e:
                 raise OpalError(f"Failed to load state.json at {st_path}: {e}", ExitCodes.BAD_ARGS) from e
-            require_completed_predecessors(st, requested_round=int(round))
             exists = any(int(r.round_index) == int(round) for r in st.rounds)
             if exists and not resume:
                 if not prompt_confirm(
@@ -214,6 +213,7 @@ def cmd_run(
                     print_stdout("Aborted.")
                     raise typer.Exit(code=ExitCodes.BAD_ARGS)
                 resume = True
+        require_completed_predecessors(st, requested_round=int(round))
         assert_round_artifacts_writable(
             ws.round_dir(int(round)),
             round_index=int(round),

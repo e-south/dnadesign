@@ -251,28 +251,31 @@ def apply_history_relocation(
             if current.canonical_rounds != plan.canonical_rounds or current.invariant_sha256 != plan.invariant_sha256:
                 raise OpalError("Campaign history changed before relocation apply.")
             _assert_history_unchanged(plan.target, existing_target_files, label="Target")
-            for staged_path, target_path in staged["moves"]:
-                if target_path == state_path:
+            state_replaced = False
+            try:
+                for staged_path, target_path in staged["moves"]:
+                    if target_path == state_path:
+                        target_path.parent.mkdir(parents=True, exist_ok=True)
+                        os.replace(staged_path, target_path)
+                        state_replaced = True
+                        continue
+                    if target_path.exists():
+                        raise OpalError(f"History relocation destination already exists: {target_path}")
                     target_path.parent.mkdir(parents=True, exist_ok=True)
                     os.replace(staged_path, target_path)
-                    continue
-                if target_path.exists():
-                    raise OpalError(f"History relocation destination already exists: {target_path}")
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(staged_path, target_path)
-                created.append(target_path)
+                    created.append(target_path)
+            except Exception:
+                for path in reversed(created):
+                    if path.is_dir():
+                        shutil.rmtree(path)
+                    elif path.exists():
+                        path.unlink()
+                if state_replaced:
+                    if state_backup is None:
+                        state_path.unlink(missing_ok=True)
+                    else:
+                        state_path.write_bytes(state_backup)
+                raise
         return Path(staged["receipt_path"])
-    except Exception:
-        for path in reversed(created):
-            if path.is_dir():
-                shutil.rmtree(path)
-            elif path.exists():
-                path.unlink()
-        if state_backup is None:
-            if state_path.exists():
-                state_path.unlink()
-        else:
-            state_path.write_bytes(state_backup)
-        raise
     finally:
         shutil.rmtree(staging_root, ignore_errors=True)

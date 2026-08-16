@@ -15,11 +15,15 @@ from ..core.utils import ExitCodes, OpalError
 from .state import CampaignState
 
 
-def require_completed_predecessors(state: CampaignState, *, requested_round: int) -> None:
+def require_completed_predecessors(state: CampaignState | None, *, requested_round: int) -> None:
     round_index = int(requested_round)
     if round_index <= 0:
         return
-    completed = {int(entry.round_index) for entry in state.rounds if entry.status == "completed"}
+    completed = (
+        {int(entry.round_index) for entry in state.rounds if entry.status == "completed"}
+        if state is not None
+        else set()
+    )
     required = set(range(round_index))
     missing = sorted(required - completed)
     if missing:
