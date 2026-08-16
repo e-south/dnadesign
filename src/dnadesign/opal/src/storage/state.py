@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Mapping
 from ..core.utils import now_iso, read_json, write_json
 
 STATE_SCHEMA_VERSION = 3
+BACKLOG_COUNT_KEY = "number_of_selected_but_not_yet_labeled_candidates_total"
 _STATE_REQUIRED_KEYS = (
     "version",
     "campaign_slug",
@@ -108,9 +109,7 @@ class CampaignState:
     training_policy: Dict[str, Any] = field(default_factory=dict)
     performance: Dict[str, Any] = field(default_factory=dict)
     rounds: List[RoundEntry] = field(default_factory=list)
-    backlog: Dict[str, Any] = field(
-        default_factory=lambda: {"number_of_selected_but_not_yet_labeled_candidates_total": 0}
-    )
+    backlog: Dict[str, Any] = field(default_factory=lambda: {BACKLOG_COUNT_KEY: 0})
 
     # ---- persistence ----
     def to_dict(self) -> Dict[str, Any]:

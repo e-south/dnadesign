@@ -28,6 +28,7 @@ from ...runtime.round_plan import required_candidate_columns
 from ...runtime.run_round import RunRoundRequest, assert_round_artifacts_writable, run_round
 from ...storage.artifacts import append_round_log_event
 from ...storage.candidate_scope import load_candidate_scope_ids
+from ...storage.history_contracts import require_completed_predecessors
 from ...storage.locks import CampaignLock
 from ...storage.state import CampaignState
 from ...storage.workspace import CampaignWorkspace
@@ -196,11 +197,13 @@ def cmd_run(
         # Reject an implicit rerun before opening the prior round's immutable log.
         ws = CampaignWorkspace.from_config(cfg, cfg_path)
         st_path = ws.state_path
+        st = None
         if st_path.exists():
             try:
                 st = CampaignState.load(st_path)
             except Exception as e:
                 raise OpalError(f"Failed to load state.json at {st_path}: {e}", ExitCodes.BAD_ARGS) from e
+            require_completed_predecessors(st, requested_round=int(round))
             exists = any(int(r.round_index) == int(round) for r in st.rounds)
             if exists and not resume:
                 if not prompt_confirm(
