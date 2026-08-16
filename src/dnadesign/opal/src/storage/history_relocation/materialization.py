@@ -238,6 +238,13 @@ def _assert_history_unchanged(history: CampaignHistory, expected: list[dict[str,
         raise OpalError(f"{label} campaign history changed while the relocation was staged.")
 
 
+def _discard_after_commit(path: Path) -> None:
+    try:
+        shutil.rmtree(path)
+    except BaseException:
+        pass
+
+
 def apply_history_relocation(
     plan: HistoryRelocationPlan,
     *,
@@ -249,6 +256,7 @@ def apply_history_relocation(
     created: list[Path] = []
     replaced: list[tuple[Path, Path]] = []
     state_path = plan.target.workdir / "state.json"
+    committed = False
     try:
         staged = _stage_history(plan, cfg=cfg, records_path=records_path, staging_root=staging_root)
         imported_source_files = staged["receipt"]["imported_source_files"]
@@ -305,8 +313,12 @@ def apply_history_relocation(
                         target_path.unlink()
                     os.replace(backup, target_path)
                 raise
+            committed = True
             for _, backup in replaced:
-                shutil.rmtree(backup)
+                _discard_after_commit(backup)
         return Path(staged["receipt_path"])
     finally:
-        shutil.rmtree(staging_root, ignore_errors=True)
+        if committed:
+            _discard_after_commit(staging_root)
+        else:
+            shutil.rmtree(staging_root, ignore_errors=True)
