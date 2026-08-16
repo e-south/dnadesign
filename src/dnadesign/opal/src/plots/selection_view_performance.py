@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import textwrap
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -20,6 +21,48 @@ import pandas as pd
 from ..analysis.selection_views.performance import selection_view_performance
 
 _COLORS = ("#2A6F97", "#2F7F74", "#D97757", "#6F5B7E", "#767676")
+_VIEW_LABEL_WIDTH = 26
+
+
+def _require_single_line_header(value: str | None, *, field: str) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError(f"selection-view performance {field} must be non-empty when provided")
+    if "\n" in normalized or "\r" in normalized:
+        raise ValueError(f"selection-view performance {field} must be one line")
+    return normalized
+
+
+def _display_view_label(view_id: str, labels: Mapping[str, str]) -> str:
+    value = " ".join(str(labels.get(view_id, view_id)).split())
+    if not value:
+        raise ValueError(f"selection-view performance view label for {view_id!r} must be non-empty")
+    return value
+
+
+def _header_layout(*, round_count: int, title: str | None, subtitle: str | None) -> dict[str, float]:
+    header_height = 2.0 if subtitle else (1.15 if title else 0.85)
+    bottom_height = 1.35
+    figure_height = header_height + bottom_height + 5.3 * round_count
+    return {
+        "figure_height": figure_height,
+        "top": 1.0 - header_height / figure_height,
+        "bottom": bottom_height / figure_height,
+        "title_y": 1.0 - 0.25 / figure_height,
+        "subtitle_y": 1.0 - 0.85 / figure_height,
+    }
+
+
+def _keep_y_tick_labels_inside_canvas(fig: object, axes: np.ndarray) -> None:
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    left = min(label.get_window_extent(renderer=renderer).x0 for axis in axes.flat for label in axis.get_yticklabels())
+    padding = 8.0
+    if left < padding:
+        correction = (padding - left) / fig.bbox.width
+        fig.subplots_adjust(left=min(fig.subplotpars.left + correction, 0.42))
 
 
 def render_selection_view_performance(
@@ -39,10 +82,10 @@ def render_selection_view_performance(
         raise ValueError("selection-view performance output must be PNG or SVG")
     if not objective_value_label.strip():
         raise ValueError("selection-view performance objective-value label must be non-empty")
-    if subtitle is not None and not subtitle.strip():
-        raise ValueError("selection-view performance subtitle must be non-empty when provided")
+    title = _require_single_line_header(title, field="title")
+    subtitle = _require_single_line_header(subtitle, field="subtitle")
     if subtitle and not title:
-        raise ValueError("selection-view performance subtitle requires a title")
+        raise ValueError("selection-view performance subtitle requires a non-empty title")
     labels = dict(view_labels or {})
     rounds = sorted(performance.observations["observed_round"].unique().tolist())
     objectives = sorted(performance.observations["objective_view_id"].unique().tolist())
@@ -67,10 +110,12 @@ def render_selection_view_performance(
         }
     )
     with style:
+        layout = _header_layout(round_count=len(rounds), title=title, subtitle=subtitle)
+        figure_width = 6.4 * len(objectives)
         fig, axes = plt.subplots(
             len(rounds),
             len(objectives),
-            figsize=(6.4 * len(objectives), 7.6 * len(rounds)),
+            figsize=(figure_width, layout["figure_height"]),
             squeeze=False,
             sharey=True,
         )
@@ -107,17 +152,34 @@ def render_selection_view_performance(
                 ax.grid(axis="x", color="#E6E6E6", linewidth=1.0)
                 ax.set_axisbelow(True)
                 ax.set_box_aspect(1)
+                ax.set_anchor("N")
                 ax.set_yticks(range(len(selected_views)))
-                ax.set_yticklabels([f"Selected: {labels.get(view, view)}" for view in selected_views])
+                ax.set_yticklabels(
+                    [
+                        textwrap.fill(
+                            f"Selected: {_display_view_label(view, labels)}",
+                            width=_VIEW_LABEL_WIDTH,
+                            break_long_words=False,
+                            break_on_hyphens=False,
+                        )
+                        for view in selected_views
+                    ]
+                )
                 ax.set_xlabel(objective_value_label)
                 round_label = f"Round {observed_round}"
-                ax.set_title(f"{labels.get(objective_view, objective_view)} objective\n{round_label}", pad=18)
+                objective_label = textwrap.fill(
+                    _display_view_label(objective_view, labels),
+                    width=_VIEW_LABEL_WIDTH,
+                    break_long_words=False,
+                    break_on_hyphens=False,
+                )
+                ax.set_title(f"{objective_label} objective\n{round_label}", pad=18)
         if title:
-            fig.suptitle(title, fontsize=25, fontweight="bold", x=0.5, y=0.975, ha="center")
+            fig.suptitle(title, fontsize=25, fontweight="bold", x=0.5, y=layout["title_y"], ha="center")
         if subtitle:
             fig.text(
                 0.5,
-                0.895,
+                layout["subtitle_y"],
                 subtitle,
                 ha="center",
                 va="center",
@@ -146,8 +208,16 @@ def render_selection_view_performance(
             frameon=False,
             fontsize=16,
         )
-        top = 0.74 if subtitle else (0.82 if title else 0.90)
-        fig.subplots_adjust(left=0.12, right=0.985, top=top, bottom=0.22, wspace=0.18, hspace=0.40)
+        left = min(2.0 / figure_width, 0.24)
+        fig.subplots_adjust(
+            left=left,
+            right=1.0 - 0.2 / figure_width,
+            top=layout["top"],
+            bottom=layout["bottom"],
+            wspace=0.18,
+            hspace=0.40,
+        )
+        _keep_y_tick_labels_inside_canvas(fig, axes)
         fig.align_titles()
         output.parent.mkdir(parents=True, exist_ok=True)
         metadata = {"Date": None} if output.suffix.lower() == ".svg" else {"Software": "dnadesign.opal"}
