@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 
 from ...plots._mpl_utils import NOTEBOOK_ANNOTATION_FONTSIZE
-from .selection_round_encoding import selection_round_palette_index
+from .selection_round_encoding import selection_round_marker, selection_round_palette_index
 
 
 def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, Any]):
@@ -103,7 +103,6 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
             label=_legend_label(f"Predicted pool (n={len(pool):,})"),
             zorder=2,
         )
-    selection_markers = ("D", "P", "X", "s", "^", "v", "<", ">")
     for round_k in sorted(selected[selection_round_column].astype(int).unique()):
         if round_k not in round_palette_index:
             raise ValueError(f"Layered-scatter selection round {round_k} is absent from the contract.")
@@ -115,7 +114,7 @@ def render_layered_scatter_figure(rows: pd.DataFrame, *, contract: Mapping[str, 
             c=round_selected[color_column],
             cmap=cmap,
             norm=norm,
-            marker=selection_markers[index % len(selection_markers)],
+            marker=selection_round_marker(round_index=round_k, palette_index=index),
             s=42,
             edgecolors="#111111",
             linewidths=1.1,

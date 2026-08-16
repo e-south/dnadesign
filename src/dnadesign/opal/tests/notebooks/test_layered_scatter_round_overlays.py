@@ -140,6 +140,27 @@ def test_layered_scatter_can_overlay_selected_cohorts_categorically_by_round(tmp
         plt.close(round_one_figure)
 
 
+def test_layered_scatter_round_markers_remain_distinct_after_eight_rounds(tmp_path: Path) -> None:
+    choice = _choice(tmp_path)
+    contract = build_notebook_layered_scatter_contract(choice)
+    assert contract is not None
+    selected = contract["selection_rows"].iloc[[0]].copy()
+    round_zero = selected.assign(id="selected-zero", __notebook_selection_round=0)
+    round_eight = selected.assign(id="selected-eight", __notebook_selection_round=8)
+    rows = pd.concat([round_zero, round_eight], ignore_index=True)
+    rows.attrs.update(show_prediction_pool=False, show_selected=True)
+    contract["selection_rounds"] = list(range(9))
+
+    figure = render_layered_scatter_figure(rows, contract=contract)
+    try:
+        assert not np.array_equal(
+            _marker_vertices(figure, "Selected for Round 0"),
+            _marker_vertices(figure, "Selected for Round 8"),
+        )
+    finally:
+        plt.close(figure)
+
+
 def test_layered_scatter_controls_offer_exact_manifest_backed_selection_rounds() -> None:
     class _Ui:
         @staticmethod
