@@ -114,6 +114,25 @@ def test_full_history_rejects_memberships_that_disagree_with_immutable_selection
         )
 
 
+def test_full_history_rejects_non_boolean_selection_memberships() -> None:
+    predictions = pd.DataFrame(
+        {
+            "id": ["candidate-a"],
+            "pred__selection_views": [[{"selection_view_id": "primary", "is_selected": "false"}]],
+        }
+    )
+    selections = pd.DataFrame({"id": ["candidate-a"], "selection_view_id": ["primary"]})
+
+    with pytest.raises(OpalError, match="is_selected values must be boolean"):
+        validate_prediction_retention(
+            predictions,
+            expected_scored_rows=1,
+            mode=FULL,
+            label="Round 0",
+            selections=selections,
+        )
+
+
 def test_history_import_rejects_duplicate_unselected_view_memberships() -> None:
     predictions = pd.DataFrame(
         {

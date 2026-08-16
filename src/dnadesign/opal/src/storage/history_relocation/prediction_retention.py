@@ -160,7 +160,8 @@ def validate_prediction_retention(
         raise OpalError(f"{label} has an unsupported prediction retention mode: {mode!r}.")
     if "pred__selection_views" not in frame:
         raise OpalError(f"{label} prediction history is missing selection memberships.")
-    if mode == SELECTED_HISTORY and not frame["pred__selection_views"].map(selected_by_any_view).all():
+    selected_rows = frame["pred__selection_views"].map(selected_by_any_view)
+    if mode == SELECTED_HISTORY and not selected_rows.all():
         raise OpalError(f"{label} selected prediction history contains an unselected candidate.")
     if selections is None:
         raise OpalError(f"{label} prediction history requires immutable selections.")
