@@ -125,6 +125,39 @@ def test_init_validate_explain_cli(tmp_path: Path) -> None:
     assert out["round_index"] == 0
 
 
+def test_init_rejects_existing_history_when_state_is_missing(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    write_ledger(workdir, run_id="run-0", round_index=0)
+
+    result = CliRunner().invoke(
+        _build(),
+        ["--no-color", "init", "-c", str(campaign), "--json"],
+    )
+
+    assert result.exit_code == 2
+    output = _plain_output(f"{result.stdout}\n{result.stderr}")
+    assert "campaign history already exists" in output.lower()
+    assert not (workdir / "state.json").exists()
+
+
+def test_run_rejects_a_missing_predecessor_before_writing_round_artifacts(tmp_path: Path) -> None:
+    workdir, campaign, _ = _setup_workspace(tmp_path, include_opal_cols=True)
+    app = _build()
+    runner = CliRunner()
+    initialized = runner.invoke(app, ["--no-color", "init", "-c", str(campaign), "--json"])
+    assert initialized.exit_code == 0, initialized.output
+
+    result = runner.invoke(
+        app,
+        ["--no-color", "run", "-c", str(campaign), "--round", "1", "--quiet", "--json"],
+    )
+
+    assert result.exit_code == 2
+    output = _plain_output(f"{result.stdout}\n{result.stderr}")
+    assert "requires completed predecessor rounds [0]" in output
+    assert not (workdir / "outputs" / "rounds" / "round_1").exists()
+
+
 def test_validate_json_writes_machine_readable_contract(tmp_path: Path) -> None:
     workdir, campaign, records = _setup_workspace(tmp_path, include_opal_cols=True)
     app = _build()
@@ -885,6 +918,12 @@ def test_run_surfaces_sfxi_round_label_requirements_as_opal_error(tmp_path: Path
         ],
     )
     assert ingest_res.exit_code == 0, ingest_res.stdout
+    write_state(
+        workdir,
+        records_path=workdir / "records.parquet",
+        run_id="completed-round-0",
+        round_index=0,
+    )
 
     res = runner.invoke(app, ["--no-color", "run", "-c", str(campaign), "--round", "1"])
     assert res.exit_code == 2, res.output

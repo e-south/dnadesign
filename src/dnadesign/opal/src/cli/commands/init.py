@@ -40,6 +40,22 @@ def _records_metadata(records_path: Path) -> dict[str, object]:
     }
 
 
+def _campaign_history_exists(workdir: Path) -> bool:
+    state_path = workdir / "state.json"
+    if state_path.is_file():
+        try:
+            if CampaignState.load(state_path).rounds:
+                return True
+        except (OSError, TypeError, ValueError):
+            return True
+    ledger_dir = workdir / "outputs" / "ledger"
+    rounds_dir = workdir / "outputs" / "rounds"
+    round_ledgers = (ledger_dir / "runs.parquet", ledger_dir / "predictions")
+    return any(path.is_dir() and any(path.rglob("*.parquet")) for path in round_ledgers) or (
+        rounds_dir.is_dir() and any(path.is_dir() and any(path.rglob("*")) for path in rounds_dir.iterdir())
+    )
+
+
 @cli_command("init", help="Initialize the campaign workspace and write state.json.")
 def cmd_init(
     config: Path = typer.Option(None, "--config", "-c", help="Path to campaign.yaml", envvar="OPAL_CONFIG"),
@@ -52,6 +68,12 @@ def cmd_init(
         if not json:
             print_config_context(cfg_path, cfg=cfg)
         workdir = Path(cfg.campaign.workdir)
+        if _campaign_history_exists(workdir):
+            raise OpalError(
+                f"Campaign history already exists at {workdir.resolve()}; init will not replace it. "
+                "Use `opal history import` to relocate history or `opal campaign-reset` to delete it explicitly.",
+                ExitCodes.BAD_ARGS,
+            )
         outputs_dir = workdir / "outputs"
         ensure_dir(outputs_dir / "ledger")
         ensure_dir(outputs_dir / "rounds")

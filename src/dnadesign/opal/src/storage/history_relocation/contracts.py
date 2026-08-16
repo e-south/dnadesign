@@ -1,0 +1,59 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/storage/history_relocation/contracts.py
+
+Defines immutable records used to inspect and relocate OPAL campaign histories.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from ..state import CampaignState
+
+
+@dataclass(frozen=True)
+class RunHistory:
+    round_index: int
+    run_id: str
+    round_dir: Path
+    run_part: Path
+    prediction_parts: tuple[Path, ...]
+    run_row: dict[str, Any]
+    round_context: dict[str, Any]
+    invariant_sha256: str
+
+
+@dataclass(frozen=True)
+class CampaignHistory:
+    workdir: Path
+    campaign_slug: str
+    runs: tuple[RunHistory, ...]
+    state: CampaignState | None
+
+    @property
+    def rounds(self) -> tuple[int, ...]:
+        return tuple(run.round_index for run in self.runs)
+
+
+@dataclass(frozen=True)
+class HistoryRelocationPlan:
+    source: CampaignHistory
+    target: CampaignHistory
+    campaign_slug: str
+    canonical_rounds: tuple[int, ...]
+    invariant_sha256: str
+
+    @property
+    def imported_rounds(self) -> tuple[int, ...]:
+        return self.source.rounds
+
+    @property
+    def existing_rounds(self) -> tuple[int, ...]:
+        return self.target.rounds
