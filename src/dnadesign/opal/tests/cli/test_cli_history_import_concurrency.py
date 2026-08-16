@@ -219,3 +219,48 @@ def test_history_import_rolls_back_when_interrupted_after_publication(
     assert interrupted is True
     assert result.exit_code == 130
     assert _tree_digest(target) == tree_before
+
+
+def test_history_import_keeps_its_successful_commit_when_backup_cleanup_is_interrupted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=True)
+
+    from dnadesign.opal.src.storage.history_relocation import materialization
+
+    remove_tree = materialization.shutil.rmtree
+    interrupted = False
+
+    def interrupt_backup_cleanup(path, *args, **kwargs):
+        nonlocal interrupted
+        candidate = Path(path)
+        if not interrupted and candidate.name.startswith(".runs.parquet.") and candidate.name.endswith(".backup"):
+            interrupted = True
+            raise KeyboardInterrupt
+        return remove_tree(path, *args, **kwargs)
+
+    monkeypatch.setattr(materialization.shutil, "rmtree", interrupt_backup_cleanup)
+
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "history",
+            "import",
+            "-c",
+            str(target_campaign),
+            "--source-workdir",
+            str(source),
+            "--apply",
+            "--json",
+        ],
+    )
+
+    assert interrupted is True
+    assert result.exit_code == 0, result.output
+    assert json.loads(target.joinpath("state.json").read_text(encoding="utf-8"))["rounds"][-1]["round_index"] == 1
+    assert (target / "outputs/rounds/round_0").is_dir()
