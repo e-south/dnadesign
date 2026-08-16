@@ -28,6 +28,8 @@ class RunHistory:
     run_row: dict[str, Any]
     round_context: dict[str, Any]
     invariant_sha256: str
+    prediction_row_count: int
+    prediction_retention: str
 
 
 @dataclass(frozen=True)
@@ -52,6 +54,7 @@ class CampaignHistory:
     campaign_slug: str
     runs: tuple[RunHistory, ...]
     state: CampaignState | None
+    retention_manifest: Path | None
 
     @property
     def rounds(self) -> tuple[int, ...]:

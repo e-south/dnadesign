@@ -17,12 +17,16 @@ import shutil
 from pathlib import Path
 
 import pandas as pd
+import yaml
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
+from dnadesign.opal.src.config.loader import load_config
+from dnadesign.opal.src.runtime.retention import apply_runtime_artifact_retention
 from dnadesign.opal.src.storage.history_relocation.inspection import inspect_campaign_history
 from dnadesign.opal.src.storage.ledger import compact_runs_ledger
 from dnadesign.opal.src.storage.parquet_io import read_parquet_df
+from dnadesign.opal.src.storage.workspace import CampaignWorkspace
 from dnadesign.opal.tests.cli.test_cli_history_import import _workspace
 
 
@@ -47,15 +51,21 @@ def _invoke_import(source: Path, target_campaign: Path):
     )
 
 
-def _compact_prediction_parts(workdir: Path) -> Path:
-    predictions = workdir / "outputs" / "ledger" / "predictions"
-    parts = sorted(predictions.glob("*.parquet"))
-    compacted = pd.concat([read_parquet_df(path) for path in parts], ignore_index=True)
-    for path in parts:
-        path.unlink()
-    output = predictions / "part-compacted.parquet"
-    compacted.to_parquet(output, index=False)
-    return output
+def _apply_selected_history_retention(campaign: Path) -> None:
+    payload = yaml.safe_load(campaign.read_text(encoding="utf-8"))
+    payload["artifact_retention"] = {
+        "mode": "production_review",
+        "prediction_ledger": "selected_history_only",
+        "plot_tidy_data": "full",
+        "model_artifacts": "all",
+        "tabular_format": "parquet",
+        "max_estimated_bytes": 1_000_000,
+        "fail_if_estimate_exceeds": True,
+        "final_round": None,
+    }
+    campaign.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    cfg = load_config(campaign)
+    apply_runtime_artifact_retention(cfg, CampaignWorkspace.from_config(cfg, campaign))
 
 
 def _add_artifact_receipt(workdir: Path, *, round_index: int, run_id: str, key: str) -> bytes:
@@ -227,7 +237,7 @@ def test_history_import_projects_compacted_prediction_parts_by_run(tmp_path: Pat
     canonical_campaign, _ = _workspace(canonical, round_index=1, run_id="run-1", with_state=False)
     first_import = _invoke_import(source, canonical_campaign)
     assert first_import.exit_code == 0, first_import.output
-    _compact_prediction_parts(canonical)
+    _apply_selected_history_retention(canonical_campaign)
     future_campaign, _ = _workspace(future, round_index=2, run_id="run-2", with_state=False)
 
     result = _invoke_import(canonical, future_campaign)
@@ -243,7 +253,66 @@ def test_history_import_projects_compacted_prediction_parts_by_run(tmp_path: Pat
         assert set(zip(frame["as_of_round"].astype(int), frame["run_id"].astype(str), strict=True)) == {
             (run.round_index, run.run_id)
         }
-        assert len(frame) == 2
+        assert len(frame) == (2 if run.round_index == 2 else 1)
+
+
+def test_history_import_accepts_retention_selected_prediction_history(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    canonical = tmp_path / "canonical"
+    future = tmp_path / "future"
+    _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    canonical_campaign, _ = _workspace(canonical, round_index=1, run_id="run-1", with_state=False)
+    first_import = _invoke_import(source, canonical_campaign)
+    assert first_import.exit_code == 0, first_import.output
+    _apply_selected_history_retention(canonical_campaign)
+    retained = read_parquet_df(canonical / "outputs" / "ledger" / "predictions")
+    assert len(retained) == 2
+    future_campaign, _ = _workspace(future, round_index=2, run_id="run-2", with_state=False)
+
+    result = _invoke_import(canonical, future_campaign)
+
+    assert result.exit_code == 0, result.output
+    history = inspect_campaign_history(future, label="Relocated campaign")
+    assert history.rounds == (0, 1, 2)
+    assert [(run.round_index, run.prediction_retention) for run in history.runs] == [
+        (0, "selected_history"),
+        (1, "selected_history"),
+        (2, "full"),
+    ]
+
+
+def test_history_import_preserves_round_scoped_mixed_retention(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=False)
+    _apply_selected_history_retention(target_campaign)
+
+    result = _invoke_import(source, target_campaign)
+
+    assert result.exit_code == 0, result.output
+    history = inspect_campaign_history(target, label="Relocated campaign")
+    assert [(run.round_index, run.prediction_retention) for run in history.runs] == [
+        (0, "full"),
+        (1, "selected_history"),
+    ]
+
+
+def test_history_import_rejects_a_tampered_retention_ledger_digest(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source_campaign, _ = _workspace(source, round_index=0, run_id="run-0", with_state=True)
+    _apply_selected_history_retention(source_campaign)
+    manifest_path = source / "outputs" / "retention_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["actions"][0]["sha256"] = "sha256:" + "0" * 64
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=False)
+
+    result = _invoke_import(source, target_campaign)
+
+    assert result.exit_code == 4
+    assert "retention manifest prediction-ledger digest mismatch" in result.output.lower()
 
 
 def test_history_import_keeps_inspection_fields_out_of_canonical_run_rows(tmp_path: Path) -> None:

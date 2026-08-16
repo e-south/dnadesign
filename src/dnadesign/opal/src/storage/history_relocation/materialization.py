@@ -32,6 +32,7 @@ from .inspection import (
 )
 from .label_ledger import label_ledger_parts, stage_label_ledger
 from .prediction_ledger import prediction_part_is_run_specific, prediction_rows_for_run
+from .prediction_retention import stage_prediction_retention_manifest
 from .run_ledger import stage_canonical_run_ledger
 from .state_projection import build_canonical_state
 
@@ -57,6 +58,8 @@ def _history_entries(history: CampaignHistory) -> list[dict[str, object]]:
         paths.append(run.run_part)
         paths.extend(run.prediction_parts)
     paths.extend(label_ledger_parts(history))
+    if history.retention_manifest is not None:
+        paths.append(history.retention_manifest)
     state_path = history.workdir / "state.json"
     if state_path.is_file():
         paths.append(state_path)
@@ -142,6 +145,7 @@ def _stage_history(
     transformations: list[dict[str, object]] = []
     staged_destinations: list[tuple[Path, Path]] = []
     staged_replacements: list[tuple[Path, Path]] = []
+    canonical_prediction_files = {part: part for run in plan.target.runs for part in run.prediction_parts}
     for run in plan.source.runs:
         staged_round = _stage_verified_round(run=run, staging_root=staging_root)
         for path in _files_under(staged_round / "logs"):
@@ -193,9 +197,19 @@ def _stage_history(
                 )
             else:
                 shutil.copy2(prediction_part, staged_prediction)
-            staged_destinations.append(
-                (staged_prediction, plan.target.workdir / staged_prediction.relative_to(staging_root))
-            )
+            final_prediction = plan.target.workdir / staged_prediction.relative_to(staging_root)
+            staged_destinations.append((staged_prediction, final_prediction))
+            canonical_prediction_files[final_prediction] = staged_prediction
+    staged_retention = stage_prediction_retention_manifest(
+        plan,
+        prediction_files=canonical_prediction_files,
+        staging_root=staging_root,
+    )
+    target_retention = plan.target.workdir / staged_retention.relative_to(staging_root)
+    if target_retention.exists():
+        staged_replacements.append((staged_retention, target_retention))
+    else:
+        staged_destinations.append((staged_retention, target_retention))
     staged_runs, run_transformations = stage_canonical_run_ledger(plan, staging_root=staging_root)
     transformations.extend(run_transformations)
     staged_replacements.append((staged_runs, plan.target.workdir / "outputs" / "ledger" / "runs.parquet"))
@@ -222,6 +236,7 @@ def _stage_history(
             entry
             for entry in existing_target_entries
             if entry["path"] != "state.json"
+            and entry["path"] != "outputs/retention_manifest.json"
             and not str(entry["path"]).startswith("outputs/ledger/runs.parquet/")
             and not (staged_labels is not None and str(entry["path"]).startswith("outputs/ledger/labels.parquet/"))
         ]
