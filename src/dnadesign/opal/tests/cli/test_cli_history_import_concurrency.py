@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -19,6 +20,15 @@ from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
 from dnadesign.opal.tests.cli.test_cli_history_import import _workspace
+
+
+def _tree_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    for file_path in sorted(path.rglob("*")):
+        if file_path.is_file():
+            digest.update(file_path.relative_to(path).as_posix().encode())
+            digest.update(file_path.read_bytes())
+    return digest.hexdigest()
 
 
 def test_history_import_does_not_restore_stale_state_after_concurrent_drift(
@@ -74,6 +84,8 @@ def test_history_import_rolls_back_to_the_state_seen_under_lock(
     _workspace(source, round_index=0, run_id="run-0", with_state=True)
     target_campaign, _ = _workspace(target, round_index=1, run_id="run-1", with_state=True)
     state_path = target / "state.json"
+    runs_path = target / "outputs" / "ledger" / "runs.parquet"
+    runs_before = _tree_digest(runs_path)
     concurrent_state = json.loads(state_path.read_text(encoding="utf-8"))
     concurrent_state["updated_at"] = "2026-08-16T00:00:00+00:00"
 
@@ -109,4 +121,5 @@ def test_history_import_rolls_back_to_the_state_seen_under_lock(
     assert result.exit_code == 2
     assert "destination already exists" in result.output
     assert json.loads(state_path.read_text(encoding="utf-8"))["updated_at"] == concurrent_state["updated_at"]
+    assert _tree_digest(runs_path) == runs_before
     assert not (target / "outputs" / "rounds" / "round_0").exists()

@@ -102,30 +102,12 @@ def _read_round_context(round_dir: Path) -> dict[str, Any]:
     return payload
 
 
-def _read_run_column_contract(round_dir: Path, *, round_index: int) -> tuple[str, str]:
-    path = round_dir / "logs" / "round.log.jsonl"
-    try:
-        events = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-    except (OSError, json.JSONDecodeError) as exc:
-        raise OpalError(f"Invalid round log at {path}: {exc}", ExitCodes.CONTRACT_VIOLATION) from exc
-    starts = [event for event in events if isinstance(event, dict) and event.get("stage") == "start"]
-    if len(starts) != 1:
-        raise OpalError(
-            f"Round {round_index} log must contain exactly one start event with data column identities.",
-            ExitCodes.CONTRACT_VIOLATION,
-        )
-    event = starts[0]
-    data = event.get("data")
-    if int(event.get("round", -1)) != round_index or not isinstance(data, dict):
-        raise OpalError(
-            f"Round {round_index} start event does not match its run identity.",
-            ExitCodes.CONTRACT_VIOLATION,
-        )
-    x_column = str(data.get("x_column") or "").strip()
-    y_column = str(data.get("y_column") or "").strip()
+def _read_run_column_contract(context: dict[str, Any], *, round_index: int) -> tuple[str, str]:
+    x_column = str(context.get("core/data/x_column_name") or "").strip()
+    y_column = str(context.get("core/data/y_column_name") or "").strip()
     if not x_column or not y_column:
         raise OpalError(
-            f"Round {round_index} start event has no X/Y column identities.",
+            f"Round {round_index} immutable context has no X/Y column identities.",
             ExitCodes.CONTRACT_VIOLATION,
         )
     return x_column, y_column
@@ -147,7 +129,7 @@ def run_artifact_root(round_dir: Path, *, run_id: str) -> Path:
     return matches[0].resolve()
 
 
-def _verified_artifact_path(root: Path, *, artifact_key: str) -> Path:
+def verified_artifact_path(root: Path, *, artifact_key: str) -> Path:
     key = str(artifact_key)
     logical = PurePosixPath(key)
     if (
@@ -178,7 +160,7 @@ def _verify_run_artifacts(round_dir: Path, *, run_id: str, artifacts: Any, label
                 ExitCodes.CONTRACT_VIOLATION,
             )
         expected_sha256 = str(receipt[0])
-        artifact_path = _verified_artifact_path(artifact_root, artifact_key=str(artifact_key))
+        artifact_path = verified_artifact_path(artifact_root, artifact_key=str(artifact_key))
         if not artifact_path.is_file():
             raise OpalError(
                 f"{label} immutable artifact is missing for {artifact_key!r}.",
@@ -242,7 +224,8 @@ def inspect_campaign_history(workdir: Path, *, label: str) -> CampaignHistory:
             artifacts=run_row.get("artifacts"),
             label=f"{label} round {round_index}",
         )
-        context = _read_round_context(round_dir)
+        artifact_root = run_artifact_root(round_dir, run_id=run_id)
+        context = _read_round_context(artifact_root)
         context_slug = str(context.get("core/campaign_slug") or "").strip()
         if not context_slug:
             raise OpalError(f"{label} round {round_index} context has no campaign slug.", ExitCodes.CONTRACT_VIOLATION)
@@ -255,7 +238,7 @@ def inspect_campaign_history(workdir: Path, *, label: str) -> CampaignHistory:
                 f"{label} round {round_index} context does not match its ledger identity.",
                 ExitCodes.CONTRACT_VIOLATION,
             )
-        x_column_name, y_column_name = _read_run_column_contract(round_dir, round_index=round_index)
+        x_column_name, y_column_name = _read_run_column_contract(context, round_index=round_index)
         run_row["data__x_column_name"] = x_column_name
         run_row["data__y_column_name"] = y_column_name
         invariant = {field: run_row.get(field) for field in _RUN_INVARIANT_FIELDS}
