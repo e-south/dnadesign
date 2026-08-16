@@ -62,3 +62,20 @@ def test_opal_cli_reference_documents_the_explicit_usr_coordinate() -> None:
     assert "opal --usr-root <absolute-path> <command>" in cli
     assert "existing directory that is not a symbolic link" in cli
     assert "same coordinate for validation and round execution" in cli
+
+
+def test_opal_cli_reference_documents_one_history_import_contract() -> None:
+    cli = _read("src/dnadesign/opal/docs/reference/cli.md")
+
+    assert "opal history import" in cli
+    assert "previews without writing" in cli
+    assert "same campaign slug, X/Y/objective contract, and candidate lineage" in cli
+    assert "does not retrain, rescore, or retain a second active runtime" in cli
+
+
+def test_opal_notebook_reference_documents_all_round_review_scope() -> None:
+    cli = _read("src/dnadesign/opal/docs/reference/cli.md")
+    notebooks = _read("src/dnadesign/opal/docs/reference/notebooks.md")
+
+    assert "[--round <latest|all|k>]" in cli
+    assert "one campaign history across all recorded rounds" in notebooks

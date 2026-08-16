@@ -153,10 +153,8 @@ def _visual_scope_cell() -> str:
                         )
 
                     plot_scope_ui = mo.ui.dropdown(
-                        _scope_labels,
-                        value=_preferred,
-                        label=_scope_control_label,
-                        on_change=_remember_scope,
+                        _scope_labels, value=_preferred, label=_scope_control_label,
+                        on_change=_remember_scope, full_width=True,
                     )
                 else:
                     plot_scope_ui = None

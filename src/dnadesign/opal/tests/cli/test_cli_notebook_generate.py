@@ -210,6 +210,43 @@ def test_notebook_generate_rejects_unknown_round(tmp_path: Path) -> None:
     assert "Available rounds" in res.output
 
 
+def test_notebook_generate_single_campaign_accepts_all_round_scope(tmp_path: Path, monkeypatch) -> None:
+    workdir = tmp_path / "campaign"
+    workdir.mkdir(parents=True, exist_ok=True)
+    records = workdir / "records.parquet"
+    write_records(records)
+    campaign = workdir / "campaign.yaml"
+    write_campaign_yaml(campaign, workdir=workdir, records_path=records)
+    write_ledger(workdir, run_id="run-0", round_index=0)
+    write_ledger(workdir, run_id="run-1", round_index=1)
+    out_path = tmp_path / "campaign_history.py"
+    import dnadesign.opal.src.cli.commands.notebook as notebook_cmd
+
+    monkeypatch.setattr(
+        notebook_cmd,
+        "smoke_check_notebook",
+        lambda path, *, run_marimo_check=True: {"python_parse_ok": True, "marimo_check_ok": True},
+    )
+
+    result = CliRunner().invoke(
+        _build(),
+        [
+            "--no-color",
+            "notebook",
+            "generate",
+            "--config",
+            str(campaign),
+            "--round",
+            "all",
+            "--out",
+            str(out_path),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "selected_round_selector = 'all'" in out_path.read_text(encoding="utf-8")
+
+
 def test_notebook_generate_with_name(tmp_path: Path) -> None:
     workdir = tmp_path / "campaign"
     workdir.mkdir(parents=True, exist_ok=True)

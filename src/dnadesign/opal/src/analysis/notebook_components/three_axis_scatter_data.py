@@ -68,12 +68,14 @@ def sample_notebook_three_axis_rows(
     interactive = resolve_three_axis_interactive_contract(contract)
     view = _mapping(contract["view"])
     record_column = str(view["record_kind_column"])
-    selection_column = str(view["selection_column"])
     prediction_value = str(view["prediction_value"])
     is_prediction = rows[record_column].astype(str).eq(prediction_value)
-    is_selected = rows[selection_column].fillna(False).astype(bool)
-    background = rows.loc[is_prediction & ~is_selected]
-    evidence = rows.loc[~is_prediction | is_selected]
+    selection_round_column = "__notebook_selection_round"
+    if selection_round_column not in rows:
+        raise ValueError("Three-axis scatter rows are missing categorical selection-round provenance.")
+    highlighted_selection = rows[selection_round_column].notna() & bool(rows.attrs.get("show_selected", True))
+    background = rows.loc[is_prediction & ~highlighted_selection]
+    evidence = rows.loc[~is_prediction | highlighted_selection]
     limit = int(interactive["prediction_sample_limit"])
     if len(background) > limit:
         identities = background["id"].astype(str)
@@ -81,7 +83,7 @@ def sample_notebook_three_axis_rows(
         background = background.loc[order]
     sampled = pd.concat([background, evidence], axis=0).sort_index(kind="mergesort").reset_index(drop=True)
     sampled.attrs.update(rows.attrs)
-    sampled.attrs["complete_background_count"] = int((is_prediction & ~is_selected).sum())
+    sampled.attrs["complete_background_count"] = int((is_prediction & ~highlighted_selection).sum())
     sampled.attrs["displayed_background_count"] = int(len(background))
     return sampled
 

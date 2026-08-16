@@ -42,6 +42,8 @@ def _contract_cell() -> str:
                 select_notebook_plot_scope(selected_visual_choice, _scope_label)
                 if selected_visual_choice is not None else None
             )
+            if _s is not None:
+                _s["scope_options"] = list(selected_visual_choice.get("scope_options") or [_s])
             layered_scatter_contract = build_notebook_layered_scatter_contract(_s) if _s is not None else None
             return layered_scatter_contract
         """
@@ -61,10 +63,12 @@ def _control_cell() -> str:
             scatter_figure_ui = layered_scatter_controls["figure"]
             scatter_prediction_pool_ui = layered_scatter_controls["prediction_pool"]
             scatter_selected_ui = layered_scatter_controls["selected"]
+            scatter_selection_rounds_ui = layered_scatter_controls["selection_rounds"]
             scatter_observed_batches_ui = layered_scatter_controls["observed_batches"]
             scatter_labels_ui = layered_scatter_controls["labels"]
             return (layered_scatter_controls, scatter_figure_ui, scatter_labels_ui,
-                    scatter_observed_batches_ui, scatter_prediction_pool_ui, scatter_selected_ui)
+                    scatter_observed_batches_ui, scatter_prediction_pool_ui,
+                    scatter_selected_ui, scatter_selection_rounds_ui)
         """
     )
 
@@ -74,12 +78,13 @@ def _state_cell() -> str:
         """
         @app.cell
         def _(scatter_figure_ui, scatter_labels_ui, scatter_observed_batches_ui,
-              scatter_prediction_pool_ui, scatter_selected_ui,
+              scatter_prediction_pool_ui, scatter_selected_ui, scatter_selection_rounds_ui,
               read_notebook_layered_scatter_state):
             plot_view_state = read_notebook_layered_scatter_state({
                 "figure": scatter_figure_ui,
                 "prediction_pool": scatter_prediction_pool_ui,
                 "selected": scatter_selected_ui,
+                "selection_rounds": scatter_selection_rounds_ui,
                 "observed_batches": scatter_observed_batches_ui,
                 "labels": scatter_labels_ui,
             })

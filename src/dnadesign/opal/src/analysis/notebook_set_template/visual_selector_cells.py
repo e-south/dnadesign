@@ -62,10 +62,8 @@ def _visual_group_selector_cell() -> str:
                 _preferred = visual_group_label_memory()
                 _preferred = _preferred if _preferred in visual_group_options else visual_group_options[0]
                 visual_group_ui = mo.ui.dropdown(
-                    visual_group_options,
-                    value=_preferred,
-                    label="Review section",
-                    on_change=set_visual_group_label_memory,
+                    visual_group_options, value=_preferred, label="Review section",
+                    on_change=set_visual_group_label_memory, full_width=True,
                 )
             else:
                 visual_group_ui = None
@@ -102,7 +100,8 @@ def _visual_selector_cell() -> str:
                 def _remember_visual(value):
                     set_visual_label_memory({**_memory, _memory_key: str(value)})
                 plot_ui = mo.ui.dropdown(
-                    _labels, value=_preferred, label="Deliverable", on_change=_remember_visual
+                    _labels, value=_preferred, label="Deliverable",
+                    on_change=_remember_visual, full_width=True,
                 )
             else:
                 plot_ui = None

@@ -47,6 +47,8 @@ def _contract() -> dict[str, object]:
             "sampling_method": "sha256_id_v1",
         },
         "observed_batches": [{"id": "batch_0", "label": "Batch 0"}],
+        "active_selection_round": 1,
+        "selection_rounds": [1],
         "rows": _rows(),
     }
 
@@ -57,6 +59,7 @@ def _rows() -> pd.DataFrame:
             "id": ["pool-a", "selected-b", "observed-c"],
             "record_kind": ["prediction", "prediction", "observed_label"],
             "selected": [False, True, False],
+            "__notebook_selection_round": [pd.NA, 1, pd.NA],
             "batch_key": [None, None, "batch_0"],
             "display_label": [None, "Selected B", "Observed C"],
             "response_family_score": [0.2, 1.1, -0.4],
@@ -77,7 +80,7 @@ def test_three_axis_figure_uses_exact_family_axes_and_campaign_layers() -> None:
     assert [trace.type for trace in figure.data] == ["scatter3d", "scatter3d", "scatter3d"]
     assert [trace.name for trace in figure.data] == [
         "Deterministic prediction sample (n=1 of 1)",
-        "Selected (n=1)",
+        "Selected for Round 1 (n=1)",
         "Observed · Batch 0 (n=1)",
     ]
     assert list(figure.data[0].x) == [0.2]
@@ -100,6 +103,68 @@ def test_three_axis_figure_uses_exact_family_axes_and_campaign_layers() -> None:
     assert figure.layout.scene.xaxis.tickfont.size >= 14
     assert figure.layout.scene.yaxis.tickfont.size >= 14
     assert figure.layout.scene.zaxis.tickfont.size >= 14
+
+
+def test_three_axis_selected_overlay_hides_the_categorical_trace_without_dropping_the_pool() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    rows = _rows()
+    rows["__notebook_selection_round"] = pd.NA
+    rows.attrs["show_prediction_pool"] = True
+    rows.attrs["show_selected"] = False
+
+    figure = build_notebook_three_axis_scatter_figure(rows, contract=_contract())
+
+    assert [trace.name for trace in figure.data] == [
+        "Deterministic prediction sample (n=2 of 2)",
+        "Observed · Batch 0 (n=1)",
+    ]
+    assert list(figure.data[0].x) == [0.2, 1.1]
+
+
+def test_three_axis_selected_cohorts_are_separate_round_categories() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    rows = _rows()
+    round_zero = rows.loc[rows["id"].eq("selected-b")].copy()
+    round_zero["id"] = "selected-a"
+    round_zero["display_label"] = "Selected A"
+    round_zero["__notebook_selection_round"] = 0
+    rows = pd.concat([rows, round_zero], ignore_index=True)
+    contract = _contract()
+    contract["selection_rounds"] = [0, 1]
+
+    figure = build_notebook_three_axis_scatter_figure(rows, contract=contract)
+
+    assert [trace.name for trace in figure.data] == [
+        "Deterministic prediction sample (n=1 of 1)",
+        "Selected for Round 0 (n=1)",
+        "Selected for Round 1 (n=1)",
+        "Observed · Batch 0 (n=1)",
+    ]
+    assert figure.data[1].marker.symbol != figure.data[2].marker.symbol
+    assert figure.data[1].marker.color != figure.data[2].marker.color
+
+
+def test_three_axis_camera_orientation_is_stable_across_evidence_choices() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    round_zero = _contract()
+    round_zero["key"] = "layered_scatter_v1:round-zero"
+    round_one = _contract()
+    round_one["key"] = "layered_scatter_v1:round-one"
+
+    first = build_notebook_three_axis_scatter_figure(_rows(), contract=round_zero)
+    second = build_notebook_three_axis_scatter_figure(_rows(), contract=round_one)
+
+    assert first.layout.uirevision == second.layout.uirevision
+    assert first.layout.scene.uirevision == second.layout.scene.uirevision
 
 
 def test_three_axis_hover_identity_is_ledger_backed() -> None:
@@ -152,6 +217,10 @@ def test_three_axis_widget_uses_marimo_plotly_happy_path() -> None:
         ui = _Ui()
 
         @staticmethod
+        def iframe(text, *, width, height):
+            return {"kind": "html", "text": text, "width": width, "height": height}
+
+        @staticmethod
         def md(text):
             return {"kind": "md", "text": text}
 
@@ -166,8 +235,16 @@ def test_three_axis_widget_uses_marimo_plotly_happy_path() -> None:
     )
 
     assert widget["items"][0].points == []
-    assert "deterministic SHA-256-ID sample" in widget["items"][1]["text"]
-    assert "rendering error" not in widget["items"][1]["text"]
+    assert widget["items"][1]["kind"] == "html"
+    assert "plotly_relayout" in widget["items"][1]["text"]
+    assert "scene.camera" in widget["items"][1]["text"]
+    restore_position = widget["items"][1]["text"].index("if (saved && !cameraMatches")
+    binding_position = widget["items"][1]["text"].index("if (plot.dataset.opalCameraRevision")
+    assert restore_position < binding_position
+    assert widget["items"][1]["width"] == "0"
+    assert widget["items"][1]["height"] == "0"
+    assert "deterministic SHA-256-ID sample" in widget["items"][2]["text"]
+    assert "rendering error" not in widget["items"][2]["text"]
     assert captured["figure"].data[0].type == "scatter3d"
     assert captured["kwargs"] == {
         "config": {

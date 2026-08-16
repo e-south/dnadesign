@@ -19,8 +19,9 @@ from typing import Any, Mapping
 import numpy as np
 import pandas as pd
 
-from ...plots._mpl_utils import observed_batch_marker_map, pretty_batch_label
+from ...plots._mpl_utils import compact_batch_label, observed_batch_marker_map, pretty_batch_label
 from ...plots.manifests import verified_plot_tidy_csv
+from .layered_scatter_rounds import resolve_layered_scatter_selection_rounds
 
 
 def build_notebook_layered_scatter_contract(choice: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -106,6 +107,15 @@ def build_notebook_layered_scatter_contract(choice: Mapping[str, Any]) -> dict[s
         raise ValueError("Layered-scatter review requires at least one observed batch.")
     observed_batch_marker_map(tuple(batch_ids), universe_batch_ids=tuple(batch_ids))
     batch_labels = _unique_observed_batch_labels(batch_ids)
+    active_selection_round, round_options = resolve_layered_scatter_selection_rounds(choice, active_manifest=manifest)
+    selection_rows = _load_selection_round_rows(
+        round_options,
+        active_manifest=manifest,
+        view=view,
+        runtime=runtime,
+        interactive=interactive,
+        columns=columns,
+    )
     return {
         "adapter": "layered_scatter_v1",
         "key": _layered_scatter_memory_key(manifest, workdir=workdir),
@@ -114,31 +124,92 @@ def build_notebook_layered_scatter_contract(choice: Mapping[str, Any]) -> dict[s
         "view": dict(view),
         "runtime": dict(runtime),
         "interactive": dict(interactive),
+        "active_selection_round": active_selection_round,
+        "selection_rounds": sorted(round_options),
+        "selection_rows": selection_rows,
         "observed_batches": [{"id": value, "label": batch_labels[value]} for value in batch_ids],
     }
 
 
+def _load_selection_round_rows(
+    round_options: Mapping[int, Mapping[str, Any]],
+    *,
+    active_manifest: Mapping[str, Any],
+    view: Mapping[str, Any],
+    runtime: Mapping[str, Any],
+    interactive: Mapping[str, Any],
+    columns: list[str],
+) -> pd.DataFrame:
+    selected_column = str(view["selection_column"])
+    record_column = str(view["record_kind_column"])
+    prediction_value = str(view["prediction_value"])
+    active_kind = str(active_manifest.get("kind") or "")
+    active_selection_view = str(active_manifest.get("selection_view_id") or "")
+    cohorts: list[pd.DataFrame] = []
+    for round_k, option in sorted(round_options.items()):
+        option_manifest = _mapping(option.get("manifest"))
+        if str(option_manifest.get("kind") or "") != active_kind:
+            raise ValueError("Layered-scatter round overlays must use the same plot kind.")
+        if str(option_manifest.get("selection_view_id") or "") != active_selection_view:
+            raise ValueError("Layered-scatter round overlays must use the same selection view.")
+        option_view = _mapping(_mapping(option_manifest.get("metadata")).get("notebook_view"))
+        if option_view != view:
+            raise ValueError("Layered-scatter round overlays must use the same notebook view contract.")
+        option_runtime = _mapping(_mapping(option_manifest.get("artifact_metadata")).get("notebook_view"))
+        _validate_runtime_semantics(option_runtime)
+        if _round_overlay_coordinate_contract(option_runtime) != _round_overlay_coordinate_contract(runtime):
+            raise ValueError("Layered-scatter round overlays must use the same coordinate display contract.")
+        workdir = str(option.get("workdir") or "").strip()
+        if not workdir:
+            raise ValueError("Layered-scatter round overlay requires the campaign workdir.")
+        tidy_path = verified_plot_tidy_csv(
+            option_manifest,
+            plot_root=Path(workdir) / "outputs" / "plots",
+        )
+        tidy = pd.read_csv(tidy_path, low_memory=False)
+        missing = sorted(set(columns) - set(tidy.columns))
+        if missing:
+            raise ValueError(f"Layered-scatter round overlay is missing columns: {missing}.")
+        _validate_tidy_semantics(tidy, view=view, interactive=interactive)
+        selected = tidy.loc[
+            tidy[record_column].astype(str).eq(prediction_value) & tidy[selected_column].fillna(False).astype(bool),
+            columns,
+        ].copy()
+        if selected.empty:
+            raise ValueError(f"Layered-scatter selection round {round_k} contains no selected candidates.")
+        selected["__notebook_selection_round"] = round_k
+        cohorts.append(selected)
+    return pd.concat(cohorts, ignore_index=True)
+
+
+def _round_overlay_coordinate_contract(runtime: Mapping[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in runtime.items() if key not in {"x_limits", "y_limits"}}
+
+
 def _layered_scatter_memory_key(manifest: Mapping[str, Any], *, workdir: str) -> str:
-    # Selection views change the evidence shown, not the operator's display preferences.
+    # Selection views and rounds change the evidence shown, not the operator's display preferences.
     identity = {
         "workdir": str(Path(workdir).expanduser().resolve()),
-        "plot": manifest.get("plot_id") or manifest.get("name") or manifest.get("kind"),
+        "plot": manifest.get("name") or manifest.get("kind"),
         "kind": manifest.get("kind"),
-        "run_id": manifest.get("run_id"),
-        "rounds": manifest.get("rounds"),
     }
     payload = json.dumps(identity, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
     return f"layered_scatter_v1:{hashlib.sha256(payload).hexdigest()}"
 
 
 def _unique_observed_batch_labels(batch_ids: list[str]) -> dict[str, str]:
-    base_labels = {batch_id: pretty_batch_label(batch_id) for batch_id in batch_ids}
+    base_labels = {batch_id: _notebook_batch_label(batch_id) for batch_id in batch_ids}
     counts: dict[str, int] = {}
     for label in base_labels.values():
         counts[label] = counts.get(label, 0) + 1
     return {
         batch_id: (f"{label} · {batch_id}" if counts[label] > 1 else label) for batch_id, label in base_labels.items()
     }
+
+
+def _notebook_batch_label(batch_id: str) -> str:
+    full = pretty_batch_label(batch_id)
+    return compact_batch_label(batch_id) if len(full) > 28 else full
 
 
 def _validate_tidy_semantics(

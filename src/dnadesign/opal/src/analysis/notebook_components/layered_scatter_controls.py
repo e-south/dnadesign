@@ -24,7 +24,17 @@ def build_notebook_layered_scatter_controls(
     """Build persistent widgets for one manifest-declared layered scatter."""
 
     if contract is None:
-        return {key: None for key in ("figure", "prediction_pool", "selected", "observed_batches", "labels")}
+        return {
+            key: None
+            for key in (
+                "figure",
+                "prediction_pool",
+                "selected",
+                "selection_rounds",
+                "observed_batches",
+                "labels",
+            )
+        }
     key = str(contract["key"])
     remembered = dict(dict(memory()).get(key) or {})
 
@@ -59,6 +69,19 @@ def build_notebook_layered_scatter_controls(
         (label for label, value in figure_options.items() if value == remembered_figure),
         "2D publication figure",
     )
+    selection_round_values = [int(value) for value in contract.get("selection_rounds") or []]
+    active_selection_round = int(contract["active_selection_round"])
+    selection_round_options = {f"Round {round_k}": round_k for round_k in selection_round_values}
+    remembered_rounds = {
+        int(value)
+        for value in remembered.get("selection_rounds", [active_selection_round])
+        if not isinstance(value, bool) and str(value).lstrip("-").isdigit()
+    }
+    selected_round_labels = [
+        label for label, round_k in selection_round_options.items() if round_k in remembered_rounds
+    ]
+    if not selected_round_labels:
+        selected_round_labels = [f"Round {active_selection_round}"]
     return {
         "figure": (
             mo.ui.dropdown(
@@ -66,6 +89,7 @@ def build_notebook_layered_scatter_controls(
                 value=figure_key,
                 label="Figure",
                 on_change=lambda value: remember("figure", str(value)),
+                full_width=True,
             )
             if interactive
             else None
@@ -80,17 +104,30 @@ def build_notebook_layered_scatter_controls(
             label="Selected overlay",
             on_change=lambda value: remember("show_selected", bool(value)),
         ),
+        "selection_rounds": (
+            mo.ui.multiselect(
+                selection_round_options,
+                value=selected_round_labels,
+                label="Selected rounds",
+                on_change=lambda value: remember("selection_rounds", [int(item) for item in value]),
+                full_width=True,
+            )
+            if len(selection_round_options) > 1
+            else None
+        ),
         "observed_batches": mo.ui.multiselect(
             batch_options,
             value=selected_batch_labels,
             label="Observed batches",
             on_change=lambda value: remember("observed_batches", [str(item) for item in value]),
+            full_width=True,
         ),
         "labels": mo.ui.dropdown(
             label_options,
             value=label_key,
             label="2D annotations" if interactive else "Labels",
             on_change=lambda value: remember("label_scope", str(value)),
+            full_width=True,
         ),
     }
 
@@ -101,10 +138,14 @@ def read_notebook_layered_scatter_state(controls: Mapping[str, Any]) -> dict[str
     if not controls or controls.get("prediction_pool") is None:
         return None
     figure = controls.get("figure")
+    selection_rounds = controls.get("selection_rounds")
     return {
         "figure": str(figure.value) if figure is not None else "publication_2d",
         "show_prediction_pool": bool(controls["prediction_pool"].value),
         "show_selected": bool(controls["selected"].value),
+        "selection_rounds": (
+            [int(value) for value in selection_rounds.value] if selection_rounds is not None else None
+        ),
         "observed_batches": [str(value) for value in controls["observed_batches"].value],
         "label_scope": str(controls["labels"].value),
     }

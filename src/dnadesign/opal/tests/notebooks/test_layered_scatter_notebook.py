@@ -15,6 +15,7 @@ import inspect
 import io
 import warnings
 from pathlib import Path
+from types import SimpleNamespace
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -160,9 +161,11 @@ def test_layered_scatter_contract_discovers_exact_observed_batches(tmp_path: Pat
     ]
     assert [item["label"] for item in contract["observed_batches"]] == [
         "Batch 1",
-        "Pre-round 0 response corpus 4–8 h · v1",
+        "Pre-round 0",
     ]
     assert isinstance(contract["rows"], pd.DataFrame)
+    assert contract["active_selection_round"] == 0
+    assert contract["selection_rounds"] == [0]
     assert list(contract["rows"].columns) == [
         "id",
         "record_kind",
@@ -253,6 +256,19 @@ def test_layered_scatter_memory_persists_across_selection_views(tmp_path: Path) 
     assert ethanol["key"] == ciprofloxacin["key"]
 
 
+def test_layered_scatter_memory_persists_across_round_scopes(tmp_path: Path) -> None:
+    round_zero_choice = _choice(tmp_path, filename="frontier_r0.csv")
+    round_one_choice = _choice(tmp_path, filename="frontier_r1.csv")
+    round_zero_choice["manifest"].update({"plot_id": "frontier_r0", "run_id": "r0", "rounds": [0]})
+    round_one_choice["manifest"].update({"plot_id": "frontier_r1", "run_id": "r1", "rounds": [1]})
+
+    round_zero = build_notebook_layered_scatter_contract(round_zero_choice)
+    round_one = build_notebook_layered_scatter_contract(round_one_choice)
+
+    assert round_zero is not None and round_one is not None
+    assert round_zero["key"] == round_one["key"]
+
+
 def test_behavior_layered_scatter_memory_and_reference_semantics_are_view_neutral(tmp_path: Path) -> None:
     first_choice = _behavior_choice(tmp_path, filename="behavior_a.csv", selection_view_id="factor-a")
     second_choice = _behavior_choice(tmp_path, filename="behavior_b.csv", selection_view_id="factor-b")
@@ -313,7 +329,7 @@ def test_layered_scatter_wraps_long_title_and_target_context_inside_square_viewp
         plt.close(figure)
 
 
-def test_layered_scatter_memory_stays_isolated_by_run_round_and_plot(tmp_path: Path) -> None:
+def test_layered_scatter_memory_stays_stable_across_evidence_scopes_but_not_plots(tmp_path: Path) -> None:
     baseline_choice = _choice(tmp_path)
     run_choice = _choice(tmp_path, filename="frontier_run.csv")
     run_choice["manifest"]["run_id"] = "r1"
@@ -329,7 +345,8 @@ def test_layered_scatter_memory_stays_isolated_by_run_round_and_plot(tmp_path: P
 
     assert all(contract is not None for contract in contracts)
     keys = [contract["key"] for contract in contracts if contract is not None]
-    assert len(set(keys)) == len(keys)
+    assert keys[0] == keys[1] == keys[2]
+    assert keys[3] != keys[0]
 
 
 def test_layered_scatter_batch_labels_preserve_meaningful_acronyms(tmp_path: Path) -> None:
@@ -585,6 +602,26 @@ def test_layered_scatter_renderer_returns_a_publication_image(tmp_path: Path) ->
     assert rendered["style"]["max-height"] == "min(76vh, 860px)"
 
 
+def test_layered_scatter_export_keeps_one_square_canvas_across_display_controls(tmp_path: Path) -> None:
+    class _Mo:
+        @staticmethod
+        def image(data: bytes, **kwargs):
+            return {"data": data, **kwargs}
+
+    choice = _behavior_choice(tmp_path, filename="behavior_canvas.csv", selection_view_id="ethanol")
+    states = (
+        {"show_prediction_pool": True, "show_selected": True, "observed_batches": [], "label_scope": "none"},
+        {"show_prediction_pool": True, "show_selected": False, "observed_batches": [], "label_scope": "none"},
+        {"show_prediction_pool": True, "show_selected": True, "observed_batches": [], "label_scope": "selected"},
+    )
+    dimensions = []
+    for state in states:
+        payload = render_notebook_layered_scatter_image(choice, state=state, mo=_Mo())["data"]
+        dimensions.append((int.from_bytes(payload[16:20], "big"), int.from_bytes(payload[20:24], "big")))
+
+    assert dimensions == [(1296, 1296)] * len(states)
+
+
 def test_layered_scatter_caption_plainly_preserves_msrb_symbols(tmp_path: Path) -> None:
     class _Mo:
         @staticmethod
@@ -732,6 +769,55 @@ def test_annotated_selected_and_observed_markers_remain_visible_above_label_boxe
         plt.close(figure)
 
 
+def test_selected_annotations_use_both_sides_of_the_plot_for_a_dense_six_candidate_cohort(tmp_path: Path) -> None:
+    choice = _behavior_choice(tmp_path, filename="behavior_dense_labels.csv", selection_view_id="ethanol")
+    manifest = choice["manifest"]
+    assert isinstance(manifest, dict)
+    tidy_path = Path(str(manifest["tidy_csv"]))
+    tidy = pd.read_csv(tidy_path)
+    selected_template = tidy.loc[tidy["selected"].eq(True)].iloc[0]
+    dense = pd.DataFrame(
+        [
+            {
+                **selected_template.to_dict(),
+                "id": f"selected-{index}",
+                "display_label": f"Selected candidate {index}",
+                "response_family_score": 0.20 + index * 0.002,
+                "on_signal_family_score": 1.20 + index * 0.002,
+            }
+            for index in range(6)
+        ]
+    )
+    tidy = pd.concat([tidy.loc[~tidy["selected"].eq(True)], dense], ignore_index=True)
+    tidy.to_csv(tidy_path, index=False)
+    outputs = manifest["outputs"]
+    assert isinstance(outputs, list) and isinstance(outputs[0], dict)
+    outputs[0]["sha256"] = file_sha256(tidy_path)
+    contract = build_notebook_layered_scatter_contract(choice)
+    assert contract is not None
+    visible = filter_notebook_layered_scatter_rows(
+        contract["rows"],
+        contract=contract,
+        state={
+            "show_prediction_pool": True,
+            "show_selected": True,
+            "observed_batches": [],
+            "label_scope": "selected",
+        },
+    )
+
+    figure = render_layered_scatter_figure(visible, contract=contract)
+    try:
+        annotations = [text for text in figure.axes[0].texts if text.get_gid() != "notebook-plot-subtitle"]
+        assert len(annotations) == 6
+        assert {annotation.get_ha() for annotation in annotations} == {"left", "right"}
+        renderer = figure.canvas.get_renderer()
+        boxes = [annotation.get_bbox_patch().get_window_extent(renderer=renderer) for annotation in annotations]
+        assert not any(left.overlaps(right) for index, left in enumerate(boxes) for right in boxes[index + 1 :])
+    finally:
+        plt.close(figure)
+
+
 def test_generated_layered_scatter_controls_are_compact_and_reactive() -> None:
     text = render_layered_scatter_cells()
     contract_cell = layered_scatter_cell_template._contract_cell()
@@ -748,11 +834,13 @@ def test_generated_layered_scatter_controls_are_compact_and_reactive() -> None:
     assert 'scatter_prediction_pool_ui = layered_scatter_controls["prediction_pool"]' in text
     assert 'scatter_figure_ui = layered_scatter_controls["figure"]' in text
     assert 'scatter_selected_ui = layered_scatter_controls["selected"]' in text
+    assert 'scatter_selection_rounds_ui = layered_scatter_controls["selection_rounds"]' in text
     assert 'scatter_observed_batches_ui = layered_scatter_controls["observed_batches"]' in text
     assert 'scatter_labels_ui = layered_scatter_controls["labels"]' in text
     assert '"prediction_pool": scatter_prediction_pool_ui' in text
     assert '"figure": scatter_figure_ui' in text
     assert '"selected": scatter_selected_ui' in text
+    assert '"selection_rounds": scatter_selection_rounds_ui' in text
     assert '"observed_batches": scatter_observed_batches_ui' in text
     assert '"labels": scatter_labels_ui' in text
     assert "read_notebook_layered_scatter_state(layered_scatter_controls)" not in text
@@ -785,6 +873,115 @@ def test_layered_scatter_controls_follow_the_selected_manifest_scope(tmp_path: P
 
     assert contract is not None
     assert [item["id"] for item in contract["observed_batches"]] == ["batch_1"]
+
+
+def test_layered_scatter_contract_loads_exact_selected_cohorts_for_every_round(tmp_path: Path) -> None:
+    round_zero = _choice(tmp_path, filename="frontier_r0.csv")
+    round_one = _choice(tmp_path, filename="frontier_r1.csv")
+    round_zero["manifest"].update({"run_id": "r0", "rounds": [0]})
+    round_one["manifest"].update({"run_id": "r1", "rounds": [1]})
+    for choice, selected_id in ((round_zero, "selected-r0"), (round_one, "selected-r1")):
+        manifest = choice["manifest"]
+        tidy_path = Path(str(manifest["tidy_csv"]))
+        tidy = pd.read_csv(tidy_path)
+        tidy.loc[tidy["selected"].eq(True), "id"] = selected_id
+        tidy.to_csv(tidy_path, index=False)
+        manifest["outputs"][0]["sha256"] = file_sha256(tidy_path)
+
+    contract = build_notebook_layered_scatter_contract({**round_one, "scope_options": [round_zero, round_one]})
+
+    assert contract is not None
+    assert contract["active_selection_round"] == 1
+    assert contract["selection_rounds"] == [0, 1]
+    assert contract["selection_rows"][["id", "__notebook_selection_round"]].to_dict("records") == [
+        {"id": "selected-r0", "__notebook_selection_round": 0},
+        {"id": "selected-r1", "__notebook_selection_round": 1},
+    ]
+
+
+def test_layered_scatter_round_overlay_allows_round_specific_display_limits(tmp_path: Path) -> None:
+    round_zero = _choice(tmp_path, filename="frontier_r0.csv")
+    round_one = _choice(tmp_path, filename="frontier_r1.csv")
+    round_zero["manifest"].update({"run_id": "r0", "rounds": [0]})
+    round_one["manifest"].update({"run_id": "r1", "rounds": [1]})
+    round_zero["manifest"]["artifact_metadata"]["notebook_view"]["y_limits"] = [-3.0, 4.0]
+
+    contract = build_notebook_layered_scatter_contract({**round_one, "scope_options": [round_zero, round_one]})
+
+    assert contract is not None
+    assert contract["runtime"]["y_limits"] == [-0.5, 1.8]
+    assert contract["selection_rounds"] == [0, 1]
+
+
+def test_layered_scatter_can_overlay_selected_cohorts_categorically_by_round(tmp_path: Path) -> None:
+    round_zero = _choice(tmp_path, filename="frontier_r0.csv")
+    round_one = _choice(tmp_path, filename="frontier_r1.csv")
+    round_zero["manifest"].update({"run_id": "r0", "rounds": [0]})
+    round_one["manifest"].update({"run_id": "r1", "rounds": [1]})
+    for choice, selected_id in ((round_zero, "selected-r0"), (round_one, "selected-r1")):
+        manifest = choice["manifest"]
+        tidy_path = Path(str(manifest["tidy_csv"]))
+        tidy = pd.read_csv(tidy_path)
+        tidy.loc[tidy["selected"].eq(True), "id"] = selected_id
+        tidy.to_csv(tidy_path, index=False)
+        manifest["outputs"][0]["sha256"] = file_sha256(tidy_path)
+    contract = build_notebook_layered_scatter_contract({**round_one, "scope_options": [round_zero, round_one]})
+    assert contract is not None
+
+    visible = filter_notebook_layered_scatter_rows(
+        contract["rows"],
+        contract=contract,
+        state={
+            "show_prediction_pool": False,
+            "show_selected": True,
+            "selection_rounds": [0, 1],
+            "observed_batches": [],
+            "label_scope": "none",
+        },
+    )
+    figure = render_layered_scatter_figure(visible, contract=contract)
+    try:
+        assert visible[["id", "__notebook_selection_round"]].to_dict("records") == [
+            {"id": "selected-r0", "__notebook_selection_round": 0},
+            {"id": "selected-r1", "__notebook_selection_round": 1},
+        ]
+        assert [text.get_text() for text in figure.axes[0].get_legend().get_texts()] == [
+            "Selected for Round 0 (n=1)",
+            "Selected for Round 1 (n=1)",
+        ]
+    finally:
+        plt.close(figure)
+
+
+def test_layered_scatter_controls_offer_exact_manifest_backed_selection_rounds() -> None:
+    class _Ui:
+        @staticmethod
+        def dropdown(_options, *, value, **_kwargs):
+            return SimpleNamespace(value=value)
+
+        @staticmethod
+        def switch(*, value, **_kwargs):
+            return SimpleNamespace(value=value)
+
+        @staticmethod
+        def multiselect(options, *, value, **_kwargs):
+            return SimpleNamespace(value=[options[item] for item in value])
+
+    memory_state: dict[str, object] = {}
+    controls = build_notebook_layered_scatter_controls(
+        {
+            "key": "plot",
+            "interactive": {"adapter": "three_axis_scatter_v1"},
+            "active_selection_round": 1,
+            "selection_rounds": [0, 1],
+            "observed_batches": [],
+        },
+        memory=lambda: memory_state,
+        set_memory=lambda value: memory_state.update(value),
+        mo=SimpleNamespace(ui=_Ui()),
+    )
+
+    assert controls["selection_rounds"].value == [1]
 
 
 def _marker_vertices(figure, label: str) -> np.ndarray:

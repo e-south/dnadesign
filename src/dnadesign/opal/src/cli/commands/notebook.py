@@ -237,9 +237,11 @@ def cmd_notebook_generate(
         if out is not None and name is not None:
             raise OpalError("Use --out or --name, not both.", ExitCodes.BAD_ARGS)
 
-        round_sel = parse_notebook_round_selector(round, allow_all=False)
+        round_sel = parse_notebook_round_selector(round, allow_all=True)
 
         if run_id is not None:
+            if round_sel == "all":
+                raise OpalError("--run-id cannot be combined with --round all.", ExitCodes.BAD_ARGS)
             round_sel, resolved_run_id = resolve_generation_run_scope(
                 analysis,
                 round_selector=round_sel,
@@ -248,7 +250,7 @@ def cmd_notebook_generate(
         else:
             resolved_run_id = None
 
-        if validate and ws.ledger_runs_path.exists():
+        if validate and round_sel != "all" and ws.ledger_runs_path.exists():
             runs_df = analysis.read_runs()
             # Validate requested round exists (or at least that runs are available for "latest").
             resolve_round_index_from_runs(runs_df, round_sel)

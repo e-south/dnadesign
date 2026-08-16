@@ -3,7 +3,7 @@ id: opal-reference-notebooks
 title: OPAL notebooks
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-02
+last_verified: 2026-08-15
 audience:
   - operator
   - maintainer
@@ -14,7 +14,7 @@ entrypoints:
 ---
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+**Last verified:** 2026-08-15
 
 ## OPAL Notebooks
 
@@ -32,6 +32,10 @@ Generate one with:
 ```bash
 uv run opal notebook generate --config /path/to/campaign --round latest --force --json
 ```
+
+Use `--round all` to review one campaign history across all recorded rounds.
+The generated surface keeps one campaign identity and exposes round-scoped
+progress and plot deliverables; it does not model rounds as separate campaigns.
 
 Open a generated notebook in read-only app mode:
 
