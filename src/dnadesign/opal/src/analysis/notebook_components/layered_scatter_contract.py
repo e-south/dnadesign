@@ -21,6 +21,7 @@ import pandas as pd
 
 from ...plots._mpl_utils import compact_batch_label, observed_batch_marker_map, pretty_batch_label
 from ...plots.manifests import verified_plot_tidy_csv
+from .layered_scatter_display import invariant_round_display, runtime_limits, shared_colorbar_extend
 from .layered_scatter_rounds import resolve_layered_scatter_selection_rounds
 
 
@@ -125,7 +126,7 @@ def build_notebook_layered_scatter_contract(choice: Mapping[str, Any]) -> dict[s
             if len(shared_display["color_contexts"]) == 1
             else "shared across loaded rounds; endpoint values remain in the plotted data"
         ),
-        extend=_shared_colorbar_extend(
+        extend=shared_colorbar_extend(
             minimum=shared_display["color_min"],
             maximum=shared_display["color_max"],
             center=float(shared_color_scale["center"]),
@@ -182,13 +183,13 @@ def _load_selection_round_rows(
             raise ValueError("Layered-scatter round overlays must use the same notebook view contract.")
         option_runtime = _mapping(_mapping(option_manifest.get("artifact_metadata")).get("notebook_view"))
         _validate_runtime_semantics(option_runtime)
-        if _round_overlay_coordinate_contract(option_runtime) != _round_overlay_coordinate_contract(runtime):
+        if invariant_round_display(option_runtime) != invariant_round_display(runtime):
             raise ValueError("Layered-scatter round overlays must use the same coordinate display contract.")
         option_color_scale = _mapping(option_runtime["color_scale"])
         color_extents.append(float(option_color_scale["extent"]))
         color_contexts.add(str(option_color_scale["context"]))
-        x_limits.append(_runtime_limits(option_runtime, "x_limits"))
-        y_limits.append(_runtime_limits(option_runtime, "y_limits"))
+        x_limits.append(runtime_limits(option_runtime, "x_limits"))
+        y_limits.append(runtime_limits(option_runtime, "y_limits"))
         workdir = str(option.get("workdir") or "").strip()
         if not workdir:
             raise ValueError("Layered-scatter round overlay requires the campaign workdir.")
@@ -220,37 +221,6 @@ def _load_selection_round_rows(
         "x_limits": [min(lower for lower, _ in x_limits), max(upper for _, upper in x_limits)],
         "y_limits": [min(lower for lower, _ in y_limits), max(upper for _, upper in y_limits)],
     }
-
-
-def _round_overlay_coordinate_contract(runtime: Mapping[str, Any]) -> dict[str, Any]:
-    contract = {key: value for key, value in runtime.items() if key not in {"x_limits", "y_limits"}}
-    color_scale = dict(_mapping(contract["color_scale"]))
-    for field in ("context", "extend", "extent"):
-        color_scale.pop(field, None)
-    contract["color_scale"] = color_scale
-    return contract
-
-
-def _runtime_limits(runtime: Mapping[str, Any], field: str) -> tuple[float, float]:
-    value = runtime[field]
-    if not isinstance(value, list) or len(value) != 2:
-        raise ValueError(f"Layered-scatter {field} must contain two values.")
-    lower, upper = (float(item) for item in value)
-    if not np.isfinite([lower, upper]).all() or lower >= upper:
-        raise ValueError(f"Layered-scatter {field} must be finite and increasing.")
-    return lower, upper
-
-
-def _shared_colorbar_extend(*, minimum: float, maximum: float, center: float, extent: float) -> str:
-    below = minimum < center - extent
-    above = maximum > center + extent
-    if below and above:
-        return "both"
-    if below:
-        return "min"
-    if above:
-        return "max"
-    return "neither"
 
 
 def _layered_scatter_memory_key(manifest: Mapping[str, Any], *, workdir: str) -> str:
