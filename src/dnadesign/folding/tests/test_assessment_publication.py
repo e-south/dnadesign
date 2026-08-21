@@ -521,6 +521,44 @@ def test_assessment_inventory_bounds_aggregate_bytes(tmp_path: Path) -> None:
         assessment_publication.artifact_digests(root)
 
 
+def test_assessment_inventory_charges_bytes_from_the_opened_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "assessment"
+    root.mkdir()
+    artifact_size = 1_000_000
+    artifact_count = (assessment_publication.ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES // artifact_size) + 1
+    for index in range(artifact_count):
+        (root / f"artifact-{index:03d}").touch()
+    original_open = assessment_publication.os.open
+    expanded: set[str] = set()
+
+    def grow_before_open(
+        path: str | bytes | int,
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        if isinstance(path, str) and path.startswith("artifact-") and dir_fd is not None and path not in expanded:
+            writer = original_open(path, os.O_WRONLY | os.O_TRUNC, dir_fd=dir_fd)
+            try:
+                os.ftruncate(writer, artifact_size)
+            finally:
+                os.close(writer)
+            expanded.add(path)
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(assessment_publication.os, "open", grow_before_open)
+
+    with pytest.raises(
+        ValueError,
+        match=rf"{assessment_publication.ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES}-byte aggregate limit",
+    ):
+        assessment_publication.artifact_digests(root)
+
+
 def test_structure_assessment_loader_rejects_prediction_tampering(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -709,38 +747,69 @@ def test_structure_assessment_loader_reads_and_validates_one_anchored_descriptor
 ) -> None:
     _install_fake_rna_module(tmp_path, monkeypatch)
     output = tmp_path / "assessment"
-    publish_structure_assessment(_request(), output_dir=output)
+    published = publish_structure_assessment(_request(), output_dir=output)
     request_path = output / "assessment-request.json"
     original_path = output / "assessment-request.original.json"
     outside = tmp_path / "replacement-request.json"
     outside.write_text("{}\n", encoding="utf-8")
-    original_open_file = assessment_publication._AnchoredPublicationReader._open_file
+    original_open = assessment_publication.os.open
     replaced = False
 
     def open_file_then_replace_path(
-        reader: assessment_publication._AnchoredPublicationReader,
-        relative: str,
+        path: str | bytes | int,
+        flags: int,
+        mode: int = 0o777,
         *,
-        label: str,
+        dir_fd: int | None = None,
     ) -> int:
         nonlocal replaced
-        descriptor = original_open_file(reader, relative, label=label)
-        if relative == "assessment-request.json" and not replaced:
+        descriptor = original_open(path, flags, mode, dir_fd=dir_fd)
+        if path == "assessment-request.json" and dir_fd is not None and not replaced:
             request_path.rename(original_path)
             request_path.symlink_to(outside)
             replaced = True
         return descriptor
 
-    monkeypatch.setattr(
-        assessment_publication._AnchoredPublicationReader,
-        "_open_file",
-        open_file_then_replace_path,
-    )
+    monkeypatch.setattr(assessment_publication.os, "open", open_file_then_replace_path)
 
-    with pytest.raises(ValueError, match="artifact inventory cannot use a symbolic link"):
-        load_published_assessment(output)
+    replayed = load_published_assessment(output)
 
     assert replaced
+    assert replayed == published
+
+
+def test_structure_assessment_loader_replays_backend_bytes_from_the_inventory_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    output = tmp_path / "assessment"
+    published = publish_structure_assessment(_request(), output_dir=output)
+    stdout_reference = published.record.prediction.artifacts.stdout
+    assert stdout_reference is not None
+    stdout_path = output / "prediction" / stdout_reference
+    original_inventory = assessment_publication._AnchoredPublicationReader.inventory
+    mutated = False
+
+    def inventory_then_mutate_backend_log(
+        reader: assessment_publication._AnchoredPublicationReader,
+    ) -> assessment_publication._AnchoredInventory:
+        nonlocal mutated
+        inventory = original_inventory(reader)
+        stdout_path.write_text("not valid RNAfold output\n", encoding="utf-8")
+        mutated = True
+        return inventory
+
+    monkeypatch.setattr(
+        assessment_publication._AnchoredPublicationReader,
+        "inventory",
+        inventory_then_mutate_backend_log,
+    )
+
+    replayed = load_published_assessment(output)
+
+    assert mutated
+    assert replayed == published
 
 
 def test_structure_assessment_loader_enumerates_the_anchored_publication_root(
@@ -754,27 +823,24 @@ def test_structure_assessment_loader_enumerates_the_anchored_publication_root(
     publish_structure_assessment(_request(), output_dir=output)
     publish_structure_assessment(_request(), output_dir=replacement)
     (output / "hidden.txt").write_text("not inventoried\n", encoding="utf-8")
-    original_read_bytes = assessment_publication._AnchoredPublicationReader.read_bytes
+    original_inventory = assessment_publication._AnchoredPublicationReader.inventory
     swapped = False
 
-    def read_bytes_then_replace_publication(
+    def inventory_then_replace_publication(
         reader: assessment_publication._AnchoredPublicationReader,
-        relative: str,
-        *,
-        label: str,
-    ) -> bytes:
+    ) -> assessment_publication._AnchoredInventory:
         nonlocal swapped
-        content = original_read_bytes(reader, relative, label=label)
-        if relative == "assessment-record.json" and not swapped:
+        inventory = original_inventory(reader)
+        if not swapped:
             output.rename(detached)
             replacement.rename(output)
             swapped = True
-        return content
+        return inventory
 
     monkeypatch.setattr(
         assessment_publication._AnchoredPublicationReader,
-        "read_bytes",
-        read_bytes_then_replace_publication,
+        "inventory",
+        inventory_then_replace_publication,
     )
 
     with pytest.raises(ValueError, match="artifact inventory does not match"):

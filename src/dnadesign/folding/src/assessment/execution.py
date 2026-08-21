@@ -125,9 +125,15 @@ def _enforce_artifact_budget(root_descriptor: int) -> None:
                         raise FoldingExecutionError(
                             f"Structure assessment artifacts exceeded the {ARTIFACT_ENTRY_COUNT_LIMIT}-entry limit."
                         )
-                    metadata = os.stat(name, dir_fd=directory_descriptor, follow_symlinks=False)
+                    try:
+                        metadata = os.stat(name, dir_fd=directory_descriptor, follow_symlinks=False)
+                    except FileNotFoundError:
+                        continue
                     if stat.S_ISDIR(metadata.st_mode):
-                        pending.append(os.open(name, directory_flags, dir_fd=directory_descriptor))
+                        try:
+                            pending.append(os.open(name, directory_flags, dir_fd=directory_descriptor))
+                        except FileNotFoundError:
+                            continue
                     elif stat.S_ISREG(metadata.st_mode):
                         total_bytes += metadata.st_size
                         if total_bytes >= ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES:

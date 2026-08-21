@@ -97,6 +97,7 @@ class PublishedStructureAssessment:
 @dataclass(frozen=True, slots=True)
 class _AnchoredInventory:
     files: dict[str, str]
+    contents: dict[str, bytes]
     directories: set[str]
     symbolic_links: set[str]
     special_entries: set[str]
@@ -217,6 +218,13 @@ class _AnchoredPublicationReader:
 
     @staticmethod
     def _read_descriptor(descriptor: int, *, label: str) -> bytes:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            os.close(descriptor)
+            raise ValueError(f"{label} must be a regular file.")
+        if metadata.st_size >= ARTIFACT_FILE_SIZE_LIMIT_BYTES:
+            os.close(descriptor)
+            raise ValueError(f"{label} exceeds the {ARTIFACT_FILE_SIZE_LIMIT_BYTES}-byte limit.")
         chunks: list[bytes] = []
         total = 0
         with os.fdopen(descriptor, "rb") as handle:
@@ -227,33 +235,10 @@ class _AnchoredPublicationReader:
                 chunks.append(chunk)
         return b"".join(chunks)
 
-    def content_digest(self, relative: str, *, label: str) -> str:
-        """Hash bounded bytes from the same descriptor that was validated."""
-        descriptor = self._open_file(relative, label=label)
-        return self._digest_descriptor(descriptor, label=label)
-
-    @staticmethod
-    def _digest_descriptor(descriptor: int, *, label: str) -> str:
-        metadata = os.fstat(descriptor)
-        if not stat.S_ISREG(metadata.st_mode):
-            os.close(descriptor)
-            raise ValueError(f"{label} must be a regular file.")
-        if metadata.st_size >= ARTIFACT_FILE_SIZE_LIMIT_BYTES:
-            os.close(descriptor)
-            raise ValueError(f"{label} exceeds the {ARTIFACT_FILE_SIZE_LIMIT_BYTES}-byte limit.")
-        digest = hashlib.sha256()
-        total = 0
-        with os.fdopen(descriptor, "rb") as handle:
-            while chunk := handle.read(_HASH_CHUNK_BYTES):
-                total += len(chunk)
-                if total >= ARTIFACT_FILE_SIZE_LIMIT_BYTES:
-                    raise ValueError(f"{label} exceeds the {ARTIFACT_FILE_SIZE_LIMIT_BYTES}-byte limit.")
-                digest.update(chunk)
-        return f"sha256:{digest.hexdigest()}"
-
     def inventory(self) -> _AnchoredInventory:
         """Enumerate and hash the tree below the anchored root descriptor."""
         files: dict[str, str] = {}
+        contents: dict[str, bytes] = {}
         directories: set[str] = set()
         symbolic_links: set[str] = set()
         special_entries: set[str] = set()
@@ -262,6 +247,7 @@ class _AnchoredPublicationReader:
             self._root_descriptor,
             PurePosixPath(),
             files=files,
+            contents=contents,
             directories=directories,
             symbolic_links=symbolic_links,
             special_entries=special_entries,
@@ -269,6 +255,7 @@ class _AnchoredPublicationReader:
         )
         return _AnchoredInventory(
             files=files,
+            contents=contents,
             directories=directories,
             symbolic_links=symbolic_links,
             special_entries=special_entries,
@@ -281,6 +268,7 @@ class _AnchoredPublicationReader:
         prefix: PurePosixPath,
         *,
         files: dict[str, str],
+        contents: dict[str, bytes],
         directories: set[str],
         symbolic_links: set[str],
         special_entries: set[str],
@@ -314,6 +302,7 @@ class _AnchoredPublicationReader:
                         child_descriptor,
                         prefix / name,
                         files=files,
+                        contents=contents,
                         directories=directories,
                         symbolic_links=symbolic_links,
                         special_entries=special_entries,
@@ -323,20 +312,22 @@ class _AnchoredPublicationReader:
                     os.close(child_descriptor)
                 continue
             if stat.S_ISREG(metadata.st_mode):
-                totals[1] += metadata.st_size
+                try:
+                    descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_descriptor)
+                except OSError as exc:
+                    raise ValueError(f"Assessment artifact inventory cannot open file: {relative}") from exc
+                content = self._read_descriptor(
+                    descriptor,
+                    label=f"assessment artifact {relative}",
+                )
+                totals[1] += len(content)
                 if totals[1] >= ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES:
                     raise ValueError(
                         "Assessment artifact inventory exceeds the "
                         f"{ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES}-byte aggregate limit."
                     )
-                try:
-                    descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_descriptor)
-                except OSError as exc:
-                    raise ValueError(f"Assessment artifact inventory cannot open file: {relative}") from exc
-                files[relative] = self._digest_descriptor(
-                    descriptor,
-                    label=f"assessment artifact {relative}",
-                )
+                files[relative] = content_digest(content)
+                contents[relative] = content
                 continue
             special_entries.add(relative)
 
@@ -395,24 +386,37 @@ def verify_publication(
     root = root if root.is_absolute() else Path.cwd() / root
     reader_context = _AnchoredPublicationReader(root) if reader is None else nullcontext(reader)
     with reader_context as active_reader:
-        manifest_content = active_reader.read_bytes(_MANIFEST, label="assessment manifest")
+        inventory = active_reader.inventory()
+        manifest_content = _inventory_bytes(inventory, _MANIFEST, label="assessment manifest")
         manifest = StructureAssessmentPublicationV1.model_validate_json(manifest_content)
-        request_content = active_reader.read_bytes(manifest.request_path, label="assessment request")
-        target_sequence_content = active_reader.read_bytes(
+        _verify_artifact_inventory_structure(
+            root,
+            inventory,
+            allow_staging_owner=allow_staging_owner,
+        )
+        request_content = _inventory_bytes(inventory, manifest.request_path, label="assessment request")
+        target_sequence_content = _inventory_bytes(
+            inventory,
             manifest.target_sequence_path,
             label="assessment target sequence",
         )
-        worker_request_content = active_reader.read_bytes(
+        worker_request_content = _inventory_bytes(
+            inventory,
             manifest.worker_request_path,
             label="assessment worker request",
         )
-        prediction_content = active_reader.read_bytes(manifest.prediction_path, label="assessment prediction")
+        prediction_content = _inventory_bytes(
+            inventory,
+            manifest.prediction_path,
+            label="assessment prediction",
+        )
         prediction_root = PurePosixPath(manifest.prediction_path).parent
-        preflight_content = active_reader.read_bytes(
+        preflight_content = _inventory_bytes(
+            inventory,
             (prediction_root / _PREFLIGHT).as_posix(),
             label="assessment preflight",
         )
-        record_content = active_reader.read_bytes(manifest.record_path, label="assessment record")
+        record_content = _inventory_bytes(inventory, manifest.record_path, label="assessment record")
         if content_digest(request_content) != manifest.request_digest:
             raise ValueError("Assessment request digest does not match the publication manifest.")
         if content_digest(target_sequence_content) != manifest.target_sequence_artifact_digest:
@@ -423,12 +427,7 @@ def verify_publication(
             raise ValueError("Assessment prediction digest does not match the publication manifest.")
         if content_digest(record_content) != manifest.record_digest:
             raise ValueError("Assessment record digest does not match the publication manifest.")
-        _verify_artifact_inventory(
-            root,
-            active_reader,
-            manifest.artifact_digests,
-            allow_staging_owner=allow_staging_owner,
-        )
+        _verify_artifact_inventory_contents(inventory, manifest.artifact_digests)
         request = StructureAssessmentRequestV1.model_validate_json(request_content)
         target_sequence = AssessmentTargetSequenceV1.model_validate_json(target_sequence_content)
         worker_request = SecondaryStructurePredictionRequestV1.model_validate_json(worker_request_content)
@@ -450,8 +449,8 @@ def verify_publication(
             prediction_root=prediction_root,
         )
         _verify_prediction_execution_metadata(preflight, worker_request=worker_request, prediction=prediction)
-        _verify_prediction_artifacts(active_reader, prediction_root, prediction)
-        _verify_prediction_backend_output(active_reader, prediction_root, request=request, prediction=prediction)
+        _verify_prediction_artifacts(inventory, prediction_root, prediction)
+        _verify_prediction_backend_output(inventory, prediction_root, request=request, prediction=prediction)
         if (
             target_sequence.sequence.id != request.target.sequence_id
             or f"sha256:{target_sequence.sequence.sha256}" != request.target.sequence_sha256
@@ -466,8 +465,15 @@ def verify_publication(
     return PublishedStructureAssessment(manifest=manifest, request=request, record=record)
 
 
+def _inventory_bytes(inventory: _AnchoredInventory, relative: str, *, label: str) -> bytes:
+    try:
+        return inventory.contents[relative]
+    except KeyError as exc:
+        raise ValueError(f"{label} is missing from the assessment publication.") from exc
+
+
 def _verify_prediction_artifacts(
-    reader: _AnchoredPublicationReader,
+    inventory: _AnchoredInventory,
     prediction_root: PurePosixPath,
     prediction: SecondaryStructurePredictionV2,
 ) -> None:
@@ -476,7 +482,7 @@ def _verify_prediction_artifacts(
         ("prediction stderr", prediction.artifacts.stderr),
     ):
         if reference is not None:
-            reader.read_bytes((prediction_root / reference).as_posix(), label=label)
+            _inventory_bytes(inventory, (prediction_root / reference).as_posix(), label=label)
 
 
 def _verify_prediction_execution_metadata(
@@ -560,7 +566,7 @@ def _missing_backend_diagnostic(worker_request: SecondaryStructurePredictionRequ
 
 
 def _verify_prediction_backend_output(
-    reader: _AnchoredPublicationReader,
+    inventory: _AnchoredInventory,
     prediction_root: PurePosixPath,
     *,
     request: StructureAssessmentRequestV1,
@@ -568,7 +574,7 @@ def _verify_prediction_backend_output(
 ) -> None:
     if prediction.status == "error":
         _verify_prediction_failure(
-            reader,
+            inventory,
             prediction_root,
             request=request,
             prediction=prediction,
@@ -579,7 +585,8 @@ def _verify_prediction_backend_output(
     stdout_ref = prediction.artifacts.stdout
     if stdout_ref is None:
         raise ValueError("Successful assessment prediction lacks backend output evidence.")
-    stdout = reader.read_bytes(
+    stdout = _inventory_bytes(
+        inventory,
         (prediction_root / stdout_ref).as_posix(),
         label="prediction stdout",
     ).decode("utf-8")
@@ -599,7 +606,7 @@ def _verify_prediction_backend_output(
 
 
 def _verify_prediction_failure(
-    reader: _AnchoredPublicationReader,
+    inventory: _AnchoredInventory,
     prediction_root: PurePosixPath,
     *,
     request: StructureAssessmentRequestV1,
@@ -610,11 +617,13 @@ def _verify_prediction_failure(
     stderr_ref = prediction.artifacts.stderr
     if failure is None or stdout_ref is None or stderr_ref is None:
         raise ValueError("Failed assessment prediction lacks typed backend evidence.")
-    stdout = reader.read_bytes(
+    stdout = _inventory_bytes(
+        inventory,
         (prediction_root / stdout_ref).as_posix(),
         label="prediction stdout",
     ).decode("utf-8")
-    stderr = reader.read_bytes(
+    stderr = _inventory_bytes(
+        inventory,
         (prediction_root / stderr_ref).as_posix(),
         label="prediction stderr",
     ).decode("utf-8")
@@ -731,14 +740,12 @@ def _verify_preflight(
         raise ValueError("Assessment preflight diagnostics do not match the prediction.")
 
 
-def _verify_artifact_inventory(
+def _verify_artifact_inventory_structure(
     root: Path,
-    reader: _AnchoredPublicationReader,
-    expected: dict[str, str],
+    inventory: _AnchoredInventory,
     *,
     allow_staging_owner: bool,
 ) -> None:
-    inventory = reader.inventory()
     relative_entry_files = {
         **{relative: True for relative in inventory.files},
         **{relative: False for relative in inventory.directories},
@@ -761,6 +768,12 @@ def _verify_artifact_inventory(
     if inventory.special_entries:
         first = sorted(inventory.special_entries)[0]
         raise ValueError(f"Assessment artifact inventory contains an unsupported filesystem entry: {first}")
+
+
+def _verify_artifact_inventory_contents(
+    inventory: _AnchoredInventory,
+    expected: dict[str, str],
+) -> None:
     actual_files = {
         relative: digest for relative, digest in inventory.files.items() if relative not in {_MANIFEST, _STAGING_OWNER}
     }
