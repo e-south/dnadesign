@@ -53,8 +53,14 @@ def validate_publication_metadata_paths(
     *,
     required_manifest: Path,
     owner_file: str,
+    require_owner: bool = True,
 ) -> None:
-    """Validate required and reserved metadata under portable path identity."""
+    """Validate required and reserved metadata under portable path identity.
+
+    Staging publications require their transaction owner. Published bundles
+    require that owner to be absent. Both states reject portable aliases of the
+    reserved manifest and owner names.
+    """
 
     canonical_manifest = Path("manifest.json")
     if (
@@ -85,8 +91,11 @@ def validate_publication_metadata_paths(
     if manifest is None or manifest.relative_to(stage) != required_manifest or not manifest.is_file():
         raise PublicationError(f"Artifact bundle staging is incomplete: {stage / required_manifest}")
     owner = entries.get(portable_path_identity(Path(owner_file)))
-    if owner is None or owner.relative_to(stage) != Path(owner_file) or not owner.is_file():
-        raise PublicationError("Artifact bundle publication owner sentinel is unavailable or unsafe")
+    if require_owner:
+        if owner is None or owner.relative_to(stage) != Path(owner_file) or not owner.is_file():
+            raise PublicationError("Artifact bundle publication owner sentinel is unavailable or unsafe")
+    elif owner is not None:
+        raise PublicationError("Published artifact bundle cannot contain publication transaction metadata")
 
 
 __all__ = ["portable_path_identity", "validate_publication_metadata_paths"]

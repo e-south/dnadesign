@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 
 import dnadesign.folding.src.assessment.api as assessment_api
+import dnadesign.folding.src.assessment.publication as assessment_publication
 from dnadesign.folding import (
     FoldingConfigError,
     FoldingExecutionError,
@@ -447,6 +448,25 @@ def test_structure_assessment_loader_rejects_inventoried_staging_owner(
         load_published_assessment(output)
 
 
+def test_structure_assessment_loader_rejects_portable_staging_owner_alias(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    output = tmp_path / "assessment"
+    publish_structure_assessment(_request(), output_dir=output)
+    owner_alias = output / ".DNADESIGN-PUBLICATION-OWNER.JSON"
+    owner_content = b"{}\n"
+    owner_alias.write_bytes(owner_content)
+    manifest_path = output / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifact_digests"][owner_alias.name] = _content_digest(owner_content)
+    manifest_path.write_bytes(_json_content(manifest))
+
+    with pytest.raises(ValueError, match="reserved publication owner metadata"):
+        load_published_assessment(output)
+
+
 @pytest.mark.skipif(os.name != "posix", reason="FIFO contract is POSIX-specific")
 def test_structure_assessment_loader_rejects_special_files(
     tmp_path: Path,
@@ -475,6 +495,46 @@ def test_structure_assessment_loader_rejects_symlinked_nested_directory(
 
     with pytest.raises(ValueError, match="symbolic link"):
         load_published_assessment(output)
+
+
+def test_structure_assessment_loader_reads_and_validates_one_anchored_descriptor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    output = tmp_path / "assessment"
+    publish_structure_assessment(_request(), output_dir=output)
+    request_path = output / "assessment-request.json"
+    original_path = output / "assessment-request.original.json"
+    outside = tmp_path / "replacement-request.json"
+    outside.write_text("{}\n", encoding="utf-8")
+    original_open_file = assessment_publication._AnchoredPublicationReader._open_file
+    replaced = False
+
+    def open_file_then_replace_path(
+        reader: assessment_publication._AnchoredPublicationReader,
+        relative: str,
+        *,
+        label: str,
+    ) -> int:
+        nonlocal replaced
+        descriptor = original_open_file(reader, relative, label=label)
+        if relative == "assessment-request.json" and not replaced:
+            request_path.rename(original_path)
+            request_path.symlink_to(outside)
+            replaced = True
+        return descriptor
+
+    monkeypatch.setattr(
+        assessment_publication._AnchoredPublicationReader,
+        "_open_file",
+        open_file_then_replace_path,
+    )
+
+    with pytest.raises(ValueError, match="artifact inventory cannot use a symbolic link"):
+        load_published_assessment(output)
+
+    assert replaced
 
 
 def test_structure_assessment_loader_rejects_record_identity_drift(
@@ -587,6 +647,41 @@ def test_structure_assessment_loader_derives_optional_missing_status_from_policy
     manifest_path.write_bytes(_json_content(manifest))
 
     with pytest.raises(ValueError, match="preflight blocker does not match"):
+        load_published_assessment(output)
+
+
+def test_structure_assessment_loader_rejects_derived_qa_when_backend_did_not_run(tmp_path: Path) -> None:
+    output = tmp_path / "assessment"
+    publish_structure_assessment(_optional_missing_request(), output_dir=output)
+    prediction_path = output / "prediction/secondary_structure_prediction_v2.json"
+    record_path = output / "assessment-record.json"
+    manifest_path = output / "manifest.json"
+    prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    prediction["qa"]["pairing_summary"] = {
+        "predicted_pair_count": 0,
+        "cross_copy_pair_count": 0,
+        "intended_pairing_count": 0,
+        "intended_recovered_count": 0,
+        "intended_partially_recovered_count": 0,
+        "intended_missed_count": 0,
+    }
+    record["prediction"] = prediction
+    prediction_content = _json_content(prediction)
+    prediction_digest = _content_digest(prediction_content)
+    record["prediction_digest"] = prediction_digest
+    record_content = _json_content(record)
+    record_digest = _content_digest(record_content)
+    prediction_path.write_bytes(prediction_content)
+    record_path.write_bytes(record_content)
+    manifest["prediction_digest"] = prediction_digest
+    manifest["record_digest"] = record_digest
+    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v2.json"] = prediction_digest
+    manifest["artifact_digests"]["assessment-record.json"] = record_digest
+    manifest_path.write_bytes(_json_content(manifest))
+
+    with pytest.raises(ValueError, match="derived QA without backend execution"):
         load_published_assessment(output)
 
 

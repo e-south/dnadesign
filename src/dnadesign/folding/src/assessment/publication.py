@@ -13,12 +13,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import stat
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from pydantic import BaseModel, ConfigDict
 
+from dnadesign.artifacts.errors import PublicationError
+from dnadesign.artifacts.portable_paths import validate_publication_metadata_paths
 from dnadesign.contracts.folding import (
     AssessmentTargetSequenceV1,
     StructureAssessmentPublicationV1,
@@ -75,6 +78,94 @@ class PublishedStructureAssessment:
     record: StructureAssessmentRecordV1
 
 
+class _AnchoredPublicationReader:
+    """Read publication files through one no-follow root descriptor."""
+
+    def __init__(self, root: Path) -> None:
+        if not hasattr(os, "O_DIRECTORY") or not hasattr(os, "O_NOFOLLOW") or os.open not in os.supports_dir_fd:
+            raise ValueError("Descriptor-anchored assessment reads are unavailable on this platform.")
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        try:
+            self._root_descriptor = os.open(root, flags)
+        except OSError as exc:
+            raise ValueError("Assessment publication root is missing or unsafe.") from exc
+        if not stat.S_ISDIR(os.fstat(self._root_descriptor).st_mode):
+            os.close(self._root_descriptor)
+            raise ValueError("Assessment publication root must be a directory.")
+
+    def close(self) -> None:
+        if self._root_descriptor >= 0:
+            os.close(self._root_descriptor)
+            self._root_descriptor = -1
+
+    def __enter__(self) -> _AnchoredPublicationReader:
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.close()
+
+    def _open_file(self, relative: str, *, label: str) -> int:
+        relative_path = PurePosixPath(relative)
+        if relative_path.is_absolute() or not relative_path.parts or ".." in relative_path.parts:
+            raise ValueError(f"{label} must stay inside the assessment publication.")
+        directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        opened_directories: list[int] = []
+        current_descriptor = self._root_descriptor
+        try:
+            for part in relative_path.parts[:-1]:
+                directory_descriptor = os.open(
+                    part,
+                    directory_flags,
+                    dir_fd=current_descriptor,
+                )
+                opened_directories.append(directory_descriptor)
+                current_descriptor = directory_descriptor
+            descriptor = os.open(
+                relative_path.parts[-1],
+                os.O_RDONLY | os.O_NOFOLLOW,
+                dir_fd=current_descriptor,
+            )
+        except OSError as exc:
+            raise ValueError(f"{label} cannot use a symbolic link or unsafe or missing path.") from exc
+        finally:
+            for directory_descriptor in reversed(opened_directories):
+                os.close(directory_descriptor)
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            os.close(descriptor)
+            raise ValueError(f"{label} must be a regular file.")
+        if metadata.st_size >= _ARTIFACT_SIZE_LIMIT_BYTES:
+            os.close(descriptor)
+            raise ValueError(f"{label} exceeds the {_ARTIFACT_SIZE_LIMIT_BYTES}-byte limit.")
+        return descriptor
+
+    def read_bytes(self, relative: str, *, label: str) -> bytes:
+        """Read bounded bytes from the same descriptor that was validated."""
+        descriptor = self._open_file(relative, label=label)
+        chunks: list[bytes] = []
+        total = 0
+        with os.fdopen(descriptor, "rb") as handle:
+            while chunk := handle.read(_HASH_CHUNK_BYTES):
+                total += len(chunk)
+                if total >= _ARTIFACT_SIZE_LIMIT_BYTES:
+                    raise ValueError(f"{label} exceeds the {_ARTIFACT_SIZE_LIMIT_BYTES}-byte limit.")
+                chunks.append(chunk)
+        return b"".join(chunks)
+
+    def content_digest(self, relative: str, *, label: str) -> str:
+        """Hash bounded bytes from the same descriptor that was validated."""
+        descriptor = self._open_file(relative, label=label)
+        digest = hashlib.sha256()
+        total = 0
+        with os.fdopen(descriptor, "rb") as handle:
+            while chunk := handle.read(_HASH_CHUNK_BYTES):
+                total += len(chunk)
+                if total >= _ARTIFACT_SIZE_LIMIT_BYTES:
+                    raise ValueError(f"{label} exceeds the {_ARTIFACT_SIZE_LIMIT_BYTES}-byte limit.")
+                digest.update(chunk)
+        return f"sha256:{digest.hexdigest()}"
+
+
 def model_json_bytes(model: BaseModel) -> bytes:
     """Return canonical indented JSON bytes for one contract model."""
     payload = model.model_dump(mode="json", by_alias=True)
@@ -96,55 +187,15 @@ def write_model_json(path: Path, model: BaseModel) -> bytes:
 def artifact_digests(root: Path) -> dict[str, str]:
     """Inventory every non-manifest file in one staged publication."""
     digests: dict[str, str] = {}
-    for path in sorted(root.rglob("*")):
-        relative = path.relative_to(root).as_posix()
-        if path.is_symlink():
-            raise ValueError(f"Assessment artifact inventory cannot use a symbolic link: {relative}")
-        if path.is_dir() or relative in {_MANIFEST, _STAGING_OWNER}:
-            continue
-        digests[relative] = _file_content_digest(path, label=f"assessment artifact {relative}")
+    with _AnchoredPublicationReader(root) as reader:
+        for path in sorted(root.rglob("*")):
+            relative = path.relative_to(root).as_posix()
+            if path.is_symlink():
+                raise ValueError(f"Assessment artifact inventory cannot use a symbolic link: {relative}")
+            if path.is_dir() or relative in {_MANIFEST, _STAGING_OWNER}:
+                continue
+            digests[relative] = reader.content_digest(relative, label=f"assessment artifact {relative}")
     return digests
-
-
-def _file_content_digest(path: Path, *, label: str) -> str:
-    metadata = path.stat(follow_symlinks=False)
-    if not stat.S_ISREG(metadata.st_mode):
-        raise ValueError(f"{label} must be a regular file.")
-    if metadata.st_size >= _ARTIFACT_SIZE_LIMIT_BYTES:
-        raise ValueError(f"{label} exceeds the {_ARTIFACT_SIZE_LIMIT_BYTES}-byte limit.")
-    digest = hashlib.sha256()
-    total = 0
-    with path.open("rb") as handle:
-        while chunk := handle.read(_HASH_CHUNK_BYTES):
-            total += len(chunk)
-            if total >= _ARTIFACT_SIZE_LIMIT_BYTES:
-                raise ValueError(f"{label} exceeds the {_ARTIFACT_SIZE_LIMIT_BYTES}-byte limit.")
-            digest.update(chunk)
-    return f"sha256:{digest.hexdigest()}"
-
-
-def _confined_file(root: Path, relative: str, *, label: str) -> Path:
-    relative_path = Path(relative)
-    if relative_path.is_absolute() or ".." in relative_path.parts:
-        raise ValueError(f"{label} must stay inside the assessment publication.")
-    path = root
-    for part in relative_path.parts:
-        path /= part
-        if path.is_symlink():
-            raise ValueError(f"{label} cannot use a symbolic link: {path}")
-    resolved = path.resolve()
-    try:
-        resolved.relative_to(root.resolve())
-    except ValueError as exc:
-        raise ValueError(f"{label} escapes the assessment publication.") from exc
-    if not resolved.is_file():
-        raise ValueError(f"{label} is missing.")
-    metadata = resolved.stat(follow_symlinks=False)
-    if not stat.S_ISREG(metadata.st_mode):
-        raise ValueError(f"{label} must be a regular file.")
-    if metadata.st_size >= _ARTIFACT_SIZE_LIMIT_BYTES:
-        raise ValueError(f"{label} exceeds the {_ARTIFACT_SIZE_LIMIT_BYTES}-byte limit.")
-    return resolved
 
 
 def verify_publication(
@@ -153,82 +204,98 @@ def verify_publication(
     allow_staging_owner: bool = False,
 ) -> PublishedStructureAssessment:
     """Replay all byte and cross-object invariants in one publication."""
-    manifest_path = _confined_file(root, _MANIFEST, label="assessment manifest")
-    manifest = StructureAssessmentPublicationV1.model_validate_json(manifest_path.read_bytes())
-    request_path = _confined_file(root, manifest.request_path, label="assessment request")
-    target_sequence_path = _confined_file(
-        root,
-        manifest.target_sequence_path,
-        label="assessment target sequence",
-    )
-    worker_request_path = _confined_file(root, manifest.worker_request_path, label="assessment worker request")
-    prediction_path = _confined_file(root, manifest.prediction_path, label="assessment prediction")
-    preflight_path = _confined_file(prediction_path.parent, _PREFLIGHT, label="assessment preflight")
-    record_path = _confined_file(root, manifest.record_path, label="assessment record")
-    request_content = request_path.read_bytes()
-    target_sequence_content = target_sequence_path.read_bytes()
-    worker_request_content = worker_request_path.read_bytes()
-    prediction_content = prediction_path.read_bytes()
-    record_content = record_path.read_bytes()
-    if content_digest(request_content) != manifest.request_digest:
-        raise ValueError("Assessment request digest does not match the publication manifest.")
-    if content_digest(target_sequence_content) != manifest.target_sequence_artifact_digest:
-        raise ValueError("Assessment target-sequence artifact digest does not match the publication manifest.")
-    if content_digest(worker_request_content) != manifest.worker_request_digest:
-        raise ValueError("Assessment worker-request digest does not match the publication manifest.")
-    if content_digest(prediction_content) != manifest.prediction_digest:
-        raise ValueError("Assessment prediction digest does not match the publication manifest.")
-    if content_digest(record_content) != manifest.record_digest:
-        raise ValueError("Assessment record digest does not match the publication manifest.")
-    _verify_artifact_inventory(
-        root,
-        manifest.artifact_digests,
-        allow_staging_owner=allow_staging_owner,
-    )
-    request = StructureAssessmentRequestV1.model_validate_json(request_content)
-    target_sequence = AssessmentTargetSequenceV1.model_validate_json(target_sequence_content)
-    worker_request = SecondaryStructurePredictionRequestV1.model_validate_json(worker_request_content)
-    prediction = SecondaryStructurePredictionV2.model_validate_json(prediction_content)
-    preflight = _PreflightArtifact.model_validate_json(preflight_path.read_bytes())
-    record = StructureAssessmentRecordV1.model_validate_json(record_content)
-    if request.assessment_id != manifest.assessment_id or record.assessment_id != manifest.assessment_id:
-        raise ValueError("Assessment identifiers do not agree across the publication.")
-    if record.request_digest != manifest.request_digest or record.prediction_digest != manifest.prediction_digest:
-        raise ValueError("Assessment record digests do not agree with the publication manifest.")
-    if record.target != request.target or record.prediction != prediction:
-        raise ValueError("Assessment record does not replay its request target and prediction.")
-    if worker_request != project_prediction_request(request):
-        raise ValueError("Assessment worker request does not match its deterministic high-level projection.")
-    _verify_preflight(
-        preflight,
-        worker_request=worker_request,
-        prediction=prediction,
-        prediction_root=prediction_path.parent,
-    )
-    _verify_prediction_execution_metadata(preflight, worker_request=worker_request, prediction=prediction)
-    _verify_prediction_artifacts(prediction_path.parent, prediction)
-    _verify_prediction_backend_output(prediction_path.parent, request=request, prediction=prediction)
-    if (
-        target_sequence.sequence.id != request.target.sequence_id
-        or f"sha256:{target_sequence.sequence.sha256}" != request.target.sequence_sha256
-        or target_sequence.sequence.sequence != request.target.sequence
-    ):
-        raise ValueError("Assessment target artifact does not match the assessment request.")
-    if (
-        request.target.state_digest != manifest.target_state_digest
-        or request.target.sequence_sha256 != manifest.target_sequence_sha256
-    ):
-        raise ValueError("Assessment target digests do not agree with the publication manifest.")
+    with _AnchoredPublicationReader(root) as reader:
+        manifest_content = reader.read_bytes(_MANIFEST, label="assessment manifest")
+        manifest = StructureAssessmentPublicationV1.model_validate_json(manifest_content)
+        try:
+            validate_publication_metadata_paths(
+                root,
+                required_manifest=Path(_MANIFEST),
+                owner_file=_STAGING_OWNER,
+                require_owner=allow_staging_owner,
+            )
+        except PublicationError as exc:
+            raise ValueError(str(exc)) from exc
+        request_content = reader.read_bytes(manifest.request_path, label="assessment request")
+        target_sequence_content = reader.read_bytes(
+            manifest.target_sequence_path,
+            label="assessment target sequence",
+        )
+        worker_request_content = reader.read_bytes(
+            manifest.worker_request_path,
+            label="assessment worker request",
+        )
+        prediction_content = reader.read_bytes(manifest.prediction_path, label="assessment prediction")
+        prediction_root = PurePosixPath(manifest.prediction_path).parent
+        preflight_content = reader.read_bytes(
+            (prediction_root / _PREFLIGHT).as_posix(),
+            label="assessment preflight",
+        )
+        record_content = reader.read_bytes(manifest.record_path, label="assessment record")
+        if content_digest(request_content) != manifest.request_digest:
+            raise ValueError("Assessment request digest does not match the publication manifest.")
+        if content_digest(target_sequence_content) != manifest.target_sequence_artifact_digest:
+            raise ValueError("Assessment target-sequence artifact digest does not match the publication manifest.")
+        if content_digest(worker_request_content) != manifest.worker_request_digest:
+            raise ValueError("Assessment worker-request digest does not match the publication manifest.")
+        if content_digest(prediction_content) != manifest.prediction_digest:
+            raise ValueError("Assessment prediction digest does not match the publication manifest.")
+        if content_digest(record_content) != manifest.record_digest:
+            raise ValueError("Assessment record digest does not match the publication manifest.")
+        _verify_artifact_inventory(
+            root,
+            reader,
+            manifest.artifact_digests,
+            allow_staging_owner=allow_staging_owner,
+        )
+        request = StructureAssessmentRequestV1.model_validate_json(request_content)
+        target_sequence = AssessmentTargetSequenceV1.model_validate_json(target_sequence_content)
+        worker_request = SecondaryStructurePredictionRequestV1.model_validate_json(worker_request_content)
+        prediction = SecondaryStructurePredictionV2.model_validate_json(prediction_content)
+        preflight = _PreflightArtifact.model_validate_json(preflight_content)
+        record = StructureAssessmentRecordV1.model_validate_json(record_content)
+        if request.assessment_id != manifest.assessment_id or record.assessment_id != manifest.assessment_id:
+            raise ValueError("Assessment identifiers do not agree across the publication.")
+        if record.request_digest != manifest.request_digest or record.prediction_digest != manifest.prediction_digest:
+            raise ValueError("Assessment record digests do not agree with the publication manifest.")
+        if record.target != request.target or record.prediction != prediction:
+            raise ValueError("Assessment record does not replay its request target and prediction.")
+        if worker_request != project_prediction_request(request):
+            raise ValueError("Assessment worker request does not match its deterministic high-level projection.")
+        _verify_preflight(
+            preflight,
+            worker_request=worker_request,
+            prediction=prediction,
+            prediction_root=prediction_root,
+        )
+        _verify_prediction_execution_metadata(preflight, worker_request=worker_request, prediction=prediction)
+        _verify_prediction_artifacts(reader, prediction_root, prediction)
+        _verify_prediction_backend_output(reader, prediction_root, request=request, prediction=prediction)
+        if (
+            target_sequence.sequence.id != request.target.sequence_id
+            or f"sha256:{target_sequence.sequence.sha256}" != request.target.sequence_sha256
+            or target_sequence.sequence.sequence != request.target.sequence
+        ):
+            raise ValueError("Assessment target artifact does not match the assessment request.")
+        if (
+            request.target.state_digest != manifest.target_state_digest
+            or request.target.sequence_sha256 != manifest.target_sequence_sha256
+        ):
+            raise ValueError("Assessment target digests do not agree with the publication manifest.")
     return PublishedStructureAssessment(manifest=manifest, request=request, record=record)
 
 
-def _verify_prediction_artifacts(root: Path, prediction: SecondaryStructurePredictionV2) -> None:
+def _verify_prediction_artifacts(
+    reader: _AnchoredPublicationReader,
+    prediction_root: PurePosixPath,
+    prediction: SecondaryStructurePredictionV2,
+) -> None:
     for label, reference in (
         ("prediction stdout", prediction.artifacts.stdout),
         ("prediction stderr", prediction.artifacts.stderr),
     ):
         if reference is not None:
-            _confined_file(root, reference, label=label)
+            reader.read_bytes((prediction_root / reference).as_posix(), label=label)
 
 
 def _verify_prediction_execution_metadata(
@@ -260,6 +327,13 @@ def _verify_prediction_execution_metadata(
             or prediction.artifacts.stderr is not None
         ):
             raise ValueError("Assessment blocked prediction contains execution metadata.")
+        expected_qa = SecondaryStructureQaV1(
+            length_matches_input=None,
+            warnings=preflight.warnings,
+            errors=preflight.errors,
+        )
+        if prediction.qa != expected_qa:
+            raise ValueError("Assessment blocked prediction contains derived QA without backend execution.")
         return
     backend = prediction.backend
     dna_policy = prediction.dna_policy
@@ -294,20 +368,29 @@ def _verify_prediction_execution_metadata(
 
 
 def _verify_prediction_backend_output(
-    root: Path,
+    reader: _AnchoredPublicationReader,
+    prediction_root: PurePosixPath,
     *,
     request: StructureAssessmentRequestV1,
     prediction: SecondaryStructurePredictionV2,
 ) -> None:
     if prediction.status == "error":
-        _verify_prediction_failure(root, request=request, prediction=prediction)
+        _verify_prediction_failure(
+            reader,
+            prediction_root,
+            request=request,
+            prediction=prediction,
+        )
         return
     if prediction.status != "ok":
         return
     stdout_ref = prediction.artifacts.stdout
     if stdout_ref is None:
         raise ValueError("Successful assessment prediction lacks backend output evidence.")
-    stdout = _confined_file(root, stdout_ref, label="prediction stdout").read_text(encoding="utf-8")
+    stdout = reader.read_bytes(
+        (prediction_root / stdout_ref).as_posix(),
+        label="prediction stdout",
+    ).decode("utf-8")
     submitted_sequence = request.target.sequence.upper()
     if request.backend.dna_policy.mode == "convert_t_to_u_for_rna_backend":
         submitted_sequence = submitted_sequence.replace("T", "U")
@@ -324,7 +407,8 @@ def _verify_prediction_backend_output(
 
 
 def _verify_prediction_failure(
-    root: Path,
+    reader: _AnchoredPublicationReader,
+    prediction_root: PurePosixPath,
     *,
     request: StructureAssessmentRequestV1,
     prediction: SecondaryStructurePredictionV2,
@@ -334,8 +418,14 @@ def _verify_prediction_failure(
     stderr_ref = prediction.artifacts.stderr
     if failure is None or stdout_ref is None or stderr_ref is None:
         raise ValueError("Failed assessment prediction lacks typed backend evidence.")
-    stdout = _confined_file(root, stdout_ref, label="prediction stdout").read_text(encoding="utf-8")
-    stderr = _confined_file(root, stderr_ref, label="prediction stderr").read_text(encoding="utf-8")
+    stdout = reader.read_bytes(
+        (prediction_root / stdout_ref).as_posix(),
+        label="prediction stdout",
+    ).decode("utf-8")
+    stderr = reader.read_bytes(
+        (prediction_root / stderr_ref).as_posix(),
+        label="prediction stderr",
+    ).decode("utf-8")
     if failure.kind == "output_parse_exception":
         submitted_sequence = request.target.sequence.upper()
         if request.backend.dna_policy.mode == "convert_t_to_u_for_rna_backend":
@@ -380,7 +470,7 @@ def _verify_preflight(
     *,
     worker_request: SecondaryStructurePredictionRequestV1,
     prediction: SecondaryStructurePredictionV2,
-    prediction_root: Path,
+    prediction_root: PurePosixPath,
 ) -> None:
     if preflight.contract != "secondary_structure_folding_preflight_v1":
         raise ValueError("Assessment preflight contract is unsupported.")
@@ -451,6 +541,7 @@ def _verify_preflight(
 
 def _verify_artifact_inventory(
     root: Path,
+    reader: _AnchoredPublicationReader,
     expected: dict[str, str],
     *,
     allow_staging_owner: bool,
@@ -470,7 +561,7 @@ def _verify_artifact_inventory(
         if path.is_dir():
             actual_directories.add(relative)
         elif path.is_file() and relative != _MANIFEST:
-            actual_files[relative] = _file_content_digest(path, label=f"assessment artifact {relative}")
+            actual_files[relative] = reader.content_digest(relative, label=f"assessment artifact {relative}")
         elif relative != _MANIFEST:
             raise ValueError(f"Assessment artifact inventory contains an unsupported filesystem entry: {relative}")
     expected_directories = {
