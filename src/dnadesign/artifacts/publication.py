@@ -144,6 +144,22 @@ def _entry_exists_at(parent_descriptor: int, name: str) -> bool:
     return True
 
 
+def _descriptor_entry_name(parent_descriptor: int, descriptor: int) -> str | None:
+    """Return the current name for one anchored directory in its parent."""
+    anchored = os.fstat(descriptor)
+    for name in os.listdir(parent_descriptor):
+        try:
+            candidate = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+        except FileNotFoundError:
+            continue
+        if stat.S_ISDIR(candidate.st_mode) and (candidate.st_dev, candidate.st_ino) == (
+            anchored.st_dev,
+            anchored.st_ino,
+        ):
+            return name
+    return None
+
+
 def _source_directory_descriptor(source: Path | int) -> int:
     if isinstance(source, int):
         return os.dup(source)
@@ -732,12 +748,14 @@ class CreateOnlyDirectoryPublication:
         if self._closed:
             return
         try:
-            remove_descriptor_anchored_directory(
-                self._stage_parent_descriptor,
-                self.stage.name,
-                self.stage_descriptor,
-                last_entry=_OWNER_FILE,
-            )
+            stage_name = _descriptor_entry_name(self._stage_parent_descriptor, self.stage_descriptor)
+            if stage_name is not None:
+                remove_descriptor_anchored_directory(
+                    self._stage_parent_descriptor,
+                    stage_name,
+                    self.stage_descriptor,
+                    last_entry=_OWNER_FILE,
+                )
             remove_owned_named_directory(
                 self.parent_descriptor,
                 self.adjacent_stage_name,

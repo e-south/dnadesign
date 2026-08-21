@@ -122,9 +122,9 @@ def test_publication_copies_the_prepared_stage_descriptor_after_path_replacement
     finally:
         publication.close()
         shutil.rmtree(publication.stage, ignore_errors=True)
-        shutil.rmtree(displaced_stage, ignore_errors=True)
 
     assert (bundle / "manifest.json").read_text(encoding="utf-8") == "original\n"
+    assert not displaced_stage.exists()
 
 
 def test_close_removes_the_anchored_stage_after_owner_sentinel_corruption(tmp_path: Path) -> None:

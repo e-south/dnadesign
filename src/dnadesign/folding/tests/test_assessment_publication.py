@@ -112,9 +112,15 @@ def test_structure_assessment_rejects_backend_target_mutation_before_publication
         request_path: Path,
         output_path: Path,
         *,
+        artifact_root_descriptor: int,
         timeout_seconds: float,
     ) -> None:
-        original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
+        original_run_worker(
+            request_path,
+            output_path,
+            artifact_root_descriptor=artifact_root_descriptor,
+            timeout_seconds=timeout_seconds,
+        )
         target = request_path.parent.parent / "assessment-target-sequence.json"
         target.write_bytes(target.read_bytes() + b" ")
 
@@ -141,9 +147,15 @@ def test_structure_assessment_rejects_named_worker_artifact_symlink_before_super
         request_path: Path,
         output_path: Path,
         *,
+        artifact_root_descriptor: int,
         timeout_seconds: float,
     ) -> None:
-        original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
+        original_run_worker(
+            request_path,
+            output_path,
+            artifact_root_descriptor=artifact_root_descriptor,
+            timeout_seconds=timeout_seconds,
+        )
         request_path.unlink()
         request_path.symlink_to(outside)
 
@@ -198,9 +210,15 @@ def test_structure_assessment_rejects_worker_request_mutation_before_publication
         request_path: Path,
         output_path: Path,
         *,
+        artifact_root_descriptor: int,
         timeout_seconds: float,
     ) -> None:
-        original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
+        original_run_worker(
+            request_path,
+            output_path,
+            artifact_root_descriptor=artifact_root_descriptor,
+            timeout_seconds=timeout_seconds,
+        )
         request = json.loads(request_path.read_text(encoding="utf-8"))
         request["policy"]["required"] = False
         request_path.write_text(json.dumps(request, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -228,9 +246,15 @@ def test_structure_assessment_rejects_staged_symlink_before_hashing(
         request_path: Path,
         output_path: Path,
         *,
+        artifact_root_descriptor: int,
         timeout_seconds: float,
     ) -> None:
-        original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
+        original_run_worker(
+            request_path,
+            output_path,
+            artifact_root_descriptor=artifact_root_descriptor,
+            timeout_seconds=timeout_seconds,
+        )
         (output_path / "backend-extra").symlink_to(outside)
 
     monkeypatch.setattr(assessment_api, "run_worker", run_worker_then_link)
@@ -253,9 +277,15 @@ def test_structure_assessment_rejects_preflight_mutation_before_publication(
         request_path: Path,
         output_path: Path,
         *,
+        artifact_root_descriptor: int,
         timeout_seconds: float,
     ) -> None:
-        original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
+        original_run_worker(
+            request_path,
+            output_path,
+            artifact_root_descriptor=artifact_root_descriptor,
+            timeout_seconds=timeout_seconds,
+        )
         preflight_path = output_path / "folding_preflight.json"
         preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
         preflight["backend"]["version"] = "fabricated-version"
@@ -281,9 +311,15 @@ def test_structure_assessment_rejects_prediction_execution_metadata_mutation(
         request_path: Path,
         output_path: Path,
         *,
+        artifact_root_descriptor: int,
         timeout_seconds: float,
     ) -> None:
-        original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
+        original_run_worker(
+            request_path,
+            output_path,
+            artifact_root_descriptor=artifact_root_descriptor,
+            timeout_seconds=timeout_seconds,
+        )
         prediction_path = output_path / "secondary_structure_prediction_v2.json"
         prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
         prediction["backend"]["parameters"] = {"temperature_c": 25.0}
@@ -309,9 +345,15 @@ def test_structure_assessment_rejects_prediction_log_reference_mutation(
         request_path: Path,
         output_path: Path,
         *,
+        artifact_root_descriptor: int,
         timeout_seconds: float,
     ) -> None:
-        original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
+        original_run_worker(
+            request_path,
+            output_path,
+            artifact_root_descriptor=artifact_root_descriptor,
+            timeout_seconds=timeout_seconds,
+        )
         prediction_path = output_path / "secondary_structure_prediction_v2.json"
         prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
         prediction["artifacts"] = {
@@ -340,9 +382,15 @@ def test_structure_assessment_rejects_prediction_result_without_log_evidence(
         request_path: Path,
         output_path: Path,
         *,
+        artifact_root_descriptor: int,
         timeout_seconds: float,
     ) -> None:
-        original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
+        original_run_worker(
+            request_path,
+            output_path,
+            artifact_root_descriptor=artifact_root_descriptor,
+            timeout_seconds=timeout_seconds,
+        )
         prediction_path = output_path / "secondary_structure_prediction_v2.json"
         prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
         prediction["result"]["mfe_kcal_mol"] = -9.9

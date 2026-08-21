@@ -60,7 +60,12 @@ def publish_structure_assessment(
         low_level_path, target_content = prepare_prediction_request(stage, request)
         target_artifact_digest = content_digest(target_content)
         with _AnchoredPublicationReader.from_descriptor(publication.stage_descriptor) as reader:
-            run_worker(low_level_path, stage / "prediction", timeout_seconds=request.policy.timeout_seconds)
+            run_worker(
+                low_level_path,
+                stage / "prediction",
+                artifact_root_descriptor=publication.stage_descriptor,
+                timeout_seconds=request.policy.timeout_seconds,
+            )
             worker_request_content = reader.read_bytes(
                 "prediction/prediction-request.json",
                 label="assessment worker request",

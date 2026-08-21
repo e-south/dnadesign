@@ -302,12 +302,17 @@ def test_worker_artifact_budget_error_still_cleans_up_process_group(
         lambda _root: (_ for _ in ()).throw(FoldingExecutionError("artifact budget exceeded")),
     )
 
-    with pytest.raises(FoldingExecutionError, match="artifact budget exceeded"):
-        assessment_execution.run_worker(
-            tmp_path / "request.json",
-            tmp_path / "output.json",
-            timeout_seconds=1.0,
-        )
+    artifact_root_descriptor = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        with pytest.raises(FoldingExecutionError, match="artifact budget exceeded"):
+            assessment_execution.run_worker(
+                tmp_path / "request.json",
+                tmp_path / "output.json",
+                artifact_root_descriptor=artifact_root_descriptor,
+                timeout_seconds=1.0,
+            )
+    finally:
+        os.close(artifact_root_descriptor)
 
     assert f"killpg:4102:{signal.SIGKILL}" in events
     assert "communicate" in events
@@ -319,8 +324,12 @@ def test_worker_artifact_budget_bounds_entry_count(tmp_path: Path) -> None:
     for index in range(ARTIFACT_ENTRY_COUNT_LIMIT + 1):
         (artifact_root / f"artifact-{index:03d}").touch()
 
-    with pytest.raises(FoldingExecutionError, match=rf"{ARTIFACT_ENTRY_COUNT_LIMIT}-entry limit"):
-        assessment_execution._enforce_artifact_budget(artifact_root)
+    descriptor = os.open(artifact_root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        with pytest.raises(FoldingExecutionError, match=rf"{ARTIFACT_ENTRY_COUNT_LIMIT}-entry limit"):
+            assessment_execution._enforce_artifact_budget(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def test_worker_artifact_budget_bounds_aggregate_bytes(tmp_path: Path) -> None:
@@ -330,5 +339,26 @@ def test_worker_artifact_budget_bounds_aggregate_bytes(tmp_path: Path) -> None:
         with (artifact_root / f"artifact-{index}").open("wb") as handle:
             handle.truncate(ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES // 2)
 
-    with pytest.raises(FoldingExecutionError, match=rf"{ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES}-byte aggregate"):
-        assessment_execution._enforce_artifact_budget(artifact_root)
+    descriptor = os.open(artifact_root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        with pytest.raises(FoldingExecutionError, match=rf"{ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES}-byte aggregate"):
+            assessment_execution._enforce_artifact_budget(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def test_worker_artifact_budget_remains_bound_to_renamed_stage(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    displaced_root = tmp_path / "displaced-artifacts"
+    artifact_root.mkdir()
+    descriptor = os.open(artifact_root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        artifact_root.rename(displaced_root)
+        artifact_root.mkdir()
+        for index in range(ARTIFACT_ENTRY_COUNT_LIMIT + 1):
+            (displaced_root / f"artifact-{index:03d}").touch()
+
+        with pytest.raises(FoldingExecutionError, match=rf"{ARTIFACT_ENTRY_COUNT_LIMIT}-entry limit"):
+            assessment_execution._enforce_artifact_budget(descriptor)
+    finally:
+        os.close(descriptor)

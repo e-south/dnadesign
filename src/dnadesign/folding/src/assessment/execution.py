@@ -45,7 +45,13 @@ def write_target_sequence(path: Path, request: StructureAssessmentRequestV1) -> 
     return write_model_json(path, project_target_sequence(request))
 
 
-def run_worker(request_path: Path, output_path: Path, *, timeout_seconds: float) -> None:
+def run_worker(
+    request_path: Path,
+    output_path: Path,
+    *,
+    artifact_root_descriptor: int,
+    timeout_seconds: float,
+) -> None:
     """Run and, on timeout, terminate the assessment worker process group."""
     command = [
         sys.executable,
@@ -65,7 +71,7 @@ def run_worker(request_path: Path, output_path: Path, *, timeout_seconds: float)
         try:
             _wait_with_artifact_budget(
                 process,
-                artifact_root=output_path.parent,
+                artifact_root_descriptor=artifact_root_descriptor,
                 timeout_seconds=timeout_seconds,
             )
         except subprocess.TimeoutExpired as exc:
@@ -87,12 +93,12 @@ def run_worker(request_path: Path, output_path: Path, *, timeout_seconds: float)
 def _wait_with_artifact_budget(
     process: subprocess.Popen[bytes],
     *,
-    artifact_root: Path,
+    artifact_root_descriptor: int,
     timeout_seconds: float,
 ) -> None:
     deadline = time.monotonic() + timeout_seconds
     while process.poll() is None:
-        _enforce_artifact_budget(artifact_root)
+        _enforce_artifact_budget(artifact_root_descriptor)
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise subprocess.TimeoutExpired(process.args, timeout_seconds)
@@ -100,26 +106,28 @@ def _wait_with_artifact_budget(
             process.wait(timeout=min(_ARTIFACT_MONITOR_INTERVAL_SECONDS, remaining))
         except subprocess.TimeoutExpired:
             continue
-    _enforce_artifact_budget(artifact_root)
+    _enforce_artifact_budget(artifact_root_descriptor)
 
 
-def _enforce_artifact_budget(root: Path) -> None:
+def _enforce_artifact_budget(root_descriptor: int) -> None:
     entries = 0
     total_bytes = 0
-    pending = [root]
+    pending = [os.dup(root_descriptor)]
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     try:
         while pending:
-            directory = pending.pop()
-            with os.scandir(directory) as children:
-                for entry in children:
+            directory_descriptor = pending.pop()
+            try:
+                names = os.listdir(directory_descriptor)
+                for name in names:
                     entries += 1
                     if entries > ARTIFACT_ENTRY_COUNT_LIMIT:
                         raise FoldingExecutionError(
                             f"Structure assessment artifacts exceeded the {ARTIFACT_ENTRY_COUNT_LIMIT}-entry limit."
                         )
-                    metadata = entry.stat(follow_symlinks=False)
-                    if entry.is_dir(follow_symlinks=False):
-                        pending.append(Path(entry.path))
+                    metadata = os.stat(name, dir_fd=directory_descriptor, follow_symlinks=False)
+                    if stat.S_ISDIR(metadata.st_mode):
+                        pending.append(os.open(name, directory_flags, dir_fd=directory_descriptor))
                     elif stat.S_ISREG(metadata.st_mode):
                         total_bytes += metadata.st_size
                         if total_bytes >= ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES:
@@ -127,10 +135,15 @@ def _enforce_artifact_budget(root: Path) -> None:
                                 "Structure assessment artifacts exceeded the "
                                 f"{ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES}-byte aggregate limit."
                             )
+            finally:
+                os.close(directory_descriptor)
     except FoldingExecutionError:
         raise
     except OSError as exc:
         raise FoldingExecutionError("Structure assessment artifact budget could not be verified safely.") from exc
+    finally:
+        for directory_descriptor in pending:
+            os.close(directory_descriptor)
 
 
 def _limit_worker_file_output() -> None:
