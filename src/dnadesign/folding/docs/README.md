@@ -95,11 +95,15 @@ those facts or import the producer's domain package.
 
 The assessment runs in an isolated worker process. The policy timeout applies
 to both ViennaRNA interfaces; on POSIX systems, timeout cleanup terminates the
-worker process group, including an `RNAfold` child. Publication is atomic and
-create-only. Its manifest binds the request, prediction, record, target-state
-digest, target-sequence digest, and an exhaustive digest inventory of every
-published evidence file. The verified loader rejects missing or extra files,
-byte drift, cross-record identity drift, traversal, and symlinked paths.
+worker process group, including an `RNAfold` child. The worker disables the
+older low-level CLI deadline so the assessment supervisor is the only timeout
+authority. Publication is atomic and create-only. The target artifact is
+digest-pinned before execution, checked again afterward, and semantically
+replayed against the request. The manifest binds the request, prediction,
+record, target-state digest, target-sequence digest, and an exhaustive digest
+inventory of every published evidence file. The verified loader rejects
+missing or extra files, byte drift, cross-record identity drift, traversal,
+symlinked paths, and non-regular filesystem entries.
 
 The emitted `StructureAssessmentRecordV1` always has `authority: advisory`.
 It cannot make a HOP design valid, identify an experimental construct, or

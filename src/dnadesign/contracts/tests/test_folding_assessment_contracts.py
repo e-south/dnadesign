@@ -16,7 +16,11 @@ import hashlib
 import pytest
 from pydantic import ValidationError
 
-from dnadesign.contracts.folding import AssessmentIntendedPairV1, AssessmentTargetV1
+from dnadesign.contracts.folding import (
+    AssessmentIntendedPairV1,
+    AssessmentTargetSequenceV1,
+    AssessmentTargetV1,
+)
 
 
 def _target() -> AssessmentTargetV1:
@@ -58,3 +62,16 @@ def test_assessment_target_rejects_pair_outside_target() -> None:
 
     with pytest.raises(ValidationError, match="intended pair coordinate"):
         AssessmentTargetV1.model_validate(payload)
+
+
+def test_assessment_target_artifact_rejects_its_own_sequence_digest_drift() -> None:
+    with pytest.raises(ValidationError, match="artifact digest"):
+        AssessmentTargetSequenceV1.model_validate(
+            {
+                "sequence": {
+                    "id": "hop:encoding/example",
+                    "sha256": "0" * 64,
+                    "sequence": "GCATGC",
+                }
+            }
+        )

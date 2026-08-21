@@ -21,6 +21,8 @@ Generic sequence and folding contracts:
 - `AssessmentTargetV1`: exact producer-owned molecular state submitted for
   advisory structure assessment, including state and sequence digests,
   physical posture, and intended coordinate pairs
+- `AssessmentTargetSequenceV1`: worker-readable exact sequence artifact whose
+  identifier, bytes, and digest replay against the assessment target
 - `StructureAssessmentRequestV1`: backend and isolation policy for assessing
   one exact target
 - `StructureAssessmentRecordV1`: immutable advisory result that binds the

@@ -11,14 +11,17 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import json
 import os
 import signal
 import subprocess
 import sys
 from pathlib import Path
 
-from dnadesign.contracts.folding import StructureAssessmentRequestV1
+from dnadesign.contracts.folding import (
+    AssessmentTargetSequenceV1,
+    AssessmentTargetSequenceValueV1,
+    StructureAssessmentRequestV1,
+)
 from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
     SecondaryStructurePredictionRequestV1,
 )
@@ -54,18 +57,17 @@ def prediction_request(request: StructureAssessmentRequestV1) -> SecondaryStruct
     )
 
 
-def write_target_sequence(path: Path, request: StructureAssessmentRequestV1) -> None:
+def write_target_sequence(path: Path, request: StructureAssessmentRequestV1) -> bytes:
     """Write the exact target bytes consumed by the isolated worker."""
     target = request.target
-    payload = {
-        "contract": "assessment_target_sequence_v1",
-        "sequence": {
-            "id": target.sequence_id,
-            "sha256": target.sequence_sha256.removeprefix("sha256:"),
-            "sequence": target.sequence,
-        },
-    }
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    artifact = AssessmentTargetSequenceV1(
+        sequence=AssessmentTargetSequenceValueV1(
+            id=target.sequence_id,
+            sha256=target.sequence_sha256.removeprefix("sha256:"),
+            sequence=target.sequence,
+        )
+    )
+    return write_model_json(path, artifact)
 
 
 def run_worker(request_path: Path, output_path: Path, *, timeout_seconds: float) -> None:
@@ -98,11 +100,11 @@ def run_worker(request_path: Path, output_path: Path, *, timeout_seconds: float)
         raise FoldingExecutionError(f"Structure assessment worker failed: {detail}")
 
 
-def prepare_prediction_request(stage: Path, request: StructureAssessmentRequestV1) -> Path:
+def prepare_prediction_request(stage: Path, request: StructureAssessmentRequestV1) -> tuple[Path, bytes]:
     """Write the target and backend request used by one worker invocation."""
-    write_target_sequence(stage / _TARGET_SEQUENCE, request)
+    target_content = write_target_sequence(stage / _TARGET_SEQUENCE, request)
     prediction_dir = stage / "prediction"
     prediction_dir.mkdir()
     low_level_path = prediction_dir / _PREDICTION_REQUEST
     write_model_json(low_level_path, prediction_request(request))
-    return low_level_path
+    return low_level_path, target_content

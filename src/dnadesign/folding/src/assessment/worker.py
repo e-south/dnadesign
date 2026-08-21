@@ -28,6 +28,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         output_dir=args.output_dir,
         request_path=request_path,
         raise_on_required_failure=False,
+        backend_timeout_seconds=None,
     )
     return 0
 

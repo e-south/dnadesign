@@ -19,6 +19,7 @@ from pathlib import Path, PurePosixPath
 from pydantic import BaseModel
 
 from dnadesign.contracts.folding import (
+    AssessmentTargetSequenceV1,
     StructureAssessmentPublicationV1,
     StructureAssessmentRecordV1,
     StructureAssessmentRequestV1,
@@ -84,7 +85,11 @@ def _confined_file(root: Path, relative: str, *, label: str) -> Path:
     return resolved
 
 
-def verify_publication(root: Path) -> PublishedStructureAssessment:
+def verify_publication(
+    root: Path,
+    *,
+    allow_staging_owner: bool = False,
+) -> PublishedStructureAssessment:
     """Replay all byte and cross-object invariants in one publication."""
     manifest_path = _confined_file(root, _MANIFEST, label="assessment manifest")
     manifest = StructureAssessmentPublicationV1.model_validate_json(manifest_path.read_bytes())
@@ -97,18 +102,24 @@ def verify_publication(root: Path) -> PublishedStructureAssessment:
     prediction_path = _confined_file(root, manifest.prediction_path, label="assessment prediction")
     record_path = _confined_file(root, manifest.record_path, label="assessment record")
     request_content = request_path.read_bytes()
+    target_sequence_content = target_sequence_path.read_bytes()
     prediction_content = prediction_path.read_bytes()
     record_content = record_path.read_bytes()
     if content_digest(request_content) != manifest.request_digest:
         raise ValueError("Assessment request digest does not match the publication manifest.")
-    if content_digest(target_sequence_path.read_bytes()) != manifest.target_sequence_artifact_digest:
+    if content_digest(target_sequence_content) != manifest.target_sequence_artifact_digest:
         raise ValueError("Assessment target-sequence artifact digest does not match the publication manifest.")
     if content_digest(prediction_content) != manifest.prediction_digest:
         raise ValueError("Assessment prediction digest does not match the publication manifest.")
     if content_digest(record_content) != manifest.record_digest:
         raise ValueError("Assessment record digest does not match the publication manifest.")
-    _verify_artifact_inventory(root, manifest.artifact_digests)
+    _verify_artifact_inventory(
+        root,
+        manifest.artifact_digests,
+        allow_staging_owner=allow_staging_owner,
+    )
     request = StructureAssessmentRequestV1.model_validate_json(request_content)
+    target_sequence = AssessmentTargetSequenceV1.model_validate_json(target_sequence_content)
     prediction = SecondaryStructurePredictionV1.model_validate_json(prediction_content)
     record = StructureAssessmentRecordV1.model_validate_json(record_content)
     if request.assessment_id != manifest.assessment_id or record.assessment_id != manifest.assessment_id:
@@ -118,6 +129,12 @@ def verify_publication(root: Path) -> PublishedStructureAssessment:
     if record.target != request.target or record.prediction != prediction:
         raise ValueError("Assessment record does not replay its request target and prediction.")
     if (
+        target_sequence.sequence.id != request.target.sequence_id
+        or f"sha256:{target_sequence.sequence.sha256}" != request.target.sequence_sha256
+        or target_sequence.sequence.sequence != request.target.sequence
+    ):
+        raise ValueError("Assessment target artifact does not match the assessment request.")
+    if (
         request.target.state_digest != manifest.target_state_digest
         or request.target.sequence_sha256 != manifest.target_sequence_sha256
     ):
@@ -125,17 +142,28 @@ def verify_publication(root: Path) -> PublishedStructureAssessment:
     return PublishedStructureAssessment(manifest=manifest, request=request, record=record)
 
 
-def _verify_artifact_inventory(root: Path, expected: dict[str, str]) -> None:
+def _verify_artifact_inventory(
+    root: Path,
+    expected: dict[str, str],
+    *,
+    allow_staging_owner: bool,
+) -> None:
     actual_files: dict[str, str] = {}
     actual_directories: set[str] = set()
     for path in sorted(root.rglob("*")):
         relative = path.relative_to(root).as_posix()
         if path.is_symlink():
             raise ValueError(f"Assessment artifact inventory cannot use a symbolic link: {relative}")
+        if relative == _STAGING_OWNER and allow_staging_owner:
+            if not path.is_file():
+                raise ValueError("Assessment staging owner must be a regular file.")
+            continue
         if path.is_dir():
             actual_directories.add(relative)
-        elif path.is_file() and relative not in {_MANIFEST, _STAGING_OWNER}:
+        elif path.is_file() and relative != _MANIFEST:
             actual_files[relative] = content_digest(path.read_bytes())
+        elif relative != _MANIFEST:
+            raise ValueError(f"Assessment artifact inventory contains an unsupported filesystem entry: {relative}")
     expected_directories = {
         parent.as_posix()
         for artifact_path in expected

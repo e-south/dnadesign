@@ -19,6 +19,8 @@ from pathlib import Path
 
 import pytest
 
+import dnadesign.folding.src.assessment.api as assessment_api
+import dnadesign.folding.src.assessment.worker as assessment_worker
 from dnadesign.contracts.folding import AssessmentTargetV1, StructureAssessmentPolicyV1, StructureAssessmentRequestV1
 from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
     SecondaryStructurePredictionRequestBackendV1,
@@ -129,6 +131,32 @@ def test_structure_assessment_timeout_leaves_no_partial_publication(
     assert not output.exists()
 
 
+def test_structure_assessment_rejects_backend_target_mutation_before_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    original_run_worker = assessment_api.run_worker
+
+    def run_worker_then_mutate(
+        request_path: Path,
+        output_path: Path,
+        *,
+        timeout_seconds: float,
+    ) -> None:
+        original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
+        target = request_path.parent.parent / "assessment-target-sequence.json"
+        target.write_bytes(target.read_bytes() + b" ")
+
+    monkeypatch.setattr(assessment_api, "run_worker", run_worker_then_mutate)
+    output = tmp_path / "mutated-target-assessment"
+
+    with pytest.raises(FoldingExecutionError, match="target artifact changed"):
+        publish_structure_assessment(_request(), output_dir=output)
+
+    assert not output.exists()
+
+
 @pytest.mark.skipif(os.name != "posix", reason="process-group timeout contract is POSIX-specific")
 def test_structure_assessment_timeout_terminates_cli_descendants(
     tmp_path: Path,
@@ -209,6 +237,30 @@ def test_structure_assessment_loader_rejects_target_artifact_tampering(
         load_published_assessment(output)
 
 
+def test_structure_assessment_loader_replays_target_artifact_semantics(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    output = tmp_path / "assessment"
+    publish_structure_assessment(_request(), output_dir=output)
+    target_path = output / "assessment-target-sequence.json"
+    manifest_path = output / "manifest.json"
+    target = json.loads(target_path.read_text(encoding="utf-8"))
+    target["sequence"]["sequence"] = "ACATGC"
+    target["sequence"]["sha256"] = hashlib.sha256(target["sequence"]["sequence"].encode()).hexdigest()
+    target_content = (json.dumps(target, indent=2, sort_keys=True) + "\n").encode()
+    target_path.write_bytes(target_content)
+    target_digest = f"sha256:{hashlib.sha256(target_content).hexdigest()}"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["target_sequence_artifact_digest"] = target_digest
+    manifest["artifact_digests"]["assessment-target-sequence.json"] = target_digest
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="target artifact does not match"):
+        load_published_assessment(output)
+
+
 def test_structure_assessment_loader_rejects_unlisted_artifact(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -219,6 +271,33 @@ def test_structure_assessment_loader_rejects_unlisted_artifact(
     (output / "unlisted.txt").write_text("not declared\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="artifact inventory"):
+        load_published_assessment(output)
+
+
+def test_structure_assessment_loader_rejects_staging_owner_in_published_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    output = tmp_path / "assessment"
+    publish_structure_assessment(_request(), output_dir=output)
+    (output / ".dnadesign-publication-owner.json").write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="artifact inventory"):
+        load_published_assessment(output)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="FIFO contract is POSIX-specific")
+def test_structure_assessment_loader_rejects_special_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    output = tmp_path / "assessment"
+    publish_structure_assessment(_request(), output_dir=output)
+    os.mkfifo(output / "unexpected.fifo")
+
+    with pytest.raises(ValueError, match="unsupported filesystem entry"):
         load_published_assessment(output)
 
 
@@ -259,3 +338,31 @@ def test_structure_assessment_loader_rejects_record_identity_drift(
 
     with pytest.raises(ValueError, match="assessment_id must match"):
         load_published_assessment(output)
+
+
+def test_assessment_worker_delegates_the_only_deadline_to_its_supervisor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+    request = object()
+    request_path = tmp_path / "request.json"
+
+    monkeypatch.setattr(
+        assessment_worker,
+        "load_prediction_request",
+        lambda _path: (request, request_path),
+    )
+
+    def run_prediction_request(
+        observed_request: object,
+        **kwargs: object,
+    ) -> None:
+        captured["request"] = observed_request
+        captured.update(kwargs)
+
+    monkeypatch.setattr(assessment_worker, "run_prediction_request", run_prediction_request)
+
+    assert assessment_worker.main([request_path.as_posix(), (tmp_path / "output").as_posix()]) == 0
+    assert captured["request"] is request
+    assert captured["backend_timeout_seconds"] is None

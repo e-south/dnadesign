@@ -104,6 +104,41 @@ class AssessmentTargetV1(AssessmentContractModel):
         return self
 
 
+class AssessmentTargetSequenceValueV1(AssessmentContractModel):
+    """Sequence value in the worker-readable target artifact."""
+
+    id: str
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    sequence: str = Field(min_length=1)
+
+    @field_validator("id")
+    @classmethod
+    def validate_id(cls, value: str) -> str:
+        return _not_blank(value, label="assessment target sequence id")
+
+    @field_validator("sequence", mode="before")
+    @classmethod
+    def normalize_sequence(cls, value: object) -> str:
+        if not isinstance(value, str) or not value or set(value.upper()) - set("ACGT"):
+            raise ValueError("assessment target artifact must use non-empty exact DNA.")
+        return value.upper()
+
+    @model_validator(mode="after")
+    def validate_digest(self) -> AssessmentTargetSequenceValueV1:
+        digest = hashlib.sha256(self.sequence.encode()).hexdigest()
+        if self.sha256 != digest:
+            raise ValueError("assessment target artifact digest must match its sequence.")
+        return self
+
+
+class AssessmentTargetSequenceV1(AssessmentContractModel):
+    """Exact sequence artifact consumed by an isolated assessment worker."""
+
+    contract: Literal["assessment_target_sequence_v1"] = "assessment_target_sequence_v1"
+    schema_version: Literal[1] = 1
+    sequence: AssessmentTargetSequenceValueV1
+
+
 class StructureAssessmentPolicyV1(SecondaryStructurePredictionRequestPolicyV1):
     """Execution policy for one isolated assessment."""
 
@@ -233,6 +268,8 @@ __all__ = [
     "AssessmentIntendedPairV1",
     "AssessmentProducerV1",
     "AssessmentStatus",
+    "AssessmentTargetSequenceV1",
+    "AssessmentTargetSequenceValueV1",
     "AssessmentTargetV1",
     "StructureAssessmentPolicyV1",
     "StructureAssessmentPublicationV1",

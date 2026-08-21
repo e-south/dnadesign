@@ -228,7 +228,10 @@ def run_prediction_request(
     output_dir: str | Path,
     request_path: str | Path | None = None,
     raise_on_required_failure: bool = True,
+    backend_timeout_seconds: float | None = 60.0,
 ) -> SecondaryStructurePredictionV1:
+    if backend_timeout_seconds is not None and backend_timeout_seconds <= 0:
+        raise FoldingConfigError("backend_timeout_seconds must be positive or None.")
     output_path = Path(output_dir).expanduser().resolve()
     preflight = preflight_request(request, output_dir=output_path)
     _write_json(output_path / _PREFLIGHT_FILENAME, preflight.to_dict())
@@ -278,7 +281,7 @@ def run_prediction_request(
             text=True,
             capture_output=True,
             check=False,
-            timeout=60,
+            timeout=backend_timeout_seconds,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         prediction = _error_prediction(

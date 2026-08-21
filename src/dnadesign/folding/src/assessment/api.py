@@ -54,8 +54,11 @@ def publish_structure_assessment(
         stage = publication.stage
         request_content = write_model_json(stage / _REQUEST, request)
         request_digest = content_digest(request_content)
-        low_level_path = prepare_prediction_request(stage, request)
+        low_level_path, target_content = prepare_prediction_request(stage, request)
+        target_artifact_digest = content_digest(target_content)
         run_worker(low_level_path, stage / "prediction", timeout_seconds=request.policy.timeout_seconds)
+        if content_digest((stage / "assessment-target-sequence.json").read_bytes()) != target_artifact_digest:
+            raise FoldingExecutionError("Assessment target artifact changed during backend execution.")
         prediction_path = stage / _PREDICTION
         prediction_content = prediction_path.read_bytes()
         prediction = SecondaryStructurePredictionV1.model_validate_json(prediction_content)
@@ -77,7 +80,7 @@ def publish_structure_assessment(
         manifest = StructureAssessmentPublicationV1(
             assessment_id=request.assessment_id,
             request_digest=request_digest,
-            target_sequence_artifact_digest=inventory["assessment-target-sequence.json"],
+            target_sequence_artifact_digest=target_artifact_digest,
             prediction_digest=prediction_digest,
             record_digest=content_digest(record_content),
             target_state_digest=request.target.state_digest,
@@ -85,7 +88,7 @@ def publish_structure_assessment(
             artifact_digests=inventory,
         )
         write_model_json(stage / _MANIFEST, manifest)
-        verify_publication(stage)
+        verify_publication(stage, allow_staging_owner=True)
         publication.publish(required_manifest=_MANIFEST)
     except PublicationError as exc:
         raise FoldingConfigError(str(exc)) from exc
