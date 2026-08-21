@@ -9,6 +9,10 @@ producer's validity decision. The result record is backend-neutral, but the
 current runner is not a plugin framework: its only implemented backend is
 ViennaRNA. Its request contract supports only `temperature_c`; unknown
 parameters fail validation instead of being recorded without effect.
+Assessment publication requires a non-root POSIX worker with kernel-enforced
+no-fork limits. A Python backend runs in that worker, and a CLI backend runs as
+its single permitted process; neither backend may create child processes. The
+assessment fails closed where that containment cannot be enforced.
 
 ## Documentation
 

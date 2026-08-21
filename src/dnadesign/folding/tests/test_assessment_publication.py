@@ -34,6 +34,38 @@ from dnadesign.folding.tests._assessment_fixtures import (
 )
 
 
+def _optional_missing_request():
+    base_request = _request()
+    return base_request.model_copy(
+        update={
+            "backend": base_request.backend.model_copy(update={"python_module": "dnadesign_missing_rna_backend"}),
+            "policy": base_request.policy.model_copy(update={"required": False}),
+        },
+    )
+
+
+def _optional_missing_cli_request():
+    base_request = _request()
+    payload = base_request.model_dump(mode="python")
+    payload["backend"].update(
+        {
+            "interface": "cli",
+            "executable": "dnadesign-missing-rnafold",
+            "python_module": None,
+        }
+    )
+    payload["policy"]["required"] = False
+    return type(base_request).model_validate(payload)
+
+
+def _json_content(payload: object) -> bytes:
+    return (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode()
+
+
+def _content_digest(content: bytes) -> str:
+    return f"sha256:{hashlib.sha256(content).hexdigest()}"
+
+
 def test_structure_assessment_publication_round_trips_exact_target(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -443,15 +475,8 @@ def test_structure_assessment_loader_rejects_record_identity_drift(
 def test_structure_assessment_loader_rejects_optional_status_for_required_policy(
     tmp_path: Path,
 ) -> None:
-    base_request = _request()
-    optional_request = base_request.model_copy(
-        update={
-            "backend": base_request.backend.model_copy(update={"python_module": "dnadesign_missing_rna_backend"}),
-            "policy": base_request.policy.model_copy(update={"required": False}),
-        },
-    )
     output = tmp_path / "assessment"
-    publish_structure_assessment(optional_request, output_dir=output)
+    publish_structure_assessment(_optional_missing_request(), output_dir=output)
 
     request_path = output / "assessment-request.json"
     worker_request_path = output / "prediction/prediction-request.json"
@@ -463,15 +488,15 @@ def test_structure_assessment_loader_rejects_optional_status_for_required_policy
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     request["policy"]["required"] = True
     worker_request["policy"]["required"] = True
-    request_content = (json.dumps(request, indent=2, sort_keys=True) + "\n").encode()
-    worker_request_content = (json.dumps(worker_request, indent=2, sort_keys=True) + "\n").encode()
-    request_digest = f"sha256:{hashlib.sha256(request_content).hexdigest()}"
-    worker_request_digest = f"sha256:{hashlib.sha256(worker_request_content).hexdigest()}"
+    request_content = _json_content(request)
+    worker_request_content = _json_content(worker_request)
+    request_digest = _content_digest(request_content)
+    worker_request_digest = _content_digest(worker_request_content)
     request_path.write_bytes(request_content)
     worker_request_path.write_bytes(worker_request_content)
     record["request_digest"] = request_digest
-    record_content = (json.dumps(record, indent=2, sort_keys=True) + "\n").encode()
-    record_digest = f"sha256:{hashlib.sha256(record_content).hexdigest()}"
+    record_content = _json_content(record)
+    record_digest = _content_digest(record_content)
     record_path.write_bytes(record_content)
     manifest["request_digest"] = request_digest
     manifest["worker_request_digest"] = worker_request_digest
@@ -482,4 +507,56 @@ def test_structure_assessment_loader_rejects_optional_status_for_required_policy
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="required assessment cannot replay non-ok status"):
+        load_published_assessment(output)
+
+
+def test_structure_assessment_loader_rejects_version_for_unavailable_backend(tmp_path: Path) -> None:
+    output = tmp_path / "assessment"
+    publish_structure_assessment(_optional_missing_cli_request(), output_dir=output)
+    preflight_path = output / "prediction/folding_preflight.json"
+    manifest_path = output / "manifest.json"
+    preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    preflight["backend"]["version"] = "fabricated-version"
+    preflight_content = _json_content(preflight)
+    preflight_path.write_bytes(preflight_content)
+    manifest["artifact_digests"]["prediction/folding_preflight.json"] = _content_digest(preflight_content)
+    manifest_path.write_bytes(_json_content(manifest))
+
+    with pytest.raises(ValueError, match="preflight blocker does not match"):
+        load_published_assessment(output)
+
+
+def test_structure_assessment_loader_derives_optional_missing_status_from_policy(tmp_path: Path) -> None:
+    output = tmp_path / "assessment"
+    publish_structure_assessment(_optional_missing_request(), output_dir=output)
+    preflight_path = output / "prediction/folding_preflight.json"
+    prediction_path = output / "prediction/secondary_structure_prediction_v1.json"
+    record_path = output / "assessment-record.json"
+    manifest_path = output / "manifest.json"
+    preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
+    prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    preflight["status"] = "blocker_required_missing"
+    prediction["status"] = "blocker_required_missing"
+    record["status"] = "blocker_required_missing"
+    record["prediction"]["status"] = "blocker_required_missing"
+    preflight_content = _json_content(preflight)
+    prediction_content = _json_content(prediction)
+    prediction_digest = _content_digest(prediction_content)
+    record["prediction_digest"] = prediction_digest
+    record_content = _json_content(record)
+    record_digest = _content_digest(record_content)
+    preflight_path.write_bytes(preflight_content)
+    prediction_path.write_bytes(prediction_content)
+    record_path.write_bytes(record_content)
+    manifest["prediction_digest"] = prediction_digest
+    manifest["record_digest"] = record_digest
+    manifest["artifact_digests"]["prediction/folding_preflight.json"] = _content_digest(preflight_content)
+    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v1.json"] = prediction_digest
+    manifest["artifact_digests"]["assessment-record.json"] = record_digest
+    manifest_path.write_bytes(_json_content(manifest))
+
+    with pytest.raises(ValueError, match="preflight blocker does not match"):
         load_published_assessment(output)

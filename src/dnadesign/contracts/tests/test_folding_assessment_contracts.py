@@ -21,6 +21,7 @@ from dnadesign.contracts.folding import (
     AssessmentTargetSequenceV1,
     AssessmentTargetV1,
 )
+from dnadesign.contracts.folding.secondary_structure_prediction_v1 import SecondaryStructurePredictionV1
 
 
 def _target() -> AssessmentTargetV1:
@@ -73,5 +74,23 @@ def test_assessment_target_artifact_rejects_its_own_sequence_digest_drift() -> N
                     "sha256": "0" * 64,
                     "sequence": "GCATGC",
                 }
+            }
+        )
+
+
+def test_failed_prediction_rejects_attached_structure_result() -> None:
+    with pytest.raises(ValidationError, match="result must be absent"):
+        SecondaryStructurePredictionV1.model_validate(
+            {
+                "prediction_id": "failed-prediction",
+                "status": "error",
+                "input": {
+                    "sequence_id": "example",
+                    "sequence_sha256": "sha256:" + "1" * 64,
+                    "alphabet": "dna",
+                    "topology": "linear_ssdna",
+                    "length": 6,
+                },
+                "result": {"dot_bracket": "......"},
             }
         )

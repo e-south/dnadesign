@@ -42,6 +42,11 @@ from .errors import (
 from .execution_metadata import prediction_command, prediction_log_paths
 from .rnafold import parse_rnafold_stdout
 
+try:
+    import resource
+except ImportError:  # pragma: no cover - assessment execution fails closed off POSIX
+    resource = None  # type: ignore[assignment]
+
 _PREDICTION_FILENAME = "secondary_structure_prediction_v1.json"
 _PREFLIGHT_FILENAME = "folding_preflight.json"
 
@@ -115,6 +120,7 @@ def preflight_request(
     request: SecondaryStructurePredictionRequestV1,
     *,
     output_dir: str | Path,
+    deny_backend_child_processes: bool = False,
 ) -> FoldingPreflightResult:
     output_path = Path(output_dir).expanduser().resolve()
     try:
@@ -211,7 +217,10 @@ def preflight_request(
         status="ok",
         backend_name=request.backend.name,
         interface=request.backend.interface,
-        version=_capture_version(resolved),
+        version=_capture_version(
+            resolved,
+            deny_backend_child_processes=deny_backend_child_processes,
+        ),
         output_dir=output_path,
         executable=request.backend.executable,
         resolved_executable=resolved,
@@ -226,11 +235,18 @@ def run_prediction_request(
     request_path: str | Path | None = None,
     raise_on_required_failure: bool = True,
     backend_timeout_seconds: float | None = 60.0,
+    deny_backend_child_processes: bool = False,
 ) -> SecondaryStructurePredictionV1:
     if backend_timeout_seconds is not None and backend_timeout_seconds <= 0:
         raise FoldingConfigError("backend_timeout_seconds must be positive or None.")
     output_path = Path(output_dir).expanduser().resolve()
-    preflight = preflight_request(request, output_dir=output_path)
+    if deny_backend_child_processes and request.backend.interface == "python_api":
+        _deny_process_creation()
+    preflight = preflight_request(
+        request,
+        output_dir=output_path,
+        deny_backend_child_processes=deny_backend_child_processes,
+    )
     _write_json(output_path / _PREFLIGHT_FILENAME, preflight.to_dict())
     if preflight.status != "ok":
         prediction = _prediction_for_preflight_blocker(request, preflight)
@@ -288,6 +304,7 @@ def run_prediction_request(
             capture_output=True,
             check=False,
             timeout=backend_timeout_seconds,
+            preexec_fn=_deny_process_creation if deny_backend_child_processes else None,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         _write_backend_logs(
@@ -680,7 +697,20 @@ def _resolve_executable(executable: str) -> Path | None:
     return Path(resolved).resolve() if resolved else None
 
 
-def _capture_version(executable: Path) -> str:
+def _deny_process_creation() -> None:
+    if os.name != "posix" or resource is None or not hasattr(resource, "RLIMIT_NPROC"):
+        raise FoldingConfigError("Kernel no-fork containment is unavailable for this assessment backend.")
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        raise FoldingConfigError("Kernel no-fork containment is not enforceable for a root assessment process.")
+    _, hard_limit = resource.getrlimit(resource.RLIMIT_NPROC)
+    resource.setrlimit(resource.RLIMIT_NPROC, (0, hard_limit))
+
+
+def _capture_version(
+    executable: Path,
+    *,
+    deny_backend_child_processes: bool = False,
+) -> str:
     try:
         completed = subprocess.run(
             [executable.as_posix(), "--version"],
@@ -688,6 +718,7 @@ def _capture_version(executable: Path) -> str:
             capture_output=True,
             check=False,
             timeout=10,
+            preexec_fn=_deny_process_creation if deny_backend_child_processes else None,
         )
     except (OSError, subprocess.SubprocessError):
         return "unknown"

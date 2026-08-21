@@ -17,7 +17,6 @@ import subprocess
 import time
 from pathlib import Path
 
-import psutil
 import pytest
 
 import dnadesign.folding.src.assessment.worker as assessment_worker
@@ -66,8 +65,8 @@ def test_structure_assessment_timeout_terminates_cli_descendants(
     assert not output.exists()
 
 
-@pytest.mark.skipif(os.name != "posix", reason="process-group cleanup contract is POSIX-specific")
-def test_structure_assessment_success_terminates_residual_cli_descendants(
+@pytest.mark.skipif(os.name != "posix", reason="kernel no-fork contract is POSIX-specific")
+def test_structure_assessment_cli_backend_cannot_spawn_detached_descendants(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -87,7 +86,6 @@ def test_structure_assessment_success_terminates_residual_cli_descendants(
         "    'import os,pathlib,time; time.sleep(0.5); '"
         '    \'pathlib.Path(os.environ["ASSESSMENT_DESCENDANT_MARKER"]).write_text("alive")\',\n'
         "], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)\n"
-        "import time; time.sleep(0.05)\n"
         "sys.stdin.read()\n"
         "print('>hop:encoding/example')\n"
         "print('GCAUGC')\n"
@@ -97,17 +95,20 @@ def test_structure_assessment_success_terminates_residual_cli_descendants(
     executable.chmod(0o755)
     monkeypatch.setenv("ASSESSMENT_DESCENDANT_MARKER", descendant_marker.as_posix())
 
-    publish_structure_assessment(
-        cli_assessment_request(executable, timeout_seconds=2.0),
-        output_dir=tmp_path / "assessment",
-    )
+    output = tmp_path / "assessment"
+    with pytest.raises(FoldingExecutionError, match="RNAfold CLI exited with status"):
+        publish_structure_assessment(
+            cli_assessment_request(executable, timeout_seconds=2.0),
+            output_dir=output,
+        )
 
     time.sleep(0.7)
     assert not descendant_marker.exists()
+    assert not output.exists()
 
 
-@pytest.mark.skipif(os.name != "posix", reason="detached pipe contract is POSIX-specific")
-def test_structure_assessment_timeout_does_not_wait_for_detached_pipe_holder(
+@pytest.mark.skipif(os.name != "posix", reason="kernel no-fork contract is POSIX-specific")
+def test_structure_assessment_python_backend_cannot_double_fork(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -117,15 +118,17 @@ def test_structure_assessment_timeout_does_not_wait_for_detached_pipe_holder(
     (module_root / "RNA.py").write_text(
         "__version__ = 'test-1.0'\n"
         "import os\n"
-        "import subprocess\n"
-        "import sys\n"
         "import time\n"
         "class Compound:\n"
         "    def mfe(self):\n"
-        "        child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(10)'], "
-        "start_new_session=True)\n"
-        "        open(os.environ['ASSESSMENT_CHILD_PID'], 'w').write(str(child.pid))\n"
-        "        time.sleep(10)\n"
+        "        child = os.fork()\n"
+        "        if child == 0:\n"
+        "            os.setsid()\n"
+        "            grandchild = os.fork()\n"
+        "            if grandchild == 0:\n"
+        "                open(os.environ['ASSESSMENT_CHILD_PID'], 'w').write(str(os.getpid()))\n"
+        "                time.sleep(10)\n"
+        "            raise SystemExit(0)\n"
         "        return '((..))', -1.2\n"
         "def fold_compound(sequence):\n"
         "    return Compound()\n",
@@ -137,19 +140,14 @@ def test_structure_assessment_timeout_does_not_wait_for_detached_pipe_holder(
         os.pathsep.join(part for part in (module_root.as_posix(), existing) if part),
     )
     monkeypatch.setenv("ASSESSMENT_CHILD_PID", child_pid_path.as_posix())
-    started = time.monotonic()
-
-    with pytest.raises(FoldingExecutionError, match="timed out"):
+    output = tmp_path / "assessment"
+    with pytest.raises(FoldingExecutionError, match="worker failed"):
         publish_structure_assessment(
-            assessment_request(timeout_seconds=0.5),
-            output_dir=tmp_path / "assessment",
+            assessment_request(timeout_seconds=2.0),
+            output_dir=output,
         )
-    assert time.monotonic() - started < 2.0
-    child_pid = int(child_pid_path.read_text(encoding="utf-8"))
-    deadline = time.monotonic() + 1.0
-    while psutil.pid_exists(child_pid) and time.monotonic() < deadline:
-        time.sleep(0.01)
-    assert not psutil.pid_exists(child_pid)
+    assert not child_pid_path.exists()
+    assert not output.exists()
 
 
 def test_assessment_worker_delegates_the_only_deadline_to_its_supervisor(
@@ -183,6 +181,7 @@ def test_assessment_worker_delegates_the_only_deadline_to_its_supervisor(
     assert assessment_worker.main([request_path.as_posix(), (tmp_path / "output").as_posix()]) == 0
     assert captured["request"] is request
     assert captured["backend_timeout_seconds"] is None
+    assert captured["deny_backend_child_processes"] is True
     assert captured["normalized_output_dir"] == tmp_path / "output"
 
 

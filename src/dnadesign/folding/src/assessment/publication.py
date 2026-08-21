@@ -340,7 +340,17 @@ def _verify_preflight(
         ) or prediction.backend.command != expected_command:
             raise ValueError("Assessment preflight backend does not match the prediction command.")
         return
-    if backend.available or prediction.backend is not None or preflight.status != prediction.status:
+    expected_missing_status = (
+        "blocker_required_missing" if worker_request.policy.required else "warning_optional_missing"
+    )
+    if (
+        backend.available
+        or backend.version is not None
+        or backend.resolved_executable is not None
+        or prediction.backend is not None
+        or preflight.status != expected_missing_status
+        or prediction.status != expected_missing_status
+    ):
         raise ValueError("Assessment preflight blocker does not match the prediction status.")
     if preflight.warnings != prediction.qa.warnings or preflight.errors != prediction.qa.errors:
         raise ValueError("Assessment preflight diagnostics do not match the prediction.")

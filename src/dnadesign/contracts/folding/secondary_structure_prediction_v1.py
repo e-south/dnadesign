@@ -237,6 +237,8 @@ class SecondaryStructurePredictionV1(FoldingContractModel):
                 raise ValueError("dna_policy is required when status='ok'.")
             if self.result is None:
                 raise ValueError("result is required when status='ok'.")
+        elif self.result is not None:
+            raise ValueError("result must be absent when status is not 'ok'.")
         if self.result is None:
             return self
         if len(self.result.dot_bracket) != self.input.length:

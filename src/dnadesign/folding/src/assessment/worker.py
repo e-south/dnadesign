@@ -17,7 +17,6 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from ..api import load_prediction_request, run_prediction_request
-from .execution import terminate_current_process_descendants
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -26,16 +25,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("output_dir")
     args = parser.parse_args(argv)
     request, request_path = load_prediction_request(args.request)
-    try:
-        run_prediction_request(
-            request,
-            output_dir=args.output_dir,
-            request_path=request_path,
-            raise_on_required_failure=False,
-            backend_timeout_seconds=None,
-        )
-    finally:
-        terminate_current_process_descendants()
+    run_prediction_request(
+        request,
+        output_dir=args.output_dir,
+        request_path=request_path,
+        raise_on_required_failure=False,
+        backend_timeout_seconds=None,
+        deny_backend_child_processes=True,
+    )
     _normalize_preflight_output_dir(Path(args.output_dir))
     return 0
 
