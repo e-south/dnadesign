@@ -89,6 +89,14 @@ class PublishedStructureAssessment:
     record: StructureAssessmentRecordV1
 
 
+@dataclass(frozen=True, slots=True)
+class _AnchoredInventory:
+    files: dict[str, str]
+    directories: set[str]
+    symbolic_links: set[str]
+    special_entries: set[str]
+
+
 class _AnchoredPublicationReader:
     """Read publication files through one no-follow root descriptor."""
 
@@ -164,6 +172,10 @@ class _AnchoredPublicationReader:
     def read_bytes(self, relative: str, *, label: str) -> bytes:
         """Read bounded bytes from the same descriptor that was validated."""
         descriptor = self._open_file(relative, label=label)
+        return self._read_descriptor(descriptor, label=label)
+
+    @staticmethod
+    def _read_descriptor(descriptor: int, *, label: str) -> bytes:
         chunks: list[bytes] = []
         total = 0
         with os.fdopen(descriptor, "rb") as handle:
@@ -177,6 +189,17 @@ class _AnchoredPublicationReader:
     def content_digest(self, relative: str, *, label: str) -> str:
         """Hash bounded bytes from the same descriptor that was validated."""
         descriptor = self._open_file(relative, label=label)
+        return self._digest_descriptor(descriptor, label=label)
+
+    @staticmethod
+    def _digest_descriptor(descriptor: int, *, label: str) -> str:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            os.close(descriptor)
+            raise ValueError(f"{label} must be a regular file.")
+        if metadata.st_size >= _ARTIFACT_SIZE_LIMIT_BYTES:
+            os.close(descriptor)
+            raise ValueError(f"{label} exceeds the {_ARTIFACT_SIZE_LIMIT_BYTES}-byte limit.")
         digest = hashlib.sha256()
         total = 0
         with os.fdopen(descriptor, "rb") as handle:
@@ -186,6 +209,81 @@ class _AnchoredPublicationReader:
                     raise ValueError(f"{label} exceeds the {_ARTIFACT_SIZE_LIMIT_BYTES}-byte limit.")
                 digest.update(chunk)
         return f"sha256:{digest.hexdigest()}"
+
+    def inventory(self) -> _AnchoredInventory:
+        """Enumerate and hash the tree below the anchored root descriptor."""
+        files: dict[str, str] = {}
+        directories: set[str] = set()
+        symbolic_links: set[str] = set()
+        special_entries: set[str] = set()
+        self._inventory_directory(
+            self._root_descriptor,
+            PurePosixPath(),
+            files=files,
+            directories=directories,
+            symbolic_links=symbolic_links,
+            special_entries=special_entries,
+        )
+        return _AnchoredInventory(
+            files=files,
+            directories=directories,
+            symbolic_links=symbolic_links,
+            special_entries=special_entries,
+        )
+
+    def _inventory_directory(
+        self,
+        directory_descriptor: int,
+        prefix: PurePosixPath,
+        *,
+        files: dict[str, str],
+        directories: set[str],
+        symbolic_links: set[str],
+        special_entries: set[str],
+    ) -> None:
+        try:
+            names = sorted(os.listdir(directory_descriptor))
+        except OSError as exc:
+            raise ValueError("Assessment artifact inventory cannot enumerate the anchored publication.") from exc
+        directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        for name in names:
+            relative = (prefix / name).as_posix()
+            try:
+                metadata = os.stat(name, dir_fd=directory_descriptor, follow_symlinks=False)
+            except OSError as exc:
+                raise ValueError(f"Assessment artifact inventory cannot inspect: {relative}") from exc
+            if stat.S_ISLNK(metadata.st_mode):
+                symbolic_links.add(relative)
+                continue
+            if stat.S_ISDIR(metadata.st_mode):
+                try:
+                    child_descriptor = os.open(name, directory_flags, dir_fd=directory_descriptor)
+                except OSError as exc:
+                    raise ValueError(f"Assessment artifact inventory cannot open directory: {relative}") from exc
+                directories.add(relative)
+                try:
+                    self._inventory_directory(
+                        child_descriptor,
+                        prefix / name,
+                        files=files,
+                        directories=directories,
+                        symbolic_links=symbolic_links,
+                        special_entries=special_entries,
+                    )
+                finally:
+                    os.close(child_descriptor)
+                continue
+            if stat.S_ISREG(metadata.st_mode):
+                try:
+                    descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_descriptor)
+                except OSError as exc:
+                    raise ValueError(f"Assessment artifact inventory cannot open file: {relative}") from exc
+                files[relative] = self._digest_descriptor(
+                    descriptor,
+                    label=f"assessment artifact {relative}",
+                )
+                continue
+            special_entries.add(relative)
 
 
 def model_json_bytes(model: BaseModel) -> bytes:
@@ -206,18 +304,28 @@ def write_model_json(path: Path, model: BaseModel) -> bytes:
     return content
 
 
-def artifact_digests(root: Path) -> dict[str, str]:
+def artifact_digests(
+    root: Path,
+    *,
+    reader: _AnchoredPublicationReader | None = None,
+) -> dict[str, str]:
     """Inventory every non-manifest file in one staged publication."""
-    digests: dict[str, str] = {}
-    with _AnchoredPublicationReader(root) as reader:
-        for path in sorted(root.rglob("*")):
-            relative = path.relative_to(root).as_posix()
-            if path.is_symlink():
-                raise ValueError(f"Assessment artifact inventory cannot use a symbolic link: {relative}")
-            if path.is_dir() or relative in {_MANIFEST, _STAGING_OWNER}:
-                continue
-            digests[relative] = reader.content_digest(relative, label=f"assessment artifact {relative}")
-    return digests
+    owned_reader = reader is None
+    active_reader = reader or _AnchoredPublicationReader(root)
+    try:
+        inventory = active_reader.inventory()
+    finally:
+        if owned_reader:
+            active_reader.close()
+    if inventory.symbolic_links:
+        first = sorted(inventory.symbolic_links)[0]
+        raise ValueError(f"Assessment artifact inventory cannot use a symbolic link: {first}")
+    if inventory.special_entries:
+        first = sorted(inventory.special_entries)[0]
+        raise ValueError(f"Assessment artifact inventory contains an unsupported filesystem entry: {first}")
+    return {
+        relative: digest for relative, digest in inventory.files.items() if relative not in {_MANIFEST, _STAGING_OWNER}
+    }
 
 
 def verify_publication(
@@ -232,15 +340,6 @@ def verify_publication(
     with _AnchoredPublicationReader(root) as reader:
         manifest_content = reader.read_bytes(_MANIFEST, label="assessment manifest")
         manifest = StructureAssessmentPublicationV1.model_validate_json(manifest_content)
-        try:
-            validate_publication_metadata_paths(
-                root,
-                required_manifest=Path(_MANIFEST),
-                owner_file=_STAGING_OWNER,
-                require_owner=allow_staging_owner,
-            )
-        except PublicationError as exc:
-            raise ValueError(str(exc)) from exc
         request_content = reader.read_bytes(manifest.request_path, label="assessment request")
         target_sequence_content = reader.read_bytes(
             manifest.target_sequence_path,
@@ -582,24 +681,33 @@ def _verify_artifact_inventory(
     *,
     allow_staging_owner: bool,
 ) -> None:
-    actual_files: dict[str, str] = {}
-    actual_directories: set[str] = set()
-    for path in sorted(root.rglob("*")):
-        relative = path.relative_to(root).as_posix()
-        if path.is_symlink():
-            raise ValueError(f"Assessment artifact inventory cannot use a symbolic link: {relative}")
-        if relative == _STAGING_OWNER:
-            if not allow_staging_owner:
-                raise ValueError("Published assessment cannot contain transaction metadata.")
-            if not path.is_file():
-                raise ValueError("Assessment staging owner must be a regular file.")
-            continue
-        if path.is_dir():
-            actual_directories.add(relative)
-        elif path.is_file() and relative != _MANIFEST:
-            actual_files[relative] = reader.content_digest(relative, label=f"assessment artifact {relative}")
-        elif relative != _MANIFEST:
-            raise ValueError(f"Assessment artifact inventory contains an unsupported filesystem entry: {relative}")
+    inventory = reader.inventory()
+    relative_entry_files = {
+        **{relative: True for relative in inventory.files},
+        **{relative: False for relative in inventory.directories},
+        **{relative: False for relative in inventory.symbolic_links},
+        **{relative: False for relative in inventory.special_entries},
+    }
+    try:
+        validate_publication_metadata_paths(
+            root,
+            required_manifest=Path(_MANIFEST),
+            owner_file=_STAGING_OWNER,
+            require_owner=allow_staging_owner,
+            relative_entry_files=relative_entry_files,
+        )
+    except PublicationError as exc:
+        raise ValueError(str(exc)) from exc
+    if inventory.symbolic_links:
+        first = sorted(inventory.symbolic_links)[0]
+        raise ValueError(f"Assessment artifact inventory cannot use a symbolic link: {first}")
+    if inventory.special_entries:
+        first = sorted(inventory.special_entries)[0]
+        raise ValueError(f"Assessment artifact inventory contains an unsupported filesystem entry: {first}")
+    actual_files = {
+        relative: digest for relative, digest in inventory.files.items() if relative not in {_MANIFEST, _STAGING_OWNER}
+    }
+    actual_directories = inventory.directories
     expected_directories = {
         parent.as_posix()
         for artifact_path in expected

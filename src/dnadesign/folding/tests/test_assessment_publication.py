@@ -126,6 +126,35 @@ def test_structure_assessment_rejects_backend_target_mutation_before_publication
     assert not output.exists()
 
 
+def test_structure_assessment_rejects_named_worker_artifact_symlink_before_supervisor_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    outside = tmp_path / "large-outside-request"
+    with outside.open("wb") as handle:
+        handle.truncate(4 * 1024 * 1024 * 1024)
+    original_run_worker = assessment_api.run_worker
+
+    def run_worker_then_replace_request(
+        request_path: Path,
+        output_path: Path,
+        *,
+        timeout_seconds: float,
+    ) -> None:
+        original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
+        request_path.unlink()
+        request_path.symlink_to(outside)
+
+    monkeypatch.setattr(assessment_api, "run_worker", run_worker_then_replace_request)
+    output = tmp_path / "linked-worker-request-assessment"
+
+    with pytest.raises(ValueError, match="worker request.*symbolic link"):
+        publish_structure_assessment(_request(), output_dir=output)
+
+    assert not output.exists()
+
+
 def test_structure_assessment_rejects_worker_request_mutation_before_publication(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -514,7 +543,7 @@ def test_structure_assessment_loader_anchors_every_publication_root_component(
     def open_after_ancestor_swap(
         path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
         flags: int,
-        mode: int = 0o777,
+        mode: int = 0o600,
         *,
         dir_fd: int | None = None,
     ) -> int:
@@ -571,6 +600,46 @@ def test_structure_assessment_loader_reads_and_validates_one_anchored_descriptor
         load_published_assessment(output)
 
     assert replaced
+
+
+def test_structure_assessment_loader_enumerates_the_anchored_publication_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    output = tmp_path / "assessment"
+    replacement = tmp_path / "replacement-assessment"
+    detached = tmp_path / "detached-assessment"
+    publish_structure_assessment(_request(), output_dir=output)
+    publish_structure_assessment(_request(), output_dir=replacement)
+    (output / "hidden.txt").write_text("not inventoried\n", encoding="utf-8")
+    original_read_bytes = assessment_publication._AnchoredPublicationReader.read_bytes
+    swapped = False
+
+    def read_bytes_then_replace_publication(
+        reader: assessment_publication._AnchoredPublicationReader,
+        relative: str,
+        *,
+        label: str,
+    ) -> bytes:
+        nonlocal swapped
+        content = original_read_bytes(reader, relative, label=label)
+        if relative == "assessment-record.json" and not swapped:
+            output.rename(detached)
+            replacement.rename(output)
+            swapped = True
+        return content
+
+    monkeypatch.setattr(
+        assessment_publication._AnchoredPublicationReader,
+        "read_bytes",
+        read_bytes_then_replace_publication,
+    )
+
+    with pytest.raises(ValueError, match="artifact inventory does not match"):
+        load_published_assessment(output)
+
+    assert swapped
 
 
 def test_structure_assessment_loader_rejects_record_identity_drift(
