@@ -318,6 +318,8 @@ def _verify_preflight(
         raise ValueError("Assessment preflight backend availability is internally inconsistent.")
     if preflight.output_dir != "." or prediction_root.name != "prediction":
         raise ValueError("Assessment preflight output directory is not the portable worker root.")
+    if worker_request.policy.required and prediction.status != "ok":
+        raise ValueError("A required assessment cannot replay non-ok status.")
     if preflight.status == "ok":
         if not backend.available or backend.version is None or prediction.backend is None:
             raise ValueError("Assessment preflight success lacks a usable prediction backend.")

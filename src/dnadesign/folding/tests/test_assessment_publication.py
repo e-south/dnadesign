@@ -438,3 +438,48 @@ def test_structure_assessment_loader_rejects_record_identity_drift(
 
     with pytest.raises(ValueError, match="assessment_id must match"):
         load_published_assessment(output)
+
+
+def test_structure_assessment_loader_rejects_optional_status_for_required_policy(
+    tmp_path: Path,
+) -> None:
+    base_request = _request()
+    optional_request = base_request.model_copy(
+        update={
+            "backend": base_request.backend.model_copy(update={"python_module": "dnadesign_missing_rna_backend"}),
+            "policy": base_request.policy.model_copy(update={"required": False}),
+        },
+    )
+    output = tmp_path / "assessment"
+    publish_structure_assessment(optional_request, output_dir=output)
+
+    request_path = output / "assessment-request.json"
+    worker_request_path = output / "prediction/prediction-request.json"
+    record_path = output / "assessment-record.json"
+    manifest_path = output / "manifest.json"
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    worker_request = json.loads(worker_request_path.read_text(encoding="utf-8"))
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    request["policy"]["required"] = True
+    worker_request["policy"]["required"] = True
+    request_content = (json.dumps(request, indent=2, sort_keys=True) + "\n").encode()
+    worker_request_content = (json.dumps(worker_request, indent=2, sort_keys=True) + "\n").encode()
+    request_digest = f"sha256:{hashlib.sha256(request_content).hexdigest()}"
+    worker_request_digest = f"sha256:{hashlib.sha256(worker_request_content).hexdigest()}"
+    request_path.write_bytes(request_content)
+    worker_request_path.write_bytes(worker_request_content)
+    record["request_digest"] = request_digest
+    record_content = (json.dumps(record, indent=2, sort_keys=True) + "\n").encode()
+    record_digest = f"sha256:{hashlib.sha256(record_content).hexdigest()}"
+    record_path.write_bytes(record_content)
+    manifest["request_digest"] = request_digest
+    manifest["worker_request_digest"] = worker_request_digest
+    manifest["record_digest"] = record_digest
+    manifest["artifact_digests"]["assessment-request.json"] = request_digest
+    manifest["artifact_digests"]["prediction/prediction-request.json"] = worker_request_digest
+    manifest["artifact_digests"]["assessment-record.json"] = record_digest
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="required assessment cannot replay non-ok status"):
+        load_published_assessment(output)

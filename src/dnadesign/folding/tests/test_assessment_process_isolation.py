@@ -17,6 +17,7 @@ import subprocess
 import time
 from pathlib import Path
 
+import psutil
 import pytest
 
 import dnadesign.folding.src.assessment.worker as assessment_worker
@@ -85,7 +86,8 @@ def test_structure_assessment_success_terminates_residual_cli_descendants(
         "    '-c',\n"
         "    'import os,pathlib,time; time.sleep(0.5); '"
         '    \'pathlib.Path(os.environ["ASSESSMENT_DESCENDANT_MARKER"]).write_text("alive")\',\n'
-        "], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)\n"
+        "], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)\n"
+        "import time; time.sleep(0.05)\n"
         "sys.stdin.read()\n"
         "print('>hop:encoding/example')\n"
         "print('GCAUGC')\n"
@@ -137,19 +139,17 @@ def test_structure_assessment_timeout_does_not_wait_for_detached_pipe_holder(
     monkeypatch.setenv("ASSESSMENT_CHILD_PID", child_pid_path.as_posix())
     started = time.monotonic()
 
-    try:
-        with pytest.raises(FoldingExecutionError, match="timed out"):
-            publish_structure_assessment(
-                assessment_request(timeout_seconds=0.1),
-                output_dir=tmp_path / "assessment",
-            )
-        assert time.monotonic() - started < 2.0
-    finally:
-        if child_pid_path.exists():
-            try:
-                os.kill(int(child_pid_path.read_text(encoding="utf-8")), signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+    with pytest.raises(FoldingExecutionError, match="timed out"):
+        publish_structure_assessment(
+            assessment_request(timeout_seconds=0.5),
+            output_dir=tmp_path / "assessment",
+        )
+    assert time.monotonic() - started < 2.0
+    child_pid = int(child_pid_path.read_text(encoding="utf-8"))
+    deadline = time.monotonic() + 1.0
+    while psutil.pid_exists(child_pid) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert not psutil.pid_exists(child_pid)
 
 
 def test_assessment_worker_delegates_the_only_deadline_to_its_supervisor(
