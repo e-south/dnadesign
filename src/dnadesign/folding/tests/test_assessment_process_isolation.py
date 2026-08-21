@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+import dnadesign.folding.src.api as folding_api
 import dnadesign.folding.src.assessment.worker as assessment_worker
 from dnadesign.folding import FoldingExecutionError, publish_structure_assessment
 from dnadesign.folding.src.assessment import execution as assessment_execution
@@ -108,6 +109,37 @@ def test_structure_assessment_cli_backend_cannot_spawn_detached_descendants(
 
     time.sleep(0.7)
     assert not descendant_marker.exists()
+    assert not output.exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="CLI stream limit is kernel-enforced on POSIX")
+@pytest.mark.parametrize(("file_descriptor", "label"), [(1, "stdout"), (2, "stderr")])
+def test_structure_assessment_bounds_cli_backend_streams(
+    tmp_path: Path,
+    file_descriptor: int,
+    label: str,
+) -> None:
+    executable = tmp_path / "fake-rnafold"
+    executable.write_text(
+        "#!/usr/bin/env python3\n"
+        "import os\n"
+        "import sys\n"
+        "if '--version' in sys.argv:\n"
+        "    print('RNAfold 2.7.2')\n"
+        "    raise SystemExit(0)\n"
+        "sys.stdin.read()\n"
+        f"os.write({file_descriptor}, b'x' * {folding_api._BACKEND_STREAM_LIMIT_BYTES + 1})\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    output = tmp_path / "assessment"
+
+    with pytest.raises(FoldingExecutionError, match=rf"backend {label} exceeded.*byte limit"):
+        publish_structure_assessment(
+            cli_assessment_request(executable, timeout_seconds=2.0),
+            output_dir=output,
+        )
+
     assert not output.exists()
 
 

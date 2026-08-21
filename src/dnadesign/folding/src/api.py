@@ -17,9 +17,10 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 import yaml
 from pydantic import ValidationError as PydanticValidationError
@@ -54,6 +55,7 @@ except ImportError:  # pragma: no cover - assessment execution fails closed off 
 
 _PREDICTION_FILENAME = "secondary_structure_prediction_v2.json"
 _PREFLIGHT_FILENAME = "folding_preflight.json"
+_BACKEND_STREAM_LIMIT_BYTES = 1_048_576
 
 
 @dataclass(frozen=True)
@@ -277,25 +279,7 @@ def run_prediction_request(
         )
 
     if preflight.resolved_executable is None:
-        _write_backend_logs(
-            output_path,
-            interface=request.backend.interface,
-            stdout="",
-            stderr="Folding executable preflight succeeded without a resolved executable.\n",
-        )
-        prediction = _error_prediction(
-            request,
-            assembled=assembled,
-            preflight=preflight,
-            submitted_alphabet=submitted_alphabet,
-            command=[request.backend.executable or request.backend.name],
-            error="Folding executable preflight succeeded without a resolved executable.",
-            failure_kind="backend_contract_error",
-        )
-        _write_prediction(output_path, prediction)
-        if request.policy.required and raise_on_required_failure:
-            raise FoldingExecutionError(prediction.qa.errors[0])
-        return prediction
+        raise FoldingExecutionError("Successful CLI preflight lacks a resolved executable.")
     command = prediction_command(
         interface=request.backend.interface,
         python_module=request.backend.python_module,
@@ -303,14 +287,11 @@ def run_prediction_request(
         parameters=request.backend.parameters,
     )
     try:
-        completed = subprocess.run(
+        completed = _run_bounded_cli_command(
             command,
-            input=f">{request.input.sequence_id}\n{submitted_sequence}\n",
-            text=True,
-            capture_output=True,
-            check=False,
+            input_text=f">{request.input.sequence_id}\n{submitted_sequence}\n",
             timeout=backend_timeout_seconds,
-            preexec_fn=_deny_process_creation if deny_backend_child_processes else None,
+            deny_backend_child_processes=deny_backend_child_processes,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         _write_backend_logs(
@@ -415,25 +396,7 @@ def _run_python_api_prediction_request(
 ) -> SecondaryStructurePredictionV2:
     module_name = request.backend.python_module
     if module_name is None:
-        _write_backend_logs(
-            output_path,
-            interface=request.backend.interface,
-            stdout="",
-            stderr="Folding backend python module is not configured.\n",
-        )
-        prediction = _error_prediction(
-            request,
-            assembled=assembled,
-            preflight=preflight,
-            submitted_alphabet=submitted_alphabet,
-            command=[request.backend.name],
-            error="Folding backend python module is not configured.",
-            failure_kind="backend_contract_error",
-        )
-        _write_prediction(output_path, prediction)
-        if request.policy.required and raise_on_required_failure:
-            raise FoldingExecutionError(prediction.qa.errors[0])
-        return prediction
+        raise FoldingExecutionError("Successful Python preflight lacks a configured module.")
 
     command = prediction_command(
         interface=request.backend.interface,
@@ -724,11 +687,57 @@ def _resolve_executable(executable: str) -> Path | None:
 
 
 def _deny_process_creation() -> None:
-    if os.name != "posix" or resource is None or not hasattr(resource, "RLIMIT_NPROC"):
+    if (
+        os.name != "posix"
+        or resource is None
+        or not hasattr(resource, "RLIMIT_NPROC")
+        or not hasattr(resource, "RLIMIT_FSIZE")
+    ):
         raise FoldingConfigError("Kernel no-fork containment is unavailable for this assessment backend.")
     if hasattr(os, "geteuid") and os.geteuid() == 0:
         raise FoldingConfigError("Kernel no-fork containment is not enforceable for a root assessment process.")
     resource.setrlimit(resource.RLIMIT_NPROC, (0, 0))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (_BACKEND_STREAM_LIMIT_BYTES, _BACKEND_STREAM_LIMIT_BYTES))
+
+
+def _run_bounded_cli_command(
+    command: list[str],
+    *,
+    input_text: str | None,
+    timeout: float | None,
+    deny_backend_child_processes: bool,
+) -> subprocess.CompletedProcess[str]:
+    with tempfile.TemporaryFile(mode="w+b") as stdout_file, tempfile.TemporaryFile(mode="w+b") as stderr_file:
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.PIPE,
+            stdout=stdout_file,
+            stderr=stderr_file,
+            text=True,
+            preexec_fn=_deny_process_creation if deny_backend_child_processes else None,
+        )
+        try:
+            process.communicate(input=input_text, timeout=timeout)
+        except BaseException:
+            if process.poll() is None:
+                process.kill()
+            process.communicate()
+            raise
+        stdout = _read_bounded_cli_stream(stdout_file, label="stdout")
+        stderr = _read_bounded_cli_stream(stderr_file, label="stderr")
+        if process.returncode is None:
+            raise FoldingExecutionError("ViennaRNA backend completed without a return code.")
+        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
+def _read_bounded_cli_stream(stream: BinaryIO, *, label: str) -> str:
+    stream.flush()
+    stream.seek(0, os.SEEK_END)
+    size = stream.tell()
+    if size >= _BACKEND_STREAM_LIMIT_BYTES:
+        raise FoldingExecutionError(f"ViennaRNA backend {label} exceeded the {_BACKEND_STREAM_LIMIT_BYTES}-byte limit.")
+    stream.seek(0)
+    return stream.read().decode("utf-8", errors="replace")
 
 
 def _capture_version(
@@ -737,13 +746,11 @@ def _capture_version(
     deny_backend_child_processes: bool = False,
 ) -> str:
     try:
-        completed = subprocess.run(
+        completed = _run_bounded_cli_command(
             [executable.as_posix(), "--version"],
-            text=True,
-            capture_output=True,
-            check=False,
+            input_text=None,
             timeout=10,
-            preexec_fn=_deny_process_creation if deny_backend_child_processes else None,
+            deny_backend_child_processes=deny_backend_child_processes,
         )
     except (OSError, subprocess.SubprocessError):
         return "unknown"

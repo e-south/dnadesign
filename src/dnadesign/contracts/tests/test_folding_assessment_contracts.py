@@ -157,3 +157,24 @@ def test_prediction_v2_rejects_v1_contract_identity() -> None:
                 },
             }
         )
+
+
+def test_prediction_v2_rejects_impossible_backend_contract_failure() -> None:
+    with pytest.raises(ValidationError, match="backend_invocation_exception"):
+        SecondaryStructurePredictionV2.model_validate(
+            {
+                "prediction_id": "failed-prediction",
+                "status": "error",
+                "input": {
+                    "sequence_id": "example",
+                    "sequence_sha256": "sha256:" + "1" * 64,
+                    "alphabet": "dna",
+                    "topology": "linear_ssdna",
+                    "length": 6,
+                },
+                "failure": {
+                    "kind": "backend_contract_error",
+                    "message": "impossible post-preflight state",
+                },
+            }
+        )

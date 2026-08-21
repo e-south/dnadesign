@@ -98,8 +98,9 @@ those facts or import the producer's domain package.
 The assessment runs in an isolated worker process. The policy timeout applies
 to both ViennaRNA interfaces. On POSIX systems, cleanup terminates residual
 worker-group descendants after every completion or communication failure.
-Kernel file limits cap each worker output stream at 1,048,576 bytes, so a noisy
-backend fails instead of filling the supervisor's memory. The worker
+Kernel file limits cap each worker output stream and each nested CLI-backend
+stream at 1,048,576 bytes, so a noisy backend fails instead of filling the
+worker or supervisor memory. The worker
 disables the older low-level CLI deadline so the assessment supervisor is the
 only timeout authority. Publication is atomic and create-only. The target and
 worker-request artifacts are digest-pinned and semantically replayed against

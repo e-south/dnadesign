@@ -128,7 +128,7 @@ def _folding_request(
     backend_payload: dict[str, object] = {
         "name": backend.name,
         "interface": backend.interface,
-        "backend_contract": backend.backend_contract or "secondary_structure_prediction_v2",
+        "backend_contract": "secondary_structure_prediction_v2",
         "parameters": backend.parameters,
         "dna_policy": {
             "mode": dna_policy.mode,
