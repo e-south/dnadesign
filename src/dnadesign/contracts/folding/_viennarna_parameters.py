@@ -1,4 +1,13 @@
-"""Fail-closed validation for the ViennaRNA parameters DNA Design implements."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/contracts/folding/_viennarna_parameters.py
+
+Fail-closed validation for the ViennaRNA parameters DNA Design implements.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Atomic placement of digest-pinned annotated sequence parts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/construct/src/realization/annotated_parts.py
+
+Atomic placement of digest-pinned annotated sequence parts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,13 @@
-"""Atomic placement of a digest-pinned annotated sequence part."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/construct/tests/runtime/test_annotated_part_placement.py
+
+Atomic placement of a digest-pinned annotated sequence part.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

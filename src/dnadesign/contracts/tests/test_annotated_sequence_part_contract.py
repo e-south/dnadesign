@@ -1,4 +1,13 @@
-"""Neutral annotated sequence-part handoff contracts."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/contracts/tests/test_annotated_sequence_part_contract.py
+
+Neutral annotated sequence-part handoff contracts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
