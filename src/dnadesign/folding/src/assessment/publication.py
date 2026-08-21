@@ -16,7 +16,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from dnadesign.contracts.folding import (
     AssessmentTargetSequenceV1,
@@ -33,6 +33,30 @@ from .projection import project_prediction_request
 
 _MANIFEST = "manifest.json"
 _STAGING_OWNER = ".dnadesign-publication-owner.json"
+_PREFLIGHT = "folding_preflight.json"
+
+
+class _PreflightContractModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+
+
+class _PreflightBackend(_PreflightContractModel):
+    name: str
+    interface: str
+    executable: str | None
+    python_module: str | None
+    resolved_executable: str | None
+    available: bool
+    version: str | None
+
+
+class _PreflightArtifact(_PreflightContractModel):
+    contract: str
+    status: str
+    backend: _PreflightBackend
+    output_dir: str
+    warnings: list[str]
+    errors: list[str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,6 +130,7 @@ def verify_publication(
     )
     worker_request_path = _confined_file(root, manifest.worker_request_path, label="assessment worker request")
     prediction_path = _confined_file(root, manifest.prediction_path, label="assessment prediction")
+    preflight_path = _confined_file(prediction_path.parent, _PREFLIGHT, label="assessment preflight")
     record_path = _confined_file(root, manifest.record_path, label="assessment record")
     request_content = request_path.read_bytes()
     target_sequence_content = target_sequence_path.read_bytes()
@@ -131,6 +156,7 @@ def verify_publication(
     target_sequence = AssessmentTargetSequenceV1.model_validate_json(target_sequence_content)
     worker_request = SecondaryStructurePredictionRequestV1.model_validate_json(worker_request_content)
     prediction = SecondaryStructurePredictionV1.model_validate_json(prediction_content)
+    preflight = _PreflightArtifact.model_validate_json(preflight_path.read_bytes())
     record = StructureAssessmentRecordV1.model_validate_json(record_content)
     if request.assessment_id != manifest.assessment_id or record.assessment_id != manifest.assessment_id:
         raise ValueError("Assessment identifiers do not agree across the publication.")
@@ -140,6 +166,12 @@ def verify_publication(
         raise ValueError("Assessment record does not replay its request target and prediction.")
     if worker_request != project_prediction_request(request):
         raise ValueError("Assessment worker request does not match its deterministic high-level projection.")
+    _verify_preflight(
+        preflight,
+        worker_request=worker_request,
+        prediction=prediction,
+        prediction_root=prediction_path.parent,
+    )
     _verify_prediction_artifacts(prediction_path.parent, prediction)
     if (
         target_sequence.sequence.id != request.target.sequence_id
@@ -164,6 +196,56 @@ def _verify_prediction_artifacts(root: Path, prediction: SecondaryStructurePredi
             _confined_file(root, reference, label=label)
 
 
+def _verify_preflight(
+    preflight: _PreflightArtifact,
+    *,
+    worker_request: SecondaryStructurePredictionRequestV1,
+    prediction: SecondaryStructurePredictionV1,
+    prediction_root: Path,
+) -> None:
+    if preflight.contract != "secondary_structure_folding_preflight_v1":
+        raise ValueError("Assessment preflight contract is unsupported.")
+    backend = preflight.backend
+    request_backend = worker_request.backend
+    if (
+        backend.name != request_backend.name
+        or backend.interface != request_backend.interface
+        or backend.executable != request_backend.executable
+        or backend.python_module != request_backend.python_module
+    ):
+        raise ValueError("Assessment preflight backend does not match the worker request.")
+    expected_available = (
+        backend.python_module is not None and backend.version is not None
+        if backend.interface == "python_api"
+        else backend.resolved_executable is not None
+    )
+    if backend.available is not expected_available:
+        raise ValueError("Assessment preflight backend availability is internally inconsistent.")
+    output_dir = Path(preflight.output_dir)
+    if not output_dir.is_absolute() or output_dir.name != prediction_root.name:
+        raise ValueError("Assessment preflight output directory does not identify the worker output.")
+    if preflight.status == "ok":
+        if not backend.available or backend.version is None or prediction.backend is None:
+            raise ValueError("Assessment preflight success lacks a usable prediction backend.")
+        if preflight.warnings or preflight.errors:
+            raise ValueError("Assessment preflight success cannot contain warnings or errors.")
+        if prediction.backend.name != backend.name:
+            raise ValueError("Assessment preflight backend name does not match the prediction.")
+        if prediction.backend.version != backend.version:
+            raise ValueError("Assessment preflight backend version does not match the prediction.")
+        if backend.interface == "python_api":
+            expected_command = [f"{backend.python_module}.fold_compound", "mfe"]
+            if backend.resolved_executable is not None or prediction.backend.command != expected_command:
+                raise ValueError("Assessment preflight Python backend does not match the prediction command.")
+        elif not prediction.backend.command or prediction.backend.command[0] != backend.resolved_executable:
+            raise ValueError("Assessment preflight executable does not match the prediction command.")
+        return
+    if backend.available or prediction.backend is not None or preflight.status != prediction.status:
+        raise ValueError("Assessment preflight blocker does not match the prediction status.")
+    if preflight.warnings != prediction.qa.warnings or preflight.errors != prediction.qa.errors:
+        raise ValueError("Assessment preflight diagnostics do not match the prediction.")
+
+
 def _verify_artifact_inventory(
     root: Path,
     expected: dict[str, str],
@@ -176,7 +258,9 @@ def _verify_artifact_inventory(
         relative = path.relative_to(root).as_posix()
         if path.is_symlink():
             raise ValueError(f"Assessment artifact inventory cannot use a symbolic link: {relative}")
-        if relative == _STAGING_OWNER and allow_staging_owner:
+        if relative == _STAGING_OWNER:
+            if not allow_staging_owner:
+                raise ValueError("Published assessment cannot contain transaction metadata.")
             if not path.is_file():
                 raise ValueError("Assessment staging owner must be a regular file.")
             continue

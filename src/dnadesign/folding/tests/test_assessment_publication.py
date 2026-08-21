@@ -118,6 +118,34 @@ def test_structure_assessment_rejects_worker_request_mutation_before_publication
     assert not output.exists()
 
 
+def test_structure_assessment_rejects_preflight_mutation_before_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    original_run_worker = assessment_api.run_worker
+
+    def run_worker_then_mutate(
+        request_path: Path,
+        output_path: Path,
+        *,
+        timeout_seconds: float,
+    ) -> None:
+        original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
+        preflight_path = output_path / "folding_preflight.json"
+        preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
+        preflight["backend"]["version"] = "fabricated-version"
+        preflight_path.write_text(json.dumps(preflight, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    monkeypatch.setattr(assessment_api, "run_worker", run_worker_then_mutate)
+    output = tmp_path / "mutated-preflight-assessment"
+
+    with pytest.raises(ValueError, match="preflight backend version"):
+        publish_structure_assessment(_request(), output_dir=output)
+
+    assert not output.exists()
+
+
 def test_structure_assessment_publication_is_create_only(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -247,7 +275,26 @@ def test_structure_assessment_loader_rejects_staging_owner_in_published_output(
     publish_structure_assessment(_request(), output_dir=output)
     (output / ".dnadesign-publication-owner.json").write_text("{}\n", encoding="utf-8")
 
-    with pytest.raises(ValueError, match="artifact inventory"):
+    with pytest.raises(ValueError, match="transaction metadata"):
+        load_published_assessment(output)
+
+
+def test_structure_assessment_loader_rejects_inventoried_staging_owner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    output = tmp_path / "assessment"
+    publish_structure_assessment(_request(), output_dir=output)
+    owner_path = output / ".dnadesign-publication-owner.json"
+    owner_content = b"{}\n"
+    owner_path.write_bytes(owner_content)
+    manifest_path = output / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifact_digests"][owner_path.name] = f"sha256:{hashlib.sha256(owner_content).hexdigest()}"
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="transaction metadata"):
         load_published_assessment(output)
 
 

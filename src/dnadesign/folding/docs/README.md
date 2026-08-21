@@ -100,13 +100,16 @@ timeout cleanup cannot wait indefinitely on inherited pipes. The worker
 disables the older low-level CLI deadline so the assessment supervisor is the
 only timeout authority. Publication is atomic and create-only. The target and
 worker-request artifacts are digest-pinned and semantically replayed against
-the high-level request. Every referenced backend log must exist. The manifest
-binds the request, worker request, prediction, record, target-state digest,
+the high-level request. Preflight status, backend identity, version,
+availability, executable, and diagnostics must agree with the worker request
+and prediction. Every referenced backend log must exist. The manifest binds
+the request, worker request, prediction, record, target-state digest,
 target-sequence digest, and an exhaustive digest inventory of every published
 evidence file. Replay occurs while the publication transaction still owns
 rollback authority, with final path identity checked before and after replay.
 The verified loader rejects missing or extra files, byte drift, cross-record
-identity drift, traversal, symlinked paths, and non-regular filesystem entries.
+identity drift, transaction-private metadata, traversal, symlinked paths, and
+non-regular filesystem entries.
 
 The emitted `StructureAssessmentRecordV1` always has `authority: advisory`.
 It cannot make a HOP design valid, identify an experimental construct, or
