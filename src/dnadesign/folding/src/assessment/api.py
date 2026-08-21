@@ -27,6 +27,7 @@ from ..errors import FoldingConfigError, FoldingExecutionError
 from .execution import prepare_prediction_request, run_worker
 from .publication import (
     PublishedStructureAssessment,
+    _AnchoredPublicationReader,
     artifact_digests,
     content_digest,
     load_published_assessment,
@@ -57,28 +58,39 @@ def publish_structure_assessment(
         request_digest = content_digest(request_content)
         low_level_path, target_content = prepare_prediction_request(stage, request)
         target_artifact_digest = content_digest(target_content)
-        run_worker(low_level_path, stage / "prediction", timeout_seconds=request.policy.timeout_seconds)
-        worker_request_digest = content_digest(low_level_path.read_bytes())
-        if content_digest((stage / "assessment-target-sequence.json").read_bytes()) != target_artifact_digest:
-            raise FoldingExecutionError("Assessment target artifact changed during backend execution.")
-        prediction_path = stage / _PREDICTION
-        prediction_content = prediction_path.read_bytes()
-        prediction = SecondaryStructurePredictionV2.model_validate_json(prediction_content)
-        if request.policy.required and prediction.status != "ok":
-            errors = "; ".join(prediction.qa.errors or prediction.qa.warnings)
-            raise FoldingExecutionError(errors or f"Required assessment ended with status {prediction.status}.")
-        prediction_digest = content_digest(prediction_content)
-        record = StructureAssessmentRecordV1(
-            assessment_id=request.assessment_id,
-            status=prediction.status,
-            request_digest=request_digest,
-            target=request.target,
-            prediction_digest=prediction_digest,
-            prediction=prediction,
-            producer=AssessmentProducerV1(version=version("dnadesign")),
-        )
-        record_content = write_model_json(stage / _RECORD, record)
-        inventory = artifact_digests(stage)
+        with _AnchoredPublicationReader(stage) as reader:
+            run_worker(low_level_path, stage / "prediction", timeout_seconds=request.policy.timeout_seconds)
+            worker_request_content = reader.read_bytes(
+                "prediction/prediction-request.json",
+                label="assessment worker request",
+            )
+            worker_request_digest = content_digest(worker_request_content)
+            observed_target_content = reader.read_bytes(
+                "assessment-target-sequence.json",
+                label="assessment target sequence",
+            )
+            if content_digest(observed_target_content) != target_artifact_digest:
+                raise FoldingExecutionError("Assessment target artifact changed during backend execution.")
+            prediction_content = reader.read_bytes(
+                _PREDICTION,
+                label="assessment prediction",
+            )
+            prediction = SecondaryStructurePredictionV2.model_validate_json(prediction_content)
+            if request.policy.required and prediction.status != "ok":
+                errors = "; ".join(prediction.qa.errors or prediction.qa.warnings)
+                raise FoldingExecutionError(errors or f"Required assessment ended with status {prediction.status}.")
+            prediction_digest = content_digest(prediction_content)
+            record = StructureAssessmentRecordV1(
+                assessment_id=request.assessment_id,
+                status=prediction.status,
+                request_digest=request_digest,
+                target=request.target,
+                prediction_digest=prediction_digest,
+                prediction=prediction,
+                producer=AssessmentProducerV1(version=version("dnadesign")),
+            )
+            record_content = write_model_json(stage / _RECORD, record)
+            inventory = artifact_digests(stage, reader=reader)
         manifest = StructureAssessmentPublicationV1(
             assessment_id=request.assessment_id,
             request_digest=request_digest,
