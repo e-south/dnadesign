@@ -27,9 +27,12 @@ from dnadesign.contracts.folding import (
 from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
     SecondaryStructurePredictionRequestV1,
     SecondaryStructurePredictionV1,
+    SecondaryStructureQaV1,
 )
 
+from ..errors import FoldingError
 from ..execution_metadata import prediction_command, prediction_log_paths
+from ..rnafold import parse_rnafold_stdout
 from .projection import project_prediction_request
 
 _MANIFEST = "manifest.json"
@@ -175,6 +178,7 @@ def verify_publication(
     )
     _verify_prediction_execution_metadata(preflight, worker_request=worker_request, prediction=prediction)
     _verify_prediction_artifacts(prediction_path.parent, prediction)
+    _verify_prediction_backend_output(prediction_path.parent, request=request, prediction=prediction)
     if (
         target_sequence.sequence.id != request.target.sequence_id
         or f"sha256:{target_sequence.sequence.sha256}" != request.target.sequence_sha256
@@ -258,6 +262,33 @@ def _verify_prediction_execution_metadata(
         or expected_stdout == expected_stderr
     ):
         raise ValueError("Assessment prediction log references do not match the backend interface.")
+
+
+def _verify_prediction_backend_output(
+    root: Path,
+    *,
+    request: StructureAssessmentRequestV1,
+    prediction: SecondaryStructurePredictionV1,
+) -> None:
+    if prediction.status != "ok":
+        return
+    stdout_ref = prediction.artifacts.stdout
+    if stdout_ref is None:
+        raise ValueError("Successful assessment prediction lacks backend output evidence.")
+    stdout = _confined_file(root, stdout_ref, label="prediction stdout").read_text(encoding="utf-8")
+    submitted_sequence = request.target.sequence.upper()
+    if request.backend.dna_policy.mode == "convert_t_to_u_for_rna_backend":
+        submitted_sequence = submitted_sequence.replace("T", "U")
+    try:
+        replayed_result = parse_rnafold_stdout(
+            stdout=stdout,
+            submitted_sequence=submitted_sequence,
+            input_length=len(request.target.sequence),
+        )
+    except FoldingError as exc:
+        raise ValueError(f"Assessment backend output evidence cannot be replayed: {exc}") from exc
+    if prediction.result != replayed_result or prediction.qa != SecondaryStructureQaV1(length_matches_input=True):
+        raise ValueError("Assessment prediction does not match its backend output evidence.")
 
 
 def _verify_preflight(
