@@ -68,7 +68,9 @@ class AnnotatedSequenceFeatureV1(AnnotatedPartContractModel):
     def normalize_sequence(cls, value: object) -> str:
         if not isinstance(value, str) or not value:
             raise ValueError("feature sequence must be a non-empty DNA string.")
-        sequence = value.upper()
+        if value != value.upper():
+            raise ValueError("feature sequence must use canonical uppercase IUPAC DNA.")
+        sequence = value
         invalid = sorted(set(sequence) - _IUPAC_DNA)
         if invalid:
             raise ValueError(f"feature sequence contains invalid IUPAC DNA: {', '.join(invalid)}.")
@@ -109,7 +111,9 @@ class AnnotatedSequencePartV1(AnnotatedPartContractModel):
     def normalize_sequence(cls, value: object) -> str:
         if not isinstance(value, str) or not value:
             raise ValueError("part sequence must be a non-empty DNA string.")
-        sequence = value.upper()
+        if value != value.upper():
+            raise ValueError("part sequence must use canonical uppercase IUPAC DNA.")
+        sequence = value
         invalid = sorted(set(sequence) - _IUPAC_DNA)
         if invalid:
             raise ValueError(f"part sequence contains invalid IUPAC DNA: {', '.join(invalid)}.")

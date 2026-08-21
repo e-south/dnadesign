@@ -19,6 +19,8 @@ def validate_viennarna_parameters(value: object) -> dict[str, Any]:
     """Accept only parameters that both supported ViennaRNA interfaces apply."""
     if not isinstance(value, dict):
         raise ValueError("ViennaRNA parameters must be a mapping.")
+    if any(not isinstance(key, str) for key in value):
+        raise ValueError("ViennaRNA parameter names must be strings.")
     unknown = sorted(set(value) - {"temperature_c"})
     if unknown:
         raise ValueError(f"Unsupported ViennaRNA parameters: {', '.join(unknown)}.")

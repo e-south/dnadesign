@@ -16,7 +16,8 @@ part's sequence, annotations, or scientific meaning.
 
 The contract requires:
 
-- a sequence and matching SHA-256 digest;
+- a canonical uppercase IUPAC DNA sequence and a SHA-256 digest of those exact
+  sequence bytes;
 - explicit `strandedness` and `topology`, including `not_asserted` when the
   producer has not modeled a physical molecule;
 - zero-based, half-open feature coordinates whose sequences match the part;

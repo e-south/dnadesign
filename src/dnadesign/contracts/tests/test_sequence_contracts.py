@@ -69,6 +69,19 @@ def test_viennarna_request_surfaces_reject_unsupported_parameters(
         model.model_validate(payload)  # type: ignore[attr-defined]
 
 
+def test_viennarna_request_rejects_non_string_parameter_keys_as_validation_error() -> None:
+    with pytest.raises(PydanticValidationError, match="parameter names must be strings"):
+        SecondaryStructurePredictionRequestBackendV1.model_validate(
+            {
+                "name": "ViennaRNA",
+                "interface": "python_api",
+                "python_module": "RNA",
+                "parameters": {1: "ignored"},
+                "dna_policy": {"mode": "convert_t_to_u_for_rna_backend"},
+            }
+        )
+
+
 @pytest.mark.parametrize("temperature", [True, 0, -1.0, float("nan"), "37"])
 def test_viennarna_request_rejects_ineffective_temperature_values(temperature: object) -> None:
     with pytest.raises(PydanticValidationError, match="finite positive number"):

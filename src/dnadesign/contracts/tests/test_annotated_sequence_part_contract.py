@@ -100,3 +100,22 @@ def test_annotated_sequence_part_rejects_feature_sequence_drift() -> None:
 
     with pytest.raises(ValidationError, match="feature sequence does not match"):
         AnnotatedSequencePartV1.model_validate(payload)
+
+
+def test_annotated_sequence_part_rejects_noncanonical_lowercase_sequence() -> None:
+    payload = _payload()
+    payload["sequence"] = "aaccgg"
+    payload["sequence_digest"] = _digest("aaccgg")
+    for feature in payload["features"]:
+        feature["sequence"] = feature["sequence"].lower()
+
+    with pytest.raises(ValidationError, match="canonical uppercase"):
+        AnnotatedSequencePartV1.model_validate(payload)
+
+
+def test_annotated_sequence_part_rejects_noncanonical_lowercase_feature() -> None:
+    payload = _payload()
+    payload["features"][0]["sequence"] = "aa"
+
+    with pytest.raises(ValidationError, match="canonical uppercase"):
+        AnnotatedSequencePartV1.model_validate(payload)
