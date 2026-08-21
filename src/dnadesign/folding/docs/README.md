@@ -1,7 +1,7 @@
 ## Folding Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-09
+**Last verified:** 2026-08-21
 
 Folding is the stateless secondary-structure service for dnadesign. Use it when
 a sequence producer has already emitted a folding request or bundle and you
@@ -74,7 +74,7 @@ for ad hoc designs.
    reproducibility; use `backend.interface: cli` for a system-provided
    ViennaRNA `RNAfold` executable when a workflow explicitly needs the CLI
    interface.
-5. Emit `secondary_structure_prediction_v1.json`.
+5. Emit the backend-neutral `secondary_structure_prediction_v1.json` result.
 6. When a `sequence_evidence_map_v1` is available, enrich prediction QA with
    cross-copy predicted pairings and intended-pair recovered/missed counts.
 7. Optionally publish `viennarna_secondary_structure_svg_v1.json`, native SVG,
@@ -82,6 +82,13 @@ for ad hoc designs.
 
 Missing backends are not treated as success. Advisory requests emit
 `warning_optional_missing`; required requests fail the run.
+
+Both ViennaRNA interfaces accept only the optional `temperature_c` backend
+parameter. Unknown parameters, nonnumeric temperatures, nonfinite values, and
+nonpositive values fail request validation.
+
+ViennaRNA is the only implemented request backend. Add no plugin registry until
+a second real backend establishes a shared execution contract.
 
 ### Architecture Boundaries
 

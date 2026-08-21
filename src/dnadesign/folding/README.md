@@ -2,7 +2,11 @@
 
 Folding predicts secondary structure for assembled sequence artifacts and
 renders ViennaRNA plots for review. Producers own sequences and bundles;
-Folding owns backend preflight, prediction, parsing, and plot publication.
+Folding owns ViennaRNA preflight, prediction, parsing, and plot publication.
+The result record is backend-neutral, but the current runner is not a plugin
+framework: its only implemented backend is ViennaRNA. Its request contract
+supports only `temperature_c`; unknown parameters fail validation instead of
+being recorded without effect.
 
 ## Documentation
 
