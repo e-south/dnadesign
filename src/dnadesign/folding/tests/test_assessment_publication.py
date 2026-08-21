@@ -391,6 +391,30 @@ def test_structure_assessment_final_replay_failure_rolls_back_publication(
     assert not output.exists()
 
 
+def test_structure_assessment_final_replay_must_equal_the_verified_stage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    output = tmp_path / "assessment"
+    original_loader = assessment_api.load_published_assessment
+
+    def load_different_valid_object(output_dir: str | Path):
+        loaded = original_loader(output_dir)
+        return type(loaded)(
+            manifest=loaded.manifest,
+            request=loaded.request,
+            record=loaded.record.model_copy(update={"assessment_id": "different-assessment"}),
+        )
+
+    monkeypatch.setattr(assessment_api, "load_published_assessment", load_different_valid_object)
+
+    with pytest.raises(FoldingExecutionError, match="does not match the verified staging assessment"):
+        publish_structure_assessment(_request(), output_dir=output)
+
+    assert not output.exists()
+
+
 def test_structure_assessment_rechecks_path_identity_after_final_replay(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

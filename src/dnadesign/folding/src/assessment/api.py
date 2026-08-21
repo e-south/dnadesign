@@ -125,6 +125,8 @@ def publish_structure_assessment(
         try:
             publication.assert_published_path_identity()
             published = load_published_assessment(publication.final)
+            if published != verified_stage:
+                raise FoldingExecutionError("Published assessment does not match the verified staging assessment.")
             publication.assert_published_path_identity()
         except BaseException:
             publication.rollback()
