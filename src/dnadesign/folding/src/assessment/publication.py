@@ -29,6 +29,7 @@ from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
     SecondaryStructurePredictionV1,
 )
 
+from ..execution_metadata import prediction_command, prediction_log_paths
 from .projection import project_prediction_request
 
 _MANIFEST = "manifest.json"
@@ -172,6 +173,7 @@ def verify_publication(
         prediction=prediction,
         prediction_root=prediction_path.parent,
     )
+    _verify_prediction_execution_metadata(preflight, worker_request=worker_request, prediction=prediction)
     _verify_prediction_artifacts(prediction_path.parent, prediction)
     if (
         target_sequence.sequence.id != request.target.sequence_id
@@ -194,6 +196,68 @@ def _verify_prediction_artifacts(root: Path, prediction: SecondaryStructurePredi
     ):
         if reference is not None:
             _confined_file(root, reference, label=label)
+
+
+def _verify_prediction_execution_metadata(
+    preflight: _PreflightArtifact,
+    *,
+    worker_request: SecondaryStructurePredictionRequestV1,
+    prediction: SecondaryStructurePredictionV1,
+) -> None:
+    request_input = worker_request.input
+    observed_input = prediction.input
+    if prediction.prediction_id != worker_request.request_id or (
+        observed_input.sequence_id,
+        observed_input.sequence_sha256,
+        observed_input.alphabet,
+        observed_input.topology,
+        observed_input.length,
+    ) != (
+        request_input.sequence_id,
+        request_input.sequence_sha256,
+        request_input.alphabet,
+        request_input.topology,
+        request_input.length,
+    ):
+        raise ValueError("Assessment prediction input does not match the worker request.")
+    if preflight.status != "ok":
+        if (
+            prediction.dna_policy is not None
+            or prediction.artifacts.stdout is not None
+            or prediction.artifacts.stderr is not None
+        ):
+            raise ValueError("Assessment blocked prediction contains execution metadata.")
+        return
+    backend = prediction.backend
+    dna_policy = prediction.dna_policy
+    if backend is None or dna_policy is None:
+        raise ValueError("Assessment prediction lacks deterministic execution metadata.")
+    expected_command = prediction_command(
+        interface=worker_request.backend.interface,
+        python_module=worker_request.backend.python_module,
+        resolved_executable=preflight.backend.resolved_executable,
+        parameters=worker_request.backend.parameters,
+    )
+    expected_submitted_alphabet = (
+        "rna_surrogate" if worker_request.backend.dna_policy.mode == "convert_t_to_u_for_rna_backend" else "dna"
+    )
+    if (
+        backend.name != worker_request.backend.name
+        or backend.version != preflight.backend.version
+        or backend.command != expected_command
+        or backend.parameters != worker_request.backend.parameters
+        or dna_policy.mode != worker_request.backend.dna_policy.mode
+        or dna_policy.submitted_alphabet != expected_submitted_alphabet
+        or dna_policy.coordinates_mapped_to != worker_request.backend.dna_policy.output_coordinates
+    ):
+        raise ValueError("Assessment prediction execution metadata does not match the worker request.")
+    expected_stdout, expected_stderr = prediction_log_paths(interface=worker_request.backend.interface)
+    if (
+        prediction.artifacts.stdout != expected_stdout
+        or prediction.artifacts.stderr != expected_stderr
+        or expected_stdout == expected_stderr
+    ):
+        raise ValueError("Assessment prediction log references do not match the backend interface.")
 
 
 def _verify_preflight(
@@ -232,12 +296,16 @@ def _verify_preflight(
             raise ValueError("Assessment preflight backend name does not match the prediction.")
         if prediction.backend.version != backend.version:
             raise ValueError("Assessment preflight backend version does not match the prediction.")
-        if backend.interface == "python_api":
-            expected_command = [f"{backend.python_module}.fold_compound", "mfe"]
-            if backend.resolved_executable is not None or prediction.backend.command != expected_command:
-                raise ValueError("Assessment preflight Python backend does not match the prediction command.")
-        elif not prediction.backend.command or prediction.backend.command[0] != backend.resolved_executable:
-            raise ValueError("Assessment preflight executable does not match the prediction command.")
+        expected_command = prediction_command(
+            interface=backend.interface,
+            python_module=backend.python_module,
+            resolved_executable=backend.resolved_executable,
+            parameters=request_backend.parameters,
+        )
+        if (
+            backend.interface == "python_api" and backend.resolved_executable is not None
+        ) or prediction.backend.command != expected_command:
+            raise ValueError("Assessment preflight backend does not match the prediction command.")
         return
     if backend.available or prediction.backend is not None or preflight.status != prediction.status:
         raise ValueError("Assessment preflight blocker does not match the prediction status.")

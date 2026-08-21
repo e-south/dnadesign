@@ -174,10 +174,16 @@ def test_assessment_worker_delegates_the_only_deadline_to_its_supervisor(
         captured.update(kwargs)
 
     monkeypatch.setattr(assessment_worker, "run_prediction_request", run_prediction_request)
+    monkeypatch.setattr(
+        assessment_worker,
+        "_normalize_preflight_output_dir",
+        lambda path: captured.update(normalized_output_dir=path),
+    )
 
     assert assessment_worker.main([request_path.as_posix(), (tmp_path / "output").as_posix()]) == 0
     assert captured["request"] is request
     assert captured["backend_timeout_seconds"] is None
+    assert captured["normalized_output_dir"] == tmp_path / "output"
 
 
 def test_worker_communication_error_still_cleans_up_process_group(

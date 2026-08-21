@@ -103,7 +103,9 @@ worker-request artifacts are digest-pinned and semantically replayed against
 the high-level request. Preflight status, backend identity, version,
 availability, executable, and diagnostics must agree with the worker request
 and prediction; its output root is normalized so staged filesystem paths do
-not enter the evidence. Every referenced backend log must exist. The manifest binds
+not enter the evidence. Prediction input, parameters, full command, DNA/RNA
+projection policy, and interface-specific log names must also replay exactly.
+Every referenced backend log must exist. The manifest binds
 the request, worker request, prediction, record, target-state digest,
 target-sequence digest, and an exhaustive digest inventory of every published
 evidence file. Replay occurs while the publication transaction still owns

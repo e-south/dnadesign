@@ -148,6 +148,65 @@ def test_structure_assessment_rejects_preflight_mutation_before_publication(
     assert not output.exists()
 
 
+def test_structure_assessment_rejects_prediction_execution_metadata_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    original_run_worker = assessment_api.run_worker
+
+    def run_worker_then_mutate(
+        request_path: Path,
+        output_path: Path,
+        *,
+        timeout_seconds: float,
+    ) -> None:
+        original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
+        prediction_path = output_path / "secondary_structure_prediction_v1.json"
+        prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
+        prediction["backend"]["parameters"] = {"temperature_c": 25.0}
+        prediction_path.write_text(json.dumps(prediction, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    monkeypatch.setattr(assessment_api, "run_worker", run_worker_then_mutate)
+    output = tmp_path / "mutated-execution-metadata-assessment"
+
+    with pytest.raises(ValueError, match="execution metadata"):
+        publish_structure_assessment(_request(), output_dir=output)
+
+    assert not output.exists()
+
+
+def test_structure_assessment_rejects_prediction_log_reference_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    original_run_worker = assessment_api.run_worker
+
+    def run_worker_then_mutate(
+        request_path: Path,
+        output_path: Path,
+        *,
+        timeout_seconds: float,
+    ) -> None:
+        original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
+        prediction_path = output_path / "secondary_structure_prediction_v1.json"
+        prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
+        prediction["artifacts"] = {
+            "stdout": "folding_preflight.json",
+            "stderr": "folding_preflight.json",
+        }
+        prediction_path.write_text(json.dumps(prediction, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    monkeypatch.setattr(assessment_api, "run_worker", run_worker_then_mutate)
+    output = tmp_path / "mutated-log-reference-assessment"
+
+    with pytest.raises(ValueError, match="log references"):
+        publish_structure_assessment(_request(), output_dir=output)
+
+    assert not output.exists()
+
+
 def test_structure_assessment_publication_is_create_only(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

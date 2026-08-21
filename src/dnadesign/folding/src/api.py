@@ -39,14 +39,11 @@ from .errors import (
     FoldingLengthMismatchError,
     FoldingMalformedOutputError,
 )
+from .execution_metadata import prediction_command, prediction_log_paths
 from .rnafold import parse_rnafold_stdout
 
 _PREDICTION_FILENAME = "secondary_structure_prediction_v1.json"
 _PREFLIGHT_FILENAME = "folding_preflight.json"
-_STDOUT_FILENAME = "RNAfold.stdout.txt"
-_STDERR_FILENAME = "RNAfold.stderr.txt"
-_PYTHON_API_STDOUT_FILENAME = "ViennaRNA.python_api.stdout.txt"
-_PYTHON_API_STDERR_FILENAME = "ViennaRNA.python_api.stderr.txt"
 
 
 @dataclass(frozen=True)
@@ -277,7 +274,12 @@ def run_prediction_request(
         if request.policy.required and raise_on_required_failure:
             raise FoldingExecutionError(prediction.qa.errors[0])
         return prediction
-    command = _rnafold_cli_command(preflight.resolved_executable, parameters=request.backend.parameters)
+    command = prediction_command(
+        interface=request.backend.interface,
+        python_module=request.backend.python_module,
+        resolved_executable=preflight.resolved_executable,
+        parameters=request.backend.parameters,
+    )
     try:
         completed = subprocess.run(
             command,
@@ -372,14 +374,6 @@ def run_prediction_request(
     return prediction
 
 
-def _rnafold_cli_command(executable: Path, *, parameters: dict[str, Any]) -> list[str]:
-    command = [executable.as_posix(), "--noPS"]
-    temperature_c = parameters.get("temperature_c")
-    if temperature_c is not None:
-        command.extend(["--temp", f"{float(temperature_c):g}"])
-    return command
-
-
 def _run_python_api_prediction_request(
     request: SecondaryStructurePredictionRequestV1,
     *,
@@ -411,7 +405,12 @@ def _run_python_api_prediction_request(
             raise FoldingExecutionError(prediction.qa.errors[0])
         return prediction
 
-    command = [f"{module_name}.fold_compound", "mfe"]
+    command = prediction_command(
+        interface=request.backend.interface,
+        python_module=module_name,
+        resolved_executable=None,
+        parameters=request.backend.parameters,
+    )
     try:
         stdout = _run_python_api_mfe(
             module_name=module_name,
@@ -653,15 +652,8 @@ def _prediction_input(
 def _artifact_refs(*, interface: str):
     from dnadesign.contracts.folding.secondary_structure_prediction_v1 import SecondaryStructureArtifactsV1
 
-    if interface == "python_api":
-        return SecondaryStructureArtifactsV1(
-            stdout=_PYTHON_API_STDOUT_FILENAME,
-            stderr=_PYTHON_API_STDERR_FILENAME,
-        )
-    return SecondaryStructureArtifactsV1(
-        stdout=_STDOUT_FILENAME,
-        stderr=_STDERR_FILENAME,
-    )
+    stdout, stderr = prediction_log_paths(interface=interface)
+    return SecondaryStructureArtifactsV1(stdout=stdout, stderr=stderr)
 
 
 def _write_backend_logs(
