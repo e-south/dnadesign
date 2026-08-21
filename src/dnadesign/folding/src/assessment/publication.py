@@ -30,7 +30,7 @@ from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
     SecondaryStructureQaV1,
 )
 
-from ..errors import FoldingError
+from ..errors import FoldingError, FoldingLengthMismatchError, FoldingMalformedOutputError
 from ..execution_metadata import prediction_command, prediction_log_paths
 from ..rnafold import parse_rnafold_stdout
 from .projection import project_prediction_request
@@ -320,6 +320,13 @@ def _verify_prediction_failure(
         except FoldingError as exc:
             if failure.exception_type != type(exc).__name__ or failure.message != str(exc):
                 raise ValueError("Assessment parse-failure evidence does not match backend output.") from exc
+            if (
+                isinstance(exc, FoldingLengthMismatchError)
+                and request.policy.fail_on_length_mismatch
+                or isinstance(exc, FoldingMalformedOutputError)
+                and request.policy.fail_on_malformed_output
+            ):
+                raise ValueError("Assessment parse-failure status contradicts the persisted failure policy.") from exc
         else:
             raise ValueError("Assessment parse-failure claim contradicts successful backend output replay.")
         return

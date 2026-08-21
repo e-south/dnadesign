@@ -695,3 +695,57 @@ def test_structure_assessment_loader_requires_diagnostics_for_execution_error(
 
     with pytest.raises(ValueError, match="execution error lacks canonical diagnostic evidence"):
         load_published_assessment(output)
+
+
+def test_structure_assessment_loader_enforces_parse_failure_policy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    (tmp_path / "fake-backend/RNA.py").write_text(
+        "__version__ = 'test-1.0'\n"
+        "class Compound:\n"
+        "    def mfe(self):\n"
+        "        return '.....', -1.2\n"
+        "def fold_compound(sequence):\n"
+        "    return Compound()\n",
+        encoding="utf-8",
+    )
+    request = _request().model_copy(
+        update={"policy": _request().policy.model_copy(update={"required": False, "fail_on_length_mismatch": False})},
+    )
+    output = tmp_path / "assessment"
+    published = publish_structure_assessment(request, output_dir=output)
+    assert published.record.prediction.failure is not None
+    assert published.record.prediction.failure.kind == "output_parse_exception"
+
+    request_path = output / "assessment-request.json"
+    worker_request_path = output / "prediction/prediction-request.json"
+    record_path = output / "assessment-record.json"
+    manifest_path = output / "manifest.json"
+    request_payload = json.loads(request_path.read_text(encoding="utf-8"))
+    worker_request = json.loads(worker_request_path.read_text(encoding="utf-8"))
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    request_payload["policy"]["fail_on_length_mismatch"] = True
+    worker_request["policy"]["fail_on_length_mismatch"] = True
+    request_content = _json_content(request_payload)
+    worker_request_content = _json_content(worker_request)
+    request_digest = _content_digest(request_content)
+    worker_request_digest = _content_digest(worker_request_content)
+    record["request_digest"] = request_digest
+    record_content = _json_content(record)
+    record_digest = _content_digest(record_content)
+    request_path.write_bytes(request_content)
+    worker_request_path.write_bytes(worker_request_content)
+    record_path.write_bytes(record_content)
+    manifest["request_digest"] = request_digest
+    manifest["worker_request_digest"] = worker_request_digest
+    manifest["record_digest"] = record_digest
+    manifest["artifact_digests"]["assessment-request.json"] = request_digest
+    manifest["artifact_digests"]["prediction/prediction-request.json"] = worker_request_digest
+    manifest["artifact_digests"]["assessment-record.json"] = record_digest
+    manifest_path.write_bytes(_json_content(manifest))
+
+    with pytest.raises(ValueError, match="parse-failure status contradicts the persisted failure policy"):
+        load_published_assessment(output)
