@@ -323,6 +323,12 @@ def _verify_preflight(
     if preflight.status == "ok":
         if not backend.available or backend.version is None or prediction.backend is None:
             raise ValueError("Assessment preflight success lacks a usable prediction backend.")
+        if prediction.status not in {"ok", "error"}:
+            raise ValueError("A successful assessment preflight has an impossible prediction status.")
+        if prediction.status == "error" and (
+            not prediction.qa.errors or prediction.qa.warnings or prediction.qa.length_matches_input is not None
+        ):
+            raise ValueError("Assessment execution error lacks canonical diagnostic evidence.")
         if preflight.warnings or preflight.errors:
             raise ValueError("Assessment preflight success cannot contain warnings or errors.")
         if prediction.backend.name != backend.name:
