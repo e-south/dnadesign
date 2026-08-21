@@ -17,6 +17,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .folding import SecondaryStructurePredictionRequestV1, SecondaryStructurePredictionV1  # noqa: F401
     from .sequence import (  # noqa: F401
+        AnnotatedSequenceFeatureV1,
+        AnnotatedSequencePartV1,
+        AnnotatedSequenceSourceRefV1,
         LinearSsdnaCompositionV1,
         MsdDesignCatalogV1,
         MsdDesignReferenceV1,
@@ -37,6 +40,9 @@ if TYPE_CHECKING:
     )
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
+    "AnnotatedSequenceFeatureV1": (".sequence", "AnnotatedSequenceFeatureV1"),
+    "AnnotatedSequencePartV1": (".sequence", "AnnotatedSequencePartV1"),
+    "AnnotatedSequenceSourceRefV1": (".sequence", "AnnotatedSequenceSourceRefV1"),
     "CassetteViewsManifestV1": (".visual", "CassetteViewsManifestV1"),
     "CompositionReviewSvgV1": (".visual", "CompositionReviewSvgV1"),
     "HairpinTopologyViewV1": (".visual", "HairpinTopologyViewV1"),
@@ -57,6 +63,9 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
 }
 
 __all__ = [
+    "AnnotatedSequenceFeatureV1",
+    "AnnotatedSequencePartV1",
+    "AnnotatedSequenceSourceRefV1",
     "LinearDuplexViewV1",
     "HairpinTopologyViewV1",
     "CassetteViewsManifestV1",

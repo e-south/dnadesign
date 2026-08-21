@@ -37,6 +37,11 @@ from ..orchestration.runtime import (
 from ..orchestration.runtime import (
     preflight_from_config as _runtime_preflight_from_config,
 )
+from ..realization.annotated_parts import (
+    AnnotatedPartPlacement,
+    RealizedAnnotatedFeature,
+    place_annotated_part,
+)
 
 
 def _wrap_usr_error(
@@ -91,13 +96,16 @@ def run_from_config(
 
 
 __all__ = [
+    "AnnotatedPartPlacement",
     "JobConfig",
     "LinearSsdnaCompositionResult",
     "LinearSsdnaCompositionSummary",
     "PreflightResult",
     "RunResult",
+    "RealizedAnnotatedFeature",
     "load_job_config",
     "load_linear_ssdna_composition_config",
+    "place_annotated_part",
     "preflight_from_config",
     "publish_composition_review_svg",
     "run_from_config",

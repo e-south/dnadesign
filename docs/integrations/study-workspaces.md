@@ -18,6 +18,10 @@ identity from a directory name.
 
 ### Public integration seams
 
+- `dnadesign.contracts.sequence.AnnotatedSequencePartV1` carries one
+  digest-pinned producer-authored sequence and its nested features into
+  `dnadesign.construct.place_annotated_part()` without a producer-specific
+  runtime dependency.
 - `dnadesign.contracts.reader_records` verifies neutral Reader record
   handoffs without assigning study meaning to the measurements.
 - `dnadesign.ops.study` loads and evaluates an explicit `operations/ops.study.yaml`

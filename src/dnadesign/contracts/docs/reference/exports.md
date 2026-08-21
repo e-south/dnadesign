@@ -1,7 +1,7 @@
 # Contract Exports
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+**Last verified:** 2026-08-21
 
 `contracts` publishes shared cross-tool artifact schemas for `dnadesign`.
 
@@ -9,6 +9,9 @@
 
 Generic sequence and folding contracts:
 
+- `AnnotatedSequencePartV1`: digest-pinned sequence, physical-posture fields,
+  source references, and nested zero-based half-open features for atomic
+  placement without producer-specific imports
 - `LinearSsdnaCompositionV1`: ordered segment, annotation, repeat, and
   provenance contract for linear ssDNA products
 - `SecondaryStructurePredictionRequestV1`: backend-neutral folding request
@@ -62,3 +65,4 @@ through a provider-owned authority or fail closed.
 
 - `src/dnadesign/contracts/tests/test_visual_contracts.py`
 - `src/dnadesign/contracts/tests/test_sequence_contracts.py`
+- `src/dnadesign/contracts/tests/test_annotated_sequence_part_contract.py`
