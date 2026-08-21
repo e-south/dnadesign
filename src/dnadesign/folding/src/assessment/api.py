@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import os
 from importlib.metadata import version
 from pathlib import Path
 
@@ -30,7 +31,6 @@ from .publication import (
     _AnchoredPublicationReader,
     artifact_digests,
     content_digest,
-    load_published_assessment,
     model_json_bytes,
     verify_publication,
     write_model_json,
@@ -124,7 +124,15 @@ def publish_structure_assessment(
             )
         try:
             publication.assert_published_path_identity()
-            published = load_published_assessment(publication.final)
+            published_descriptor = publication.duplicate_published_descriptor()
+            try:
+                with _AnchoredPublicationReader.from_descriptor(published_descriptor) as published_reader:
+                    published = verify_publication(
+                        publication.final,
+                        reader=published_reader,
+                    )
+            finally:
+                os.close(published_descriptor)
             if published != verified_stage:
                 raise FoldingExecutionError("Published assessment does not match the verified staging assessment.")
             publication.assert_published_path_identity()

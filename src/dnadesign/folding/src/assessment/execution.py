@@ -13,15 +13,18 @@ from __future__ import annotations
 
 import os
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import BinaryIO
 
 from dnadesign.contracts.folding import StructureAssessmentRequestV1
 
 from ..errors import FoldingExecutionError
+from ._limits import ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES, ARTIFACT_ENTRY_COUNT_LIMIT
 from .projection import project_prediction_request, project_target_sequence
 from .publication import write_model_json
 
@@ -29,6 +32,7 @@ _PREDICTION_REQUEST = "prediction-request.json"
 _TARGET_SEQUENCE = "assessment-target-sequence.json"
 _TERMINATION_DRAIN_SECONDS = 0.5
 _WORKER_STREAM_LIMIT_BYTES = 1_048_576
+_ARTIFACT_MONITOR_INTERVAL_SECONDS = 0.05
 
 try:
     import resource
@@ -59,7 +63,11 @@ def run_worker(request_path: Path, output_path: Path, *, timeout_seconds: float)
             preexec_fn=_limit_worker_file_output if resource is not None else None,
         )
         try:
-            process.communicate(timeout=timeout_seconds)
+            _wait_with_artifact_budget(
+                process,
+                artifact_root=output_path.parent,
+                timeout_seconds=timeout_seconds,
+            )
         except subprocess.TimeoutExpired as exc:
             _terminate_worker_group(process)
             _bounded_post_kill_wait(process)
@@ -74,6 +82,55 @@ def run_worker(request_path: Path, output_path: Path, *, timeout_seconds: float)
         if process.returncode != 0:
             detail = stderr.strip() or stdout.strip() or f"worker exited with status {process.returncode}"
             raise FoldingExecutionError(f"Structure assessment worker failed: {detail}")
+
+
+def _wait_with_artifact_budget(
+    process: subprocess.Popen[bytes],
+    *,
+    artifact_root: Path,
+    timeout_seconds: float,
+) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    while process.poll() is None:
+        _enforce_artifact_budget(artifact_root)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(process.args, timeout_seconds)
+        try:
+            process.wait(timeout=min(_ARTIFACT_MONITOR_INTERVAL_SECONDS, remaining))
+        except subprocess.TimeoutExpired:
+            continue
+    _enforce_artifact_budget(artifact_root)
+
+
+def _enforce_artifact_budget(root: Path) -> None:
+    entries = 0
+    total_bytes = 0
+    pending = [root]
+    try:
+        while pending:
+            directory = pending.pop()
+            with os.scandir(directory) as children:
+                for entry in children:
+                    entries += 1
+                    if entries > ARTIFACT_ENTRY_COUNT_LIMIT:
+                        raise FoldingExecutionError(
+                            f"Structure assessment artifacts exceeded the {ARTIFACT_ENTRY_COUNT_LIMIT}-entry limit."
+                        )
+                    metadata = entry.stat(follow_symlinks=False)
+                    if entry.is_dir(follow_symlinks=False):
+                        pending.append(Path(entry.path))
+                    elif stat.S_ISREG(metadata.st_mode):
+                        total_bytes += metadata.st_size
+                        if total_bytes >= ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES:
+                            raise FoldingExecutionError(
+                                "Structure assessment artifacts exceeded the "
+                                f"{ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES}-byte aggregate limit."
+                            )
+    except FoldingExecutionError:
+        raise
+    except OSError as exc:
+        raise FoldingExecutionError("Structure assessment artifact budget could not be verified safely.") from exc
 
 
 def _limit_worker_file_output() -> None:

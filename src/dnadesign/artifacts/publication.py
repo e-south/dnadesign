@@ -639,6 +639,15 @@ class CreateOnlyDirectoryPublication:
         ):
             raise PublicationError(f"Artifact bundle path identity changed after publication: {self.final}")
 
+    def duplicate_published_descriptor(self) -> int:
+        """Return a caller-owned descriptor for this transaction's publication."""
+        if self._closed:
+            raise PublicationError("Artifact publication is already closed")
+        published_descriptor = self._published_descriptor
+        if published_descriptor is None:
+            raise PublicationError(f"Artifact bundle is not published: {self.final}")
+        return os.dup(published_descriptor)
+
     def rollback(self) -> bool:
         """Atomically hide this transaction's publication before recursive cleanup."""
 

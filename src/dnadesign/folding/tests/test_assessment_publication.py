@@ -375,15 +375,18 @@ def test_structure_assessment_final_replay_failure_rolls_back_publication(
 ) -> None:
     _install_fake_rna_module(tmp_path, monkeypatch)
     output = tmp_path / "assessment"
-    original_loader = assessment_api.load_published_assessment
+    original_verify = assessment_api.verify_publication
+    verification_count = 0
 
-    def corrupt_then_load(output_dir: str | Path):
-        root = Path(output_dir)
-        prediction = root / "prediction/secondary_structure_prediction_v2.json"
-        prediction.write_bytes(prediction.read_bytes() + b" ")
-        return original_loader(root)
+    def corrupt_then_verify(*args, **kwargs):
+        nonlocal verification_count
+        verification_count += 1
+        if verification_count == 3:
+            prediction = output / "prediction/secondary_structure_prediction_v2.json"
+            prediction.write_bytes(prediction.read_bytes() + b" ")
+        return original_verify(*args, **kwargs)
 
-    monkeypatch.setattr(assessment_api, "load_published_assessment", corrupt_then_load)
+    monkeypatch.setattr(assessment_api, "verify_publication", corrupt_then_verify)
 
     with pytest.raises(ValueError, match="prediction digest"):
         publish_structure_assessment(_request(), output_dir=output)
@@ -397,17 +400,22 @@ def test_structure_assessment_final_replay_must_equal_the_verified_stage(
 ) -> None:
     _install_fake_rna_module(tmp_path, monkeypatch)
     output = tmp_path / "assessment"
-    original_loader = assessment_api.load_published_assessment
+    original_verify = assessment_api.verify_publication
+    verification_count = 0
 
-    def load_different_valid_object(output_dir: str | Path):
-        loaded = original_loader(output_dir)
+    def verify_different_valid_object(*args, **kwargs):
+        nonlocal verification_count
+        verification_count += 1
+        loaded = original_verify(*args, **kwargs)
+        if verification_count != 3:
+            return loaded
         return type(loaded)(
             manifest=loaded.manifest,
             request=loaded.request,
             record=loaded.record.model_copy(update={"assessment_id": "different-assessment"}),
         )
 
-    monkeypatch.setattr(assessment_api, "load_published_assessment", load_different_valid_object)
+    monkeypatch.setattr(assessment_api, "verify_publication", verify_different_valid_object)
 
     with pytest.raises(FoldingExecutionError, match="does not match the verified staging assessment"):
         publish_structure_assessment(_request(), output_dir=output)
@@ -422,18 +430,47 @@ def test_structure_assessment_rechecks_path_identity_after_final_replay(
     _install_fake_rna_module(tmp_path, monkeypatch)
     output = tmp_path / "assessment"
     displaced = tmp_path / "displaced-assessment"
-    original_loader = assessment_api.load_published_assessment
+    original_verify = assessment_api.verify_publication
+    verification_count = 0
 
-    def replace_after_publication(output_dir: str | Path):
-        root = Path(output_dir)
-        root.rename(displaced)
-        shutil.copytree(displaced, root)
-        return original_loader(root)
+    def replace_after_publication(*args, **kwargs):
+        nonlocal verification_count
+        verification_count += 1
+        if verification_count == 3:
+            output.rename(displaced)
+            shutil.copytree(displaced, output)
+        return original_verify(*args, **kwargs)
 
-    monkeypatch.setattr(assessment_api, "load_published_assessment", replace_after_publication)
+    monkeypatch.setattr(assessment_api, "verify_publication", replace_after_publication)
 
     with pytest.raises(FoldingConfigError, match="path identity changed"):
         publish_structure_assessment(_request(), output_dir=output)
+
+
+def test_assessment_inventory_bounds_entry_count(tmp_path: Path) -> None:
+    root = tmp_path / "assessment"
+    root.mkdir()
+    for index in range(assessment_publication.ARTIFACT_ENTRY_COUNT_LIMIT + 1):
+        (root / f"artifact-{index:03d}").touch()
+
+    with pytest.raises(ValueError, match=rf"{assessment_publication.ARTIFACT_ENTRY_COUNT_LIMIT}-entry limit"):
+        assessment_publication.artifact_digests(root)
+
+
+def test_assessment_inventory_bounds_aggregate_bytes(tmp_path: Path) -> None:
+    root = tmp_path / "assessment"
+    root.mkdir()
+    artifact_size = 1_000_000
+    artifact_count = (assessment_publication.ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES // artifact_size) + 1
+    for index in range(artifact_count):
+        with (root / f"artifact-{index:03d}").open("wb") as handle:
+            handle.truncate(artifact_size)
+
+    with pytest.raises(
+        ValueError,
+        match=rf"{assessment_publication.ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES}-byte aggregate limit",
+    ):
+        assessment_publication.artifact_digests(root)
 
 
 def test_structure_assessment_loader_rejects_prediction_tampering(

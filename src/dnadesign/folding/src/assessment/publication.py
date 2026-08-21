@@ -39,12 +39,16 @@ from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
 from ..errors import FoldingError, FoldingLengthMismatchError, FoldingMalformedOutputError
 from ..execution_metadata import prediction_command, prediction_log_paths
 from ..rnafold import parse_rnafold_stdout
+from ._limits import (
+    ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES,
+    ARTIFACT_ENTRY_COUNT_LIMIT,
+    ARTIFACT_FILE_SIZE_LIMIT_BYTES,
+)
 from .projection import project_prediction_request
 
 _MANIFEST = "manifest.json"
 _STAGING_OWNER = ".dnadesign-publication-owner.json"
 _PREFLIGHT = "folding_preflight.json"
-_ARTIFACT_SIZE_LIMIT_BYTES = 1_048_576
 _HASH_CHUNK_BYTES = 65_536
 _OPEN_SUPPORTS_DIR_FD = os.open in os.supports_dir_fd
 
@@ -96,6 +100,7 @@ class _AnchoredInventory:
     directories: set[str]
     symbolic_links: set[str]
     special_entries: set[str]
+    total_bytes: int
 
 
 class _AnchoredPublicationReader:
@@ -175,9 +180,9 @@ class _AnchoredPublicationReader:
         if not stat.S_ISREG(metadata.st_mode):
             os.close(descriptor)
             raise ValueError(f"{label} must be a regular file.")
-        if metadata.st_size >= _ARTIFACT_SIZE_LIMIT_BYTES:
+        if metadata.st_size >= ARTIFACT_FILE_SIZE_LIMIT_BYTES:
             os.close(descriptor)
-            raise ValueError(f"{label} exceeds the {_ARTIFACT_SIZE_LIMIT_BYTES}-byte limit.")
+            raise ValueError(f"{label} exceeds the {ARTIFACT_FILE_SIZE_LIMIT_BYTES}-byte limit.")
         return descriptor
 
     def write_new_bytes(self, relative: str, content: bytes, *, label: str) -> None:
@@ -217,8 +222,8 @@ class _AnchoredPublicationReader:
         with os.fdopen(descriptor, "rb") as handle:
             while chunk := handle.read(_HASH_CHUNK_BYTES):
                 total += len(chunk)
-                if total >= _ARTIFACT_SIZE_LIMIT_BYTES:
-                    raise ValueError(f"{label} exceeds the {_ARTIFACT_SIZE_LIMIT_BYTES}-byte limit.")
+                if total >= ARTIFACT_FILE_SIZE_LIMIT_BYTES:
+                    raise ValueError(f"{label} exceeds the {ARTIFACT_FILE_SIZE_LIMIT_BYTES}-byte limit.")
                 chunks.append(chunk)
         return b"".join(chunks)
 
@@ -233,16 +238,16 @@ class _AnchoredPublicationReader:
         if not stat.S_ISREG(metadata.st_mode):
             os.close(descriptor)
             raise ValueError(f"{label} must be a regular file.")
-        if metadata.st_size >= _ARTIFACT_SIZE_LIMIT_BYTES:
+        if metadata.st_size >= ARTIFACT_FILE_SIZE_LIMIT_BYTES:
             os.close(descriptor)
-            raise ValueError(f"{label} exceeds the {_ARTIFACT_SIZE_LIMIT_BYTES}-byte limit.")
+            raise ValueError(f"{label} exceeds the {ARTIFACT_FILE_SIZE_LIMIT_BYTES}-byte limit.")
         digest = hashlib.sha256()
         total = 0
         with os.fdopen(descriptor, "rb") as handle:
             while chunk := handle.read(_HASH_CHUNK_BYTES):
                 total += len(chunk)
-                if total >= _ARTIFACT_SIZE_LIMIT_BYTES:
-                    raise ValueError(f"{label} exceeds the {_ARTIFACT_SIZE_LIMIT_BYTES}-byte limit.")
+                if total >= ARTIFACT_FILE_SIZE_LIMIT_BYTES:
+                    raise ValueError(f"{label} exceeds the {ARTIFACT_FILE_SIZE_LIMIT_BYTES}-byte limit.")
                 digest.update(chunk)
         return f"sha256:{digest.hexdigest()}"
 
@@ -252,6 +257,7 @@ class _AnchoredPublicationReader:
         directories: set[str] = set()
         symbolic_links: set[str] = set()
         special_entries: set[str] = set()
+        totals = [0, 0]
         self._inventory_directory(
             self._root_descriptor,
             PurePosixPath(),
@@ -259,12 +265,14 @@ class _AnchoredPublicationReader:
             directories=directories,
             symbolic_links=symbolic_links,
             special_entries=special_entries,
+            totals=totals,
         )
         return _AnchoredInventory(
             files=files,
             directories=directories,
             symbolic_links=symbolic_links,
             special_entries=special_entries,
+            total_bytes=totals[1],
         )
 
     def _inventory_directory(
@@ -276,6 +284,7 @@ class _AnchoredPublicationReader:
         directories: set[str],
         symbolic_links: set[str],
         special_entries: set[str],
+        totals: list[int],
     ) -> None:
         try:
             names = sorted(os.listdir(directory_descriptor))
@@ -288,6 +297,9 @@ class _AnchoredPublicationReader:
                 metadata = os.stat(name, dir_fd=directory_descriptor, follow_symlinks=False)
             except OSError as exc:
                 raise ValueError(f"Assessment artifact inventory cannot inspect: {relative}") from exc
+            totals[0] += 1
+            if totals[0] > ARTIFACT_ENTRY_COUNT_LIMIT:
+                raise ValueError(f"Assessment artifact inventory exceeds the {ARTIFACT_ENTRY_COUNT_LIMIT}-entry limit.")
             if stat.S_ISLNK(metadata.st_mode):
                 symbolic_links.add(relative)
                 continue
@@ -305,11 +317,18 @@ class _AnchoredPublicationReader:
                         directories=directories,
                         symbolic_links=symbolic_links,
                         special_entries=special_entries,
+                        totals=totals,
                     )
                 finally:
                     os.close(child_descriptor)
                 continue
             if stat.S_ISREG(metadata.st_mode):
+                totals[1] += metadata.st_size
+                if totals[1] >= ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES:
+                    raise ValueError(
+                        "Assessment artifact inventory exceeds the "
+                        f"{ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES}-byte aggregate limit."
+                    )
                 try:
                     descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_descriptor)
                 except OSError as exc:

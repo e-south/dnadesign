@@ -23,6 +23,10 @@ import dnadesign.folding.src.api as folding_api
 import dnadesign.folding.src.assessment.worker as assessment_worker
 from dnadesign.folding import FoldingExecutionError, publish_structure_assessment
 from dnadesign.folding.src.assessment import execution as assessment_execution
+from dnadesign.folding.src.assessment._limits import (
+    ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES,
+    ARTIFACT_ENTRY_COUNT_LIMIT,
+)
 from dnadesign.folding.tests._assessment_fixtures import assessment_request, cli_assessment_request
 
 
@@ -262,7 +266,7 @@ def test_assessment_worker_delegates_the_only_deadline_to_its_supervisor(
     assert captured["normalized_output_dir"] == tmp_path / "output"
 
 
-def test_worker_communication_error_still_cleans_up_process_group(
+def test_worker_artifact_budget_error_still_cleans_up_process_group(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -274,13 +278,13 @@ def test_worker_communication_error_still_cleans_up_process_group(
         stdout = None
         stderr = None
 
+        def poll(self) -> int:
+            return None
+
         def communicate(self, *, timeout: float) -> tuple[str, str]:
             del timeout
             events.append("communicate")
-            raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
-
-        def poll(self) -> int:
-            return self.returncode
+            return "", ""
 
         def kill(self) -> None:
             events.append("kill")
@@ -292,8 +296,13 @@ def test_worker_communication_error_still_cleans_up_process_group(
 
     monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: FakeProcess())
     monkeypatch.setattr(os, "killpg", lambda pid, sig: events.append(f"killpg:{pid}:{sig}"))
+    monkeypatch.setattr(
+        assessment_execution,
+        "_enforce_artifact_budget",
+        lambda _root: (_ for _ in ()).throw(FoldingExecutionError("artifact budget exceeded")),
+    )
 
-    with pytest.raises(UnicodeDecodeError):
+    with pytest.raises(FoldingExecutionError, match="artifact budget exceeded"):
         assessment_execution.run_worker(
             tmp_path / "request.json",
             tmp_path / "output.json",
@@ -301,4 +310,25 @@ def test_worker_communication_error_still_cleans_up_process_group(
         )
 
     assert f"killpg:4102:{signal.SIGKILL}" in events
-    assert "wait" in events
+    assert "communicate" in events
+
+
+def test_worker_artifact_budget_bounds_entry_count(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    artifact_root.mkdir()
+    for index in range(ARTIFACT_ENTRY_COUNT_LIMIT + 1):
+        (artifact_root / f"artifact-{index:03d}").touch()
+
+    with pytest.raises(FoldingExecutionError, match=rf"{ARTIFACT_ENTRY_COUNT_LIMIT}-entry limit"):
+        assessment_execution._enforce_artifact_budget(artifact_root)
+
+
+def test_worker_artifact_budget_bounds_aggregate_bytes(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    artifact_root.mkdir()
+    for index in range(2):
+        with (artifact_root / f"artifact-{index}").open("wb") as handle:
+            handle.truncate(ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES // 2)
+
+    with pytest.raises(FoldingExecutionError, match=rf"{ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES}-byte aggregate"):
+        assessment_execution._enforce_artifact_budget(artifact_root)
