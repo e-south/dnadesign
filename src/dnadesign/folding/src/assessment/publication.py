@@ -221,9 +221,8 @@ def _verify_preflight(
     )
     if backend.available is not expected_available:
         raise ValueError("Assessment preflight backend availability is internally inconsistent.")
-    output_dir = Path(preflight.output_dir)
-    if not output_dir.is_absolute() or output_dir.name != prediction_root.name:
-        raise ValueError("Assessment preflight output directory does not identify the worker output.")
+    if preflight.output_dir != "." or prediction_root.name != "prediction":
+        raise ValueError("Assessment preflight output directory is not the portable worker root.")
     if preflight.status == "ok":
         if not backend.available or backend.version is None or prediction.backend is None:
             raise ValueError("Assessment preflight success lacks a usable prediction backend.")

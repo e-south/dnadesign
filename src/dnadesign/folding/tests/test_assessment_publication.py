@@ -50,6 +50,8 @@ def test_structure_assessment_publication_round_trips_exact_target(
     assert published.record.prediction.status == "ok"
     assert published.record.prediction.backend is not None
     assert published.record.prediction.backend.version == "test-1.0"
+    preflight = json.loads((output / "prediction/folding_preflight.json").read_text(encoding="utf-8"))
+    assert preflight["output_dir"] == "."
 
 
 def test_structure_assessment_timeout_leaves_no_partial_publication(
