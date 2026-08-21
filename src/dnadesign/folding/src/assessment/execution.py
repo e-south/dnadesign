@@ -93,6 +93,10 @@ def run_worker(request_path: Path, output_path: Path, *, timeout_seconds: float)
         _terminate_worker_group(process)
         _bounded_post_kill_wait(process)
         raise FoldingExecutionError(f"Structure assessment timed out after {timeout_seconds:g} seconds.") from exc
+    except BaseException:
+        _terminate_worker_group(process)
+        _bounded_post_kill_wait(process)
+        raise
     _terminate_worker_group(process)
     if process.returncode != 0:
         detail = stderr.strip() or stdout.strip() or f"worker exited with status {process.returncode}"
@@ -114,6 +118,8 @@ def _bounded_post_kill_wait(process: subprocess.Popen[str]) -> None:
         process.communicate(timeout=_TERMINATION_DRAIN_SECONDS)
         return
     except subprocess.TimeoutExpired:
+        pass
+    except Exception:
         pass
     for pipe in (process.stdout, process.stderr):
         if pipe is not None:

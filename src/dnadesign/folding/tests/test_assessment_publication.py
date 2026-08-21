@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 
 import pytest
@@ -122,6 +123,27 @@ def test_structure_assessment_final_replay_failure_rolls_back_publication(
         publish_structure_assessment(_request(), output_dir=output)
 
     assert not output.exists()
+
+
+def test_structure_assessment_rechecks_path_identity_after_final_replay(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    output = tmp_path / "assessment"
+    displaced = tmp_path / "displaced-assessment"
+    original_loader = assessment_api.load_published_assessment
+
+    def replace_after_publication(output_dir: str | Path):
+        root = Path(output_dir)
+        root.rename(displaced)
+        shutil.copytree(displaced, root)
+        return original_loader(root)
+
+    monkeypatch.setattr(assessment_api, "load_published_assessment", replace_after_publication)
+
+    with pytest.raises(FoldingConfigError, match="path identity changed"):
+        publish_structure_assessment(_request(), output_dir=output)
 
 
 def test_structure_assessment_loader_rejects_prediction_tampering(

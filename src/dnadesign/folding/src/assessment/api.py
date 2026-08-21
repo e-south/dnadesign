@@ -94,6 +94,7 @@ def publish_structure_assessment(
         try:
             publication.assert_published_path_identity()
             published = load_published_assessment(publication.final)
+            publication.assert_published_path_identity()
         except BaseException:
             publication.rollback()
             raise

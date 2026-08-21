@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import signal
+import subprocess
 import time
 from pathlib import Path
 
@@ -20,6 +21,7 @@ import pytest
 
 import dnadesign.folding.src.assessment.worker as assessment_worker
 from dnadesign.folding import FoldingExecutionError, publish_structure_assessment
+from dnadesign.folding.src.assessment import execution as assessment_execution
 from dnadesign.folding.tests._assessment_fixtures import assessment_request, cli_assessment_request
 
 
@@ -176,3 +178,45 @@ def test_assessment_worker_delegates_the_only_deadline_to_its_supervisor(
     assert assessment_worker.main([request_path.as_posix(), (tmp_path / "output").as_posix()]) == 0
     assert captured["request"] is request
     assert captured["backend_timeout_seconds"] is None
+
+
+def test_worker_communication_error_still_cleans_up_process_group(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+
+    class FakeProcess:
+        pid = 4102
+        returncode = 0
+        stdout = None
+        stderr = None
+
+        def communicate(self, *, timeout: float) -> tuple[str, str]:
+            del timeout
+            events.append("communicate")
+            raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+        def poll(self) -> int:
+            return self.returncode
+
+        def kill(self) -> None:
+            events.append("kill")
+
+        def wait(self, *, timeout: float) -> int:
+            del timeout
+            events.append("wait")
+            return self.returncode
+
+    monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: FakeProcess())
+    monkeypatch.setattr(os, "killpg", lambda pid, sig: events.append(f"killpg:{pid}:{sig}"))
+
+    with pytest.raises(UnicodeDecodeError):
+        assessment_execution.run_worker(
+            tmp_path / "request.json",
+            tmp_path / "output.json",
+            timeout_seconds=1.0,
+        )
+
+    assert f"killpg:4102:{signal.SIGKILL}" in events
+    assert "wait" in events
