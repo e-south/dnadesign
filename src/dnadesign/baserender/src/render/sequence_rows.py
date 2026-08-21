@@ -788,7 +788,7 @@ def _feature_label_font_size(style: Style) -> int:
 def _span_link_label_font_size(style: Style) -> int:
     if style.font_size_span_link_label is not None:
         return int(style.font_size_span_link_label)
-    return max(6, int(style.font_size_label) - 2)
+    return max(6, int(round(style.display_font_size())))
 
 
 def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, palette: Palette, style: Style) -> None:

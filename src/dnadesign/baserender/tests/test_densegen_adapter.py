@@ -942,6 +942,50 @@ def test_densegen_fixed_element_annotations_prefer_top_lane_before_side_fallback
         plt.close(fig)
 
 
+def test_densegen_span_link_label_matches_default_sequence_typography() -> None:
+    row = {
+        "id": "row1",
+        "sequence": "AAAAATTTGGG" + ("T" * 18) + "CCCCCCAAAAA",
+        "densegen__used_tfbs_detail": [],
+        "densegen__promoter_detail": {
+            "placements": [
+                {
+                    "name": "sigma70_core",
+                    "upstream_seq": "TTTGGG",
+                    "downstream_seq": "CCCCCC",
+                    "upstream_start": 5,
+                    "downstream_start": 29,
+                    "spacer_length": 18,
+                    "variant_ids": {"up_id": "a", "down_id": "H"},
+                }
+            ]
+        },
+    }
+    adapter = DensegenTfbsAdapter(
+        columns={
+            "sequence": "sequence",
+            "annotations": "densegen__used_tfbs_detail",
+            "id": "id",
+        },
+        policies={},
+        alphabet="DNA",
+    )
+    record = adapter.apply(row, row_index=0)
+    style = resolve_style(
+        preset="presentation_default",
+        overrides={"show_reverse_complement": False, "connectors": False, "legend": False},
+    )
+
+    palette = Palette(style.palette)
+    initialize_runtime()
+    fig = render_record(record, renderer_name="sequence_rows", style=style, palette=palette)
+    try:
+        span_label = next(text for text in fig.axes[0].texts if text.get_text() == "18 bp")
+        assert float(span_label.get_fontsize()) == pytest.approx(float(style.font_size_seq))
+    finally:
+        plt.close(fig)
+
+
 def test_densegen_bottom_legend_can_be_lifted_with_vertical_align() -> None:
     row = {
         "id": "row1",

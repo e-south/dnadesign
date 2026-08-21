@@ -131,7 +131,7 @@ def validate_span_link(
         base_fs = (
             max(6, int(round(style.display_font_size())))
             if bool(style.uniform_display_font_size)
-            else int(style.font_size_span_link_label or max(6, style.font_size_label - 2))
+            else int(style.font_size_span_link_label or max(6, round(style.display_font_size())))
         )
         _text_px_width(geometry.label, style.font_label, base_fs, style.dpi)
 
@@ -153,7 +153,7 @@ def draw_span_link(
     base_fs = (
         max(6, int(round(style.display_font_size())))
         if bool(style.uniform_display_font_size)
-        else int(style.font_size_span_link_label or max(6, style.font_size_label - 2))
+        else int(style.font_size_span_link_label or max(6, round(style.display_font_size())))
     )
 
     if label:
