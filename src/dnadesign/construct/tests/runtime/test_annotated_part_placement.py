@@ -83,12 +83,42 @@ def test_construct_places_one_annotated_part_and_offsets_nested_features() -> No
     assert placed.sequence == "TTAACCGGTT"
     assert (placed.part_start, placed.part_end) == (2, 8)
     assert placed.source_part_digest == part.sequence_digest
+    assert placed.source_strandedness == part.strandedness
+    assert placed.source_topology == part.topology
     assert placed.source_refs == part.source_refs
     assert [(feature.feature_id, feature.realized_start, feature.realized_end) for feature in placed.features] == [
         ("context-5p", 2, 4),
         ("hop-core", 4, 8),
     ]
     assert placed.features[1].source_digest == part.features[1].source_digest
+
+
+def test_atomic_placement_preserves_distinct_source_molecular_postures() -> None:
+    unasserted = place_annotated_part(
+        template_id="expression-cassette",
+        template_sequence="TTTTTT",
+        part=_part(),
+        placement_kind="insert",
+        start=3,
+        end=3,
+    )
+    linear_duplex = place_annotated_part(
+        template_id="expression-cassette",
+        template_sequence="TTTTTT",
+        part=_part().model_copy(update={"strandedness": "double", "topology": "linear"}),
+        placement_kind="insert",
+        start=3,
+        end=3,
+    )
+
+    assert (unasserted.source_strandedness, unasserted.source_topology) == (
+        "not_asserted",
+        "not_asserted",
+    )
+    assert (linear_duplex.source_strandedness, linear_duplex.source_topology) == (
+        "double",
+        "linear",
+    )
 
 
 def test_reverse_complement_placement_transforms_nested_coordinates() -> None:

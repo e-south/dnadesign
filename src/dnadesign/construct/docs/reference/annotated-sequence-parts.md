@@ -25,8 +25,9 @@ The contract requires:
 
 Call `dnadesign.construct.place_annotated_part()` with an explicit linear
 template interval and orientation. The result records both source and realized
-feature coordinates. Reverse-complement placement transforms realized feature
-coordinates and sequences while retaining source coordinates and digests.
+feature coordinates, the source part's strandedness and topology, and its
+digest-pinned references. Reverse-complement placement transforms realized
+feature coordinates and sequences while retaining the complete source posture.
 
 This operation is not an assembly-readiness decision. Destination-specific
 restriction sites, homology ends, vector identity, and biological acceptance

@@ -65,6 +65,8 @@ class AnnotatedPartPlacement:
     template_sequence_digest: str
     source_part_id: str
     source_part_digest: str
+    source_strandedness: Literal["not_asserted", "single", "double"]
+    source_topology: Literal["not_asserted", "linear", "circular"]
     source_refs: tuple[AnnotatedSequenceSourceRefV1, ...]
     placement_kind: str
     orientation: str
@@ -167,6 +169,8 @@ def place_annotated_part(
         template_sequence_digest=_digest(template),
         source_part_id=part.part_id,
         source_part_digest=part.sequence_digest,
+        source_strandedness=part.strandedness,
+        source_topology=part.topology,
         source_refs=part.source_refs,
         placement_kind=placement_kind,
         orientation=orientation,
