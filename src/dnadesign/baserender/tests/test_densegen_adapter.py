@@ -973,7 +973,15 @@ def test_densegen_span_link_label_matches_default_sequence_typography() -> None:
     record = adapter.apply(row, row_index=0)
     style = resolve_style(
         preset="presentation_default",
-        overrides={"show_reverse_complement": False, "connectors": False, "legend": False},
+        overrides={
+            "show_reverse_complement": False,
+            "connectors": False,
+            "legend": False,
+            "uniform_display_font_size": False,
+            "font_size_seq": 14,
+            "font_size_label": 24,
+            "legend_font_size": 26,
+        },
     )
 
     palette = Palette(style.palette)
