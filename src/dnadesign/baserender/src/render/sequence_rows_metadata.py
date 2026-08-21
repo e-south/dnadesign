@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 import matplotlib.colors as mcolors
 
@@ -20,6 +21,51 @@ from ..config import Style
 from ..core import Record, RenderingError
 
 _ROWS = ("primary", "complement")
+
+
+@dataclass(frozen=True)
+class TerminalLabelVisibility:
+    left: bool = True
+    right: bool = True
+
+
+def terminal_label_visibility(record: Record) -> TerminalLabelVisibility:
+    """Resolve the generic terminal-label visibility contract.
+
+    The legacy right-only flag remains readable so existing serialized records
+    do not change behavior. New producers should publish the explicit mapping.
+    """
+
+    meta = record.meta
+    if not isinstance(meta, Mapping):
+        return TerminalLabelVisibility()
+
+    raw = meta.get("terminal_label_visibility")
+    legacy_right = meta.get("show_right_terminal_labels")
+    if raw is not None and legacy_right is not None:
+        raise RenderingError(
+            "record.meta must not define both terminal_label_visibility and show_right_terminal_labels"
+        )
+    if raw is None:
+        if legacy_right is None:
+            return TerminalLabelVisibility()
+        if not isinstance(legacy_right, bool):
+            raise RenderingError("record.meta.show_right_terminal_labels must be a boolean")
+        return TerminalLabelVisibility(right=legacy_right)
+
+    if not isinstance(raw, Mapping):
+        raise RenderingError("record.meta.terminal_label_visibility must be a mapping")
+    unknown = set(raw).difference({"left", "right"})
+    if unknown:
+        joined = ", ".join(sorted(str(key) for key in unknown))
+        raise RenderingError(f"record.meta.terminal_label_visibility has unknown key(s): {joined}")
+    for side in ("left", "right"):
+        if side in raw and not isinstance(raw[side], bool):
+            raise RenderingError(f"record.meta.terminal_label_visibility.{side} must be a boolean")
+    return TerminalLabelVisibility(
+        left=raw.get("left", True),
+        right=raw.get("right", True),
+    )
 
 
 def _validate_color(value: object, *, path: str) -> None:
@@ -254,6 +300,7 @@ def validate_sequence_rows_metadata(record: Record, style: Style) -> None:
     meta = record.meta
     if not isinstance(meta, Mapping):
         return
+    terminal_label_visibility(record)
     rows = _ROWS if bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"}) else ("primary",)
     highlights = _row_indices(meta, "base_highlights", rows=rows)
     dim_indices = _row_indices(meta, "dim_base_indices", rows=rows)
@@ -275,4 +322,4 @@ def validate_sequence_rows_metadata(record: Record, style: Style) -> None:
     _validate_annotation_metadata(record, style=style)
 
 
-__all__ = ["validate_sequence_rows_metadata"]
+__all__ = ["TerminalLabelVisibility", "terminal_label_visibility", "validate_sequence_rows_metadata"]

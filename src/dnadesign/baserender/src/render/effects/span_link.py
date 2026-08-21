@@ -127,6 +127,9 @@ def validate_span_link(
 ) -> None:
     _ = (record, palette)
     geometry = compute_span_link_geometry(effect, layout, style, feature_boxes)
+    shrink_to_fit = effect.params.get("shrink_label_to_fit", True)
+    if not isinstance(shrink_to_fit, bool):
+        raise RenderingError("span_link params.shrink_label_to_fit must be bool")
     if geometry.label:
         base_fs = int(style.font_size_span_link_label or max(6, style.font_size_seq))
         _text_px_width(geometry.label, style.font_label, base_fs, style.dpi)
@@ -143,15 +146,19 @@ def draw_span_link(
 ) -> None:
     geometry = compute_span_link_geometry(effect, layout, style, feature_boxes)
     x1, x2, y, label = geometry.x1, geometry.x2, geometry.y, geometry.label
-    color = "#9CA3AF"
+    color = str(style.span_link_color)
+    label_color = str(style.span_link_label_color or color)
     line_width = max(0.8, float(getattr(style, "span_link_line_width", 1.1)))
     tick_line_width = max(0.8, float(getattr(style, "span_link_tick_line_width", line_width)))
     base_fs = int(style.font_size_span_link_label or max(6, style.font_size_seq))
+    shrink_to_fit = effect.params.get("shrink_label_to_fit", True)
+    if not isinstance(shrink_to_fit, bool):
+        raise RenderingError("span_link params.shrink_label_to_fit must be bool")
 
     if label:
         label_w = _text_px_width(label, style.font_label, base_fs, style.dpi)
         avail = max(4.0, x2 - x1)
-        if label_w + 12.0 > 0.85 * avail:
+        if shrink_to_fit and label_w + 12.0 > 0.85 * avail:
             scale = (0.85 * avail) / max(1.0, label_w)
             fs = max(6, int(base_fs * min(1.0, scale)))
             label_w = _text_px_width(label, style.font_label, fs, style.dpi)
@@ -164,7 +171,17 @@ def draw_span_link(
 
         ax.plot([x1, left_end], [y, y], color=color, lw=line_width, zorder=5)
         ax.plot([right_start, x2], [y, y], color=color, lw=line_width, zorder=5)
-        ax.text(mid, y, label, ha="center", va="center", fontsize=fs, family=style.font_label, color=color, zorder=6)
+        ax.text(
+            mid,
+            y,
+            label,
+            ha="center",
+            va="center",
+            fontsize=float(fs) * float(style.figure_scale),
+            family=style.font_label,
+            color=label_color,
+            zorder=6,
+        )
     else:
         ax.plot([x1, x2], [y, y], color=color, lw=line_width, zorder=5)
 

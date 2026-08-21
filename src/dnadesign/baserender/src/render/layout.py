@@ -505,8 +505,8 @@ def compute_layout(
 
     terminal_label_dx = style.font_size_label / 72.0 * style.dpi * 0.8
     terminal_label_width = max(
-        measure_text_width_px("5'", style.font_label, style.font_size_label, style.dpi),
-        measure_text_width_px("3'", style.font_label, style.font_size_label, style.dpi),
+        measure_text_width_px("5'", style.font_mono, style.font_size_seq, style.dpi),
+        measure_text_width_px("3'", style.font_mono, style.font_size_seq, style.dpi),
     )
     row_label_width = _row_label_width_px(record, style)
     row_label_gap = max(16.0, style.font_size_label / 72.0 * style.dpi * 0.7) if row_label_width > 0 else 0.0
