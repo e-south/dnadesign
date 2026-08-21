@@ -16,8 +16,10 @@ Generic sequence and folding contracts:
   provenance contract for linear ssDNA products
 - `SecondaryStructurePredictionRequestV1`: backend-neutral folding request
   contract with explicit DNA/RNA backend policy
-- `SecondaryStructurePredictionV1`: backend-neutral folding result contract for
-  canonical component-unit secondary-structure predictions
+- `SecondaryStructurePredictionV2`: backend-neutral folding result contract for
+  canonical component-unit secondary-structure predictions, with mutually
+  exclusive structure results and typed execution-failure evidence; V1 result
+  artifacts are not accepted as V2
 - `AssessmentTargetV1`: exact producer-owned molecular state submitted for
   advisory structure assessment, including state and sequence digests,
   physical posture, and intended coordinate pairs

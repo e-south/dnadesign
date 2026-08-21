@@ -25,12 +25,12 @@ import yaml
 from pydantic import ValidationError as PydanticValidationError
 
 from dnadesign.contracts.folding import (
-    SecondaryStructureFailureKindV1,
-    SecondaryStructureFailureV1,
+    SecondaryStructureFailureKindV2,
+    SecondaryStructureFailureV2,
     SecondaryStructurePredictionRequestV1,
-    SecondaryStructurePredictionV1,
+    SecondaryStructurePredictionV2,
 )
-from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
+from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
     SecondaryStructurePredictionBackendV1,
     SecondaryStructurePredictionDnaPolicyV1,
     SecondaryStructurePredictionInputV1,
@@ -52,7 +52,7 @@ try:
 except ImportError:  # pragma: no cover - assessment execution fails closed off POSIX
     resource = None  # type: ignore[assignment]
 
-_PREDICTION_FILENAME = "secondary_structure_prediction_v1.json"
+_PREDICTION_FILENAME = "secondary_structure_prediction_v2.json"
 _PREFLIGHT_FILENAME = "folding_preflight.json"
 
 
@@ -241,7 +241,7 @@ def run_prediction_request(
     raise_on_required_failure: bool = True,
     backend_timeout_seconds: float | None = 60.0,
     deny_backend_child_processes: bool = False,
-) -> SecondaryStructurePredictionV1:
+) -> SecondaryStructurePredictionV2:
     if backend_timeout_seconds is not None and backend_timeout_seconds <= 0:
         raise FoldingConfigError("backend_timeout_seconds must be positive or None.")
     output_path = Path(output_dir).expanduser().resolve()
@@ -362,7 +362,7 @@ def run_prediction_request(
             submitted_sequence=submitted_sequence,
             input_length=assembled.length,
         )
-        prediction = SecondaryStructurePredictionV1(
+        prediction = SecondaryStructurePredictionV2(
             prediction_id=request.request_id,
             status="ok",
             input=_prediction_input(assembled, request),
@@ -412,7 +412,7 @@ def _run_python_api_prediction_request(
     submitted_alphabet: str,
     output_path: Path,
     raise_on_required_failure: bool,
-) -> SecondaryStructurePredictionV1:
+) -> SecondaryStructurePredictionV2:
     module_name = request.backend.python_module
     if module_name is None:
         _write_backend_logs(
@@ -482,7 +482,7 @@ def _run_python_api_prediction_request(
             submitted_sequence=submitted_sequence,
             input_length=assembled.length,
         )
-        prediction = SecondaryStructurePredictionV1(
+        prediction = SecondaryStructurePredictionV2(
             prediction_id=request.request_id,
             status="ok",
             input=_prediction_input(assembled, request),
@@ -574,8 +574,8 @@ def _python_api_model_details(module: Any, *, parameters: dict[str, Any]) -> obj
 def _prediction_for_preflight_blocker(
     request: SecondaryStructurePredictionRequestV1,
     preflight: FoldingPreflightResult,
-) -> SecondaryStructurePredictionV1:
-    return SecondaryStructurePredictionV1(
+) -> SecondaryStructurePredictionV2:
+    return SecondaryStructurePredictionV2(
         prediction_id=request.request_id,
         status=preflight.status,  # type: ignore[arg-type]
         input=SecondaryStructurePredictionInputV1(
@@ -601,11 +601,11 @@ def _error_prediction(
     submitted_alphabet: str,
     command: list[str],
     error: str,
-    failure_kind: SecondaryStructureFailureKindV1,
+    failure_kind: SecondaryStructureFailureKindV2,
     returncode: int | None = None,
     exception_type: str | None = None,
-) -> SecondaryStructurePredictionV1:
-    return SecondaryStructurePredictionV1(
+) -> SecondaryStructurePredictionV2:
+    return SecondaryStructurePredictionV2(
         prediction_id=request.request_id,
         status="error",
         input=_prediction_input(assembled, request),
@@ -620,7 +620,7 @@ def _error_prediction(
             submitted_alphabet=submitted_alphabet,
             coordinates_mapped_to=request.backend.dna_policy.output_coordinates,
         ),
-        failure=SecondaryStructureFailureV1(
+        failure=SecondaryStructureFailureV2(
             kind=failure_kind,
             message=error,
             returncode=returncode,
@@ -693,7 +693,7 @@ def _prediction_input(
 
 
 def _artifact_refs(*, interface: str):
-    from dnadesign.contracts.folding.secondary_structure_prediction_v1 import SecondaryStructureArtifactsV1
+    from dnadesign.contracts.folding.secondary_structure_prediction_v2 import SecondaryStructureArtifactsV1
 
     stdout, stderr = prediction_log_paths(interface=interface)
     return SecondaryStructureArtifactsV1(stdout=stdout, stderr=stderr)
@@ -751,7 +751,7 @@ def _capture_version(
     return text[0].strip() if text else "unknown"
 
 
-def _write_prediction(output_path: Path, prediction: SecondaryStructurePredictionV1) -> None:
+def _write_prediction(output_path: Path, prediction: SecondaryStructurePredictionV2) -> None:
     _write_json(output_path / _PREDICTION_FILENAME, prediction.model_dump(mode="json"))
 
 

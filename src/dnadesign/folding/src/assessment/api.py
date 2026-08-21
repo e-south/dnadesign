@@ -21,7 +21,7 @@ from dnadesign.contracts.folding import (
     StructureAssessmentRecordV1,
     StructureAssessmentRequestV1,
 )
-from dnadesign.contracts.folding.secondary_structure_prediction_v1 import SecondaryStructurePredictionV1
+from dnadesign.contracts.folding.secondary_structure_prediction_v2 import SecondaryStructurePredictionV2
 
 from ..errors import FoldingConfigError, FoldingExecutionError
 from .execution import prepare_prediction_request, run_worker
@@ -37,7 +37,7 @@ from .publication import (
 _MANIFEST = "manifest.json"
 _REQUEST = "assessment-request.json"
 _RECORD = "assessment-record.json"
-_PREDICTION = "prediction/secondary_structure_prediction_v1.json"
+_PREDICTION = "prediction/secondary_structure_prediction_v2.json"
 
 
 def publish_structure_assessment(
@@ -63,7 +63,7 @@ def publish_structure_assessment(
             raise FoldingExecutionError("Assessment target artifact changed during backend execution.")
         prediction_path = stage / _PREDICTION
         prediction_content = prediction_path.read_bytes()
-        prediction = SecondaryStructurePredictionV1.model_validate_json(prediction_content)
+        prediction = SecondaryStructurePredictionV2.model_validate_json(prediction_content)
         if request.policy.required and prediction.status != "ok":
             errors = "; ".join(prediction.qa.errors or prediction.qa.warnings)
             raise FoldingExecutionError(errors or f"Required assessment ended with status {prediction.status}.")

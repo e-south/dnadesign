@@ -36,7 +36,7 @@ module used by the uv-managed default backend.
 uv run folding preflight --request <request.yaml>
 uv run folding run --request <request.yaml>
 uv run folding plot \
-  --prediction <secondary_structure_prediction_v1.json> \
+  --prediction <secondary_structure_prediction_v2.json> \
   --assembled-sequence <assembled_sequence.json> \
   --visual-contract <sequence_evidence_map_v1.json> \
   --output-dir <viennarna-plot-dir>
@@ -76,7 +76,9 @@ for ad hoc designs.
    reproducibility; use `backend.interface: cli` for a system-provided
    ViennaRNA `RNAfold` executable when a workflow explicitly needs the CLI
    interface.
-5. Emit the backend-neutral `secondary_structure_prediction_v1.json` result.
+5. Emit the backend-neutral `secondary_structure_prediction_v2.json` result.
+   Successful records carry a structure result; execution errors carry typed
+   failure evidence. V1 prediction artifacts are not accepted by this surface.
 6. When a `sequence_evidence_map_v1` is available, enrich prediction QA with
    cross-copy predicted pairings and intended-pair recovered/missed counts.
 7. Optionally publish `viennarna_secondary_structure_svg_v1.json`, native SVG,
@@ -95,8 +97,9 @@ those facts or import the producer's domain package.
 
 The assessment runs in an isolated worker process. The policy timeout applies
 to both ViennaRNA interfaces. On POSIX systems, cleanup terminates residual
-worker-group descendants after every completion or communication failure, and
-timeout cleanup cannot wait indefinitely on inherited pipes. The worker
+worker-group descendants after every completion or communication failure.
+Kernel file limits cap each worker output stream at 1,048,576 bytes, so a noisy
+backend fails instead of filling the supervisor's memory. The worker
 disables the older low-level CLI deadline so the assessment supervisor is the
 only timeout authority. Publication is atomic and create-only. The target and
 worker-request artifacts are digest-pinned and semantically replayed against
@@ -104,7 +107,8 @@ the high-level request. Preflight status, backend identity, version,
 availability, executable, and diagnostics must agree with the worker request
 and prediction; its output root is normalized so staged filesystem paths do
 not enter the evidence. Prediction input, parameters, full command, DNA/RNA
-projection policy, and interface-specific log names must also replay exactly.
+projection policy, interface-specific log names, typed execution failures, and
+parse-failure policy must also replay exactly.
 Every referenced backend log must exist. The manifest binds
 the request, worker request, prediction, record, target-state digest,
 target-sequence digest, and an exhaustive digest inventory of every published

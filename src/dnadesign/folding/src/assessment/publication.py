@@ -24,9 +24,9 @@ from dnadesign.contracts.folding import (
     StructureAssessmentRecordV1,
     StructureAssessmentRequestV1,
 )
-from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
+from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
     SecondaryStructurePredictionRequestV1,
-    SecondaryStructurePredictionV1,
+    SecondaryStructurePredictionV2,
     SecondaryStructureQaV1,
 )
 
@@ -159,7 +159,7 @@ def verify_publication(
     request = StructureAssessmentRequestV1.model_validate_json(request_content)
     target_sequence = AssessmentTargetSequenceV1.model_validate_json(target_sequence_content)
     worker_request = SecondaryStructurePredictionRequestV1.model_validate_json(worker_request_content)
-    prediction = SecondaryStructurePredictionV1.model_validate_json(prediction_content)
+    prediction = SecondaryStructurePredictionV2.model_validate_json(prediction_content)
     preflight = _PreflightArtifact.model_validate_json(preflight_path.read_bytes())
     record = StructureAssessmentRecordV1.model_validate_json(record_content)
     if request.assessment_id != manifest.assessment_id or record.assessment_id != manifest.assessment_id:
@@ -193,7 +193,7 @@ def verify_publication(
     return PublishedStructureAssessment(manifest=manifest, request=request, record=record)
 
 
-def _verify_prediction_artifacts(root: Path, prediction: SecondaryStructurePredictionV1) -> None:
+def _verify_prediction_artifacts(root: Path, prediction: SecondaryStructurePredictionV2) -> None:
     for label, reference in (
         ("prediction stdout", prediction.artifacts.stdout),
         ("prediction stderr", prediction.artifacts.stderr),
@@ -206,7 +206,7 @@ def _verify_prediction_execution_metadata(
     preflight: _PreflightArtifact,
     *,
     worker_request: SecondaryStructurePredictionRequestV1,
-    prediction: SecondaryStructurePredictionV1,
+    prediction: SecondaryStructurePredictionV2,
 ) -> None:
     request_input = worker_request.input
     observed_input = prediction.input
@@ -268,7 +268,7 @@ def _verify_prediction_backend_output(
     root: Path,
     *,
     request: StructureAssessmentRequestV1,
-    prediction: SecondaryStructurePredictionV1,
+    prediction: SecondaryStructurePredictionV2,
 ) -> None:
     if prediction.status == "error":
         _verify_prediction_failure(root, request=request, prediction=prediction)
@@ -298,7 +298,7 @@ def _verify_prediction_failure(
     root: Path,
     *,
     request: StructureAssessmentRequestV1,
-    prediction: SecondaryStructurePredictionV1,
+    prediction: SecondaryStructurePredictionV2,
 ) -> None:
     failure = prediction.failure
     stdout_ref = prediction.artifacts.stdout
@@ -350,7 +350,7 @@ def _verify_preflight(
     preflight: _PreflightArtifact,
     *,
     worker_request: SecondaryStructurePredictionRequestV1,
-    prediction: SecondaryStructurePredictionV1,
+    prediction: SecondaryStructurePredictionV2,
     prediction_root: Path,
 ) -> None:
     if preflight.contract != "secondary_structure_folding_preflight_v1":

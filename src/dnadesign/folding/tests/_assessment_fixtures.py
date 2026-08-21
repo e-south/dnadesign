@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from dnadesign.contracts.folding import AssessmentTargetV1, StructureAssessmentPolicyV1, StructureAssessmentRequestV1
-from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
+from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
     SecondaryStructurePredictionRequestBackendV1,
     SecondaryStructurePredictionRequestDnaPolicyV1,
 )

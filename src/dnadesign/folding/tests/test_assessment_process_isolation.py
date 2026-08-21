@@ -158,6 +158,43 @@ def test_structure_assessment_python_backend_cannot_double_fork(
     assert not output.exists()
 
 
+@pytest.mark.skipif(os.name != "posix", reason="worker stream limit is kernel-enforced on POSIX")
+@pytest.mark.parametrize(("file_descriptor", "label"), [(1, "stdout"), (2, "stderr")])
+def test_structure_assessment_bounds_worker_streams(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    file_descriptor: int,
+    label: str,
+) -> None:
+    module_root = tmp_path / "fake-backend"
+    module_root.mkdir()
+    (module_root / "RNA.py").write_text(
+        "import os\n"
+        f"os.write({file_descriptor}, b'x' * {assessment_execution._WORKER_STREAM_LIMIT_BYTES + 1})\n"
+        "__version__ = 'test-1.0'\n"
+        "class Compound:\n"
+        "    def mfe(self):\n"
+        "        return '((..))', -1.2\n"
+        "def fold_compound(sequence):\n"
+        "    return Compound()\n",
+        encoding="utf-8",
+    )
+    existing = os.environ.get("PYTHONPATH", "")
+    monkeypatch.setenv(
+        "PYTHONPATH",
+        os.pathsep.join(part for part in (module_root.as_posix(), existing) if part),
+    )
+    output = tmp_path / "assessment"
+
+    with pytest.raises(FoldingExecutionError, match=rf"worker {label} exceeded.*byte limit"):
+        publish_structure_assessment(
+            assessment_request(timeout_seconds=2.0),
+            output_dir=output,
+        )
+
+    assert not output.exists()
+
+
 def test_assessment_worker_delegates_the_only_deadline_to_its_supervisor(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

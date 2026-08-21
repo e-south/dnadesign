@@ -15,7 +15,9 @@ import os
 import signal
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
+from typing import BinaryIO
 
 from dnadesign.contracts.folding import StructureAssessmentRequestV1
 
@@ -26,6 +28,12 @@ from .publication import write_model_json
 _PREDICTION_REQUEST = "prediction-request.json"
 _TARGET_SEQUENCE = "assessment-target-sequence.json"
 _TERMINATION_DRAIN_SECONDS = 0.5
+_WORKER_STREAM_LIMIT_BYTES = 1_048_576
+
+try:
+    import resource
+except ImportError:  # pragma: no cover - unavailable on non-POSIX hosts
+    resource = None  # type: ignore[assignment]
 
 
 def write_target_sequence(path: Path, request: StructureAssessmentRequestV1) -> bytes:
@@ -42,30 +50,51 @@ def run_worker(request_path: Path, output_path: Path, *, timeout_seconds: float)
         request_path.as_posix(),
         output_path.as_posix(),
     ]
-    process = subprocess.Popen(
-        command,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        start_new_session=os.name == "posix",
-    )
-    try:
-        stdout, stderr = process.communicate(timeout=timeout_seconds)
-    except subprocess.TimeoutExpired as exc:
+    with tempfile.TemporaryFile(mode="w+b") as stdout_file, tempfile.TemporaryFile(mode="w+b") as stderr_file:
+        process = subprocess.Popen(
+            command,
+            stdout=stdout_file,
+            stderr=stderr_file,
+            start_new_session=os.name == "posix",
+            preexec_fn=_limit_worker_file_output if resource is not None else None,
+        )
+        try:
+            process.communicate(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired as exc:
+            _terminate_worker_group(process)
+            _bounded_post_kill_wait(process)
+            raise FoldingExecutionError(f"Structure assessment timed out after {timeout_seconds:g} seconds.") from exc
+        except BaseException:
+            _terminate_worker_group(process)
+            _bounded_post_kill_wait(process)
+            raise
         _terminate_worker_group(process)
-        _bounded_post_kill_wait(process)
-        raise FoldingExecutionError(f"Structure assessment timed out after {timeout_seconds:g} seconds.") from exc
-    except BaseException:
-        _terminate_worker_group(process)
-        _bounded_post_kill_wait(process)
-        raise
-    _terminate_worker_group(process)
-    if process.returncode != 0:
-        detail = stderr.strip() or stdout.strip() or f"worker exited with status {process.returncode}"
-        raise FoldingExecutionError(f"Structure assessment worker failed: {detail}")
+        stdout = _read_worker_stream(stdout_file, label="stdout")
+        stderr = _read_worker_stream(stderr_file, label="stderr")
+        if process.returncode != 0:
+            detail = stderr.strip() or stdout.strip() or f"worker exited with status {process.returncode}"
+            raise FoldingExecutionError(f"Structure assessment worker failed: {detail}")
 
 
-def _terminate_worker_group(process: subprocess.Popen[str]) -> None:
+def _limit_worker_file_output() -> None:
+    if resource is None or not hasattr(resource, "RLIMIT_FSIZE"):
+        return
+    resource.setrlimit(resource.RLIMIT_FSIZE, (_WORKER_STREAM_LIMIT_BYTES, _WORKER_STREAM_LIMIT_BYTES))
+
+
+def _read_worker_stream(stream: BinaryIO, *, label: str) -> str:
+    stream.flush()
+    stream.seek(0, os.SEEK_END)
+    size = stream.tell()
+    if size >= _WORKER_STREAM_LIMIT_BYTES:
+        raise FoldingExecutionError(
+            f"Structure assessment worker {label} exceeded the {_WORKER_STREAM_LIMIT_BYTES}-byte limit."
+        )
+    stream.seek(0)
+    return stream.read().decode("utf-8", errors="replace")
+
+
+def _terminate_worker_group(process: subprocess.Popen[bytes]) -> None:
     if os.name == "posix":
         try:
             os.killpg(process.pid, signal.SIGKILL)
@@ -75,7 +104,7 @@ def _terminate_worker_group(process: subprocess.Popen[str]) -> None:
         process.kill()
 
 
-def _bounded_post_kill_wait(process: subprocess.Popen[str]) -> None:
+def _bounded_post_kill_wait(process: subprocess.Popen[bytes]) -> None:
     try:
         process.communicate(timeout=_TERMINATION_DRAIN_SECONDS)
         return

@@ -17,8 +17,8 @@ import pytest
 from pydantic import ValidationError as PydanticValidationError
 
 import dnadesign.contracts as contracts
-from dnadesign.contracts.folding import SecondaryStructurePredictionRequestV1, SecondaryStructurePredictionV1
-from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
+from dnadesign.contracts.folding import SecondaryStructurePredictionRequestV1, SecondaryStructurePredictionV2
+from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
     SecondaryStructurePredictionRequestBackendV1,
 )
 from dnadesign.contracts.sequence import (
@@ -524,10 +524,10 @@ def test_linear_ssdna_composition_contract_rejects_duplicate_segment_ids() -> No
 
 def test_secondary_structure_prediction_contract_rejects_length_mismatch() -> None:
     with pytest.raises(PydanticValidationError, match="dot_bracket length must equal input length"):
-        SecondaryStructurePredictionV1.model_validate(
+        SecondaryStructurePredictionV2.model_validate(
             {
-                "contract": "secondary_structure_prediction_v1",
-                "schema_version": 1,
+                "contract": "secondary_structure_prediction_v2",
+                "schema_version": 2,
                 "prediction_id": "demo.rnafold.canonical_component_unit",
                 "status": "ok",
                 "input": {
@@ -558,10 +558,10 @@ def test_secondary_structure_prediction_contract_rejects_length_mismatch() -> No
 
 
 def test_secondary_structure_prediction_contract_accepts_valid_pair_map() -> None:
-    prediction = SecondaryStructurePredictionV1.model_validate(
+    prediction = SecondaryStructurePredictionV2.model_validate(
         {
-            "contract": "secondary_structure_prediction_v1",
-            "schema_version": 1,
+            "contract": "secondary_structure_prediction_v2",
+            "schema_version": 2,
             "prediction_id": "demo.rnafold.canonical_component_unit",
             "status": "ok",
             "input": {

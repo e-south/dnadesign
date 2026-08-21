@@ -194,7 +194,7 @@ def test_structure_assessment_rejects_prediction_execution_metadata_mutation(
         timeout_seconds: float,
     ) -> None:
         original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
-        prediction_path = output_path / "secondary_structure_prediction_v1.json"
+        prediction_path = output_path / "secondary_structure_prediction_v2.json"
         prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
         prediction["backend"]["parameters"] = {"temperature_c": 25.0}
         prediction_path.write_text(json.dumps(prediction, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -222,7 +222,7 @@ def test_structure_assessment_rejects_prediction_log_reference_mutation(
         timeout_seconds: float,
     ) -> None:
         original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
-        prediction_path = output_path / "secondary_structure_prediction_v1.json"
+        prediction_path = output_path / "secondary_structure_prediction_v2.json"
         prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
         prediction["artifacts"] = {
             "stdout": "folding_preflight.json",
@@ -253,7 +253,7 @@ def test_structure_assessment_rejects_prediction_result_without_log_evidence(
         timeout_seconds: float,
     ) -> None:
         original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
-        prediction_path = output_path / "secondary_structure_prediction_v1.json"
+        prediction_path = output_path / "secondary_structure_prediction_v2.json"
         prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
         prediction["result"]["mfe_kcal_mol"] = -9.9
         prediction_path.write_text(json.dumps(prediction, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -289,7 +289,7 @@ def test_structure_assessment_final_replay_failure_rolls_back_publication(
 
     def corrupt_then_load(output_dir: str | Path):
         root = Path(output_dir)
-        prediction = root / "prediction/secondary_structure_prediction_v1.json"
+        prediction = root / "prediction/secondary_structure_prediction_v2.json"
         prediction.write_bytes(prediction.read_bytes() + b" ")
         return original_loader(root)
 
@@ -329,7 +329,7 @@ def test_structure_assessment_loader_rejects_prediction_tampering(
     _install_fake_rna_module(tmp_path, monkeypatch)
     output = tmp_path / "assessment"
     publish_structure_assessment(_request(), output_dir=output)
-    prediction = output / "prediction/secondary_structure_prediction_v1.json"
+    prediction = output / "prediction/secondary_structure_prediction_v2.json"
     prediction.write_bytes(prediction.read_bytes() + b" ")
 
     with pytest.raises(ValueError, match="prediction digest"):
@@ -531,7 +531,7 @@ def test_structure_assessment_loader_derives_optional_missing_status_from_policy
     output = tmp_path / "assessment"
     publish_structure_assessment(_optional_missing_request(), output_dir=output)
     preflight_path = output / "prediction/folding_preflight.json"
-    prediction_path = output / "prediction/secondary_structure_prediction_v1.json"
+    prediction_path = output / "prediction/secondary_structure_prediction_v2.json"
     record_path = output / "assessment-record.json"
     manifest_path = output / "manifest.json"
     preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
@@ -554,7 +554,7 @@ def test_structure_assessment_loader_derives_optional_missing_status_from_policy
     manifest["prediction_digest"] = prediction_digest
     manifest["record_digest"] = record_digest
     manifest["artifact_digests"]["prediction/folding_preflight.json"] = _content_digest(preflight_content)
-    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v1.json"] = prediction_digest
+    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v2.json"] = prediction_digest
     manifest["artifact_digests"]["assessment-record.json"] = record_digest
     manifest_path.write_bytes(_json_content(manifest))
 
@@ -572,7 +572,7 @@ def test_structure_assessment_loader_rejects_missing_status_after_successful_pre
     )
     output = tmp_path / "assessment"
     publish_structure_assessment(request, output_dir=output)
-    prediction_path = output / "prediction/secondary_structure_prediction_v1.json"
+    prediction_path = output / "prediction/secondary_structure_prediction_v2.json"
     record_path = output / "assessment-record.json"
     manifest_path = output / "manifest.json"
     prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
@@ -592,7 +592,7 @@ def test_structure_assessment_loader_rejects_missing_status_after_successful_pre
     record_path.write_bytes(record_content)
     manifest["prediction_digest"] = prediction_digest
     manifest["record_digest"] = record_digest
-    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v1.json"] = prediction_digest
+    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v2.json"] = prediction_digest
     manifest["artifact_digests"]["assessment-record.json"] = record_digest
     manifest_path.write_bytes(_json_content(manifest))
 
@@ -610,7 +610,7 @@ def test_structure_assessment_loader_replays_claimed_execution_failure(
     )
     output = tmp_path / "assessment"
     publish_structure_assessment(request, output_dir=output)
-    prediction_path = output / "prediction/secondary_structure_prediction_v1.json"
+    prediction_path = output / "prediction/secondary_structure_prediction_v2.json"
     record_path = output / "assessment-record.json"
     manifest_path = output / "manifest.json"
     prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
@@ -643,7 +643,7 @@ def test_structure_assessment_loader_replays_claimed_execution_failure(
     record_path.write_bytes(record_content)
     manifest["prediction_digest"] = prediction_digest
     manifest["record_digest"] = record_digest
-    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v1.json"] = prediction_digest
+    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v2.json"] = prediction_digest
     manifest["artifact_digests"]["assessment-record.json"] = record_digest
     manifest_path.write_bytes(_json_content(manifest))
 
@@ -672,7 +672,7 @@ def test_structure_assessment_loader_requires_diagnostics_for_execution_error(
     published = publish_structure_assessment(request, output_dir=output)
     assert published.record.status == "error"
 
-    prediction_path = output / "prediction/secondary_structure_prediction_v1.json"
+    prediction_path = output / "prediction/secondary_structure_prediction_v2.json"
     record_path = output / "assessment-record.json"
     manifest_path = output / "manifest.json"
     prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
@@ -689,7 +689,7 @@ def test_structure_assessment_loader_requires_diagnostics_for_execution_error(
     record_path.write_bytes(record_content)
     manifest["prediction_digest"] = prediction_digest
     manifest["record_digest"] = record_digest
-    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v1.json"] = prediction_digest
+    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v2.json"] = prediction_digest
     manifest["artifact_digests"]["assessment-record.json"] = record_digest
     manifest_path.write_bytes(_json_content(manifest))
 

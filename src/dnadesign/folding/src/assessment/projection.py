@@ -16,7 +16,7 @@ from dnadesign.contracts.folding import (
     AssessmentTargetSequenceValueV1,
     StructureAssessmentRequestV1,
 )
-from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
+from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
     SecondaryStructurePredictionRequestV1,
 )
 

@@ -22,8 +22,8 @@ from typing import Any
 from pydantic import ValidationError as PydanticValidationError
 
 from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
-from dnadesign.contracts.folding import SecondaryStructurePredictionV1
-from dnadesign.contracts.folding.secondary_structure_prediction_v1 import SecondaryStructurePairingSummaryV1
+from dnadesign.contracts.folding import SecondaryStructurePredictionV2
+from dnadesign.contracts.folding.secondary_structure_prediction_v2 import SecondaryStructurePairingSummaryV1
 from dnadesign.contracts.visual import SequenceEvidenceMapV1, ViennaRNAStructureSvgV1
 
 from .errors import FoldingConfigError, FoldingExecutionError
@@ -56,7 +56,7 @@ class _PlotSequence:
 
 
 def publish_viennarna_structure_svg(
-    prediction: SecondaryStructurePredictionV1 | str | Path,
+    prediction: SecondaryStructurePredictionV2 | str | Path,
     *,
     assembled_sequence_path: str | Path,
     visual_contract_path: str | Path | None = None,
@@ -252,11 +252,11 @@ def _verify_plot_sources(
 
 
 def enrich_prediction_pairing_qa(
-    prediction: SecondaryStructurePredictionV1 | str | Path,
+    prediction: SecondaryStructurePredictionV2 | str | Path,
     *,
     visual_contract_path: str | Path,
     output_path: str | Path | None = None,
-) -> SecondaryStructurePredictionV1:
+) -> SecondaryStructurePredictionV2:
     prediction_model, _prediction_ref, prediction_evidence = _load_prediction(prediction)
     if prediction_model.status != "ok" or prediction_model.result is None:
         raise FoldingExecutionError("Pairing QA enrichment requires an ok folding prediction.")
@@ -290,7 +290,7 @@ def enrich_prediction_pairing_qa(
     qa_payload["intended_pairings"] = [item.model_dump(mode="json") for item in intended_pairings]
     payload = prediction_model.model_dump(mode="json")
     payload["qa"] = qa_payload
-    enriched = SecondaryStructurePredictionV1.model_validate(payload)
+    enriched = SecondaryStructurePredictionV2.model_validate(payload)
     if prediction_evidence is not None:
         prediction_evidence.verify_unchanged(label="Folding prediction source")
     visual_contract_evidence.verify_unchanged(label="Sequence evidence map source")
@@ -300,9 +300,9 @@ def enrich_prediction_pairing_qa(
 
 
 def _load_prediction(
-    prediction: SecondaryStructurePredictionV1 | str | Path,
-) -> tuple[SecondaryStructurePredictionV1, str, CapturedSource | None]:
-    if isinstance(prediction, SecondaryStructurePredictionV1):
+    prediction: SecondaryStructurePredictionV2 | str | Path,
+) -> tuple[SecondaryStructurePredictionV2, str, CapturedSource | None]:
+    if isinstance(prediction, SecondaryStructurePredictionV2):
         return prediction, "in_memory", None
     evidence = CapturedSource.capture(prediction, label="Folding prediction source")
     try:
@@ -310,7 +310,7 @@ def _load_prediction(
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise FoldingConfigError(f"Invalid folding prediction JSON: {evidence.path}") from exc
     try:
-        return SecondaryStructurePredictionV1.model_validate(payload), evidence.portable_ref, evidence
+        return SecondaryStructurePredictionV2.model_validate(payload), evidence.portable_ref, evidence
     except PydanticValidationError as exc:
         raise FoldingConfigError(f"Invalid folding prediction {evidence.path}: {exc}") from exc
 

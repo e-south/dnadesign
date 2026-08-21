@@ -1,7 +1,7 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/contracts/folding/secondary_structure_prediction_v1.py
+src/dnadesign/contracts/folding/secondary_structure_prediction_v2.py
 
 Backend-neutral secondary-structure prediction contract.
 
@@ -203,7 +203,7 @@ class SecondaryStructureArtifactsV1(FoldingContractModel):
         return _not_blank(value, label="artifact ref")
 
 
-SecondaryStructureFailureKindV1 = Literal[
+SecondaryStructureFailureKindV2 = Literal[
     "backend_contract_error",
     "backend_invocation_exception",
     "backend_nonzero_exit",
@@ -212,8 +212,8 @@ SecondaryStructureFailureKindV1 = Literal[
 ]
 
 
-class SecondaryStructureFailureV1(FoldingContractModel):
-    kind: SecondaryStructureFailureKindV1
+class SecondaryStructureFailureV2(FoldingContractModel):
+    kind: SecondaryStructureFailureKindV2
     message: str
     returncode: int | None = None
     exception_type: str | None = None
@@ -231,7 +231,7 @@ class SecondaryStructureFailureV1(FoldingContractModel):
         return _not_blank(value, label="failure.exception_type")
 
     @model_validator(mode="after")
-    def _validate_shape(self) -> "SecondaryStructureFailureV1":
+    def _validate_shape(self) -> "SecondaryStructureFailureV2":
         if self.kind == "backend_nonzero_exit":
             if self.returncode in {None, 0} or self.exception_type is not None:
                 raise ValueError("backend_nonzero_exit requires one nonzero returncode only.")
@@ -248,9 +248,9 @@ class SecondaryStructureFailureV1(FoldingContractModel):
         return self
 
 
-class SecondaryStructurePredictionV1(FoldingContractModel):
-    contract: Literal["secondary_structure_prediction_v1"] = "secondary_structure_prediction_v1"
-    schema_version: Literal[1] = 1
+class SecondaryStructurePredictionV2(FoldingContractModel):
+    contract: Literal["secondary_structure_prediction_v2"] = "secondary_structure_prediction_v2"
+    schema_version: Literal[2] = 2
     prediction_id: str
     status: Literal[
         "ok",
@@ -265,7 +265,7 @@ class SecondaryStructurePredictionV1(FoldingContractModel):
     backend: SecondaryStructurePredictionBackendV1 | None = None
     dna_policy: SecondaryStructurePredictionDnaPolicyV1 | None = None
     result: SecondaryStructurePredictionResultV1 | None = None
-    failure: SecondaryStructureFailureV1 | None = None
+    failure: SecondaryStructureFailureV2 | None = None
     qa: SecondaryStructureQaV1 = Field(default_factory=SecondaryStructureQaV1)
     artifacts: SecondaryStructureArtifactsV1 = Field(default_factory=SecondaryStructureArtifactsV1)
 
@@ -275,7 +275,7 @@ class SecondaryStructurePredictionV1(FoldingContractModel):
         return _not_blank(value, label="prediction_id")
 
     @model_validator(mode="after")
-    def _validate_result(self) -> "SecondaryStructurePredictionV1":
+    def _validate_result(self) -> "SecondaryStructurePredictionV2":
         if self.status == "ok":
             if self.backend is None:
                 raise ValueError("backend is required when status='ok'.")
@@ -373,4 +373,4 @@ class SecondaryStructurePredictionRequestV1(FoldingContractModel):
         return _not_blank(value, label="request_id")
 
 
-__all__ = ["SecondaryStructurePredictionRequestV1", "SecondaryStructurePredictionV1"]
+__all__ = ["SecondaryStructurePredictionRequestV1", "SecondaryStructurePredictionV2"]

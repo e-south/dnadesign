@@ -20,12 +20,12 @@ from pathlib import Path
 import pytest
 
 from dnadesign.contracts.folding import SecondaryStructurePredictionRequestV1
-from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
+from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
     SecondaryStructurePredictionBackendV1,
     SecondaryStructurePredictionDnaPolicyV1,
     SecondaryStructurePredictionInputV1,
     SecondaryStructurePredictionResultV1,
-    SecondaryStructurePredictionV1,
+    SecondaryStructurePredictionV2,
 )
 from dnadesign.folding import (
     enrich_prediction_pairing_qa,
@@ -171,8 +171,8 @@ def _contiguous_stem_prediction(
     *,
     sequence_sha256: str = "abc",
     sequence_id: str = "demo",
-) -> SecondaryStructurePredictionV1:
-    return SecondaryStructurePredictionV1(
+) -> SecondaryStructurePredictionV2:
+    return SecondaryStructurePredictionV2(
         prediction_id=f"{sequence_id}.viennarna.canonical_component_unit",
         status="ok",
         input=SecondaryStructurePredictionInputV1(
@@ -329,7 +329,7 @@ def test_preflight_reports_optional_missing_backend_without_silent_success(tmp_p
     assert prediction.status == "warning_optional_missing"
     assert prediction.result is None
     assert "not available" in prediction.qa.warnings[0]
-    assert (tmp_path / "folding" / "secondary_structure_prediction_v1.json").is_file()
+    assert (tmp_path / "folding" / "secondary_structure_prediction_v2.json").is_file()
 
 
 def test_run_prediction_request_uses_rnafold_cli_output(tmp_path: Path) -> None:
@@ -398,7 +398,7 @@ def test_run_prediction_request_honors_declared_parse_failure_policy(
     with pytest.raises(FoldingExecutionError, match=error_match):
         run_prediction_request(request, output_dir=tmp_path / "folding")
 
-    prediction_path = tmp_path / "folding" / "secondary_structure_prediction_v1.json"
+    prediction_path = tmp_path / "folding" / "secondary_structure_prediction_v2.json"
     assert prediction_path.is_file()
     assert json.loads(prediction_path.read_text(encoding="utf-8"))["status"] == "error"
 
@@ -791,7 +791,7 @@ def test_publish_viennarna_structure_svg_rejects_source_mutation_during_svg_writ
 ) -> None:
     request = _python_api_request(tmp_path)
     run_prediction_request(request, output_dir=tmp_path / "folding")
-    prediction_path = tmp_path / "folding" / "secondary_structure_prediction_v1.json"
+    prediction_path = tmp_path / "folding" / "secondary_structure_prediction_v2.json"
     visual_contract = tmp_path / "sequence_evidence_map_v1.json"
     visual_contract.write_text(
         json.dumps(
@@ -1196,13 +1196,13 @@ def test_enrich_prediction_pairing_qa_classifies_cross_copy_and_intended_pairs(t
         submitted_sequence="GCAU",
         input_length=4,
     )
-    from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
+    from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
         SecondaryStructurePredictionBackendV1,
         SecondaryStructurePredictionDnaPolicyV1,
-        SecondaryStructurePredictionV1,
+        SecondaryStructurePredictionV2,
     )
 
-    prediction = SecondaryStructurePredictionV1(
+    prediction = SecondaryStructurePredictionV2(
         prediction_id=request.request_id,
         status="ok",
         input={
@@ -1259,7 +1259,7 @@ def test_enrich_prediction_pairing_qa_classifies_cross_copy_and_intended_pairs(t
     enriched = enrich_prediction_pairing_qa(
         prediction,
         visual_contract_path=visual_contract,
-        output_path=tmp_path / "secondary_structure_prediction_v1.json",
+        output_path=tmp_path / "secondary_structure_prediction_v2.json",
     )
 
     assert enriched.qa.pairing_summary is not None
@@ -1270,7 +1270,7 @@ def test_enrich_prediction_pairing_qa_classifies_cross_copy_and_intended_pairs(t
     assert enriched.qa.cross_copy_pairings[0]["right_index_0"] == 3
     assert enriched.qa.intended_pairings[0].pairing_id == "demo.payload_rc"
     assert enriched.qa.intended_pairings[0].status == "fully_recovered"
-    written = json.loads((tmp_path / "secondary_structure_prediction_v1.json").read_text(encoding="utf-8"))
+    written = json.loads((tmp_path / "secondary_structure_prediction_v2.json").read_text(encoding="utf-8"))
     assert written["qa"]["pairing_summary"]["cross_copy_pair_count"] == 2
 
 
@@ -1371,7 +1371,7 @@ def test_enrich_prediction_pairing_qa_extends_payload_stem_metric_through_adjace
         + "\n",
         encoding="utf-8",
     )
-    prediction = SecondaryStructurePredictionV1(
+    prediction = SecondaryStructurePredictionV2(
         prediction_id="demo.viennarna.canonical_component_unit",
         status="ok",
         input=SecondaryStructurePredictionInputV1(

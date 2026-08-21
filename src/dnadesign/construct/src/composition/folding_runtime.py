@@ -48,7 +48,7 @@ def write_folding_artifacts(artifact_bundle: Path, composed: ComposedLinearSsdna
     if prediction.status != "ok":
         return
     visual_contract_path = artifact_bundle / SEQUENCE_EVIDENCE_MAP_PATH
-    prediction_path = folding_dir / "secondary_structure_prediction_v1.json"
+    prediction_path = folding_dir / "secondary_structure_prediction_v2.json"
     try:
         folding.enrich_prediction_pairing_qa(
             prediction_path,
@@ -82,7 +82,7 @@ def folding_artifact_refs(composed: ComposedLinearSsdna) -> dict[str, str]:
         "folding_input_sequence": CANONICAL_FOLDING_SEQUENCE_PATH.as_posix(),
         "folding_preflight": "folding/folding_preflight.json",
         "folding_request": "folding/secondary_structure_prediction_request_v1.yaml",
-        "folding_prediction": "folding/secondary_structure_prediction_v1.json",
+        "folding_prediction": "folding/secondary_structure_prediction_v2.json",
     }
 
 
@@ -128,7 +128,7 @@ def _folding_request(
     backend_payload: dict[str, object] = {
         "name": backend.name,
         "interface": backend.interface,
-        "backend_contract": backend.backend_contract or "secondary_structure_prediction_v1",
+        "backend_contract": backend.backend_contract or "secondary_structure_prediction_v2",
         "parameters": backend.parameters,
         "dna_policy": {
             "mode": dna_policy.mode,

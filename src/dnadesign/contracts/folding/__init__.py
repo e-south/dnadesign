@@ -27,11 +27,11 @@ if TYPE_CHECKING:
         StructureAssessmentRecordV1,
         StructureAssessmentRequestV1,
     )
-    from .secondary_structure_prediction_v1 import (  # noqa: F401
-        SecondaryStructureFailureKindV1,
-        SecondaryStructureFailureV1,
+    from .secondary_structure_prediction_v2 import (  # noqa: F401
+        SecondaryStructureFailureKindV2,
+        SecondaryStructureFailureV2,
         SecondaryStructurePredictionRequestV1,
-        SecondaryStructurePredictionV1,
+        SecondaryStructurePredictionV2,
     )
 
 __all__ = [
@@ -41,10 +41,10 @@ __all__ = [
     "AssessmentTargetSequenceV1",
     "AssessmentTargetSequenceValueV1",
     "AssessmentTargetV1",
-    "SecondaryStructureFailureKindV1",
-    "SecondaryStructureFailureV1",
+    "SecondaryStructureFailureKindV2",
+    "SecondaryStructureFailureV2",
     "SecondaryStructurePredictionRequestV1",
-    "SecondaryStructurePredictionV1",
+    "SecondaryStructurePredictionV2",
     "StructureAssessmentPolicyV1",
     "StructureAssessmentPublicationV1",
     "StructureAssessmentRecordV1",
@@ -58,7 +58,7 @@ def __getattr__(name: str) -> Any:
     module_name = (
         ".assessment_v1"
         if name.startswith("Assessment") or name.startswith("StructureAssessment")
-        else ".secondary_structure_prediction_v1"
+        else ".secondary_structure_prediction_v2"
     )
     value = getattr(import_module(module_name, __name__), name)
     globals()[name] = value

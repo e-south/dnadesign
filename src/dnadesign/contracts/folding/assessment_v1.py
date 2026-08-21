@@ -18,10 +18,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .secondary_structure_prediction_v1 import (
+from .secondary_structure_prediction_v2 import (
     SecondaryStructurePredictionRequestBackendV1,
     SecondaryStructurePredictionRequestPolicyV1,
-    SecondaryStructurePredictionV1,
+    SecondaryStructurePredictionV2,
 )
 
 _SHA256_PATTERN = r"^sha256:[0-9a-f]{64}$"
@@ -184,7 +184,7 @@ class StructureAssessmentRecordV1(AssessmentContractModel):
     request_digest: str = Field(pattern=_SHA256_PATTERN)
     target: AssessmentTargetV1
     prediction_digest: str = Field(pattern=_SHA256_PATTERN)
-    prediction: SecondaryStructurePredictionV1
+    prediction: SecondaryStructurePredictionV2
     producer: AssessmentProducerV1
 
     @field_validator("assessment_id", "status")
@@ -221,8 +221,8 @@ class StructureAssessmentPublicationV1(AssessmentContractModel):
     target_sequence_artifact_digest: str = Field(pattern=_SHA256_PATTERN)
     worker_request_path: Literal["prediction/prediction-request.json"] = "prediction/prediction-request.json"
     worker_request_digest: str = Field(pattern=_SHA256_PATTERN)
-    prediction_path: Literal["prediction/secondary_structure_prediction_v1.json"] = (
-        "prediction/secondary_structure_prediction_v1.json"
+    prediction_path: Literal["prediction/secondary_structure_prediction_v2.json"] = (
+        "prediction/secondary_structure_prediction_v2.json"
     )
     prediction_digest: str = Field(pattern=_SHA256_PATTERN)
     record_path: Literal["assessment-record.json"] = "assessment-record.json"
