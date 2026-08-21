@@ -58,6 +58,7 @@ def publish_structure_assessment(
         low_level_path, target_content = prepare_prediction_request(stage, request)
         target_artifact_digest = content_digest(target_content)
         run_worker(low_level_path, stage / "prediction", timeout_seconds=request.policy.timeout_seconds)
+        worker_request_digest = content_digest(low_level_path.read_bytes())
         if content_digest((stage / "assessment-target-sequence.json").read_bytes()) != target_artifact_digest:
             raise FoldingExecutionError("Assessment target artifact changed during backend execution.")
         prediction_path = stage / _PREDICTION
@@ -82,6 +83,7 @@ def publish_structure_assessment(
             assessment_id=request.assessment_id,
             request_digest=request_digest,
             target_sequence_artifact_digest=target_artifact_digest,
+            worker_request_digest=worker_request_digest,
             prediction_digest=prediction_digest,
             record_digest=content_digest(record_content),
             target_state_digest=request.target.state_digest,

@@ -94,16 +94,19 @@ physical posture, and any intended coordinate pairs. Folding does not infer
 those facts or import the producer's domain package.
 
 The assessment runs in an isolated worker process. The policy timeout applies
-to both ViennaRNA interfaces; on POSIX systems, timeout cleanup terminates the
-worker process group, including an `RNAfold` child. The worker disables the
-older low-level CLI deadline so the assessment supervisor is the only timeout
-authority. Publication is atomic and create-only. The target artifact is
-digest-pinned before execution, checked again afterward, and semantically
-replayed against the request. The manifest binds the request, prediction,
-record, target-state digest, target-sequence digest, and an exhaustive digest
-inventory of every published evidence file. The verified loader rejects
-missing or extra files, byte drift, cross-record identity drift, traversal,
-symlinked paths, and non-regular filesystem entries.
+to both ViennaRNA interfaces. On POSIX systems, cleanup terminates residual
+worker-group descendants after every completion or communication failure, and
+timeout cleanup cannot wait indefinitely on inherited pipes. The worker
+disables the older low-level CLI deadline so the assessment supervisor is the
+only timeout authority. Publication is atomic and create-only. The target and
+worker-request artifacts are digest-pinned and semantically replayed against
+the high-level request. Every referenced backend log must exist. The manifest
+binds the request, worker request, prediction, record, target-state digest,
+target-sequence digest, and an exhaustive digest inventory of every published
+evidence file. Replay occurs while the publication transaction still owns
+rollback authority, with final path identity checked before and after replay.
+The verified loader rejects missing or extra files, byte drift, cross-record
+identity drift, traversal, symlinked paths, and non-regular filesystem entries.
 
 The emitted `StructureAssessmentRecordV1` always has `authority: advisory`.
 It cannot make a HOP design valid, identify an experimental construct, or

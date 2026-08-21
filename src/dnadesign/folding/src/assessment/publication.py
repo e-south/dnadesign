@@ -24,7 +24,12 @@ from dnadesign.contracts.folding import (
     StructureAssessmentRecordV1,
     StructureAssessmentRequestV1,
 )
-from dnadesign.contracts.folding.secondary_structure_prediction_v1 import SecondaryStructurePredictionV1
+from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
+    SecondaryStructurePredictionRequestV1,
+    SecondaryStructurePredictionV1,
+)
+
+from .projection import project_prediction_request
 
 _MANIFEST = "manifest.json"
 _STAGING_OWNER = ".dnadesign-publication-owner.json"
@@ -99,16 +104,20 @@ def verify_publication(
         manifest.target_sequence_path,
         label="assessment target sequence",
     )
+    worker_request_path = _confined_file(root, manifest.worker_request_path, label="assessment worker request")
     prediction_path = _confined_file(root, manifest.prediction_path, label="assessment prediction")
     record_path = _confined_file(root, manifest.record_path, label="assessment record")
     request_content = request_path.read_bytes()
     target_sequence_content = target_sequence_path.read_bytes()
+    worker_request_content = worker_request_path.read_bytes()
     prediction_content = prediction_path.read_bytes()
     record_content = record_path.read_bytes()
     if content_digest(request_content) != manifest.request_digest:
         raise ValueError("Assessment request digest does not match the publication manifest.")
     if content_digest(target_sequence_content) != manifest.target_sequence_artifact_digest:
         raise ValueError("Assessment target-sequence artifact digest does not match the publication manifest.")
+    if content_digest(worker_request_content) != manifest.worker_request_digest:
+        raise ValueError("Assessment worker-request digest does not match the publication manifest.")
     if content_digest(prediction_content) != manifest.prediction_digest:
         raise ValueError("Assessment prediction digest does not match the publication manifest.")
     if content_digest(record_content) != manifest.record_digest:
@@ -120,6 +129,7 @@ def verify_publication(
     )
     request = StructureAssessmentRequestV1.model_validate_json(request_content)
     target_sequence = AssessmentTargetSequenceV1.model_validate_json(target_sequence_content)
+    worker_request = SecondaryStructurePredictionRequestV1.model_validate_json(worker_request_content)
     prediction = SecondaryStructurePredictionV1.model_validate_json(prediction_content)
     record = StructureAssessmentRecordV1.model_validate_json(record_content)
     if request.assessment_id != manifest.assessment_id or record.assessment_id != manifest.assessment_id:
@@ -128,6 +138,9 @@ def verify_publication(
         raise ValueError("Assessment record digests do not agree with the publication manifest.")
     if record.target != request.target or record.prediction != prediction:
         raise ValueError("Assessment record does not replay its request target and prediction.")
+    if worker_request != project_prediction_request(request):
+        raise ValueError("Assessment worker request does not match its deterministic high-level projection.")
+    _verify_prediction_artifacts(prediction_path.parent, prediction)
     if (
         target_sequence.sequence.id != request.target.sequence_id
         or f"sha256:{target_sequence.sequence.sha256}" != request.target.sequence_sha256
@@ -140,6 +153,15 @@ def verify_publication(
     ):
         raise ValueError("Assessment target digests do not agree with the publication manifest.")
     return PublishedStructureAssessment(manifest=manifest, request=request, record=record)
+
+
+def _verify_prediction_artifacts(root: Path, prediction: SecondaryStructurePredictionV1) -> None:
+    for label, reference in (
+        ("prediction stdout", prediction.artifacts.stdout),
+        ("prediction stderr", prediction.artifacts.stderr),
+    ):
+        if reference is not None:
+            _confined_file(root, reference, label=label)
 
 
 def _verify_artifact_inventory(

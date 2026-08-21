@@ -259,6 +259,12 @@ def run_prediction_request(
         )
 
     if preflight.resolved_executable is None:
+        _write_backend_logs(
+            output_path,
+            interface=request.backend.interface,
+            stdout="",
+            stderr="Folding executable preflight succeeded without a resolved executable.\n",
+        )
         prediction = _error_prediction(
             request,
             assembled=assembled,
@@ -272,8 +278,6 @@ def run_prediction_request(
             raise FoldingExecutionError(prediction.qa.errors[0])
         return prediction
     command = _rnafold_cli_command(preflight.resolved_executable, parameters=request.backend.parameters)
-    stdout_path = output_path / _STDOUT_FILENAME
-    stderr_path = output_path / _STDERR_FILENAME
     try:
         completed = subprocess.run(
             command,
@@ -284,6 +288,12 @@ def run_prediction_request(
             timeout=backend_timeout_seconds,
         )
     except (OSError, subprocess.SubprocessError) as exc:
+        _write_backend_logs(
+            output_path,
+            interface=request.backend.interface,
+            stdout="",
+            stderr=f"ViennaRNA RNAfold CLI execution failed: {exc}\n",
+        )
         prediction = _error_prediction(
             request,
             assembled=assembled,
@@ -297,8 +307,12 @@ def run_prediction_request(
             raise FoldingExecutionError(prediction.qa.errors[0]) from exc
         return prediction
 
-    stdout_path.write_text(completed.stdout, encoding="utf-8")
-    stderr_path.write_text(completed.stderr, encoding="utf-8")
+    _write_backend_logs(
+        output_path,
+        interface=request.backend.interface,
+        stdout=completed.stdout,
+        stderr=completed.stderr,
+    )
     if completed.returncode != 0:
         prediction = _error_prediction(
             request,
@@ -378,6 +392,12 @@ def _run_python_api_prediction_request(
 ) -> SecondaryStructurePredictionV1:
     module_name = request.backend.python_module
     if module_name is None:
+        _write_backend_logs(
+            output_path,
+            interface=request.backend.interface,
+            stdout="",
+            stderr="Folding backend python module is not configured.\n",
+        )
         prediction = _error_prediction(
             request,
             assembled=assembled,
@@ -392,8 +412,6 @@ def _run_python_api_prediction_request(
         return prediction
 
     command = [f"{module_name}.fold_compound", "mfe"]
-    stdout_path = output_path / _PYTHON_API_STDOUT_FILENAME
-    stderr_path = output_path / _PYTHON_API_STDERR_FILENAME
     try:
         stdout = _run_python_api_mfe(
             module_name=module_name,
@@ -402,6 +420,12 @@ def _run_python_api_prediction_request(
             parameters=request.backend.parameters,
         )
     except (FoldingError, ImportError, AttributeError, TypeError, ValueError) as exc:
+        _write_backend_logs(
+            output_path,
+            interface=request.backend.interface,
+            stdout="",
+            stderr=f"ViennaRNA Python API execution failed: {exc}\n",
+        )
         prediction = _error_prediction(
             request,
             assembled=assembled,
@@ -415,8 +439,12 @@ def _run_python_api_prediction_request(
             raise FoldingExecutionError(prediction.qa.errors[0]) from exc
         return prediction
 
-    stdout_path.write_text(stdout, encoding="utf-8")
-    stderr_path.write_text("", encoding="utf-8")
+    _write_backend_logs(
+        output_path,
+        interface=request.backend.interface,
+        stdout=stdout,
+        stderr="",
+    )
     try:
         result = parse_rnafold_stdout(
             stdout=stdout,
@@ -634,6 +662,20 @@ def _artifact_refs(*, interface: str):
         stdout=_STDOUT_FILENAME,
         stderr=_STDERR_FILENAME,
     )
+
+
+def _write_backend_logs(
+    output_path: Path,
+    *,
+    interface: str,
+    stdout: str,
+    stderr: str,
+) -> None:
+    artifacts = _artifact_refs(interface=interface)
+    if artifacts.stdout is None or artifacts.stderr is None:
+        raise FoldingExecutionError("Folding backend log references are incomplete.")
+    (output_path / artifacts.stdout).write_text(stdout, encoding="utf-8")
+    (output_path / artifacts.stderr).write_text(stderr, encoding="utf-8")
 
 
 def _resolve_executable(executable: str) -> Path | None:

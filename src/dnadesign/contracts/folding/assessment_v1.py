@@ -219,6 +219,8 @@ class StructureAssessmentPublicationV1(AssessmentContractModel):
     request_digest: str = Field(pattern=_SHA256_PATTERN)
     target_sequence_path: Literal["assessment-target-sequence.json"] = "assessment-target-sequence.json"
     target_sequence_artifact_digest: str = Field(pattern=_SHA256_PATTERN)
+    worker_request_path: Literal["prediction/prediction-request.json"] = "prediction/prediction-request.json"
+    worker_request_digest: str = Field(pattern=_SHA256_PATTERN)
     prediction_path: Literal["prediction/secondary_structure_prediction_v1.json"] = (
         "prediction/secondary_structure_prediction_v1.json"
     )
@@ -256,6 +258,7 @@ class StructureAssessmentPublicationV1(AssessmentContractModel):
         named_artifacts = {
             self.request_path: self.request_digest,
             self.target_sequence_path: self.target_sequence_artifact_digest,
+            self.worker_request_path: self.worker_request_digest,
             self.prediction_path: self.prediction_digest,
             self.record_path: self.record_digest,
         }

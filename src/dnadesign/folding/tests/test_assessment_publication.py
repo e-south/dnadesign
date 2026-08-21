@@ -91,6 +91,33 @@ def test_structure_assessment_rejects_backend_target_mutation_before_publication
     assert not output.exists()
 
 
+def test_structure_assessment_rejects_worker_request_mutation_before_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    original_run_worker = assessment_api.run_worker
+
+    def run_worker_then_mutate(
+        request_path: Path,
+        output_path: Path,
+        *,
+        timeout_seconds: float,
+    ) -> None:
+        original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+        request["policy"]["required"] = False
+        request_path.write_text(json.dumps(request, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    monkeypatch.setattr(assessment_api, "run_worker", run_worker_then_mutate)
+    output = tmp_path / "mutated-request-assessment"
+
+    with pytest.raises(ValueError, match="worker request does not match"):
+        publish_structure_assessment(_request(), output_dir=output)
+
+    assert not output.exists()
+
+
 def test_structure_assessment_publication_is_create_only(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
