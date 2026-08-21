@@ -31,6 +31,7 @@ from .publication import write_model_json
 
 _PREDICTION_REQUEST = "prediction-request.json"
 _TARGET_SEQUENCE = "assessment-target-sequence.json"
+_TERMINATION_DRAIN_SECONDS = 0.5
 
 
 def prediction_request(request: StructureAssessmentRequestV1) -> SecondaryStructurePredictionRequestV1:
@@ -89,15 +90,39 @@ def run_worker(request_path: Path, output_path: Path, *, timeout_seconds: float)
     try:
         stdout, stderr = process.communicate(timeout=timeout_seconds)
     except subprocess.TimeoutExpired as exc:
-        if os.name == "posix":
-            os.killpg(process.pid, signal.SIGKILL)
-        else:
-            process.kill()
-        process.communicate()
+        _terminate_worker_group(process)
+        _bounded_post_kill_wait(process)
         raise FoldingExecutionError(f"Structure assessment timed out after {timeout_seconds:g} seconds.") from exc
+    _terminate_worker_group(process)
     if process.returncode != 0:
         detail = stderr.strip() or stdout.strip() or f"worker exited with status {process.returncode}"
         raise FoldingExecutionError(f"Structure assessment worker failed: {detail}")
+
+
+def _terminate_worker_group(process: subprocess.Popen[str]) -> None:
+    if os.name == "posix":
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    elif process.poll() is None:
+        process.kill()
+
+
+def _bounded_post_kill_wait(process: subprocess.Popen[str]) -> None:
+    try:
+        process.communicate(timeout=_TERMINATION_DRAIN_SECONDS)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    for pipe in (process.stdout, process.stderr):
+        if pipe is not None:
+            pipe.close()
+    try:
+        process.wait(timeout=_TERMINATION_DRAIN_SECONDS)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=_TERMINATION_DRAIN_SECONDS)
 
 
 def prepare_prediction_request(stage: Path, request: StructureAssessmentRequestV1) -> tuple[Path, bytes]:

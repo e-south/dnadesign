@@ -46,6 +46,7 @@ def publish_structure_assessment(
     output_dir: str | Path,
 ) -> PublishedStructureAssessment:
     """Run one isolated assessment and atomically publish its evidence."""
+    published: PublishedStructureAssessment | None = None
     try:
         publication = CreateOnlyDirectoryPublication.prepare(output_dir)
     except PublicationError as exc:
@@ -90,11 +91,19 @@ def publish_structure_assessment(
         write_model_json(stage / _MANIFEST, manifest)
         verify_publication(stage, allow_staging_owner=True)
         publication.publish(required_manifest=_MANIFEST)
+        try:
+            publication.assert_published_path_identity()
+            published = load_published_assessment(publication.final)
+        except BaseException:
+            publication.rollback()
+            raise
     except PublicationError as exc:
         raise FoldingConfigError(str(exc)) from exc
     finally:
         publication.close()
-    return load_published_assessment(output_dir)
+    if published is None:
+        raise FoldingExecutionError("Assessment publication completed without verified output.")
+    return published
 
 
 __all__ = ["publish_structure_assessment"]
