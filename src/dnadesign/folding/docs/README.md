@@ -113,7 +113,9 @@ parse-failure policy must also replay exactly.
 Every referenced backend log must exist. The manifest binds
 the request, worker request, prediction, record, target-state digest,
 target-sequence digest, and an exhaustive digest inventory of every published
-evidence file. Replay occurs while the publication transaction still owns
+evidence file. Inventory rejects links and non-regular entries before opening
+them, caps each artifact at 1,048,576 bytes, and hashes regular files in bounded
+chunks. Replay occurs while the publication transaction still owns
 rollback authority, with final path identity checked before and after replay.
 The verified loader rejects missing or extra files, byte drift, cross-record
 identity drift, transaction-private metadata, traversal, symlinked paths, and

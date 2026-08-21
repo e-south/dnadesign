@@ -152,6 +152,34 @@ def test_structure_assessment_rejects_worker_request_mutation_before_publication
     assert not output.exists()
 
 
+def test_structure_assessment_rejects_staged_symlink_before_hashing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    outside = tmp_path / "large-outside-artifact"
+    with outside.open("wb") as handle:
+        handle.truncate(4 * 1024 * 1024 * 1024)
+    original_run_worker = assessment_api.run_worker
+
+    def run_worker_then_link(
+        request_path: Path,
+        output_path: Path,
+        *,
+        timeout_seconds: float,
+    ) -> None:
+        original_run_worker(request_path, output_path, timeout_seconds=timeout_seconds)
+        (output_path / "backend-extra").symlink_to(outside)
+
+    monkeypatch.setattr(assessment_api, "run_worker", run_worker_then_link)
+    output = tmp_path / "linked-artifact-assessment"
+
+    with pytest.raises(ValueError, match="artifact inventory cannot use a symbolic link"):
+        publish_structure_assessment(_request(), output_dir=output)
+
+    assert not output.exists()
+
+
 def test_structure_assessment_rejects_preflight_mutation_before_publication(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

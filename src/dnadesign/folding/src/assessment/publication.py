@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import stat
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
@@ -38,6 +39,8 @@ from .projection import project_prediction_request
 _MANIFEST = "manifest.json"
 _STAGING_OWNER = ".dnadesign-publication-owner.json"
 _PREFLIGHT = "folding_preflight.json"
+_ARTIFACT_SIZE_LIMIT_BYTES = 1_048_576
+_HASH_CHUNK_BYTES = 65_536
 
 
 class _PreflightContractModel(BaseModel):
@@ -92,11 +95,32 @@ def write_model_json(path: Path, model: BaseModel) -> bytes:
 
 def artifact_digests(root: Path) -> dict[str, str]:
     """Inventory every non-manifest file in one staged publication."""
-    return {
-        path.relative_to(root).as_posix(): content_digest(path.read_bytes())
-        for path in sorted(root.rglob("*"))
-        if path.is_file() and path.relative_to(root).as_posix() not in {_MANIFEST, _STAGING_OWNER}
-    }
+    digests: dict[str, str] = {}
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).as_posix()
+        if path.is_symlink():
+            raise ValueError(f"Assessment artifact inventory cannot use a symbolic link: {relative}")
+        if path.is_dir() or relative in {_MANIFEST, _STAGING_OWNER}:
+            continue
+        digests[relative] = _file_content_digest(path, label=f"assessment artifact {relative}")
+    return digests
+
+
+def _file_content_digest(path: Path, *, label: str) -> str:
+    metadata = path.stat(follow_symlinks=False)
+    if not stat.S_ISREG(metadata.st_mode):
+        raise ValueError(f"{label} must be a regular file.")
+    if metadata.st_size >= _ARTIFACT_SIZE_LIMIT_BYTES:
+        raise ValueError(f"{label} exceeds the {_ARTIFACT_SIZE_LIMIT_BYTES}-byte limit.")
+    digest = hashlib.sha256()
+    total = 0
+    with path.open("rb") as handle:
+        while chunk := handle.read(_HASH_CHUNK_BYTES):
+            total += len(chunk)
+            if total >= _ARTIFACT_SIZE_LIMIT_BYTES:
+                raise ValueError(f"{label} exceeds the {_ARTIFACT_SIZE_LIMIT_BYTES}-byte limit.")
+            digest.update(chunk)
+    return f"sha256:{digest.hexdigest()}"
 
 
 def _confined_file(root: Path, relative: str, *, label: str) -> Path:
@@ -115,6 +139,11 @@ def _confined_file(root: Path, relative: str, *, label: str) -> Path:
         raise ValueError(f"{label} escapes the assessment publication.") from exc
     if not resolved.is_file():
         raise ValueError(f"{label} is missing.")
+    metadata = resolved.stat(follow_symlinks=False)
+    if not stat.S_ISREG(metadata.st_mode):
+        raise ValueError(f"{label} must be a regular file.")
+    if metadata.st_size >= _ARTIFACT_SIZE_LIMIT_BYTES:
+        raise ValueError(f"{label} exceeds the {_ARTIFACT_SIZE_LIMIT_BYTES}-byte limit.")
     return resolved
 
 
@@ -441,7 +470,7 @@ def _verify_artifact_inventory(
         if path.is_dir():
             actual_directories.add(relative)
         elif path.is_file() and relative != _MANIFEST:
-            actual_files[relative] = content_digest(path.read_bytes())
+            actual_files[relative] = _file_content_digest(path, label=f"assessment artifact {relative}")
         elif relative != _MANIFEST:
             raise ValueError(f"Assessment artifact inventory contains an unsupported filesystem entry: {relative}")
     expected_directories = {
