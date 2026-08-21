@@ -1,4 +1,13 @@
-"""Deterministic execution metadata shared by folding writers and replay."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/folding/src/execution_metadata.py
+
+Deterministic execution metadata shared by folding writers and replay.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
