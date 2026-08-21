@@ -702,8 +702,7 @@ def _deny_process_creation() -> None:
         raise FoldingConfigError("Kernel no-fork containment is unavailable for this assessment backend.")
     if hasattr(os, "geteuid") and os.geteuid() == 0:
         raise FoldingConfigError("Kernel no-fork containment is not enforceable for a root assessment process.")
-    _, hard_limit = resource.getrlimit(resource.RLIMIT_NPROC)
-    resource.setrlimit(resource.RLIMIT_NPROC, (0, hard_limit))
+    resource.setrlimit(resource.RLIMIT_NPROC, (0, 0))
 
 
 def _capture_version(
