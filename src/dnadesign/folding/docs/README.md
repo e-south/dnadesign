@@ -18,6 +18,8 @@ module used by the uv-managed default backend.
   `secondary_structure_prediction_request_v1` file.
 - **Plot an existing prediction:** use `plot` with a prediction, assembled
   sequence, and optional `sequence_evidence_map_v1`.
+- **Publish an assessment:** use the public Python API when a producer needs a
+  replayable advisory record tied to an exact molecular-state digest.
 - **Understand contracts:** read the contract flow below before adding a new
   producer or backend.
 
@@ -83,6 +85,32 @@ for ad hoc designs.
 Missing backends are not treated as success. Advisory requests emit
 `warning_optional_missing`; required requests fail the run.
 
+### Advisory Assessment Records
+
+`publish_structure_assessment()` accepts a strict
+`StructureAssessmentRequestV1`. Its `AssessmentTargetV1` names the source
+state type, schema, identifier, state digest, exact DNA sequence and digest,
+physical posture, and any intended coordinate pairs. Folding does not infer
+those facts or import the producer's domain package.
+
+The assessment runs in an isolated worker process. The policy timeout applies
+to both ViennaRNA interfaces; on POSIX systems, timeout cleanup terminates the
+worker process group, including an `RNAfold` child. Publication is atomic and
+create-only. Its manifest binds the request, prediction, record, target-state
+digest, target-sequence digest, and an exhaustive digest inventory of every
+published evidence file. The verified loader rejects missing or extra files,
+byte drift, cross-record identity drift, traversal, and symlinked paths.
+
+The emitted `StructureAssessmentRecordV1` always has `authority: advisory`.
+It cannot make a HOP design valid, identify an experimental construct, or
+establish that a sequence is physically ready for assembly. The low-level
+`linear_ssdna` value passed to ViennaRNA is a computational projection; the
+assessment target preserves the caller-declared strandedness and topology.
+
+The assessment API currently has no CLI route. Add one only when a concrete
+operator workflow needs it; the typed Python surface and persisted record are
+the present consumer boundary.
+
 Both ViennaRNA interfaces accept only the optional `temperature_c` backend
 parameter. Unknown parameters, nonnumeric temperatures, nonfinite values, and
 nonpositive values fail request validation.
@@ -93,6 +121,8 @@ a second real backend establishes a shared execution contract.
 ### Architecture Boundaries
 
 - Folding consumes assembled sequence artifacts and typed folding requests.
+- Folding assesses an exact caller-owned state without taking authority over
+  that state or its scientific acceptance policy.
 - Folding does not assemble sequences, resolve Cruncher candidates, or own
   workspaces.
 - Folding may publish ViennaRNA-native structure SVGs from successful
@@ -104,6 +134,8 @@ a second real backend establishes a shared execution contract.
 
 - `src/api.py` owns request loading, backend preflight, ViennaRNA Python API or
   `RNAfold` CLI execution, and backend-neutral prediction emission.
+- `src/assessment/` owns target projection, worker isolation, create-only
+  assessment publication, and verified replay.
 - `src/pairing_qa.py` owns intended-vs-predicted and cross-copy pairing
   summaries.
 - `src/viennarna_plot.py` coordinates native ViennaRNA SVG publication.

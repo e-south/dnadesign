@@ -21,6 +21,11 @@ if TYPE_CHECKING:
         preflight_request,
         run_prediction_request,
     )
+    from .assessment import (  # noqa: F401
+        PublishedStructureAssessment,
+        load_published_assessment,
+        publish_structure_assessment,
+    )
     from .errors import FoldingConfigError, FoldingError, FoldingExecutionError  # noqa: F401
     from .rnafold import parse_rnafold_stdout  # noqa: F401
     from .viennarna_plot import (  # noqa: F401
@@ -33,11 +38,14 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "FoldingError": (".errors", "FoldingError"),
     "FoldingExecutionError": (".errors", "FoldingExecutionError"),
     "FoldingPreflightResult": (".api", "FoldingPreflightResult"),
+    "PublishedStructureAssessment": (".assessment", "PublishedStructureAssessment"),
     "enrich_prediction_pairing_qa": (".viennarna_plot", "enrich_prediction_pairing_qa"),
     "load_prediction_request": (".api", "load_prediction_request"),
+    "load_published_assessment": (".assessment", "load_published_assessment"),
     "parse_rnafold_stdout": (".rnafold", "parse_rnafold_stdout"),
     "preflight_request": (".api", "preflight_request"),
     "publish_viennarna_structure_svg": (".viennarna_plot", "publish_viennarna_structure_svg"),
+    "publish_structure_assessment": (".assessment", "publish_structure_assessment"),
     "run_prediction_request": (".api", "run_prediction_request"),
 }
 
