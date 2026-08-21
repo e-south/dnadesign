@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import shutil
 import stat
 from pathlib import Path
 
@@ -105,6 +106,25 @@ def test_private_sensitivity_keeps_the_complete_published_tree_owner_only(tmp_pa
     for path in (bundle, *bundle.rglob("*")):
         expected = 0o700 if path.is_dir() else 0o600
         assert stat.S_IMODE(path.stat().st_mode) == expected, path
+
+
+def test_publication_copies_the_prepared_stage_descriptor_after_path_replacement(tmp_path: Path) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    displaced_stage = publication.stage.with_name(f"{publication.stage.name}-displaced")
+    try:
+        (publication.stage / "manifest.json").write_text("original\n", encoding="utf-8")
+        publication.stage.rename(displaced_stage)
+        publication.stage.mkdir(mode=0o700)
+        (publication.stage / "manifest.json").write_text("replacement\n", encoding="utf-8")
+
+        publication.publish(required_manifest="manifest.json")
+    finally:
+        publication.close()
+        shutil.rmtree(publication.stage, ignore_errors=True)
+        shutil.rmtree(displaced_stage, ignore_errors=True)
+
+    assert (bundle / "manifest.json").read_text(encoding="utf-8") == "original\n"
 
 
 def test_published_path_identity_rejects_a_replacement_directory(tmp_path: Path) -> None:

@@ -31,6 +31,7 @@ from .publication import (
     artifact_digests,
     content_digest,
     load_published_assessment,
+    model_json_bytes,
     verify_publication,
     write_model_json,
 )
@@ -58,7 +59,7 @@ def publish_structure_assessment(
         request_digest = content_digest(request_content)
         low_level_path, target_content = prepare_prediction_request(stage, request)
         target_artifact_digest = content_digest(target_content)
-        with _AnchoredPublicationReader(stage) as reader:
+        with _AnchoredPublicationReader.from_descriptor(publication.stage_descriptor) as reader:
             run_worker(low_level_path, stage / "prediction", timeout_seconds=request.policy.timeout_seconds)
             worker_request_content = reader.read_bytes(
                 "prediction/prediction-request.json",
@@ -89,22 +90,24 @@ def publish_structure_assessment(
                 prediction=prediction,
                 producer=AssessmentProducerV1(version=version("dnadesign")),
             )
-            record_content = write_model_json(stage / _RECORD, record)
+            record_content = model_json_bytes(record)
+            reader.write_new_bytes(_RECORD, record_content, label="assessment record")
             inventory = artifact_digests(stage, reader=reader)
-        manifest = StructureAssessmentPublicationV1(
-            assessment_id=request.assessment_id,
-            request_digest=request_digest,
-            target_sequence_artifact_digest=target_artifact_digest,
-            worker_request_digest=worker_request_digest,
-            prediction_digest=prediction_digest,
-            record_digest=content_digest(record_content),
-            target_state_digest=request.target.state_digest,
-            target_sequence_sha256=request.target.sequence_sha256,
-            artifact_digests=inventory,
-        )
-        write_model_json(stage / _MANIFEST, manifest)
-        verify_publication(stage, allow_staging_owner=True)
-        publication.publish(required_manifest=_MANIFEST)
+            manifest = StructureAssessmentPublicationV1(
+                assessment_id=request.assessment_id,
+                request_digest=request_digest,
+                target_sequence_artifact_digest=target_artifact_digest,
+                worker_request_digest=worker_request_digest,
+                prediction_digest=prediction_digest,
+                record_digest=content_digest(record_content),
+                target_state_digest=request.target.state_digest,
+                target_sequence_sha256=request.target.sequence_sha256,
+                artifact_digests=inventory,
+            )
+            manifest_content = model_json_bytes(manifest)
+            reader.write_new_bytes(_MANIFEST, manifest_content, label="assessment manifest")
+            verify_publication(stage, allow_staging_owner=True, reader=reader)
+            publication.publish(required_manifest=_MANIFEST)
         try:
             publication.assert_published_path_identity()
             published = load_published_assessment(publication.final)

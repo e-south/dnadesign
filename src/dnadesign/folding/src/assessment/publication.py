@@ -16,6 +16,7 @@ import json
 import os
 import stat
 import sys
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
@@ -123,6 +124,16 @@ class _AnchoredPublicationReader:
             raise ValueError("Assessment publication root must be a directory.")
         self._root_descriptor = descriptor
 
+    @classmethod
+    def from_descriptor(cls, descriptor: int) -> _AnchoredPublicationReader:
+        """Duplicate an already anchored publication-root descriptor."""
+        instance = cls.__new__(cls)
+        instance._root_descriptor = os.dup(descriptor)
+        if not stat.S_ISDIR(os.fstat(instance._root_descriptor).st_mode):
+            os.close(instance._root_descriptor)
+            raise ValueError("Assessment publication root descriptor must name a directory.")
+        return instance
+
     def close(self) -> None:
         if self._root_descriptor >= 0:
             os.close(self._root_descriptor)
@@ -168,6 +179,31 @@ class _AnchoredPublicationReader:
             os.close(descriptor)
             raise ValueError(f"{label} exceeds the {_ARTIFACT_SIZE_LIMIT_BYTES}-byte limit.")
         return descriptor
+
+    def write_new_bytes(self, relative: str, content: bytes, *, label: str) -> None:
+        """Create one new regular file below the anchored root."""
+        relative_path = PurePosixPath(relative)
+        if relative_path.is_absolute() or not relative_path.parts or ".." in relative_path.parts:
+            raise ValueError(f"{label} must stay inside the assessment publication.")
+        directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        current_descriptor = os.dup(self._root_descriptor)
+        try:
+            for part in relative_path.parts[:-1]:
+                next_descriptor = os.open(part, directory_flags, dir_fd=current_descriptor)
+                os.close(current_descriptor)
+                current_descriptor = next_descriptor
+            descriptor = os.open(
+                relative_path.parts[-1],
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                0o600,
+                dir_fd=current_descriptor,
+            )
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(content)
+        except OSError as exc:
+            raise ValueError(f"{label} cannot be created safely in the assessment publication.") from exc
+        finally:
+            os.close(current_descriptor)
 
     def read_bytes(self, relative: str, *, label: str) -> bytes:
         """Read bounded bytes from the same descriptor that was validated."""
@@ -332,30 +368,32 @@ def verify_publication(
     root: Path,
     *,
     allow_staging_owner: bool = False,
+    reader: _AnchoredPublicationReader | None = None,
 ) -> PublishedStructureAssessment:
     """Replay all byte and cross-object invariants in one publication."""
     if ".." in root.parts:
         raise ValueError("Assessment publication root cannot use parent traversal.")
     root = root if root.is_absolute() else Path.cwd() / root
-    with _AnchoredPublicationReader(root) as reader:
-        manifest_content = reader.read_bytes(_MANIFEST, label="assessment manifest")
+    reader_context = _AnchoredPublicationReader(root) if reader is None else nullcontext(reader)
+    with reader_context as active_reader:
+        manifest_content = active_reader.read_bytes(_MANIFEST, label="assessment manifest")
         manifest = StructureAssessmentPublicationV1.model_validate_json(manifest_content)
-        request_content = reader.read_bytes(manifest.request_path, label="assessment request")
-        target_sequence_content = reader.read_bytes(
+        request_content = active_reader.read_bytes(manifest.request_path, label="assessment request")
+        target_sequence_content = active_reader.read_bytes(
             manifest.target_sequence_path,
             label="assessment target sequence",
         )
-        worker_request_content = reader.read_bytes(
+        worker_request_content = active_reader.read_bytes(
             manifest.worker_request_path,
             label="assessment worker request",
         )
-        prediction_content = reader.read_bytes(manifest.prediction_path, label="assessment prediction")
+        prediction_content = active_reader.read_bytes(manifest.prediction_path, label="assessment prediction")
         prediction_root = PurePosixPath(manifest.prediction_path).parent
-        preflight_content = reader.read_bytes(
+        preflight_content = active_reader.read_bytes(
             (prediction_root / _PREFLIGHT).as_posix(),
             label="assessment preflight",
         )
-        record_content = reader.read_bytes(manifest.record_path, label="assessment record")
+        record_content = active_reader.read_bytes(manifest.record_path, label="assessment record")
         if content_digest(request_content) != manifest.request_digest:
             raise ValueError("Assessment request digest does not match the publication manifest.")
         if content_digest(target_sequence_content) != manifest.target_sequence_artifact_digest:
@@ -368,7 +406,7 @@ def verify_publication(
             raise ValueError("Assessment record digest does not match the publication manifest.")
         _verify_artifact_inventory(
             root,
-            reader,
+            active_reader,
             manifest.artifact_digests,
             allow_staging_owner=allow_staging_owner,
         )
@@ -393,8 +431,8 @@ def verify_publication(
             prediction_root=prediction_root,
         )
         _verify_prediction_execution_metadata(preflight, worker_request=worker_request, prediction=prediction)
-        _verify_prediction_artifacts(reader, prediction_root, prediction)
-        _verify_prediction_backend_output(reader, prediction_root, request=request, prediction=prediction)
+        _verify_prediction_artifacts(active_reader, prediction_root, prediction)
+        _verify_prediction_backend_output(active_reader, prediction_root, request=request, prediction=prediction)
         if (
             target_sequence.sequence.id != request.target.sequence_id
             or f"sha256:{target_sequence.sequence.sha256}" != request.target.sequence_sha256
