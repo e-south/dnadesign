@@ -165,9 +165,9 @@ def preflight_request(
             )
         try:
             module = importlib.import_module(module_name)
-        except ImportError as exc:
+        except ImportError:
             status = "blocker_required_missing" if request.policy.required else "warning_optional_missing"
-            message = f"Folding backend Python module '{module_name}' is not available: {exc}"
+            message = f"Folding backend Python module '{module_name}' is not available."
             return FoldingPreflightResult(
                 status=status,
                 backend_name=request.backend.name,

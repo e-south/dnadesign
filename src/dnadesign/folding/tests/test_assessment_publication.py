@@ -497,6 +497,42 @@ def test_structure_assessment_loader_rejects_symlinked_nested_directory(
         load_published_assessment(output)
 
 
+def test_structure_assessment_loader_anchors_every_publication_root_component(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    published_parent = tmp_path / "published-parent"
+    replacement_parent = tmp_path / "replacement-parent"
+    output = published_parent / "assessment"
+    publish_structure_assessment(_request(), output_dir=output)
+    publish_structure_assessment(_request(), output_dir=replacement_parent / "assessment")
+    retained_parent = tmp_path / "retained-parent"
+    original_open = assessment_publication.os.open
+    swapped = False
+
+    def open_after_ancestor_swap(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal swapped
+        if path == published_parent.name and dir_fd is not None and not swapped:
+            published_parent.rename(retained_parent)
+            published_parent.symlink_to(replacement_parent, target_is_directory=True)
+            swapped = True
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(assessment_publication.os, "open", open_after_ancestor_swap)
+
+    with pytest.raises(ValueError, match="publication root is missing or unsafe"):
+        load_published_assessment(output)
+
+    assert swapped
+
+
 def test_structure_assessment_loader_reads_and_validates_one_anchored_descriptor(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -685,6 +721,40 @@ def test_structure_assessment_loader_rejects_derived_qa_when_backend_did_not_run
         load_published_assessment(output)
 
 
+def test_structure_assessment_loader_derives_missing_backend_diagnostic_from_request(tmp_path: Path) -> None:
+    output = tmp_path / "assessment"
+    publish_structure_assessment(_optional_missing_request(), output_dir=output)
+    preflight_path = output / "prediction/folding_preflight.json"
+    prediction_path = output / "prediction/secondary_structure_prediction_v2.json"
+    record_path = output / "assessment-record.json"
+    manifest_path = output / "manifest.json"
+    preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
+    prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    preflight["warnings"] = []
+    prediction["qa"]["warnings"] = []
+    record["prediction"] = prediction
+    preflight_content = _json_content(preflight)
+    prediction_content = _json_content(prediction)
+    prediction_digest = _content_digest(prediction_content)
+    record["prediction_digest"] = prediction_digest
+    record_content = _json_content(record)
+    record_digest = _content_digest(record_content)
+    preflight_path.write_bytes(preflight_content)
+    prediction_path.write_bytes(prediction_content)
+    record_path.write_bytes(record_content)
+    manifest["prediction_digest"] = prediction_digest
+    manifest["record_digest"] = record_digest
+    manifest["artifact_digests"]["prediction/folding_preflight.json"] = _content_digest(preflight_content)
+    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v2.json"] = prediction_digest
+    manifest["artifact_digests"]["assessment-record.json"] = record_digest
+    manifest_path.write_bytes(_json_content(manifest))
+
+    with pytest.raises(ValueError, match="derived QA without backend execution"):
+        load_published_assessment(output)
+
+
 def test_structure_assessment_loader_rejects_missing_status_after_successful_preflight(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -803,6 +873,59 @@ def test_structure_assessment_loader_requires_diagnostics_for_execution_error(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     prediction["qa"]["errors"] = []
     record["prediction"]["qa"]["errors"] = []
+    prediction_content = _json_content(prediction)
+    prediction_digest = _content_digest(prediction_content)
+    record["prediction_digest"] = prediction_digest
+    record_content = _json_content(record)
+    record_digest = _content_digest(record_content)
+    prediction_path.write_bytes(prediction_content)
+    record_path.write_bytes(record_content)
+    manifest["prediction_digest"] = prediction_digest
+    manifest["record_digest"] = record_digest
+    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v2.json"] = prediction_digest
+    manifest["artifact_digests"]["assessment-record.json"] = record_digest
+    manifest_path.write_bytes(_json_content(manifest))
+
+    with pytest.raises(ValueError, match="execution error lacks canonical diagnostic evidence"):
+        load_published_assessment(output)
+
+
+def test_structure_assessment_loader_rejects_derived_qa_for_execution_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    (tmp_path / "fake-backend/RNA.py").write_text(
+        "__version__ = 'test-1.0'\n"
+        "class Compound:\n"
+        "    def mfe(self):\n"
+        "        return '.....', -1.2\n"
+        "def fold_compound(sequence):\n"
+        "    return Compound()\n",
+        encoding="utf-8",
+    )
+    request = _request().model_copy(
+        update={"policy": _request().policy.model_copy(update={"required": False, "fail_on_length_mismatch": False})},
+    )
+    output = tmp_path / "assessment"
+    published = publish_structure_assessment(request, output_dir=output)
+    assert published.record.status == "error"
+
+    prediction_path = output / "prediction/secondary_structure_prediction_v2.json"
+    record_path = output / "assessment-record.json"
+    manifest_path = output / "manifest.json"
+    prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    prediction["qa"]["pairing_summary"] = {
+        "predicted_pair_count": 0,
+        "cross_copy_pair_count": 0,
+        "intended_pairing_count": 0,
+        "intended_recovered_count": 0,
+        "intended_partially_recovered_count": 0,
+        "intended_missed_count": 0,
+    }
+    record["prediction"] = prediction
     prediction_content = _json_content(prediction)
     prediction_digest = _content_digest(prediction_content)
     record["prediction_digest"] = prediction_digest

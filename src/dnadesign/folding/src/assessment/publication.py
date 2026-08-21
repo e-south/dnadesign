@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import stat
+import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
@@ -44,6 +45,16 @@ _STAGING_OWNER = ".dnadesign-publication-owner.json"
 _PREFLIGHT = "folding_preflight.json"
 _ARTIFACT_SIZE_LIMIT_BYTES = 1_048_576
 _HASH_CHUNK_BYTES = 65_536
+_OPEN_SUPPORTS_DIR_FD = os.open in os.supports_dir_fd
+
+
+def _filesystem_root_parts(path: Path) -> tuple[str, ...]:
+    parts = path.parts[1:]
+    # Darwin exposes these fixed root aliases as symlinks. Expand the known
+    # mapping lexically so later user-writable components still open no-follow.
+    if sys.platform == "darwin" and parts and parts[0] in {"etc", "tmp", "var"}:
+        return ("private", *parts)
+    return parts
 
 
 class _PreflightContractModel(BaseModel):
@@ -82,16 +93,27 @@ class _AnchoredPublicationReader:
     """Read publication files through one no-follow root descriptor."""
 
     def __init__(self, root: Path) -> None:
-        if not hasattr(os, "O_DIRECTORY") or not hasattr(os, "O_NOFOLLOW") or os.open not in os.supports_dir_fd:
+        if not hasattr(os, "O_DIRECTORY") or not hasattr(os, "O_NOFOLLOW") or not _OPEN_SUPPORTS_DIR_FD:
             raise ValueError("Descriptor-anchored assessment reads are unavailable on this platform.")
+        if ".." in root.parts:
+            raise ValueError("Assessment publication root cannot use parent traversal.")
+        absolute_root = root if root.is_absolute() else Path.cwd() / root
         flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        descriptor = -1
         try:
-            self._root_descriptor = os.open(root, flags)
+            descriptor = os.open(absolute_root.anchor, flags)
+            for part in _filesystem_root_parts(absolute_root):
+                next_descriptor = os.open(part, flags, dir_fd=descriptor)
+                os.close(descriptor)
+                descriptor = next_descriptor
         except OSError as exc:
+            if descriptor >= 0:
+                os.close(descriptor)
             raise ValueError("Assessment publication root is missing or unsafe.") from exc
-        if not stat.S_ISDIR(os.fstat(self._root_descriptor).st_mode):
-            os.close(self._root_descriptor)
+        if not stat.S_ISDIR(os.fstat(descriptor).st_mode):
+            os.close(descriptor)
             raise ValueError("Assessment publication root must be a directory.")
+        self._root_descriptor = descriptor
 
     def close(self) -> None:
         if self._root_descriptor >= 0:
@@ -204,6 +226,9 @@ def verify_publication(
     allow_staging_owner: bool = False,
 ) -> PublishedStructureAssessment:
     """Replay all byte and cross-object invariants in one publication."""
+    if ".." in root.parts:
+        raise ValueError("Assessment publication root cannot use parent traversal.")
+    root = root if root.is_absolute() else Path.cwd() / root
     with _AnchoredPublicationReader(root) as reader:
         manifest_content = reader.read_bytes(_MANIFEST, label="assessment manifest")
         manifest = StructureAssessmentPublicationV1.model_validate_json(manifest_content)
@@ -329,8 +354,8 @@ def _verify_prediction_execution_metadata(
             raise ValueError("Assessment blocked prediction contains execution metadata.")
         expected_qa = SecondaryStructureQaV1(
             length_matches_input=None,
-            warnings=preflight.warnings,
-            errors=preflight.errors,
+            warnings=[] if worker_request.policy.required else [_missing_backend_diagnostic(worker_request)],
+            errors=[_missing_backend_diagnostic(worker_request)] if worker_request.policy.required else [],
         )
         if prediction.qa != expected_qa:
             raise ValueError("Assessment blocked prediction contains derived QA without backend execution.")
@@ -365,6 +390,17 @@ def _verify_prediction_execution_metadata(
         or expected_stdout == expected_stderr
     ):
         raise ValueError("Assessment prediction log references do not match the backend interface.")
+
+
+def _missing_backend_diagnostic(worker_request: SecondaryStructurePredictionRequestV1) -> str:
+    backend = worker_request.backend
+    if backend.interface == "python_api":
+        if backend.python_module is None:
+            return "Folding backend python module is not configured."
+        return f"Folding backend Python module '{backend.python_module}' is not available."
+    if backend.executable is None:
+        return "Folding backend executable is not configured."
+    return f"Folding backend '{backend.executable}' is not available."
 
 
 def _verify_prediction_backend_output(
@@ -499,13 +535,13 @@ def _verify_preflight(
             raise ValueError("Assessment preflight success lacks a usable prediction backend.")
         if prediction.status not in {"ok", "error"}:
             raise ValueError("A successful assessment preflight has an impossible prediction status.")
-        if prediction.status == "error" and (
-            prediction.failure is None
-            or prediction.qa.errors != [prediction.failure.message]
-            or prediction.qa.warnings
-            or prediction.qa.length_matches_input is not None
-        ):
-            raise ValueError("Assessment execution error lacks canonical diagnostic evidence.")
+        if prediction.status == "error":
+            failure = prediction.failure
+            if failure is None or prediction.qa != SecondaryStructureQaV1(
+                length_matches_input=None,
+                errors=[failure.message],
+            ):
+                raise ValueError("Assessment execution error lacks canonical diagnostic evidence.")
         if preflight.warnings or preflight.errors:
             raise ValueError("Assessment preflight success cannot contain warnings or errors.")
         if prediction.backend.name != backend.name:
@@ -584,15 +620,7 @@ def load_published_assessment(output_dir: str | Path) -> PublishedStructureAsses
         raise ValueError("Assessment publication directory cannot use parent traversal.")
     if not path.is_absolute():
         path = Path.cwd() / path
-    current = Path(path.anchor)
-    for part in path.parts[1:]:
-        current /= part
-        if current.is_symlink():
-            raise ValueError(f"Assessment publication directory cannot use a symbolic link: {current}")
-    root = path.resolve()
-    if not root.is_dir():
-        raise ValueError("Assessment publication directory is missing.")
-    return verify_publication(root)
+    return verify_publication(path)
 
 
 __all__ = ["PublishedStructureAssessment", "artifact_digests", "load_published_assessment"]
