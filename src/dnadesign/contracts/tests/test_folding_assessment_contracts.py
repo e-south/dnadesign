@@ -91,6 +91,45 @@ def test_failed_prediction_rejects_attached_structure_result() -> None:
                     "topology": "linear_ssdna",
                     "length": 6,
                 },
+                "failure": {
+                    "kind": "backend_exception",
+                    "message": "backend failed",
+                    "exception_type": "RuntimeError",
+                },
                 "result": {"dot_bracket": "......"},
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    ("failure", "match"),
+    [
+        (
+            {"kind": "backend_nonzero_exit", "message": "failed", "returncode": 0},
+            "nonzero returncode",
+        ),
+        (
+            {"kind": "backend_exception", "message": "failed"},
+            "exception_type",
+        ),
+    ],
+)
+def test_failed_prediction_requires_kind_specific_evidence(
+    failure: dict[str, object],
+    match: str,
+) -> None:
+    with pytest.raises(ValidationError, match=match):
+        SecondaryStructurePredictionV1.model_validate(
+            {
+                "prediction_id": "failed-prediction",
+                "status": "error",
+                "input": {
+                    "sequence_id": "example",
+                    "sequence_sha256": "sha256:" + "1" * 64,
+                    "alphabet": "dna",
+                    "topology": "linear_ssdna",
+                    "length": 6,
+                },
+                "failure": failure,
             }
         )

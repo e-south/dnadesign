@@ -600,6 +600,57 @@ def test_structure_assessment_loader_rejects_missing_status_after_successful_pre
         load_published_assessment(output)
 
 
+def test_structure_assessment_loader_replays_claimed_execution_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    request = _request().model_copy(
+        update={"policy": _request().policy.model_copy(update={"required": False})},
+    )
+    output = tmp_path / "assessment"
+    publish_structure_assessment(request, output_dir=output)
+    prediction_path = output / "prediction/secondary_structure_prediction_v1.json"
+    record_path = output / "assessment-record.json"
+    manifest_path = output / "manifest.json"
+    prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    prediction["status"] = "error"
+    prediction["result"] = None
+    prediction["failure"] = {
+        "kind": "output_parse_exception",
+        "message": "fabricated parse failure",
+        "exception_type": "FoldingMalformedOutputError",
+        "returncode": None,
+    }
+    prediction["qa"] = {
+        "cross_copy_pairings": [],
+        "errors": ["fabricated parse failure"],
+        "intended_pairings": [],
+        "length_matches_input": None,
+        "pairing_summary": None,
+        "warnings": [],
+    }
+    record["status"] = "error"
+    record["prediction"] = prediction
+    prediction_content = _json_content(prediction)
+    prediction_digest = _content_digest(prediction_content)
+    record["prediction_digest"] = prediction_digest
+    record_content = _json_content(record)
+    record_digest = _content_digest(record_content)
+    prediction_path.write_bytes(prediction_content)
+    record_path.write_bytes(record_content)
+    manifest["prediction_digest"] = prediction_digest
+    manifest["record_digest"] = record_digest
+    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v1.json"] = prediction_digest
+    manifest["artifact_digests"]["assessment-record.json"] = record_digest
+    manifest_path.write_bytes(_json_content(manifest))
+
+    with pytest.raises(ValueError, match="parse-failure claim contradicts successful backend output replay"):
+        load_published_assessment(output)
+
+
 def test_structure_assessment_loader_requires_diagnostics_for_execution_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

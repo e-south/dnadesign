@@ -203,6 +203,51 @@ class SecondaryStructureArtifactsV1(FoldingContractModel):
         return _not_blank(value, label="artifact ref")
 
 
+SecondaryStructureFailureKindV1 = Literal[
+    "backend_contract_error",
+    "backend_invocation_exception",
+    "backend_nonzero_exit",
+    "backend_exception",
+    "output_parse_exception",
+]
+
+
+class SecondaryStructureFailureV1(FoldingContractModel):
+    kind: SecondaryStructureFailureKindV1
+    message: str
+    returncode: int | None = None
+    exception_type: str | None = None
+
+    @field_validator("message")
+    @classmethod
+    def _message_not_blank(cls, value: str) -> str:
+        return _not_blank(value, label="failure.message")
+
+    @field_validator("exception_type")
+    @classmethod
+    def _exception_type_not_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _not_blank(value, label="failure.exception_type")
+
+    @model_validator(mode="after")
+    def _validate_shape(self) -> "SecondaryStructureFailureV1":
+        if self.kind == "backend_nonzero_exit":
+            if self.returncode in {None, 0} or self.exception_type is not None:
+                raise ValueError("backend_nonzero_exit requires one nonzero returncode only.")
+            return self
+        if self.returncode is not None:
+            raise ValueError("returncode is only valid for backend_nonzero_exit.")
+        exception_kinds = {
+            "backend_invocation_exception",
+            "backend_exception",
+            "output_parse_exception",
+        }
+        if (self.kind in exception_kinds) is (self.exception_type is None):
+            raise ValueError("failure exception_type does not match its kind.")
+        return self
+
+
 class SecondaryStructurePredictionV1(FoldingContractModel):
     contract: Literal["secondary_structure_prediction_v1"] = "secondary_structure_prediction_v1"
     schema_version: Literal[1] = 1
@@ -220,6 +265,7 @@ class SecondaryStructurePredictionV1(FoldingContractModel):
     backend: SecondaryStructurePredictionBackendV1 | None = None
     dna_policy: SecondaryStructurePredictionDnaPolicyV1 | None = None
     result: SecondaryStructurePredictionResultV1 | None = None
+    failure: SecondaryStructureFailureV1 | None = None
     qa: SecondaryStructureQaV1 = Field(default_factory=SecondaryStructureQaV1)
     artifacts: SecondaryStructureArtifactsV1 = Field(default_factory=SecondaryStructureArtifactsV1)
 
@@ -237,8 +283,15 @@ class SecondaryStructurePredictionV1(FoldingContractModel):
                 raise ValueError("dna_policy is required when status='ok'.")
             if self.result is None:
                 raise ValueError("result is required when status='ok'.")
-        elif self.result is not None:
+            if self.failure is not None:
+                raise ValueError("failure must be absent when status='ok'.")
+        elif self.status == "error":
+            if self.failure is None:
+                raise ValueError("failure is required when status='error'.")
+        if self.status != "ok" and self.result is not None:
             raise ValueError("result must be absent when status is not 'ok'.")
+        if self.status != "error" and self.failure is not None:
+            raise ValueError("failure is only valid when status='error'.")
         if self.result is None:
             return self
         if len(self.result.dot_bracket) != self.input.length:

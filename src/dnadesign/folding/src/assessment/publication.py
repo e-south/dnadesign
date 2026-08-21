@@ -270,6 +270,9 @@ def _verify_prediction_backend_output(
     request: StructureAssessmentRequestV1,
     prediction: SecondaryStructurePredictionV1,
 ) -> None:
+    if prediction.status == "error":
+        _verify_prediction_failure(root, request=request, prediction=prediction)
+        return
     if prediction.status != "ok":
         return
     stdout_ref = prediction.artifacts.stdout
@@ -289,6 +292,51 @@ def _verify_prediction_backend_output(
         raise ValueError(f"Assessment backend output evidence cannot be replayed: {exc}") from exc
     if prediction.result != replayed_result or prediction.qa != SecondaryStructureQaV1(length_matches_input=True):
         raise ValueError("Assessment prediction does not match its backend output evidence.")
+
+
+def _verify_prediction_failure(
+    root: Path,
+    *,
+    request: StructureAssessmentRequestV1,
+    prediction: SecondaryStructurePredictionV1,
+) -> None:
+    failure = prediction.failure
+    stdout_ref = prediction.artifacts.stdout
+    stderr_ref = prediction.artifacts.stderr
+    if failure is None or stdout_ref is None or stderr_ref is None:
+        raise ValueError("Failed assessment prediction lacks typed backend evidence.")
+    stdout = _confined_file(root, stdout_ref, label="prediction stdout").read_text(encoding="utf-8")
+    stderr = _confined_file(root, stderr_ref, label="prediction stderr").read_text(encoding="utf-8")
+    if failure.kind == "output_parse_exception":
+        submitted_sequence = request.target.sequence.upper()
+        if request.backend.dna_policy.mode == "convert_t_to_u_for_rna_backend":
+            submitted_sequence = submitted_sequence.replace("T", "U")
+        try:
+            parse_rnafold_stdout(
+                stdout=stdout,
+                submitted_sequence=submitted_sequence,
+                input_length=len(request.target.sequence),
+            )
+        except FoldingError as exc:
+            if failure.exception_type != type(exc).__name__ or failure.message != str(exc):
+                raise ValueError("Assessment parse-failure evidence does not match backend output.") from exc
+        else:
+            raise ValueError("Assessment parse-failure claim contradicts successful backend output replay.")
+        return
+    expected_interface = {
+        "backend_invocation_exception": "cli",
+        "backend_nonzero_exit": "cli",
+        "backend_exception": "python_api",
+    }.get(failure.kind)
+    if expected_interface is not None and request.backend.interface != expected_interface:
+        raise ValueError("Assessment failure kind does not match the backend interface.")
+    if failure.kind == "backend_nonzero_exit":
+        expected_message = f"ViennaRNA RNAfold CLI exited with status {failure.returncode}."
+        if failure.message != expected_message:
+            raise ValueError("Assessment nonzero-exit evidence is internally inconsistent.")
+        return
+    if stdout or stderr.strip() != failure.message:
+        raise ValueError("Assessment exception evidence does not match backend logs.")
 
 
 def _verify_preflight(
@@ -326,7 +374,10 @@ def _verify_preflight(
         if prediction.status not in {"ok", "error"}:
             raise ValueError("A successful assessment preflight has an impossible prediction status.")
         if prediction.status == "error" and (
-            not prediction.qa.errors or prediction.qa.warnings or prediction.qa.length_matches_input is not None
+            prediction.failure is None
+            or prediction.qa.errors != [prediction.failure.message]
+            or prediction.qa.warnings
+            or prediction.qa.length_matches_input is not None
         ):
             raise ValueError("Assessment execution error lacks canonical diagnostic evidence.")
         if preflight.warnings or preflight.errors:

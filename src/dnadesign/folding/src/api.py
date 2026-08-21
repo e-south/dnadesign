@@ -24,7 +24,12 @@ from typing import Any
 import yaml
 from pydantic import ValidationError as PydanticValidationError
 
-from dnadesign.contracts.folding import SecondaryStructurePredictionRequestV1, SecondaryStructurePredictionV1
+from dnadesign.contracts.folding import (
+    SecondaryStructureFailureKindV1,
+    SecondaryStructureFailureV1,
+    SecondaryStructurePredictionRequestV1,
+    SecondaryStructurePredictionV1,
+)
 from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
     SecondaryStructurePredictionBackendV1,
     SecondaryStructurePredictionDnaPolicyV1,
@@ -285,6 +290,7 @@ def run_prediction_request(
             submitted_alphabet=submitted_alphabet,
             command=[request.backend.executable or request.backend.name],
             error="Folding executable preflight succeeded without a resolved executable.",
+            failure_kind="backend_contract_error",
         )
         _write_prediction(output_path, prediction)
         if request.policy.required and raise_on_required_failure:
@@ -320,6 +326,8 @@ def run_prediction_request(
             submitted_alphabet=submitted_alphabet,
             command=command,
             error=f"ViennaRNA RNAfold CLI execution failed: {exc}",
+            failure_kind="backend_invocation_exception",
+            exception_type=type(exc).__name__,
         )
         _write_prediction(output_path, prediction)
         if request.policy.required and raise_on_required_failure:
@@ -340,6 +348,8 @@ def run_prediction_request(
             submitted_alphabet=submitted_alphabet,
             command=command,
             error=f"ViennaRNA RNAfold CLI exited with status {completed.returncode}.",
+            failure_kind="backend_nonzero_exit",
+            returncode=completed.returncode,
         )
         _write_prediction(output_path, prediction)
         if request.policy.required and raise_on_required_failure:
@@ -379,6 +389,8 @@ def run_prediction_request(
             submitted_alphabet=submitted_alphabet,
             command=command,
             error=str(exc),
+            failure_kind="output_parse_exception",
+            exception_type=type(exc).__name__,
         )
         if _parse_failure_requires_raise(
             request,
@@ -416,6 +428,7 @@ def _run_python_api_prediction_request(
             submitted_alphabet=submitted_alphabet,
             command=[request.backend.name],
             error="Folding backend python module is not configured.",
+            failure_kind="backend_contract_error",
         )
         _write_prediction(output_path, prediction)
         if request.policy.required and raise_on_required_failure:
@@ -449,6 +462,8 @@ def _run_python_api_prediction_request(
             submitted_alphabet=submitted_alphabet,
             command=command,
             error=f"ViennaRNA Python API execution failed: {exc}",
+            failure_kind="backend_exception",
+            exception_type=type(exc).__name__,
         )
         _write_prediction(output_path, prediction)
         if request.policy.required and raise_on_required_failure:
@@ -494,6 +509,8 @@ def _run_python_api_prediction_request(
             submitted_alphabet=submitted_alphabet,
             command=command,
             error=str(exc),
+            failure_kind="output_parse_exception",
+            exception_type=type(exc).__name__,
         )
         if _parse_failure_requires_raise(
             request,
@@ -584,6 +601,9 @@ def _error_prediction(
     submitted_alphabet: str,
     command: list[str],
     error: str,
+    failure_kind: SecondaryStructureFailureKindV1,
+    returncode: int | None = None,
+    exception_type: str | None = None,
 ) -> SecondaryStructurePredictionV1:
     return SecondaryStructurePredictionV1(
         prediction_id=request.request_id,
@@ -599,6 +619,12 @@ def _error_prediction(
             mode=request.backend.dna_policy.mode,
             submitted_alphabet=submitted_alphabet,
             coordinates_mapped_to=request.backend.dna_policy.output_coordinates,
+        ),
+        failure=SecondaryStructureFailureV1(
+            kind=failure_kind,
+            message=error,
+            returncode=returncode,
+            exception_type=exception_type,
         ),
         qa=SecondaryStructureQaV1(length_matches_input=None, errors=[error]),
         artifacts=_artifact_refs(interface=preflight.interface),

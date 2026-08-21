@@ -28,6 +28,8 @@ if TYPE_CHECKING:
         StructureAssessmentRequestV1,
     )
     from .secondary_structure_prediction_v1 import (  # noqa: F401
+        SecondaryStructureFailureKindV1,
+        SecondaryStructureFailureV1,
         SecondaryStructurePredictionRequestV1,
         SecondaryStructurePredictionV1,
     )
@@ -39,6 +41,8 @@ __all__ = [
     "AssessmentTargetSequenceV1",
     "AssessmentTargetSequenceValueV1",
     "AssessmentTargetV1",
+    "SecondaryStructureFailureKindV1",
+    "SecondaryStructureFailureV1",
     "SecondaryStructurePredictionRequestV1",
     "SecondaryStructurePredictionV1",
     "StructureAssessmentPolicyV1",
