@@ -106,8 +106,22 @@ def publish_structure_assessment(
             )
             manifest_content = model_json_bytes(manifest)
             reader.write_new_bytes(_MANIFEST, manifest_content, label="assessment manifest")
-            verify_publication(stage, allow_staging_owner=True, reader=reader)
-            publication.publish(required_manifest=_MANIFEST)
+            verified_stage = verify_publication(stage, allow_staging_owner=True, reader=reader)
+
+            def verify_copied_descriptor(descriptor: int) -> None:
+                with _AnchoredPublicationReader.from_descriptor(descriptor) as copied_reader:
+                    copied = verify_publication(
+                        stage,
+                        allow_staging_owner=True,
+                        reader=copied_reader,
+                    )
+                if copied != verified_stage:
+                    raise PublicationError("Copied assessment does not match the verified staging assessment.")
+
+            publication.publish(
+                required_manifest=_MANIFEST,
+                verify_copied_descriptor=verify_copied_descriptor,
+            )
         try:
             publication.assert_published_path_identity()
             published = load_published_assessment(publication.final)

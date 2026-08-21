@@ -19,6 +19,7 @@ import stat
 import sys
 import tempfile
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -530,7 +531,12 @@ class CreateOnlyDirectoryPublication:
             anchored.st_ino,
         )
 
-    def publish(self, *, required_manifest: str) -> None:
+    def publish(
+        self,
+        *,
+        required_manifest: str,
+        verify_copied_descriptor: Callable[[int], None] | None = None,
+    ) -> None:
         if self._closed:
             raise PublicationError("Artifact publication is already closed")
         if self._published_descriptor is not None:
@@ -579,6 +585,8 @@ class CreateOnlyDirectoryPublication:
                 owner_file=_OWNER_FILE,
             ):
                 raise PublicationError("Artifact bundle publication owner sentinel is unavailable or unsafe")
+            if verify_copied_descriptor is not None:
+                verify_copied_descriptor(published_descriptor)
             _rename_create_only(self.parent_descriptor, self.adjacent_stage_name, self.final.name)
             renamed = True
             if not descriptor_matches_entry(self.parent_descriptor, self.final.name, published_descriptor):
@@ -715,12 +723,11 @@ class CreateOnlyDirectoryPublication:
         if self._closed:
             return
         try:
-            remove_owned_directory(
+            remove_descriptor_anchored_directory(
                 self._stage_parent_descriptor,
                 self.stage.name,
                 self.stage_descriptor,
-                self._owner,
-                owner_file=_OWNER_FILE,
+                last_entry=_OWNER_FILE,
             )
             remove_owned_named_directory(
                 self.parent_descriptor,

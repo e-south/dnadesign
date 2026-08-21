@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+import dnadesign.artifacts.publication as artifact_publication
 import dnadesign.folding.src.assessment.api as assessment_api
 import dnadesign.folding.src.assessment.publication as assessment_publication
 from dnadesign.folding import (
@@ -152,6 +153,37 @@ def test_structure_assessment_rejects_named_worker_artifact_symlink_before_super
     with pytest.raises(ValueError, match="worker request.*symbolic link"):
         publish_structure_assessment(_request(), output_dir=output)
 
+    assert not output.exists()
+
+
+def test_structure_assessment_verifies_the_copied_snapshot_before_publish(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    original_copy_directory = artifact_publication._copy_directory
+    mutated = False
+
+    def mutate_stage_then_copy(source: Path | int, parent_descriptor: int, name: str) -> None:
+        nonlocal mutated
+        if isinstance(source, int) and not mutated:
+            descriptor = os.open(
+                "assessment-record.json",
+                os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW,
+                dir_fd=source,
+            )
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(b"{}\n")
+            mutated = True
+        original_copy_directory(source, parent_descriptor, name)
+
+    monkeypatch.setattr(artifact_publication, "_copy_directory", mutate_stage_then_copy)
+    output = tmp_path / "mutated-during-copy-assessment"
+
+    with pytest.raises(ValueError):
+        publish_structure_assessment(_request(), output_dir=output)
+
+    assert mutated
     assert not output.exists()
 
 

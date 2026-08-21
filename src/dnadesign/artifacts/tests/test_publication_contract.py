@@ -127,6 +127,17 @@ def test_publication_copies_the_prepared_stage_descriptor_after_path_replacement
     assert (bundle / "manifest.json").read_text(encoding="utf-8") == "original\n"
 
 
+def test_close_removes_the_anchored_stage_after_owner_sentinel_corruption(tmp_path: Path) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    stage = publication.stage
+    (stage / ".dnadesign-publication-owner.json").write_text("corrupt\n", encoding="utf-8")
+
+    publication.close()
+
+    assert not stage.exists()
+
+
 def test_published_path_identity_rejects_a_replacement_directory(tmp_path: Path) -> None:
     bundle = tmp_path / "results" / "render-v1"
     displaced = tmp_path / "results" / "displaced-render-v1"
