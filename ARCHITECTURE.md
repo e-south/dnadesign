@@ -2,14 +2,14 @@
 doc_id: architecture
 surface: system-of-record
 owner: dnadesign-maintainers
-last_verified: 2026-08-09
+last_verified: 2026-08-21
 ---
 
 # ARCHITECTURE
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-09
+**Last verified:** 2026-08-21
 
 ## At a glance
 `dnadesign` is a uv-managed monorepo of modular bioinformatics tools under `src/dnadesign/`, with shared CI/devtools and operator runbooks in `docs/`.
@@ -37,6 +37,9 @@ This file is the architecture map: it names system boundaries, major flows, and 
   `dnadesign.msd` resolves and compiles Retron MSD designs while callers retain
   ownership of registry contents, candidate choices, and study evidence.
 - Shared artifact schemas live under `src/dnadesign/contracts/` when a producer and consumer need a neutral, versioned handoff model without importing either tool's internals.
+- Construct accepts producer-authored annotated sequence parts through the
+  neutral `AnnotatedSequencePartV1` contract. It may place and offset that
+  object, but it does not rederive producer-owned nested features.
 - Shared create-only filesystem publication mechanics live under `src/dnadesign/artifacts/`; producing tools still own their artifact schemas and manifest meaning.
 - Shared test infrastructure lives under `src/dnadesign/devtools/tests/support/` and is test-only by contract; production code must not depend on it.
 - OPS core is a neutral shell around discovery, observation/status, orchestration,

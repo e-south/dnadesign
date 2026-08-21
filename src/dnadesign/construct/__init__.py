@@ -17,13 +17,16 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .src.cli import main
     from .src.interfaces.api import (
+        AnnotatedPartPlacement,
         JobConfig,
         LinearSsdnaCompositionResult,
         LinearSsdnaCompositionSummary,
         PreflightResult,
+        RealizedAnnotatedFeature,
         RunResult,
         load_job_config,
         load_linear_ssdna_composition_config,
+        place_annotated_part,
         preflight_from_config,
         publish_composition_review_svg,
         run_from_config,
@@ -44,18 +47,21 @@ if TYPE_CHECKING:
     )
 
 __all__ = [
+    "AnnotatedPartPlacement",
     "ConstructUSROutputContract",
     "JobConfig",
     "LinearSsdnaCompositionResult",
     "LinearSsdnaCompositionSummary",
     "PreflightResult",
     "RunResult",
+    "RealizedAnnotatedFeature",
     "list_construct_workspace_selectors",
     "list_construct_workspace_selectors_from_root",
     "list_construct_workspaces",
     "list_construct_workspaces_from_root",
     "load_job_config",
     "load_linear_ssdna_composition_config",
+    "place_annotated_part",
     "main",
     "preflight_from_config",
     "publish_composition_review_svg",
@@ -70,18 +76,21 @@ __all__ = [
 ]
 
 _EXPORT_MODULES = {
+    "AnnotatedPartPlacement": ".src.interfaces.api",
     "ConstructUSROutputContract": ".src.interfaces.contracts",
     "JobConfig": ".src.interfaces.api",
     "LinearSsdnaCompositionResult": ".src.interfaces.api",
     "LinearSsdnaCompositionSummary": ".src.interfaces.api",
     "PreflightResult": ".src.interfaces.api",
     "RunResult": ".src.interfaces.api",
+    "RealizedAnnotatedFeature": ".src.interfaces.api",
     "list_construct_workspace_selectors": ".src.interfaces.contracts",
     "list_construct_workspace_selectors_from_root": ".src.interfaces.contracts",
     "list_construct_workspaces": ".src.interfaces.contracts",
     "list_construct_workspaces_from_root": ".src.interfaces.contracts",
     "load_job_config": ".src.interfaces.api",
     "load_linear_ssdna_composition_config": ".src.interfaces.api",
+    "place_annotated_part": ".src.interfaces.api",
     "main": ".src.cli",
     "preflight_from_config": ".src.interfaces.api",
     "publish_composition_review_svg": ".src.interfaces.api",

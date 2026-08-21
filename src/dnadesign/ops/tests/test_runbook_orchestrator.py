@@ -1746,6 +1746,9 @@ def test_discover_active_job_ids_raises_clean_error_when_qstat_times_out(
     runbook_path = _write_runbook(tmp_path)
     runbook = load_orchestration_runbook(runbook_path)
 
+    monotonic_values = iter((100.0, 100.00001))
+    monkeypatch.setattr(orchestrator_state.time, "monotonic", lambda: next(monotonic_values))
+
     def _timeout_qstat(*args, **kwargs):
         raise subprocess.TimeoutExpired(cmd=kwargs.get("args", args[0] if args else ["qstat"]), timeout=10.0)
 

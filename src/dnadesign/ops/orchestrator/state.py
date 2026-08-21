@@ -58,7 +58,7 @@ def _run_probe(
         return 127, "", f"{cmd} unavailable: {exc}"
     except subprocess.TimeoutExpired:
         cmd = str(argv[0]) if argv else "command"
-        return 124, "", f"{cmd} unavailable: timed out after {effective_timeout:g} seconds"
+        return 124, "", f"{cmd} unavailable: timed out after {effective_timeout:.3g} seconds"
     return int(result.returncode), result.stdout, result.stderr
 
 

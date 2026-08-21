@@ -18,17 +18,95 @@ from pydantic import ValidationError as PydanticValidationError
 
 import dnadesign.contracts as contracts
 from dnadesign.contracts.folding import SecondaryStructurePredictionRequestV1, SecondaryStructurePredictionV1
+from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
+    SecondaryStructurePredictionRequestBackendV1,
+)
 from dnadesign.contracts.sequence import (
     LinearSsdnaCompositionV1,
     MsdDesignCatalogV1,
     MsdDesignReferenceV1,
     RtPartPublicationV1,
 )
+from dnadesign.contracts.sequence.linear_ssdna_composition_v1 import (
+    LinearSsdnaFoldingBackendConfigV1,
+)
 from dnadesign.contracts.visual import CompositionReviewSvgV1
 
 
 def _sha256(value: str) -> str:
     return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+@pytest.mark.parametrize(
+    ("model", "payload"),
+    [
+        (
+            SecondaryStructurePredictionRequestBackendV1,
+            {
+                "name": "ViennaRNA",
+                "interface": "python_api",
+                "python_module": "RNA",
+                "parameters": {"unsupported_parameter": 1},
+                "dna_policy": {"mode": "convert_t_to_u_for_rna_backend"},
+            },
+        ),
+        (
+            LinearSsdnaFoldingBackendConfigV1,
+            {
+                "name": "ViennaRNA",
+                "interface": "python_api",
+                "python_module": "RNA",
+                "parameters": {"unsupported_parameter": 1},
+            },
+        ),
+    ],
+)
+def test_viennarna_request_surfaces_reject_unsupported_parameters(
+    model: type[object],
+    payload: dict[str, object],
+) -> None:
+    with pytest.raises(PydanticValidationError, match="Unsupported ViennaRNA parameters"):
+        model.model_validate(payload)  # type: ignore[attr-defined]
+
+
+def test_viennarna_request_rejects_non_string_parameter_keys_as_validation_error() -> None:
+    with pytest.raises(PydanticValidationError, match="parameter names must be strings"):
+        SecondaryStructurePredictionRequestBackendV1.model_validate(
+            {
+                "name": "ViennaRNA",
+                "interface": "python_api",
+                "python_module": "RNA",
+                "parameters": {1: "ignored"},
+                "dna_policy": {"mode": "convert_t_to_u_for_rna_backend"},
+            }
+        )
+
+
+@pytest.mark.parametrize("temperature", [True, 0, -1.0, float("nan"), "37"])
+def test_viennarna_request_rejects_ineffective_temperature_values(temperature: object) -> None:
+    with pytest.raises(PydanticValidationError, match="finite positive number"):
+        SecondaryStructurePredictionRequestBackendV1.model_validate(
+            {
+                "name": "ViennaRNA",
+                "interface": "python_api",
+                "python_module": "RNA",
+                "parameters": {"temperature_c": temperature},
+                "dna_policy": {"mode": "convert_t_to_u_for_rna_backend"},
+            }
+        )
+
+
+def test_folding_request_rejects_an_unimplemented_backend() -> None:
+    with pytest.raises(PydanticValidationError, match="ViennaRNA"):
+        SecondaryStructurePredictionRequestBackendV1.model_validate(
+            {
+                "name": "ImaginaryFold",
+                "interface": "python_api",
+                "python_module": "imaginary",
+                "parameters": {},
+                "dna_policy": {"mode": "convert_t_to_u_for_rna_backend"},
+            }
+        )
 
 
 def _rt_part_publication_payload() -> dict[str, object]:

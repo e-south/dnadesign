@@ -15,6 +15,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from ._viennarna_parameters import validate_viennarna_parameters
+
 
 class FoldingContractModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -264,7 +266,7 @@ class SecondaryStructurePredictionRequestDnaPolicyV1(FoldingContractModel):
 
 
 class SecondaryStructurePredictionRequestBackendV1(FoldingContractModel):
-    name: str
+    name: Literal["ViennaRNA"]
     interface: Literal["cli", "python_api"] = "cli"
     executable: str | None = None
     python_module: str | None = None
@@ -272,12 +274,17 @@ class SecondaryStructurePredictionRequestBackendV1(FoldingContractModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
     dna_policy: SecondaryStructurePredictionRequestDnaPolicyV1
 
-    @field_validator("name", "executable", "python_module", "backend_contract")
+    @field_validator("executable", "python_module", "backend_contract")
     @classmethod
     def _optional_not_blank(cls, value: str | None) -> str | None:
         if value is None:
             return None
         return _not_blank(value, label="backend field")
+
+    @field_validator("parameters", mode="before")
+    @classmethod
+    def _supported_parameters(cls, value: object) -> dict[str, Any]:
+        return validate_viennarna_parameters(value)
 
     @model_validator(mode="after")
     def _validate_backend_entrypoint(self) -> "SecondaryStructurePredictionRequestBackendV1":
