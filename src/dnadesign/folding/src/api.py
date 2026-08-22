@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Any, BinaryIO
 
@@ -77,6 +78,7 @@ class FoldingPreflightResult:
     resolved_executable: Path | None = None
     warnings: tuple[str, ...] = ()
     errors: tuple[str, ...] = ()
+    failure: SecondaryStructureFailureV2 | None = None
 
     @property
     def backend_available(self) -> bool:
@@ -86,7 +88,7 @@ class FoldingPreflightResult:
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "contract": "secondary_structure_folding_preflight_v1",
+            "contract": "secondary_structure_folding_preflight_v2",
             "status": self.status,
             "backend": {
                 "name": self.backend_name,
@@ -102,6 +104,7 @@ class FoldingPreflightResult:
             "output_dir": self.output_dir.as_posix(),
             "warnings": list(self.warnings),
             "errors": list(self.errors),
+            "failure": self.failure.model_dump(mode="json") if self.failure is not None else None,
         }
 
 
@@ -171,8 +174,15 @@ def preflight_request(
                 errors=(message,) if request.policy.required else (),
             )
         try:
-            module = importlib.import_module(module_name)
-        except ImportError:
+            module_spec = find_spec(module_name)
+        except Exception as exc:  # Discovery failures are evidence; process-control exceptions remain fatal.
+            return _python_import_failure_preflight(
+                request,
+                output_path=output_path,
+                module_name=module_name,
+                error=exc,
+            )
+        if module_spec is None:
             status = "blocker_required_missing" if request.policy.required else "warning_optional_missing"
             message = f"Folding backend Python module '{module_name}' is not available."
             return FoldingPreflightResult(
@@ -185,6 +195,15 @@ def preflight_request(
                 python_module=module_name,
                 warnings=() if request.policy.required else (message,),
                 errors=(message,) if request.policy.required else (),
+            )
+        try:
+            module = importlib.import_module(module_name)
+        except Exception as exc:  # Import failures are evidence; process-control exceptions remain fatal.
+            return _python_import_failure_preflight(
+                request,
+                output_path=output_path,
+                module_name=module_name,
+                error=exc,
             )
         return FoldingPreflightResult(
             status="ok",
@@ -242,6 +261,32 @@ def preflight_request(
     )
 
 
+def _python_import_failure_preflight(
+    request: SecondaryStructurePredictionRequestV1,
+    *,
+    output_path: Path,
+    module_name: str,
+    error: Exception,
+) -> FoldingPreflightResult:
+    message = f"ViennaRNA Python API import failed: {error}"
+    failure = SecondaryStructureFailureV2(
+        kind="backend_import_exception",
+        message=message,
+        exception_type=type(error).__name__,
+    )
+    return FoldingPreflightResult(
+        status="error",
+        backend_name=request.backend.name,
+        interface=request.backend.interface,
+        version=None,
+        output_dir=output_path,
+        executable=request.backend.executable,
+        python_module=module_name,
+        errors=(message,),
+        failure=failure,
+    )
+
+
 def run_prediction_request(
     request: SecondaryStructurePredictionRequestV1,
     *,
@@ -262,6 +307,47 @@ def run_prediction_request(
         deny_backend_child_processes=deny_backend_child_processes,
     )
     _write_json(output_path / _PREFLIGHT_FILENAME, preflight.to_dict())
+    if preflight.failure is not None:
+        if (
+            preflight.interface != "python_api"
+            or preflight.failure.kind != "backend_import_exception"
+            or preflight.failure.exception_type is None
+        ):
+            raise FoldingExecutionError("Python import preflight returned an invalid typed failure.")
+        assembled = _load_assembled_sequence(request, request_path=request_path)
+        _submitted_value, submitted_alphabet = _submitted_sequence(
+            assembled.sequence,
+            dna_policy=request.backend.dna_policy.mode,
+        )
+        command = prediction_command(
+            interface=request.backend.interface,
+            python_module=request.backend.python_module,
+            resolved_executable=preflight.resolved_executable,
+            parameters=request.backend.parameters,
+        )
+        _write_backend_logs(
+            output_path,
+            interface=request.backend.interface,
+            stdout="",
+            stderr=exception_evidence_text(
+                exception_type=preflight.failure.exception_type,
+                message=preflight.failure.message,
+            ),
+        )
+        prediction = _error_prediction(
+            request,
+            assembled=assembled,
+            preflight=preflight,
+            submitted_alphabet=submitted_alphabet,
+            command=command,
+            error=preflight.failure.message,
+            failure_kind=preflight.failure.kind,
+            exception_type=preflight.failure.exception_type,
+        )
+        _write_prediction(output_path, prediction)
+        if request.policy.required and raise_on_required_failure:
+            raise FoldingExecutionError(prediction.qa.errors[0])
+        return prediction
     if preflight.status != "ok":
         prediction = _prediction_for_preflight_blocker(request, preflight)
         _write_prediction(output_path, prediction)

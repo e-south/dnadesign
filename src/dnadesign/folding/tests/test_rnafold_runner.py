@@ -538,6 +538,54 @@ def test_optional_python_api_failure_materializes_referenced_logs(
     )
 
 
+def test_optional_python_api_import_failure_materializes_typed_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_dir = tmp_path / "python_api"
+    module_dir.mkdir()
+    (module_dir / "RNA.py").write_text(
+        "raise RuntimeError('backend import failure')\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(module_dir.as_posix())
+    sys.modules.pop("RNA", None)
+
+    prediction = run_prediction_request(
+        _python_api_request(tmp_path, required=False),
+        output_dir=tmp_path / "folding",
+    )
+
+    assert prediction.status == "error"
+    assert prediction.failure is not None
+    assert prediction.failure.kind == "backend_import_exception"
+    assert prediction.failure.exception_type == "RuntimeError"
+    assert prediction.failure.message == "ViennaRNA Python API import failed: backend import failure"
+    preflight = json.loads((tmp_path / "folding/folding_preflight.json").read_text(encoding="utf-8"))
+    assert preflight["status"] == "error"
+    assert preflight["backend"]["available"] is False
+    assert preflight["failure"] == prediction.failure.model_dump(mode="json")
+
+
+def test_python_api_import_system_exit_remains_fatal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_dir = tmp_path / "python_api"
+    module_dir.mkdir()
+    (module_dir / "RNA.py").write_text("raise SystemExit(17)\n", encoding="utf-8")
+    monkeypatch.syspath_prepend(module_dir.as_posix())
+    sys.modules.pop("RNA", None)
+
+    with pytest.raises(SystemExit, match="17"):
+        run_prediction_request(
+            _python_api_request(tmp_path, required=False),
+            output_dir=tmp_path / "folding",
+        )
+
+    assert not (tmp_path / "folding/secondary_structure_prediction_v2.json").exists()
+
+
 def test_publish_viennarna_structure_svg_annotates_native_svg(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

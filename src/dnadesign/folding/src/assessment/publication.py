@@ -31,6 +31,7 @@ from dnadesign.contracts.folding import (
     StructureAssessmentRequestV1,
 )
 from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
+    SecondaryStructureFailureV2,
     SecondaryStructurePredictionRequestV1,
     SecondaryStructurePredictionV2,
     SecondaryStructureQaV1,
@@ -90,6 +91,7 @@ class _PreflightArtifact(_PreflightContractModel):
     output_dir: str
     warnings: list[str]
     errors: list[str]
+    failure: SecondaryStructureFailureV2 | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -514,7 +516,7 @@ def _verify_prediction_execution_metadata(
         request_input.length,
     ):
         raise ValueError("Assessment prediction input does not match the worker request.")
-    if preflight.status != "ok":
+    if preflight.failure is None and preflight.status != "ok":
         if (
             prediction.dna_policy is not None
             or prediction.artifacts.stdout is not None
@@ -544,7 +546,7 @@ def _verify_prediction_execution_metadata(
     )
     if (
         backend.name != worker_request.backend.name
-        or backend.version != preflight.backend.version
+        or backend.version != (preflight.backend.version or "unknown")
         or backend.command != expected_command
         or backend.parameters != worker_request.backend.parameters
         or dna_policy.mode != worker_request.backend.dna_policy.mode
@@ -689,6 +691,7 @@ def _verify_prediction_failure(
     expected_interface = {
         "backend_invocation_exception": "cli",
         "backend_nonzero_exit": "cli",
+        "backend_import_exception": "python_api",
         "backend_exception": "python_api",
     }.get(failure.kind)
     if expected_interface is not None and request.backend.interface != expected_interface:
@@ -716,6 +719,10 @@ def _verify_prediction_failure(
         "ViennaRNA Python API execution failed: "
     ):
         raise ValueError("Assessment Python backend failure is not producer-reachable evidence.")
+    if failure.kind == "backend_import_exception" and not failure.message.startswith(
+        "ViennaRNA Python API import failed: "
+    ):
+        raise ValueError("Assessment Python backend import failure is not producer-reachable evidence.")
     expected_stderr = exception_evidence_text(
         exception_type=exception_type,
         message=failure.message,
@@ -731,7 +738,7 @@ def _verify_preflight(
     prediction: SecondaryStructurePredictionV2,
     prediction_root: PurePosixPath,
 ) -> None:
-    if preflight.contract != "secondary_structure_folding_preflight_v1":
+    if preflight.contract != "secondary_structure_folding_preflight_v2":
         raise ValueError("Assessment preflight contract is unsupported.")
     backend = preflight.backend
     request_backend = worker_request.backend
@@ -763,6 +770,37 @@ def _verify_preflight(
         raise ValueError("Assessment preflight output directory is not the portable worker root.")
     if worker_request.policy.required and prediction.status != "ok":
         raise ValueError("A required assessment cannot replay non-ok status.")
+    if preflight.failure is not None:
+        failure = prediction.failure
+        expected_command = prediction_command(
+            interface=backend.interface,
+            python_module=backend.python_module,
+            resolved_executable=backend.resolved_executable,
+            parameters=request_backend.parameters,
+        )
+        if (
+            preflight.status != "error"
+            or preflight.failure.kind != "backend_import_exception"
+            or backend.interface != "python_api"
+            or backend.available
+            or backend.version is not None
+            or backend.resolved_executable is not None
+            or preflight.warnings
+            or preflight.errors != [preflight.failure.message]
+            or prediction.status != "error"
+            or failure != preflight.failure
+            or prediction.backend is None
+            or prediction.backend.name != backend.name
+            or prediction.backend.version != "unknown"
+            or prediction.backend.command != expected_command
+            or prediction.qa
+            != SecondaryStructureQaV1(
+                length_matches_input=None,
+                errors=[preflight.failure.message],
+            )
+        ):
+            raise ValueError("Assessment backend import failure is internally inconsistent.")
+        return
     if preflight.status == "ok":
         if not backend.available or backend.version is None or prediction.backend is None:
             raise ValueError("Assessment preflight success lacks a usable prediction backend.")
@@ -775,7 +813,7 @@ def _verify_preflight(
                 errors=[failure.message],
             ):
                 raise ValueError("Assessment execution error lacks canonical diagnostic evidence.")
-        if preflight.warnings or preflight.errors:
+        if preflight.warnings or preflight.errors or preflight.failure is not None:
             raise ValueError("Assessment preflight success cannot contain warnings or errors.")
         if prediction.backend.name != backend.name:
             raise ValueError("Assessment preflight backend name does not match the prediction.")
@@ -802,6 +840,7 @@ def _verify_preflight(
         or prediction.backend is not None
         or preflight.status != expected_missing_status
         or prediction.status != expected_missing_status
+        or preflight.failure is not None
     ):
         raise ValueError("Assessment preflight blocker does not match the prediction status.")
     if preflight.warnings != prediction.qa.warnings or preflight.errors != prediction.qa.errors:

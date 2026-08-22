@@ -1245,6 +1245,50 @@ def test_optional_python_backend_runtime_error_publishes_typed_evidence(
     assert failure.message == "ViennaRNA Python API execution failed: ordinary backend failure"
 
 
+def test_optional_python_backend_import_error_publishes_typed_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_root = tmp_path / "import-error-backend"
+    module_root.mkdir()
+    (module_root / "RNA.py").write_text(
+        "raise RuntimeError('ordinary import failure')\n",
+        encoding="utf-8",
+    )
+    existing = os.environ.get("PYTHONPATH", "")
+    monkeypatch.setenv(
+        "PYTHONPATH",
+        os.pathsep.join(part for part in (module_root.as_posix(), existing) if part),
+    )
+    request = _request().model_copy(
+        update={"policy": _request().policy.model_copy(update={"required": False})},
+    )
+    output = tmp_path / "assessment"
+
+    published = publish_structure_assessment(request, output_dir=output)
+
+    failure = published.record.prediction.failure
+    assert published.record.status == "error"
+    assert failure is not None
+    assert failure.kind == "backend_import_exception"
+    assert failure.exception_type == "RuntimeError"
+    assert failure.message == "ViennaRNA Python API import failed: ordinary import failure"
+    assert load_published_assessment(output) == published
+
+    preflight_path = output / "prediction/folding_preflight.json"
+    manifest_path = output / "manifest.json"
+    preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    preflight["failure"]["exception_type"] = "FabricatedError"
+    preflight_content = _json_content(preflight)
+    preflight_path.write_bytes(preflight_content)
+    manifest["artifact_digests"]["prediction/folding_preflight.json"] = _content_digest(preflight_content)
+    manifest_path.write_bytes(_json_content(manifest))
+
+    with pytest.raises(ValueError, match="backend import failure is internally inconsistent"):
+        load_published_assessment(output)
+
+
 def test_structure_assessment_loader_binds_nonzero_returncode_to_backend_evidence(
     tmp_path: Path,
 ) -> None:

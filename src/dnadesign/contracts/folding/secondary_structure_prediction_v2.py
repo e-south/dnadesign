@@ -206,6 +206,7 @@ class SecondaryStructureArtifactsV1(FoldingContractModel):
 SecondaryStructureFailureKindV2 = Literal[
     "backend_invocation_exception",
     "backend_nonzero_exit",
+    "backend_import_exception",
     "backend_exception",
     "output_parse_exception",
 ]
@@ -239,6 +240,7 @@ class SecondaryStructureFailureV2(FoldingContractModel):
             raise ValueError("returncode is only valid for backend_nonzero_exit.")
         exception_kinds = {
             "backend_invocation_exception",
+            "backend_import_exception",
             "backend_exception",
             "output_parse_exception",
         }
