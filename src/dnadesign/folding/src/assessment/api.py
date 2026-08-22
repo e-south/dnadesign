@@ -25,7 +25,11 @@ from dnadesign.contracts.folding import (
 from dnadesign.contracts.folding.secondary_structure_prediction_v2 import SecondaryStructurePredictionV2
 
 from ..errors import FoldingConfigError, FoldingExecutionError
-from ._limits import ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES, ARTIFACT_FILE_SIZE_LIMIT_BYTES
+from ._limits import (
+    ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES,
+    ARTIFACT_ENTRY_COUNT_LIMIT,
+    ARTIFACT_FILE_SIZE_LIMIT_BYTES,
+)
 from .execution import prepare_prediction_request, run_worker
 from .publication import (
     PublishedStructureAssessment,
@@ -129,6 +133,7 @@ def publish_structure_assessment(
                 verify_copied_descriptor=verify_copied_descriptor,
                 copy_file_size_limit_bytes=ARTIFACT_FILE_SIZE_LIMIT_BYTES,
                 copy_aggregate_size_limit_bytes=ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES,
+                copy_entry_count_limit=ARTIFACT_ENTRY_COUNT_LIMIT,
             )
         try:
             publication.assert_published_path_identity()

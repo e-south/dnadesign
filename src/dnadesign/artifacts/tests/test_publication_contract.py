@@ -127,6 +127,24 @@ def test_publication_copy_enforces_file_budget_before_verification(tmp_path: Pat
     assert not bundle.exists()
 
 
+def test_publication_copy_enforces_entry_budget_before_verification(tmp_path: Path) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    try:
+        (publication.stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+        (publication.stage / "empty-artifact").touch()
+
+        with pytest.raises(PublicationError, match="2-entry copy limit"):
+            publication.publish(
+                required_manifest="manifest.json",
+                copy_entry_count_limit=2,
+            )
+    finally:
+        publication.close()
+
+    assert not bundle.exists()
+
+
 def test_publication_copies_the_prepared_stage_descriptor_after_path_replacement(tmp_path: Path) -> None:
     bundle = tmp_path / "results" / "render-v1"
     publication = CreateOnlyDirectoryPublication.prepare(bundle)

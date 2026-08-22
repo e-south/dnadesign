@@ -55,7 +55,15 @@ _COPY_CHUNK_BYTES = 65_536
 class _CopyBudget:
     file_limit_bytes: int | None
     aggregate_limit_bytes: int | None
+    entry_limit: int | None
     copied_bytes: int = 0
+    copied_entries: int = 0
+
+    def charge_entry(self) -> None:
+        next_entries = self.copied_entries + 1
+        if self.entry_limit is not None and next_entries > self.entry_limit:
+            raise PublicationError(f"Bundle staging exceeded the {self.entry_limit}-entry copy limit")
+        self.copied_entries = next_entries
 
     def charge(self, *, file_bytes: int, chunk_bytes: int, source_name: str) -> int:
         next_file_bytes = file_bytes + chunk_bytes
@@ -246,7 +254,11 @@ def _copy_directory(
     *,
     budget: _CopyBudget | None = None,
 ) -> None:
-    active_budget = budget or _CopyBudget(file_limit_bytes=None, aggregate_limit_bytes=None)
+    active_budget = budget or _CopyBudget(
+        file_limit_bytes=None,
+        aggregate_limit_bytes=None,
+        entry_limit=None,
+    )
     source_descriptor = _source_directory_descriptor(source)
     try:
         _copy_directory_from_descriptor(source_descriptor, parent_descriptor, name, budget=active_budget)
@@ -269,6 +281,7 @@ def _copy_directory_from_descriptor(
     try:
         entries = sorted(os.listdir(source_descriptor), key=lambda entry: (entry != _OWNER_FILE, entry))
         for entry in entries:
+            budget.charge_entry()
             entry_stat = os.stat(entry, dir_fd=source_descriptor, follow_symlinks=False)
             if stat.S_ISLNK(entry_stat.st_mode):
                 raise PublicationError(f"Bundle staging must not contain symlinks: {entry}")
@@ -612,6 +625,7 @@ class CreateOnlyDirectoryPublication:
         verify_copied_descriptor: Callable[[int], None] | None = None,
         copy_file_size_limit_bytes: int | None = None,
         copy_aggregate_size_limit_bytes: int | None = None,
+        copy_entry_count_limit: int | None = None,
     ) -> None:
         if self._closed:
             raise PublicationError("Artifact publication is already closed")
@@ -625,6 +639,10 @@ class CreateOnlyDirectoryPublication:
             aggregate_limit_bytes=_validate_copy_limit(
                 copy_aggregate_size_limit_bytes,
                 label="copy aggregate-size limit",
+            ),
+            entry_limit=_validate_copy_limit(
+                copy_entry_count_limit,
+                label="copy entry-count limit",
             ),
         )
         validated_published_root_mode = _validate_published_root_mode(self.published_root_mode)

@@ -395,7 +395,7 @@ def test_optional_cli_invocation_failure_materializes_exception_type_evidence(
     assert prediction.failure.kind == "backend_invocation_exception"
     assert prediction.artifacts.stderr is not None
     assert (tmp_path / "folding" / prediction.artifacts.stderr).read_text(encoding="utf-8") == exception_evidence_text(
-        exception_type="PermissionError",
+        exception_type="OSError",
         message="ViennaRNA RNAfold CLI execution failed: execution denied",
     )
 

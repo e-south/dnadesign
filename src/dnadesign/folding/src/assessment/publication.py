@@ -40,6 +40,7 @@ from ..errors import FoldingError, FoldingLengthMismatchError, FoldingMalformedO
 from ..execution_metadata import (
     exception_evidence_text,
     parse_cli_failure_evidence,
+    parse_python_api_stdout_evidence,
     prediction_command,
     prediction_log_paths,
     python_api_success_stdout,
@@ -652,11 +653,20 @@ def _verify_prediction_failure(
         label="prediction stderr",
     ).decode("utf-8")
     if failure.kind == "output_parse_exception":
-        if request.backend.interface == "python_api" and stderr:
-            raise ValueError("Assessment Python parse-failure stderr is not canonical producer evidence.")
         submitted_sequence = request.target.sequence.upper()
         if request.backend.dna_policy.mode == "convert_t_to_u_for_rna_backend":
             submitted_sequence = submitted_sequence.replace("T", "U")
+        if request.backend.interface == "python_api":
+            if stderr:
+                raise ValueError("Assessment Python parse-failure stderr is not canonical producer evidence.")
+            try:
+                parse_python_api_stdout_evidence(
+                    stdout,
+                    sequence_id=request.target.sequence_id,
+                    submitted_sequence=submitted_sequence,
+                )
+            except ValueError as exc:
+                raise ValueError("Assessment Python parse-failure stdout is not canonical producer evidence.") from exc
         try:
             parse_rnafold_stdout(
                 stdout=stdout,
@@ -697,6 +707,15 @@ def _verify_prediction_failure(
     exception_type = failure.exception_type
     if exception_type is None:
         raise ValueError("Assessment exception evidence lacks its exception type.")
+    if failure.kind == "backend_invocation_exception" and (
+        exception_type not in {"OSError", "SubprocessError"}
+        or not failure.message.startswith("ViennaRNA RNAfold CLI execution failed: ")
+    ):
+        raise ValueError("Assessment CLI invocation failure is not producer-reachable evidence.")
+    if failure.kind == "backend_exception" and not failure.message.startswith(
+        "ViennaRNA Python API execution failed: "
+    ):
+        raise ValueError("Assessment Python backend failure is not producer-reachable evidence.")
     expected_stderr = exception_evidence_text(
         exception_type=exception_type,
         message=failure.message,

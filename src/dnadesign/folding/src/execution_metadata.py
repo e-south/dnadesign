@@ -12,6 +12,8 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import math
+import re
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +55,33 @@ def python_api_success_stdout(
 ) -> str:
     """Return the exact synthetic stdout emitted for one Python API success."""
     return f">{sequence_id}\n{submitted_sequence}\n{dot_bracket} ({float(mfe_kcal_mol):.2f})\n"
+
+
+def parse_python_api_stdout_evidence(
+    content: str,
+    *,
+    sequence_id: str,
+    submitted_sequence: str,
+) -> tuple[str, float]:
+    """Parse and require stdout framing that the Python API producer can emit."""
+    prefix = f">{sequence_id}\n{submitted_sequence}\n"
+    if not content.startswith(prefix):
+        raise ValueError("Python API stdout header or submitted sequence is not canonical.")
+    structure_line = content.removeprefix(prefix)
+    matched = re.fullmatch(r"([^\r\n]*) \((-?\d+\.\d{2})\)\n", structure_line)
+    if matched is None:
+        raise ValueError("Python API stdout structure line is not canonical.")
+    dot_bracket, energy_text = matched.groups()
+    energy = float(energy_text)
+    expected = python_api_success_stdout(
+        sequence_id=sequence_id,
+        submitted_sequence=submitted_sequence,
+        dot_bracket=dot_bracket,
+        mfe_kcal_mol=energy,
+    )
+    if not math.isfinite(energy) or content != expected:
+        raise ValueError("Python API stdout structure line is not canonical.")
+    return dot_bracket, energy
 
 
 def exception_evidence_text(*, exception_type: str, message: str) -> str:
@@ -108,6 +137,7 @@ def parse_cli_failure_evidence(content: str) -> tuple[int, str]:
 __all__ = [
     "cli_failure_evidence_text",
     "exception_evidence_text",
+    "parse_python_api_stdout_evidence",
     "parse_cli_failure_evidence",
     "prediction_command",
     "prediction_log_paths",

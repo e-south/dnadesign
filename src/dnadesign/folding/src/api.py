@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -301,7 +302,7 @@ def run_prediction_request(
         )
     except (OSError, subprocess.SubprocessError) as exc:
         error = f"ViennaRNA RNAfold CLI execution failed: {exc}"
-        exception_type = type(exc).__name__
+        exception_type = "OSError" if isinstance(exc, OSError) else "SubprocessError"
         _write_backend_logs(
             output_path,
             interface=request.backend.interface,
@@ -524,11 +525,16 @@ def _run_python_api_mfe(
     if not isinstance(raw_result, (tuple, list)) or len(raw_result) != 2:
         raise FoldingExecutionError("ViennaRNA fold_compound.mfe() returned an unsupported result.")
     dot_bracket, mfe_kcal_mol = raw_result
+    if not isinstance(dot_bracket, str) or "\n" in dot_bracket or "\r" in dot_bracket:
+        raise FoldingExecutionError("ViennaRNA fold_compound.mfe() returned an unsupported dot-bracket value.")
+    energy = float(mfe_kcal_mol)
+    if not math.isfinite(energy):
+        raise FoldingExecutionError("ViennaRNA fold_compound.mfe() returned a non-finite energy.")
     return python_api_success_stdout(
         sequence_id=sequence_id,
         submitted_sequence=submitted_sequence,
-        dot_bracket=str(dot_bracket),
-        mfe_kcal_mol=float(mfe_kcal_mol),
+        dot_bracket=dot_bracket,
+        mfe_kcal_mol=energy,
     )
 
 

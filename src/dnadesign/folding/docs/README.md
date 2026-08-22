@@ -106,7 +106,9 @@ stream at 1,048,576 bytes, so a noisy backend fails instead of filling the
 worker or supervisor memory. The supervisor also caps combined resident memory
 for the worker and its permitted backend at 536,870,912 bytes. Linux workers
 add a matching kernel address-space limit; other supported POSIX hosts retain
-the supervisor-enforced resident-memory limit. The worker
+the supervisor-enforced resident-memory limit. Assessment copying repeats the
+256-entry, 1,048,576-byte per-file, and 16,777,216-byte aggregate ceilings
+before copied-descriptor replay. The worker
 disables the older low-level CLI deadline so the assessment supervisor is the
 only timeout authority. Publication is atomic and create-only. The target and
 worker-request artifacts are digest-pinned and semantically replayed against

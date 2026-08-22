@@ -28,6 +28,7 @@ from dnadesign.folding import (
     load_published_assessment,
     publish_structure_assessment,
 )
+from dnadesign.folding.src.execution_metadata import exception_evidence_text
 from dnadesign.folding.tests._assessment_fixtures import (
     assessment_request as _request,
 )
@@ -1531,4 +1532,110 @@ def test_structure_assessment_loader_requires_empty_python_parse_failure_stderr(
     manifest_path.write_bytes(_json_content(manifest))
 
     with pytest.raises(ValueError, match="Python parse-failure stderr is not canonical producer evidence"):
+        load_published_assessment(output)
+
+
+def test_structure_assessment_loader_requires_canonical_python_parse_failure_stdout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    (tmp_path / "fake-backend/RNA.py").write_text(
+        "__version__ = 'test-1.0'\n"
+        "class Compound:\n"
+        "    def mfe(self):\n"
+        "        return '.....', -1.2\n"
+        "def fold_compound(sequence):\n"
+        "    return Compound()\n",
+        encoding="utf-8",
+    )
+    request = _request().model_copy(
+        update={
+            "policy": _request().policy.model_copy(
+                update={"required": False, "fail_on_length_mismatch": False},
+            )
+        },
+    )
+    output = tmp_path / "assessment"
+    publish_structure_assessment(request, output_dir=output)
+    stdout_relative = "prediction/ViennaRNA.python_api.stdout.txt"
+    stdout_content = b">fabricated-id\nGCAUGC\n..... (-1.20)\n"
+    (output / stdout_relative).write_bytes(stdout_content)
+    manifest_path = output / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifact_digests"][stdout_relative] = _content_digest(stdout_content)
+    manifest_path.write_bytes(_json_content(manifest))
+
+    with pytest.raises(ValueError, match="Python parse-failure stdout is not canonical producer evidence"):
+        load_published_assessment(output)
+
+
+def test_structure_assessment_loader_rejects_unreachable_cli_invocation_exception_type(
+    tmp_path: Path,
+) -> None:
+    executable = tmp_path / "RNAfold"
+    executable.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = "--version" ]; then\n'
+        '  printf "RNAfold 2.7.0\\n"\n'
+        "  exit 0\n"
+        "fi\n"
+        "while IFS= read -r line; do :; done\n"
+        'printf ">hop:encoding/example\\nGCAUGC\\n((..)) (-1.20)\\n"\n',
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    base_request = cli_assessment_request(executable, timeout_seconds=5.0)
+    request = base_request.model_copy(
+        update={"policy": base_request.policy.model_copy(update={"required": False})},
+    )
+    output = tmp_path / "assessment"
+    publish_structure_assessment(request, output_dir=output)
+    prediction_path = output / "prediction/secondary_structure_prediction_v2.json"
+    record_path = output / "assessment-record.json"
+    stdout_path = output / "prediction/RNAfold.stdout.txt"
+    stderr_path = output / "prediction/RNAfold.stderr.txt"
+    manifest_path = output / "manifest.json"
+    prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    message = "ViennaRNA RNAfold CLI execution failed: fabricated"
+    prediction["status"] = "error"
+    prediction["result"] = None
+    prediction["failure"] = {
+        "kind": "backend_invocation_exception",
+        "message": message,
+        "returncode": None,
+        "exception_type": "RuntimeError",
+    }
+    prediction["qa"] = {
+        "cross_copy_pairings": [],
+        "errors": [message],
+        "intended_pairings": [],
+        "length_matches_input": None,
+        "pairing_summary": None,
+        "warnings": [],
+    }
+    record["status"] = "error"
+    record["prediction"] = prediction
+    stdout_content = b""
+    stderr_content = exception_evidence_text(exception_type="RuntimeError", message=message).encode()
+    prediction_content = _json_content(prediction)
+    prediction_digest = _content_digest(prediction_content)
+    record["prediction_digest"] = prediction_digest
+    record_content = _json_content(record)
+    record_digest = _content_digest(record_content)
+    stdout_path.write_bytes(stdout_content)
+    stderr_path.write_bytes(stderr_content)
+    prediction_path.write_bytes(prediction_content)
+    record_path.write_bytes(record_content)
+    manifest["prediction_digest"] = prediction_digest
+    manifest["record_digest"] = record_digest
+    manifest["artifact_digests"]["prediction/RNAfold.stdout.txt"] = _content_digest(stdout_content)
+    manifest["artifact_digests"]["prediction/RNAfold.stderr.txt"] = _content_digest(stderr_content)
+    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v2.json"] = prediction_digest
+    manifest["artifact_digests"]["assessment-record.json"] = record_digest
+    manifest_path.write_bytes(_json_content(manifest))
+
+    with pytest.raises(ValueError, match="CLI invocation failure is not producer-reachable evidence"):
         load_published_assessment(output)
