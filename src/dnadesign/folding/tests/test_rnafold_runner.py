@@ -19,13 +19,14 @@ from pathlib import Path
 
 import pytest
 
+import dnadesign.folding.src.api as folding_api
 from dnadesign.contracts.folding import SecondaryStructurePredictionRequestV1
-from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
+from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
     SecondaryStructurePredictionBackendV1,
     SecondaryStructurePredictionDnaPolicyV1,
     SecondaryStructurePredictionInputV1,
     SecondaryStructurePredictionResultV1,
-    SecondaryStructurePredictionV1,
+    SecondaryStructurePredictionV2,
 )
 from dnadesign.folding import (
     enrich_prediction_pairing_qa,
@@ -35,6 +36,7 @@ from dnadesign.folding import (
     run_prediction_request,
 )
 from dnadesign.folding.src.errors import FoldingConfigError, FoldingExecutionError
+from dnadesign.folding.src.execution_metadata import cli_failure_evidence_text, exception_evidence_text
 from dnadesign.folding.src.viennarna_svg import _expand_root_viewbox, _stem_metric_label
 
 _CONTIGUOUS_STEM_SEQUENCE = "GACGATATCGTC"
@@ -171,8 +173,8 @@ def _contiguous_stem_prediction(
     *,
     sequence_sha256: str = "abc",
     sequence_id: str = "demo",
-) -> SecondaryStructurePredictionV1:
-    return SecondaryStructurePredictionV1(
+) -> SecondaryStructurePredictionV2:
+    return SecondaryStructurePredictionV2(
         prediction_id=f"{sequence_id}.viennarna.canonical_component_unit",
         status="ok",
         input=SecondaryStructurePredictionInputV1(
@@ -329,7 +331,7 @@ def test_preflight_reports_optional_missing_backend_without_silent_success(tmp_p
     assert prediction.status == "warning_optional_missing"
     assert prediction.result is None
     assert "not available" in prediction.qa.warnings[0]
-    assert (tmp_path / "folding" / "secondary_structure_prediction_v1.json").is_file()
+    assert (tmp_path / "folding" / "secondary_structure_prediction_v2.json").is_file()
 
 
 def test_run_prediction_request_uses_rnafold_cli_output(tmp_path: Path) -> None:
@@ -369,6 +371,66 @@ printf ">demo\\nGCAU\\n(()) (-2.30)\\n"
     assert (tmp_path / "folding" / prediction.artifacts.stdout).is_file()
 
 
+def test_optional_cli_invocation_failure_materializes_exception_type_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executable = tmp_path / "RNAfold"
+    executable.write_text(
+        '#!/bin/sh\nif [ "$1" = "--version" ]; then\n  printf "RNAfold 2.7.0\\n"\n  exit 0\nfi\n',
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+
+    def fail_invocation(*_args, **_kwargs):
+        raise PermissionError("execution denied")
+
+    monkeypatch.setattr(folding_api, "_run_bounded_cli_command", fail_invocation)
+    prediction = run_prediction_request(
+        _request(tmp_path, executable=executable.as_posix(), required=False),
+        output_dir=tmp_path / "folding",
+    )
+
+    assert prediction.failure is not None
+    assert prediction.failure.kind == "backend_invocation_exception"
+    assert prediction.artifacts.stderr is not None
+    assert (tmp_path / "folding" / prediction.artifacts.stderr).read_text(encoding="utf-8") == exception_evidence_text(
+        exception_type="OSError",
+        message="ViennaRNA RNAfold CLI execution failed: execution denied",
+    )
+
+
+def test_optional_cli_nonzero_exit_materializes_returncode_evidence(tmp_path: Path) -> None:
+    executable = tmp_path / "RNAfold"
+    executable.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = "--version" ]; then\n'
+        '  printf "RNAfold 2.7.0\\n"\n'
+        "  exit 0\n"
+        "fi\n"
+        'printf "backend rejected input\\n" >&2\n'
+        "exit 7\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+
+    prediction = run_prediction_request(
+        _request(tmp_path, executable=executable.as_posix(), required=False),
+        output_dir=tmp_path / "folding",
+    )
+
+    assert prediction.failure is not None
+    assert prediction.failure.kind == "backend_nonzero_exit"
+    assert prediction.failure.returncode == 7
+    assert prediction.artifacts.stderr is not None
+    assert (tmp_path / "folding" / prediction.artifacts.stderr).read_text(
+        encoding="utf-8"
+    ) == cli_failure_evidence_text(
+        returncode=7,
+        backend_stderr="backend rejected input\n",
+    )
+
+
 @pytest.mark.parametrize(
     ("rnafold_output", "error_match"),
     [
@@ -398,7 +460,7 @@ def test_run_prediction_request_honors_declared_parse_failure_policy(
     with pytest.raises(FoldingExecutionError, match=error_match):
         run_prediction_request(request, output_dir=tmp_path / "folding")
 
-    prediction_path = tmp_path / "folding" / "secondary_structure_prediction_v1.json"
+    prediction_path = tmp_path / "folding" / "secondary_structure_prediction_v2.json"
     assert prediction_path.is_file()
     assert json.loads(prediction_path.read_text(encoding="utf-8"))["status"] == "error"
 
@@ -440,6 +502,88 @@ class fold_compound:
     assert prediction.artifacts.stdout == "ViennaRNA.python_api.stdout.txt"
     assert prediction.artifacts.stderr == "ViennaRNA.python_api.stderr.txt"
     assert (tmp_path / "folding" / prediction.artifacts.stdout).is_file()
+
+
+def test_optional_python_api_failure_materializes_referenced_logs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_dir = tmp_path / "python_api"
+    module_dir.mkdir()
+    (module_dir / "RNA.py").write_text(
+        "__version__ = '2.7.2'\n"
+        "class fold_compound:\n"
+        "    def __init__(self, sequence):\n"
+        "        self.sequence = sequence\n"
+        "    def mfe(self):\n"
+        "        raise ValueError('backend failure')\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(module_dir.as_posix())
+    sys.modules.pop("RNA", None)
+
+    prediction = run_prediction_request(
+        _python_api_request(tmp_path, required=False),
+        output_dir=tmp_path / "folding",
+    )
+
+    assert prediction.status == "error"
+    assert prediction.artifacts.stdout is not None
+    assert prediction.artifacts.stderr is not None
+    assert (tmp_path / "folding" / prediction.artifacts.stdout).is_file()
+    assert (tmp_path / "folding" / prediction.artifacts.stderr).is_file()
+    assert (tmp_path / "folding" / prediction.artifacts.stderr).read_text(encoding="utf-8") == exception_evidence_text(
+        exception_type="ValueError",
+        message="ViennaRNA Python API execution failed: backend failure",
+    )
+
+
+def test_optional_python_api_import_failure_materializes_typed_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_dir = tmp_path / "python_api"
+    module_dir.mkdir()
+    (module_dir / "RNA.py").write_text(
+        "raise RuntimeError('backend import failure')\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(module_dir.as_posix())
+    sys.modules.pop("RNA", None)
+
+    prediction = run_prediction_request(
+        _python_api_request(tmp_path, required=False),
+        output_dir=tmp_path / "folding",
+    )
+
+    assert prediction.status == "error"
+    assert prediction.failure is not None
+    assert prediction.failure.kind == "backend_import_exception"
+    assert prediction.failure.exception_type == "RuntimeError"
+    assert prediction.failure.message == "ViennaRNA Python API import failed: backend import failure"
+    preflight = json.loads((tmp_path / "folding/folding_preflight.json").read_text(encoding="utf-8"))
+    assert preflight["status"] == "error"
+    assert preflight["backend"]["available"] is False
+    assert preflight["failure"] == prediction.failure.model_dump(mode="json")
+
+
+def test_python_api_import_system_exit_remains_fatal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_dir = tmp_path / "python_api"
+    module_dir.mkdir()
+    (module_dir / "RNA.py").write_text("raise SystemExit(17)\n", encoding="utf-8")
+    monkeypatch.syspath_prepend(module_dir.as_posix())
+    sys.modules.pop("RNA", None)
+
+    with pytest.raises(SystemExit, match="17"):
+        run_prediction_request(
+            _python_api_request(tmp_path, required=False),
+            output_dir=tmp_path / "folding",
+        )
+
+    assert not (tmp_path / "folding/secondary_structure_prediction_v2.json").exists()
 
 
 def test_publish_viennarna_structure_svg_annotates_native_svg(
@@ -761,7 +905,7 @@ def test_publish_viennarna_structure_svg_rejects_source_mutation_during_svg_writ
 ) -> None:
     request = _python_api_request(tmp_path)
     run_prediction_request(request, output_dir=tmp_path / "folding")
-    prediction_path = tmp_path / "folding" / "secondary_structure_prediction_v1.json"
+    prediction_path = tmp_path / "folding" / "secondary_structure_prediction_v2.json"
     visual_contract = tmp_path / "sequence_evidence_map_v1.json"
     visual_contract.write_text(
         json.dumps(
@@ -1166,13 +1310,13 @@ def test_enrich_prediction_pairing_qa_classifies_cross_copy_and_intended_pairs(t
         submitted_sequence="GCAU",
         input_length=4,
     )
-    from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
+    from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
         SecondaryStructurePredictionBackendV1,
         SecondaryStructurePredictionDnaPolicyV1,
-        SecondaryStructurePredictionV1,
+        SecondaryStructurePredictionV2,
     )
 
-    prediction = SecondaryStructurePredictionV1(
+    prediction = SecondaryStructurePredictionV2(
         prediction_id=request.request_id,
         status="ok",
         input={
@@ -1229,7 +1373,7 @@ def test_enrich_prediction_pairing_qa_classifies_cross_copy_and_intended_pairs(t
     enriched = enrich_prediction_pairing_qa(
         prediction,
         visual_contract_path=visual_contract,
-        output_path=tmp_path / "secondary_structure_prediction_v1.json",
+        output_path=tmp_path / "secondary_structure_prediction_v2.json",
     )
 
     assert enriched.qa.pairing_summary is not None
@@ -1240,7 +1384,7 @@ def test_enrich_prediction_pairing_qa_classifies_cross_copy_and_intended_pairs(t
     assert enriched.qa.cross_copy_pairings[0]["right_index_0"] == 3
     assert enriched.qa.intended_pairings[0].pairing_id == "demo.payload_rc"
     assert enriched.qa.intended_pairings[0].status == "fully_recovered"
-    written = json.loads((tmp_path / "secondary_structure_prediction_v1.json").read_text(encoding="utf-8"))
+    written = json.loads((tmp_path / "secondary_structure_prediction_v2.json").read_text(encoding="utf-8"))
     assert written["qa"]["pairing_summary"]["cross_copy_pair_count"] == 2
 
 
@@ -1341,7 +1485,7 @@ def test_enrich_prediction_pairing_qa_extends_payload_stem_metric_through_adjace
         + "\n",
         encoding="utf-8",
     )
-    prediction = SecondaryStructurePredictionV1(
+    prediction = SecondaryStructurePredictionV2(
         prediction_id="demo.viennarna.canonical_component_unit",
         status="ok",
         input=SecondaryStructurePredictionInputV1(

@@ -38,7 +38,7 @@ def test_plot_output_dir_plain_relative_paths_resolve_from_cwd(
     repo_root = tmp_path / "repo"
     prediction_dir = repo_root / "src" / "dnadesign" / "construct" / "workspace" / "outputs" / "bundle" / "folding"
     prediction_dir.mkdir(parents=True)
-    prediction = prediction_dir / "secondary_structure_prediction_v1.json"
+    prediction = prediction_dir / "secondary_structure_prediction_v2.json"
     prediction.write_text("{}\n", encoding="utf-8")
     requested = Path("src/dnadesign/construct/workspace/outputs/bundle/visual/viennarna_secondary_structure")
     monkeypatch.chdir(repo_root)
@@ -52,7 +52,7 @@ def test_plot_output_dir_plain_relative_paths_resolve_from_cwd(
 def test_plot_output_dir_parent_relative_paths_stay_bundle_relative(tmp_path: Path) -> None:
     prediction_dir = tmp_path / "bundle" / "folding"
     prediction_dir.mkdir(parents=True)
-    prediction = prediction_dir / "secondary_structure_prediction_v1.json"
+    prediction = prediction_dir / "secondary_structure_prediction_v2.json"
     prediction.write_text("{}\n", encoding="utf-8")
 
     output_dir = _plot_output_dir_for(prediction, Path("../visual/viennarna_secondary_structure"))
@@ -259,12 +259,12 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
         + "\n",
         encoding="utf-8",
     )
-    prediction = tmp_path / "secondary_structure_prediction_v1.json"
+    prediction = tmp_path / "secondary_structure_prediction_v2.json"
     prediction.write_text(
         json.dumps(
             {
-                "contract": "secondary_structure_prediction_v1",
-                "schema_version": 1,
+                "contract": "secondary_structure_prediction_v2",
+                "schema_version": 2,
                 "prediction_id": "demo.viennarna.canonical_component_unit",
                 "status": "ok",
                 "input": {
@@ -415,12 +415,12 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
         + "\n",
         encoding="utf-8",
     )
-    prediction = folding_dir / "secondary_structure_prediction_v1.json"
+    prediction = folding_dir / "secondary_structure_prediction_v2.json"
     prediction.write_text(
         json.dumps(
             {
-                "contract": "secondary_structure_prediction_v1",
-                "schema_version": 1,
+                "contract": "secondary_structure_prediction_v2",
+                "schema_version": 2,
                 "prediction_id": "demo.viennarna.canonical_component_unit",
                 "status": "ok",
                 "input": {
@@ -474,7 +474,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
                 "status": "ok",
                 "artifacts": {
                     "folding_input_sequence": "folding/secondary_structure_input_sequence.json",
-                    "folding_prediction": "folding/secondary_structure_prediction_v1.json",
+                    "folding_prediction": "folding/secondary_structure_prediction_v2.json",
                     "viennarna_structure_plot": (
                         "visual/viennarna_secondary_structure/viennarna_secondary_structure_svg_v1.json"
                     ),

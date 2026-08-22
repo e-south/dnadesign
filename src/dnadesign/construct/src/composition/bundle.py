@@ -130,8 +130,8 @@ def _write_semantic_manifest_mirror(composed: ComposedLinearSsdna, *, artifact_b
                     "manifest/folding/secondary_structure_prediction_request_v1.yaml",
                 ),
                 (
-                    "folding/secondary_structure_prediction_v1.json",
-                    "manifest/folding/secondary_structure_prediction_v1.json",
+                    "folding/secondary_structure_prediction_v2.json",
+                    "manifest/folding/secondary_structure_prediction_v2.json",
                 ),
                 (
                     "folding/secondary_structure_input_sequence.json",
@@ -272,7 +272,7 @@ def _manifest_payload(composed: ComposedLinearSsdna, *, artifact_bundle: Path) -
         "created_at": datetime.now(timezone.utc).isoformat(),
         "contracts": {
             "composition": "linear_ssdna_composition_v1",
-            **({"folding": "secondary_structure_prediction_v1"} if composed.config.folding.enabled else {}),
+            **({"folding": "secondary_structure_prediction_v2"} if composed.config.folding.enabled else {}),
             "visual": "sequence_evidence_map_v1",
         },
         "artifacts": {

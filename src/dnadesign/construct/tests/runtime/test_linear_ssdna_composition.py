@@ -90,7 +90,7 @@ folding:
     interface: {folding_interface}
     executable: {folding_executable}
     python_module: {folding_python_module or ""}
-    backend_contract: secondary_structure_prediction_v1
+    backend_contract: secondary_structure_prediction_v2
     parameters:
       temperature_c: 37.0
   dna_policy:
@@ -492,7 +492,7 @@ def test_run_linear_ssdna_composition_writes_advisory_folding_artifacts_when_bac
 
     bundle = result.artifact_bundle
     request_path = bundle / "folding" / "secondary_structure_prediction_request_v1.yaml"
-    prediction_path = bundle / "folding" / "secondary_structure_prediction_v1.json"
+    prediction_path = bundle / "folding" / "secondary_structure_prediction_v2.json"
     preflight_path = bundle / "folding" / "folding_preflight.json"
     assert request_path.is_file()
     assert prediction_path.is_file()
@@ -510,7 +510,7 @@ def test_run_linear_ssdna_composition_writes_advisory_folding_artifacts_when_bac
     assert prediction["input"]["length"] == 88
     assert prediction["input"]["sequence_sha256"] != result.sequence_sha256
     assert manifest["artifacts"]["folding_request"] == "folding/secondary_structure_prediction_request_v1.yaml"
-    assert manifest["artifacts"]["folding_prediction"] == "folding/secondary_structure_prediction_v1.json"
+    assert manifest["artifacts"]["folding_prediction"] == "folding/secondary_structure_prediction_v2.json"
     assert "viennarna_structure_plot" not in manifest["artifacts"]
 
 
@@ -579,7 +579,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     result = run_linear_ssdna_composition(config_path)
 
     prediction = json.loads(
-        (result.artifact_bundle / "folding" / "secondary_structure_prediction_v1.json").read_text(encoding="utf-8")
+        (result.artifact_bundle / "folding" / "secondary_structure_prediction_v2.json").read_text(encoding="utf-8")
     )
     assert prediction["status"] == "ok"
     assert prediction["backend"]["name"] == "ViennaRNA"
@@ -738,7 +738,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
 
     manifest = json.loads((result.artifact_bundle / "manifest.json").read_text(encoding="utf-8"))
     prediction = json.loads(
-        (result.artifact_bundle / "folding" / "secondary_structure_prediction_v1.json").read_text(encoding="utf-8")
+        (result.artifact_bundle / "folding" / "secondary_structure_prediction_v2.json").read_text(encoding="utf-8")
     )
     assert prediction["status"] == "ok"
     assert "viennarna_structure_plot" not in manifest["artifacts"]

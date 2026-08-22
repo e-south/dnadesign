@@ -18,6 +18,8 @@ module used by the uv-managed default backend.
   `secondary_structure_prediction_request_v1` file.
 - **Plot an existing prediction:** use `plot` with a prediction, assembled
   sequence, and optional `sequence_evidence_map_v1`.
+- **Publish an assessment:** use the public Python API when a producer needs a
+  replayable advisory record tied to an exact molecular-state digest.
 - **Understand contracts:** read the contract flow below before adding a new
   producer or backend.
 
@@ -34,7 +36,7 @@ module used by the uv-managed default backend.
 uv run folding preflight --request <request.yaml>
 uv run folding run --request <request.yaml>
 uv run folding plot \
-  --prediction <secondary_structure_prediction_v1.json> \
+  --prediction <secondary_structure_prediction_v2.json> \
   --assembled-sequence <assembled_sequence.json> \
   --visual-contract <sequence_evidence_map_v1.json> \
   --output-dir <viennarna-plot-dir>
@@ -74,7 +76,9 @@ for ad hoc designs.
    reproducibility; use `backend.interface: cli` for a system-provided
    ViennaRNA `RNAfold` executable when a workflow explicitly needs the CLI
    interface.
-5. Emit the backend-neutral `secondary_structure_prediction_v1.json` result.
+5. Emit the backend-neutral `secondary_structure_prediction_v2.json` result.
+   Successful records carry a structure result; execution errors carry typed
+   failure evidence. V1 prediction artifacts are not accepted by this surface.
 6. When a `sequence_evidence_map_v1` is available, enrich prediction QA with
    cross-copy predicted pairings and intended-pair recovered/missed counts.
 7. Optionally publish `viennarna_secondary_structure_svg_v1.json`, native SVG,
@@ -82,6 +86,58 @@ for ad hoc designs.
 
 Missing backends are not treated as success. Advisory requests emit
 `warning_optional_missing`; required requests fail the run.
+
+### Advisory Assessment Records
+
+`publish_structure_assessment()` accepts a strict
+`StructureAssessmentRequestV1`. Its `AssessmentTargetV1` names the source
+state type, schema, identifier, state digest, exact DNA sequence and digest,
+physical posture, and any intended coordinate pairs. Folding does not infer
+those facts or import the producer's domain package. The current ViennaRNA
+projection accepts only targets that explicitly declare single strandedness
+and linear topology; double, circular, or unasserted posture fails validation
+instead of being silently reinterpreted.
+
+The assessment runs in an isolated worker process. The policy timeout applies
+to both ViennaRNA interfaces. On POSIX systems, cleanup terminates residual
+worker-group descendants after every completion or communication failure.
+Kernel file limits cap each worker output stream and each nested CLI-backend
+stream at 1,048,576 bytes, so a noisy backend fails instead of filling the
+worker or supervisor memory. The supervisor also caps combined resident memory
+for the worker and its permitted backend at 536,870,912 bytes. Linux workers
+add a matching kernel address-space limit; other supported POSIX hosts retain
+the supervisor-enforced resident-memory limit. Assessment copying repeats the
+256-entry, 1,048,576-byte per-file, and 16,777,216-byte aggregate ceilings
+before copied-descriptor replay. The worker
+disables the older low-level CLI deadline so the assessment supervisor is the
+only timeout authority. Publication is atomic and create-only. The target and
+worker-request artifacts are digest-pinned and semantically replayed against
+the high-level request. Preflight status, backend identity, version,
+availability, executable, and diagnostics must agree with the worker request
+and prediction; its output root is normalized so staged filesystem paths do
+not enter the evidence. Prediction input, parameters, full command, DNA/RNA
+projection policy, interface-specific log names, typed execution failures, and
+parse-failure policy must also replay exactly.
+Every referenced backend log must exist. The manifest binds
+the request, worker request, prediction, record, target-state digest,
+target-sequence digest, and an exhaustive digest inventory of every published
+evidence file. Inventory rejects links and non-regular entries before opening
+them, caps each artifact at 1,048,576 bytes, and hashes regular files in bounded
+chunks. Replay occurs while the publication transaction still owns
+rollback authority, with final path identity checked before and after replay.
+The verified loader rejects missing or extra files, byte drift, cross-record
+identity drift, transaction-private metadata, traversal, symlinked paths, and
+non-regular filesystem entries.
+
+The emitted `StructureAssessmentRecordV1` always has `authority: advisory`.
+It cannot make a HOP design valid, identify an experimental construct, or
+establish that a sequence is physically ready for assembly. The low-level
+`linear_ssdna` value passed to ViennaRNA is a computational projection; the
+assessment target preserves the caller-declared strandedness and topology.
+
+The assessment API currently has no CLI route. Add one only when a concrete
+operator workflow needs it; the typed Python surface and persisted record are
+the present consumer boundary.
 
 Both ViennaRNA interfaces accept only the optional `temperature_c` backend
 parameter. Unknown parameters, nonnumeric temperatures, nonfinite values, and
@@ -93,6 +149,8 @@ a second real backend establishes a shared execution contract.
 ### Architecture Boundaries
 
 - Folding consumes assembled sequence artifacts and typed folding requests.
+- Folding assesses an exact caller-owned state without taking authority over
+  that state or its scientific acceptance policy.
 - Folding does not assemble sequences, resolve Cruncher candidates, or own
   workspaces.
 - Folding may publish ViennaRNA-native structure SVGs from successful
@@ -104,6 +162,8 @@ a second real backend establishes a shared execution contract.
 
 - `src/api.py` owns request loading, backend preflight, ViennaRNA Python API or
   `RNAfold` CLI execution, and backend-neutral prediction emission.
+- `src/assessment/` owns target projection, worker isolation, create-only
+  assessment publication, and verified replay.
 - `src/pairing_qa.py` owns intended-vs-predicted and cross-copy pairing
   summaries.
 - `src/viennarna_plot.py` coordinates native ViennaRNA SVG publication.

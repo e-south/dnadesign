@@ -17,8 +17,8 @@ import pytest
 from pydantic import ValidationError as PydanticValidationError
 
 import dnadesign.contracts as contracts
-from dnadesign.contracts.folding import SecondaryStructurePredictionRequestV1, SecondaryStructurePredictionV1
-from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
+from dnadesign.contracts.folding import SecondaryStructurePredictionRequestV1, SecondaryStructurePredictionV2
+from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
     SecondaryStructurePredictionRequestBackendV1,
 )
 from dnadesign.contracts.sequence import (
@@ -107,6 +107,38 @@ def test_folding_request_rejects_an_unimplemented_backend() -> None:
                 "dna_policy": {"mode": "convert_t_to_u_for_rna_backend"},
             }
         )
+
+
+@pytest.mark.parametrize(
+    ("model", "payload"),
+    [
+        (
+            SecondaryStructurePredictionRequestBackendV1,
+            {
+                "name": "ViennaRNA",
+                "interface": "python_api",
+                "python_module": "RNA",
+                "backend_contract": "secondary_structure_prediction_v1",
+                "dna_policy": {"mode": "convert_t_to_u_for_rna_backend"},
+            },
+        ),
+        (
+            LinearSsdnaFoldingBackendConfigV1,
+            {
+                "name": "ViennaRNA",
+                "interface": "python_api",
+                "python_module": "RNA",
+                "backend_contract": "secondary_structure_prediction_v1",
+            },
+        ),
+    ],
+)
+def test_folding_request_surfaces_reject_unsupported_result_contracts(
+    model: type[object],
+    payload: dict[str, object],
+) -> None:
+    with pytest.raises(PydanticValidationError, match="secondary_structure_prediction_v2"):
+        model.model_validate(payload)  # type: ignore[attr-defined]
 
 
 def _rt_part_publication_payload() -> dict[str, object]:
@@ -524,10 +556,10 @@ def test_linear_ssdna_composition_contract_rejects_duplicate_segment_ids() -> No
 
 def test_secondary_structure_prediction_contract_rejects_length_mismatch() -> None:
     with pytest.raises(PydanticValidationError, match="dot_bracket length must equal input length"):
-        SecondaryStructurePredictionV1.model_validate(
+        SecondaryStructurePredictionV2.model_validate(
             {
-                "contract": "secondary_structure_prediction_v1",
-                "schema_version": 1,
+                "contract": "secondary_structure_prediction_v2",
+                "schema_version": 2,
                 "prediction_id": "demo.rnafold.canonical_component_unit",
                 "status": "ok",
                 "input": {
@@ -558,10 +590,10 @@ def test_secondary_structure_prediction_contract_rejects_length_mismatch() -> No
 
 
 def test_secondary_structure_prediction_contract_accepts_valid_pair_map() -> None:
-    prediction = SecondaryStructurePredictionV1.model_validate(
+    prediction = SecondaryStructurePredictionV2.model_validate(
         {
-            "contract": "secondary_structure_prediction_v1",
-            "schema_version": 1,
+            "contract": "secondary_structure_prediction_v2",
+            "schema_version": 2,
             "prediction_id": "demo.rnafold.canonical_component_unit",
             "status": "ok",
             "input": {

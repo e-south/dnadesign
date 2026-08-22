@@ -37,7 +37,7 @@ folding:
     name: ViennaRNA
     interface: cli
     executable: definitely-missing-rnafold-for-dnadesign-test
-    backend_contract: secondary_structure_prediction_v1
+    backend_contract: secondary_structure_prediction_v2
   dna_policy:
     mode: convert_t_to_u_for_rna_backend
 """
@@ -105,8 +105,8 @@ def test_composition_bundle_clears_stale_folding_artifacts_when_folding_disabled
     run_linear_ssdna_composition(first_config)
     stale_folding_artifacts = artifact_bundle / "folding"
     stale_folding_mirror = artifact_bundle / "manifest" / "folding"
-    assert (stale_folding_artifacts / "secondary_structure_prediction_v1.json").is_file()
-    assert (stale_folding_mirror / "secondary_structure_prediction_v1.json").is_file()
+    assert (stale_folding_artifacts / "secondary_structure_prediction_v2.json").is_file()
+    assert (stale_folding_mirror / "secondary_structure_prediction_v2.json").is_file()
 
     second_config = _write_minimal_composition_config(tmp_path, artifact_bundle=artifact_bundle)
     run_linear_ssdna_composition(second_config)

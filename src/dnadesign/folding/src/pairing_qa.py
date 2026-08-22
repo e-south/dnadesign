@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from dnadesign.contracts.folding import SecondaryStructurePredictionV1
-from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
+from dnadesign.contracts.folding import SecondaryStructurePredictionV2
+from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
     SecondaryStructureContiguousWatsonCrickStemRunV1,
     SecondaryStructureIntendedPairingQaV1,
 )
@@ -25,7 +25,7 @@ _STEM_METRIC_EXCLUDED_TAG_KINDS = frozenset({"snapback_cap"})
 
 
 def cross_copy_pairing_annotations(
-    prediction: SecondaryStructurePredictionV1,
+    prediction: SecondaryStructurePredictionV2,
     *,
     unit_copy_spans: tuple[dict[str, int | str], ...],
 ) -> list[dict[str, object]]:
