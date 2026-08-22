@@ -652,6 +652,8 @@ def _verify_prediction_failure(
         label="prediction stderr",
     ).decode("utf-8")
     if failure.kind == "output_parse_exception":
+        if request.backend.interface == "python_api" and stderr:
+            raise ValueError("Assessment Python parse-failure stderr is not canonical producer evidence.")
         submitted_sequence = request.target.sequence.upper()
         if request.backend.dna_policy.mode == "convert_t_to_u_for_rna_backend":
             submitted_sequence = submitted_sequence.replace("T", "U")

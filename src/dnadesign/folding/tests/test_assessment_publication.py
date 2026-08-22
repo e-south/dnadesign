@@ -1495,3 +1495,40 @@ def test_structure_assessment_loader_enforces_parse_failure_policy(
 
     with pytest.raises(ValueError, match="parse-failure status contradicts the persisted failure policy"):
         load_published_assessment(output)
+
+
+def test_structure_assessment_loader_requires_empty_python_parse_failure_stderr(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    (tmp_path / "fake-backend/RNA.py").write_text(
+        "__version__ = 'test-1.0'\n"
+        "class Compound:\n"
+        "    def mfe(self):\n"
+        "        return '.....', -1.2\n"
+        "def fold_compound(sequence):\n"
+        "    return Compound()\n",
+        encoding="utf-8",
+    )
+    request = _request().model_copy(
+        update={
+            "policy": _request().policy.model_copy(
+                update={"required": False, "fail_on_length_mismatch": False},
+            )
+        },
+    )
+    output = tmp_path / "assessment"
+    published = publish_structure_assessment(request, output_dir=output)
+    assert published.record.prediction.failure is not None
+    assert published.record.prediction.failure.kind == "output_parse_exception"
+    stderr_relative = "prediction/ViennaRNA.python_api.stderr.txt"
+    stderr_content = b"fabricated warning\n"
+    (output / stderr_relative).write_bytes(stderr_content)
+    manifest_path = output / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifact_digests"][stderr_relative] = _content_digest(stderr_content)
+    manifest_path.write_bytes(_json_content(manifest))
+
+    with pytest.raises(ValueError, match="Python parse-failure stderr is not canonical producer evidence"):
+        load_published_assessment(output)
