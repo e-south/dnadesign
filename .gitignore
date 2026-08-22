@@ -234,6 +234,8 @@ src/dnadesign/densegen/workspaces/**
 !src/dnadesign/densegen/workspaces/demo_dense_array_showcase/
 !src/dnadesign/densegen/workspaces/demo_dense_array_showcase/README.md
 !src/dnadesign/densegen/workspaces/demo_dense_array_showcase/config.yaml
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/playback.yaml
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/playback-constraints.yaml
 !src/dnadesign/densegen/workspaces/demo_dense_array_showcase/runbook.md
 !src/dnadesign/densegen/workspaces/demo_dense_array_showcase/runbook.sh
 !src/dnadesign/densegen/workspaces/demo_dense_array_showcase/inputs/
@@ -254,6 +256,7 @@ src/dnadesign/densegen/workspaces/**
 !src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/inputs/
 !src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/inputs/motif_artifacts/
 !src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/inputs/motif_artifacts/*.json
+!src/dnadesign/baserender/assets/overlays/*.png
 # BaseRender workspaces: ignore everything by default, allow README
 src/dnadesign/baserender/workspaces/**
 !src/dnadesign/baserender/workspaces/README.md

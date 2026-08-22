@@ -139,7 +139,17 @@ class _SpanLinkEffectContract:
                     ensure(req in span_obj, f"span_link {key} missing '{req}'", ContractError)
 
         params = effect.params
-        reject_unknown_keys(params, {"label", "inner_margin_bp", "lane"}, "span_link.params")
+        reject_unknown_keys(
+            params,
+            {"label", "inner_margin_bp", "lane", "shrink_label_to_fit"},
+            "span_link.params",
+        )
+        if "shrink_label_to_fit" in params:
+            ensure(
+                isinstance(params["shrink_label_to_fit"], bool),
+                "span_link.shrink_label_to_fit must be bool",
+                ContractError,
+            )
 
 
 @dataclass(frozen=True)
@@ -268,6 +278,74 @@ class _BoundaryMarkerEffectContract:
 
 
 @dataclass(frozen=True)
+class _AnchoredIllustrationEffectContract:
+    kind: str = "anchored_illustration"
+
+    def validate_effect(self, effect: Effect, record: Record) -> None:
+        reject_unknown_keys(effect.target, {"bindings"}, "anchored_illustration.target")
+        bindings = effect.target.get("bindings")
+        ensure(
+            isinstance(bindings, list) and len(bindings) > 0,
+            "anchored_illustration.target.bindings must be a non-empty list",
+            ContractError,
+        )
+        seen_anchors: set[str] = set()
+        seen_features: set[str] = set()
+        for index, binding in enumerate(bindings):
+            ensure(
+                isinstance(binding, Mapping),
+                f"anchored_illustration.target.bindings[{index}] must be a mapping",
+                ContractError,
+            )
+            reject_unknown_keys(
+                binding,
+                {"anchor_id", "feature_id", "start", "end"},
+                f"anchored_illustration.target.bindings[{index}]",
+            )
+            for field_name in ("anchor_id", "feature_id", "start", "end"):
+                ensure(
+                    field_name in binding,
+                    f"anchored_illustration.target.bindings[{index}] missing {field_name!r}",
+                    ContractError,
+                )
+            anchor_id = str(binding["anchor_id"]).strip()
+            feature_id = str(binding["feature_id"]).strip()
+            ensure(anchor_id != "", "anchored illustration anchor_id must be non-empty", ContractError)
+            ensure(feature_id != "", "anchored illustration feature_id must be non-empty", ContractError)
+            ensure(anchor_id not in seen_anchors, "anchored illustration anchor ids must be unique", ContractError)
+            ensure(feature_id not in seen_features, "anchored illustration feature ids must be unique", ContractError)
+            start = binding["start"]
+            end = binding["end"]
+            ensure(
+                isinstance(start, int) and not isinstance(start, bool),
+                "anchored illustration binding start must be int",
+                ContractError,
+            )
+            ensure(
+                isinstance(end, int) and not isinstance(end, bool),
+                "anchored illustration binding end must be int",
+                ContractError,
+            )
+            ensure(
+                0 <= start < end <= len(record.sequence),
+                "anchored illustration binding span must fit within record sequence",
+                ContractError,
+            )
+            seen_anchors.add(anchor_id)
+            seen_features.add(feature_id)
+        reject_unknown_keys(
+            effect.params,
+            {"asset_id", "width_px", "top_gap_px", "fill_color", "fill_alpha"},
+            "anchored_illustration.params",
+        )
+        ensure(
+            str(effect.params.get("asset_id", "")).strip() != "",
+            "anchored_illustration.params.asset_id is required",
+            ContractError,
+        )
+
+
+@dataclass(frozen=True)
 class _PairMapEffectContract:
     kind: str = "pair_map"
 
@@ -337,4 +415,5 @@ def register_builtin_contracts() -> None:
     register_effect_contract(_SpanLinkEffectContract())
     register_effect_contract(_MotifLogoEffectContract())
     register_effect_contract(_BoundaryMarkerEffectContract())
+    register_effect_contract(_AnchoredIllustrationEffectContract())
     register_effect_contract(_PairMapEffectContract())
