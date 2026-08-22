@@ -537,7 +537,7 @@ def test_assessment_inventory_charges_bytes_from_the_opened_files(
     def grow_before_open(
         path: str | bytes | int,
         flags: int,
-        mode: int = 0o777,
+        mode: int = 0o600,
         *,
         dir_fd: int | None = None,
     ) -> int:
@@ -758,7 +758,7 @@ def test_structure_assessment_loader_reads_and_validates_one_anchored_descriptor
     def open_file_then_replace_path(
         path: str | bytes | int,
         flags: int,
-        mode: int = 0o777,
+        mode: int = 0o600,
         *,
         dir_fd: int | None = None,
     ) -> int:
@@ -1117,6 +1117,59 @@ def test_structure_assessment_loader_replays_claimed_execution_failure(
     manifest_path.write_bytes(_json_content(manifest))
 
     with pytest.raises(ValueError, match="parse-failure claim contradicts successful backend output replay"):
+        load_published_assessment(output)
+
+
+def test_structure_assessment_loader_binds_exception_type_to_backend_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_root = tmp_path / "failing-backend"
+    module_root.mkdir()
+    (module_root / "RNA.py").write_text(
+        "__version__ = 'test-1.0'\n"
+        "class Compound:\n"
+        "    def mfe(self):\n"
+        "        raise ValueError('backend failure')\n"
+        "def fold_compound(sequence):\n"
+        "    return Compound()\n",
+        encoding="utf-8",
+    )
+    existing = os.environ.get("PYTHONPATH", "")
+    monkeypatch.setenv(
+        "PYTHONPATH",
+        os.pathsep.join(part for part in (module_root.as_posix(), existing) if part),
+    )
+    request = _request().model_copy(
+        update={"policy": _request().policy.model_copy(update={"required": False})},
+    )
+    output = tmp_path / "assessment"
+    published = publish_structure_assessment(request, output_dir=output)
+    assert published.record.prediction.failure is not None
+    assert published.record.prediction.failure.kind == "backend_exception"
+
+    prediction_path = output / "prediction/secondary_structure_prediction_v2.json"
+    record_path = output / "assessment-record.json"
+    manifest_path = output / "manifest.json"
+    prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    prediction["failure"]["exception_type"] = "FabricatedError"
+    record["prediction"] = prediction
+    prediction_content = _json_content(prediction)
+    prediction_digest = _content_digest(prediction_content)
+    record["prediction_digest"] = prediction_digest
+    record_content = _json_content(record)
+    record_digest = _content_digest(record_content)
+    prediction_path.write_bytes(prediction_content)
+    record_path.write_bytes(record_content)
+    manifest["prediction_digest"] = prediction_digest
+    manifest["record_digest"] = record_digest
+    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v2.json"] = prediction_digest
+    manifest["artifact_digests"]["assessment-record.json"] = record_digest
+    manifest_path.write_bytes(_json_content(manifest))
+
+    with pytest.raises(ValueError, match="exception evidence does not match backend logs"):
         load_published_assessment(output)
 
 

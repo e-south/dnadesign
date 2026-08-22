@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -43,4 +44,19 @@ def prediction_log_paths(*, interface: str) -> tuple[str, str]:
     return "RNAfold.stdout.txt", "RNAfold.stderr.txt"
 
 
-__all__ = ["prediction_command", "prediction_log_paths"]
+def exception_evidence_text(*, exception_type: str, message: str) -> str:
+    """Return canonical backend-exception evidence for one generated stderr log."""
+    return (
+        json.dumps(
+            {
+                "contract": "folding_backend_exception_v1",
+                "exception_type": exception_type,
+                "message": message,
+            },
+            sort_keys=True,
+        )
+        + "\n"
+    )
+
+
+__all__ = ["exception_evidence_text", "prediction_command", "prediction_log_paths"]

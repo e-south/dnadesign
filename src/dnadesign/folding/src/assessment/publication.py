@@ -37,7 +37,7 @@ from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
 )
 
 from ..errors import FoldingError, FoldingLengthMismatchError, FoldingMalformedOutputError
-from ..execution_metadata import prediction_command, prediction_log_paths
+from ..execution_metadata import exception_evidence_text, prediction_command, prediction_log_paths
 from ..rnafold import parse_rnafold_stdout
 from ._limits import (
     ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES,
@@ -662,7 +662,14 @@ def _verify_prediction_failure(
         if failure.message != expected_message:
             raise ValueError("Assessment nonzero-exit evidence is internally inconsistent.")
         return
-    if stdout or stderr.strip() != failure.message:
+    exception_type = failure.exception_type
+    if exception_type is None:
+        raise ValueError("Assessment exception evidence lacks its exception type.")
+    expected_stderr = exception_evidence_text(
+        exception_type=exception_type,
+        message=failure.message,
+    )
+    if stdout or stderr != expected_stderr:
         raise ValueError("Assessment exception evidence does not match backend logs.")
 
 

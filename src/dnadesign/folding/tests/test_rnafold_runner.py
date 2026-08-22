@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+import dnadesign.folding.src.api as folding_api
 from dnadesign.contracts.folding import SecondaryStructurePredictionRequestV1
 from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
     SecondaryStructurePredictionBackendV1,
@@ -35,6 +36,7 @@ from dnadesign.folding import (
     run_prediction_request,
 )
 from dnadesign.folding.src.errors import FoldingConfigError, FoldingExecutionError
+from dnadesign.folding.src.execution_metadata import exception_evidence_text
 from dnadesign.folding.src.viennarna_svg import _expand_root_viewbox, _stem_metric_label
 
 _CONTIGUOUS_STEM_SEQUENCE = "GACGATATCGTC"
@@ -369,6 +371,35 @@ printf ">demo\\nGCAU\\n(()) (-2.30)\\n"
     assert (tmp_path / "folding" / prediction.artifacts.stdout).is_file()
 
 
+def test_optional_cli_invocation_failure_materializes_exception_type_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executable = tmp_path / "RNAfold"
+    executable.write_text(
+        '#!/bin/sh\nif [ "$1" = "--version" ]; then\n  printf "RNAfold 2.7.0\\n"\n  exit 0\nfi\n',
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+
+    def fail_invocation(*_args, **_kwargs):
+        raise PermissionError("execution denied")
+
+    monkeypatch.setattr(folding_api, "_run_bounded_cli_command", fail_invocation)
+    prediction = run_prediction_request(
+        _request(tmp_path, executable=executable.as_posix(), required=False),
+        output_dir=tmp_path / "folding",
+    )
+
+    assert prediction.failure is not None
+    assert prediction.failure.kind == "backend_invocation_exception"
+    assert prediction.artifacts.stderr is not None
+    assert (tmp_path / "folding" / prediction.artifacts.stderr).read_text(encoding="utf-8") == exception_evidence_text(
+        exception_type="PermissionError",
+        message="ViennaRNA RNAfold CLI execution failed: execution denied",
+    )
+
+
 @pytest.mark.parametrize(
     ("rnafold_output", "error_match"),
     [
@@ -470,6 +501,10 @@ def test_optional_python_api_failure_materializes_referenced_logs(
     assert prediction.artifacts.stderr is not None
     assert (tmp_path / "folding" / prediction.artifacts.stdout).is_file()
     assert (tmp_path / "folding" / prediction.artifacts.stderr).is_file()
+    assert (tmp_path / "folding" / prediction.artifacts.stderr).read_text(encoding="utf-8") == exception_evidence_text(
+        exception_type="ValueError",
+        message="ViennaRNA Python API execution failed: backend failure",
+    )
 
 
 def test_publish_viennarna_structure_svg_annotates_native_svg(

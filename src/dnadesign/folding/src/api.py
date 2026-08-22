@@ -45,7 +45,7 @@ from .errors import (
     FoldingLengthMismatchError,
     FoldingMalformedOutputError,
 )
-from .execution_metadata import prediction_command, prediction_log_paths
+from .execution_metadata import exception_evidence_text, prediction_command, prediction_log_paths
 from .rnafold import parse_rnafold_stdout
 
 try:
@@ -294,11 +294,13 @@ def run_prediction_request(
             deny_backend_child_processes=deny_backend_child_processes,
         )
     except (OSError, subprocess.SubprocessError) as exc:
+        error = f"ViennaRNA RNAfold CLI execution failed: {exc}"
+        exception_type = type(exc).__name__
         _write_backend_logs(
             output_path,
             interface=request.backend.interface,
             stdout="",
-            stderr=f"ViennaRNA RNAfold CLI execution failed: {exc}\n",
+            stderr=exception_evidence_text(exception_type=exception_type, message=error),
         )
         prediction = _error_prediction(
             request,
@@ -306,9 +308,9 @@ def run_prediction_request(
             preflight=preflight,
             submitted_alphabet=submitted_alphabet,
             command=command,
-            error=f"ViennaRNA RNAfold CLI execution failed: {exc}",
+            error=error,
             failure_kind="backend_invocation_exception",
-            exception_type=type(exc).__name__,
+            exception_type=exception_type,
         )
         _write_prediction(output_path, prediction)
         if request.policy.required and raise_on_required_failure:
@@ -412,11 +414,13 @@ def _run_python_api_prediction_request(
             parameters=request.backend.parameters,
         )
     except (FoldingError, ImportError, AttributeError, TypeError, ValueError) as exc:
+        error = f"ViennaRNA Python API execution failed: {exc}"
+        exception_type = type(exc).__name__
         _write_backend_logs(
             output_path,
             interface=request.backend.interface,
             stdout="",
-            stderr=f"ViennaRNA Python API execution failed: {exc}\n",
+            stderr=exception_evidence_text(exception_type=exception_type, message=error),
         )
         prediction = _error_prediction(
             request,
@@ -424,9 +428,9 @@ def _run_python_api_prediction_request(
             preflight=preflight,
             submitted_alphabet=submitted_alphabet,
             command=command,
-            error=f"ViennaRNA Python API execution failed: {exc}",
+            error=error,
             failure_kind="backend_exception",
-            exception_type=type(exc).__name__,
+            exception_type=exception_type,
         )
         _write_prediction(output_path, prediction)
         if request.policy.required and raise_on_required_failure:
