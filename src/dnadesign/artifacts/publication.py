@@ -14,7 +14,6 @@ from __future__ import annotations
 import ctypes
 import errno
 import os
-import shutil
 import stat
 import sys
 import tempfile
@@ -49,6 +48,36 @@ _PRIVATE_DIRECTORY_MODE = 0o700
 _PRIVATE_FILE_MODE = 0o600
 _DEFAULT_PUBLISHED_ROOT_MODE = 0o755
 _PUBLICATION_SENSITIVITIES = frozenset({"public", "private"})
+_COPY_CHUNK_BYTES = 65_536
+
+
+@dataclass(slots=True)
+class _CopyBudget:
+    file_limit_bytes: int | None
+    aggregate_limit_bytes: int | None
+    copied_bytes: int = 0
+
+    def charge(self, *, file_bytes: int, chunk_bytes: int, source_name: str) -> int:
+        next_file_bytes = file_bytes + chunk_bytes
+        next_total_bytes = self.copied_bytes + chunk_bytes
+        if self.file_limit_bytes is not None and next_file_bytes >= self.file_limit_bytes:
+            raise PublicationError(
+                f"Bundle staging file exceeded the {self.file_limit_bytes}-byte copy limit: {source_name}"
+            )
+        if self.aggregate_limit_bytes is not None and next_total_bytes >= self.aggregate_limit_bytes:
+            raise PublicationError(
+                f"Bundle staging exceeded the {self.aggregate_limit_bytes}-byte aggregate copy limit"
+            )
+        self.copied_bytes = next_total_bytes
+        return next_file_bytes
+
+
+def _validate_copy_limit(value: int | None, *, label: str) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise PublicationError(f"Artifact bundle {label} must be a positive integer")
+    return value
 
 
 def _validate_published_root_mode(mode: int) -> int:
@@ -174,6 +203,8 @@ def _copy_file(
     source_name: str,
     parent_descriptor: int,
     name: str,
+    *,
+    budget: _CopyBudget,
 ) -> None:
     source_flags = os.O_RDONLY
     destination_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
@@ -192,19 +223,32 @@ def _copy_file(
             dir_fd=parent_descriptor,
         )
         try:
+            file_bytes = 0
             with os.fdopen(os.dup(source_descriptor), "rb") as source_handle:
                 with os.fdopen(os.dup(destination_descriptor), "wb") as destination_handle:
-                    shutil.copyfileobj(source_handle, destination_handle)
+                    while chunk := source_handle.read(_COPY_CHUNK_BYTES):
+                        file_bytes = budget.charge(
+                            file_bytes=file_bytes,
+                            chunk_bytes=len(chunk),
+                            source_name=source_name,
+                        )
+                        destination_handle.write(chunk)
         finally:
             os.close(destination_descriptor)
     finally:
         os.close(source_descriptor)
 
 
-def _copy_directory(source: Path | int, parent_descriptor: int, name: str) -> None:
+def _copy_directory(
+    source: Path | int,
+    parent_descriptor: int,
+    name: str,
+    *,
+    budget: _CopyBudget,
+) -> None:
     source_descriptor = _source_directory_descriptor(source)
     try:
-        _copy_directory_from_descriptor(source_descriptor, parent_descriptor, name)
+        _copy_directory_from_descriptor(source_descriptor, parent_descriptor, name, budget=budget)
     finally:
         os.close(source_descriptor)
 
@@ -213,6 +257,8 @@ def _copy_directory_from_descriptor(
     source_descriptor: int,
     parent_descriptor: int,
     name: str,
+    *,
+    budget: _CopyBudget,
 ) -> None:
     os.mkdir(name, mode=_PRIVATE_DIRECTORY_MODE, dir_fd=parent_descriptor)
     flags = os.O_RDONLY | os.O_DIRECTORY
@@ -228,11 +274,22 @@ def _copy_directory_from_descriptor(
             if stat.S_ISDIR(entry_stat.st_mode):
                 child_descriptor = os.open(entry, flags, dir_fd=source_descriptor)
                 try:
-                    _copy_directory_from_descriptor(child_descriptor, destination_descriptor, entry)
+                    _copy_directory_from_descriptor(
+                        child_descriptor,
+                        destination_descriptor,
+                        entry,
+                        budget=budget,
+                    )
                 finally:
                     os.close(child_descriptor)
             elif stat.S_ISREG(entry_stat.st_mode):
-                _copy_file(source_descriptor, entry, destination_descriptor, entry)
+                _copy_file(
+                    source_descriptor,
+                    entry,
+                    destination_descriptor,
+                    entry,
+                    budget=budget,
+                )
             else:
                 raise PublicationError(f"Bundle staging contains an unsupported entry: {entry}")
     finally:
@@ -552,11 +609,23 @@ class CreateOnlyDirectoryPublication:
         *,
         required_manifest: str,
         verify_copied_descriptor: Callable[[int], None] | None = None,
+        copy_file_size_limit_bytes: int | None = None,
+        copy_aggregate_size_limit_bytes: int | None = None,
     ) -> None:
         if self._closed:
             raise PublicationError("Artifact publication is already closed")
         if self._published_descriptor is not None:
             raise PublicationError(f"Artifact bundle is already published: {self.final}")
+        copy_budget = _CopyBudget(
+            file_limit_bytes=_validate_copy_limit(
+                copy_file_size_limit_bytes,
+                label="copy file-size limit",
+            ),
+            aggregate_limit_bytes=_validate_copy_limit(
+                copy_aggregate_size_limit_bytes,
+                label="copy aggregate-size limit",
+            ),
+        )
         validated_published_root_mode = _validate_published_root_mode(self.published_root_mode)
         manifest_relative = Path(required_manifest)
         if (
@@ -584,7 +653,12 @@ class CreateOnlyDirectoryPublication:
         renamed = False
         published_descriptor: int | None = None
         try:
-            _copy_directory(self.stage_descriptor, self.parent_descriptor, self.adjacent_stage_name)
+            _copy_directory(
+                self.stage_descriptor,
+                self.parent_descriptor,
+                self.adjacent_stage_name,
+                budget=copy_budget,
+            )
             if not self._parent_matches_anchor():
                 raise PublicationError(f"Artifact bundle parent changed during publication: {self.final.parent}")
             final_flags = os.O_RDONLY | os.O_DIRECTORY

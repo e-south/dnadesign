@@ -177,7 +177,13 @@ def test_structure_assessment_verifies_the_copied_snapshot_before_publish(
     original_copy_directory = artifact_publication._copy_directory
     mutated = False
 
-    def mutate_stage_then_copy(source: Path | int, parent_descriptor: int, name: str) -> None:
+    def mutate_stage_then_copy(
+        source: Path | int,
+        parent_descriptor: int,
+        name: str,
+        *,
+        budget: artifact_publication._CopyBudget,
+    ) -> None:
         nonlocal mutated
         if isinstance(source, int) and not mutated:
             descriptor = os.open(
@@ -188,7 +194,7 @@ def test_structure_assessment_verifies_the_copied_snapshot_before_publish(
             with os.fdopen(descriptor, "wb") as handle:
                 handle.write(b"{}\n")
             mutated = True
-        original_copy_directory(source, parent_descriptor, name)
+        original_copy_directory(source, parent_descriptor, name, budget=budget)
 
     monkeypatch.setattr(artifact_publication, "_copy_directory", mutate_stage_then_copy)
     output = tmp_path / "mutated-during-copy-assessment"
@@ -1172,6 +1178,40 @@ def test_structure_assessment_loader_binds_exception_type_to_backend_evidence(
 
     with pytest.raises(ValueError, match="exception evidence does not match backend logs"):
         load_published_assessment(output)
+
+
+def test_optional_python_backend_runtime_error_publishes_typed_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_root = tmp_path / "runtime-error-backend"
+    module_root.mkdir()
+    (module_root / "RNA.py").write_text(
+        "__version__ = 'test-1.0'\n"
+        "class Compound:\n"
+        "    def mfe(self):\n"
+        "        raise RuntimeError('ordinary backend failure')\n"
+        "def fold_compound(sequence):\n"
+        "    return Compound()\n",
+        encoding="utf-8",
+    )
+    existing = os.environ.get("PYTHONPATH", "")
+    monkeypatch.setenv(
+        "PYTHONPATH",
+        os.pathsep.join(part for part in (module_root.as_posix(), existing) if part),
+    )
+    request = _request().model_copy(
+        update={"policy": _request().policy.model_copy(update={"required": False})},
+    )
+
+    published = publish_structure_assessment(request, output_dir=tmp_path / "assessment")
+
+    failure = published.record.prediction.failure
+    assert published.record.status == "error"
+    assert failure is not None
+    assert failure.kind == "backend_exception"
+    assert failure.exception_type == "RuntimeError"
+    assert failure.message == "ViennaRNA Python API execution failed: ordinary backend failure"
 
 
 def test_structure_assessment_loader_binds_nonzero_returncode_to_backend_evidence(

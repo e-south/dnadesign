@@ -34,8 +34,8 @@ def assessment_target() -> AssessmentTargetV1:
         sequence_id="hop:encoding/example",
         sequence_sha256=f"sha256:{hashlib.sha256(sequence.encode()).hexdigest()}",
         sequence=sequence,
-        strandedness="not_asserted",
-        topology="not_asserted",
+        strandedness="single",
+        topology="linear",
     )
 
 

@@ -35,8 +35,8 @@ def _target() -> AssessmentTargetV1:
         sequence_sha256=f"sha256:{hashlib.sha256(sequence.encode()).hexdigest()}",
         sequence=sequence,
         alphabet="dna",
-        strandedness="not_asserted",
-        topology="not_asserted",
+        strandedness="single",
+        topology="linear",
         intended_pairs=(AssessmentIntendedPairV1(left=0, right=5),),
     )
 
@@ -62,6 +62,26 @@ def test_assessment_target_rejects_pair_outside_target() -> None:
     payload["intended_pairs"] = [{"left": 0, "right": 6}]
 
     with pytest.raises(ValidationError, match="intended pair coordinate"):
+        AssessmentTargetV1.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("strandedness", "double"),
+        ("strandedness", "not_asserted"),
+        ("topology", "circular"),
+        ("topology", "not_asserted"),
+    ],
+)
+def test_assessment_target_rejects_posture_that_viennarna_projection_cannot_honor(
+    field: str,
+    value: str,
+) -> None:
+    payload = _target().model_dump()
+    payload[field] = value
+
+    with pytest.raises(ValidationError, match=field):
         AssessmentTargetV1.model_validate(payload)
 
 

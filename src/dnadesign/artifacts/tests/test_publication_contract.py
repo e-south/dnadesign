@@ -108,6 +108,25 @@ def test_private_sensitivity_keeps_the_complete_published_tree_owner_only(tmp_pa
         assert stat.S_IMODE(path.stat().st_mode) == expected, path
 
 
+def test_publication_copy_enforces_file_budget_before_verification(tmp_path: Path) -> None:
+    bundle = tmp_path / "results" / "render-v1"
+    publication = CreateOnlyDirectoryPublication.prepare(bundle)
+    try:
+        (publication.stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+        (publication.stage / "backend.log").write_bytes(b"x" * 32)
+
+        with pytest.raises(PublicationError, match="32-byte copy limit"):
+            publication.publish(
+                required_manifest="manifest.json",
+                copy_file_size_limit_bytes=32,
+                copy_aggregate_size_limit_bytes=128,
+            )
+    finally:
+        publication.close()
+
+    assert not bundle.exists()
+
+
 def test_publication_copies_the_prepared_stage_descriptor_after_path_replacement(tmp_path: Path) -> None:
     bundle = tmp_path / "results" / "render-v1"
     publication = CreateOnlyDirectoryPublication.prepare(bundle)

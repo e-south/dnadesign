@@ -93,7 +93,10 @@ Missing backends are not treated as success. Advisory requests emit
 `StructureAssessmentRequestV1`. Its `AssessmentTargetV1` names the source
 state type, schema, identifier, state digest, exact DNA sequence and digest,
 physical posture, and any intended coordinate pairs. Folding does not infer
-those facts or import the producer's domain package.
+those facts or import the producer's domain package. The current ViennaRNA
+projection accepts only targets that explicitly declare single strandedness
+and linear topology; double, circular, or unasserted posture fails validation
+instead of being silently reinterpreted.
 
 The assessment runs in an isolated worker process. The policy timeout applies
 to both ViennaRNA interfaces. On POSIX systems, cleanup terminates residual

@@ -75,8 +75,8 @@ class AssessmentTargetV1(AssessmentContractModel):
     sequence_sha256: str = Field(pattern=_SHA256_PATTERN)
     sequence: str = Field(min_length=1)
     alphabet: Literal["dna"] = "dna"
-    strandedness: Literal["single", "double", "not_asserted"]
-    topology: Literal["linear", "circular", "not_asserted"]
+    strandedness: Literal["single"]
+    topology: Literal["linear"]
     intended_pairs: tuple[AssessmentIntendedPairV1, ...] = ()
 
     @field_validator("state_id", "state_type", "state_schema", "sequence_id")

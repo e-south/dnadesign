@@ -428,7 +428,7 @@ def _run_python_api_prediction_request(
             sequence_id=request.input.sequence_id,
             parameters=request.backend.parameters,
         )
-    except (FoldingError, ImportError, AttributeError, TypeError, ValueError) as exc:
+    except Exception as exc:  # Backend failures are evidence; process-control exceptions remain fatal.
         error = f"ViennaRNA Python API execution failed: {exc}"
         exception_type = type(exc).__name__
         _write_backend_logs(

@@ -187,12 +187,47 @@ def test_structure_assessment_python_backend_cannot_double_fork(
     )
     monkeypatch.setenv("ASSESSMENT_CHILD_PID", child_pid_path.as_posix())
     output = tmp_path / "assessment"
-    with pytest.raises(FoldingExecutionError, match="worker failed"):
+    with pytest.raises(FoldingExecutionError, match="Python API execution failed"):
         publish_structure_assessment(
             assessment_request(timeout_seconds=2.0),
             output_dir=output,
         )
     assert not child_pid_path.exists()
+    assert not output.exists()
+
+
+def test_structure_assessment_does_not_serialize_process_control_exceptions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_root = tmp_path / "process-control-backend"
+    module_root.mkdir()
+    (module_root / "RNA.py").write_text(
+        "__version__ = 'test-1.0'\n"
+        "class Compound:\n"
+        "    def mfe(self):\n"
+        "        raise SystemExit(19)\n"
+        "def fold_compound(sequence):\n"
+        "    return Compound()\n",
+        encoding="utf-8",
+    )
+    existing = os.environ.get("PYTHONPATH", "")
+    monkeypatch.setenv(
+        "PYTHONPATH",
+        os.pathsep.join(part for part in (module_root.as_posix(), existing) if part),
+    )
+    output = tmp_path / "assessment"
+
+    with pytest.raises(FoldingExecutionError, match="worker failed"):
+        publish_structure_assessment(
+            assessment_request().model_copy(
+                update={
+                    "policy": assessment_request().policy.model_copy(update={"required": False}),
+                }
+            ),
+            output_dir=output,
+        )
+
     assert not output.exists()
 
 
