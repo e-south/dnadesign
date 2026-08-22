@@ -1225,6 +1225,55 @@ def test_structure_assessment_loader_binds_nonzero_returncode_to_backend_evidenc
         load_published_assessment(output)
 
 
+def test_structure_assessment_loader_requires_absolute_normalized_cli_executable(
+    tmp_path: Path,
+) -> None:
+    executable = tmp_path / "RNAfold"
+    executable.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = "--version" ]; then\n'
+        '  printf "RNAfold 2.7.0\\n"\n'
+        "  exit 0\n"
+        "fi\n"
+        "while IFS= read -r line; do :; done\n"
+        'printf ">hop:encoding/example\\nGCAUGC\\n((..)) (-1.20)\\n"\n',
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    output = tmp_path / "assessment"
+    publish_structure_assessment(cli_assessment_request(executable, timeout_seconds=5.0), output_dir=output)
+
+    preflight_path = output / "prediction/folding_preflight.json"
+    prediction_path = output / "prediction/secondary_structure_prediction_v2.json"
+    record_path = output / "assessment-record.json"
+    manifest_path = output / "manifest.json"
+    preflight = json.loads(preflight_path.read_text(encoding="utf-8"))
+    prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    preflight["backend"]["resolved_executable"] = "RNAfold"
+    prediction["backend"]["command"][0] = "RNAfold"
+    record["prediction"] = prediction
+    preflight_content = _json_content(preflight)
+    prediction_content = _json_content(prediction)
+    prediction_digest = _content_digest(prediction_content)
+    record["prediction_digest"] = prediction_digest
+    record_content = _json_content(record)
+    record_digest = _content_digest(record_content)
+    preflight_path.write_bytes(preflight_content)
+    prediction_path.write_bytes(prediction_content)
+    record_path.write_bytes(record_content)
+    manifest["prediction_digest"] = prediction_digest
+    manifest["record_digest"] = record_digest
+    manifest["artifact_digests"]["prediction/folding_preflight.json"] = _content_digest(preflight_content)
+    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v2.json"] = prediction_digest
+    manifest["artifact_digests"]["assessment-record.json"] = record_digest
+    manifest_path.write_bytes(_json_content(manifest))
+
+    with pytest.raises(ValueError, match="resolved executable must be an absolute normalized path"):
+        load_published_assessment(output)
+
+
 def test_structure_assessment_loader_requires_diagnostics_for_execution_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

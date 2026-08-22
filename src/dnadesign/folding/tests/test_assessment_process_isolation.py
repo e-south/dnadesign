@@ -16,6 +16,7 @@ import signal
 import subprocess
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -26,6 +27,7 @@ from dnadesign.folding.src.assessment import execution as assessment_execution
 from dnadesign.folding.src.assessment._limits import (
     ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES,
     ARTIFACT_ENTRY_COUNT_LIMIT,
+    ASSESSMENT_PROCESS_TREE_MEMORY_LIMIT_BYTES,
 )
 from dnadesign.folding.tests._assessment_fixtures import assessment_request, cli_assessment_request
 
@@ -316,6 +318,63 @@ def test_worker_artifact_budget_error_still_cleans_up_process_group(
 
     assert f"killpg:4102:{signal.SIGKILL}" in events
     assert "communicate" in events
+
+
+def test_worker_memory_budget_counts_worker_and_backend(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class ObservedProcess:
+        def __init__(self, pid: int, resident_bytes: int, children: list[ObservedProcess] | None = None) -> None:
+            self.pid = pid
+            self._resident_bytes = resident_bytes
+            self._children = children or []
+
+        def children(self, *, recursive: bool) -> list[ObservedProcess]:
+            assert recursive is True
+            return self._children
+
+        def memory_info(self) -> SimpleNamespace:
+            return SimpleNamespace(rss=self._resident_bytes)
+
+    backend = ObservedProcess(4103, ASSESSMENT_PROCESS_TREE_MEMORY_LIMIT_BYTES // 2)
+    worker = ObservedProcess(4102, ASSESSMENT_PROCESS_TREE_MEMORY_LIMIT_BYTES // 2, [backend])
+    monkeypatch.setattr(assessment_execution.psutil, "Process", lambda pid: worker if pid == worker.pid else None)
+
+    with pytest.raises(FoldingExecutionError, match="resident-memory limit"):
+        assessment_execution._enforce_process_tree_memory_budget(worker.pid)
+
+
+def test_linux_worker_hook_sets_kernel_memory_and_file_limits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[int, tuple[int, int]]] = []
+
+    class FakeResource:
+        RLIMIT_FSIZE = 1
+        RLIMIT_AS = 2
+
+        @staticmethod
+        def setrlimit(resource_id: int, limit: tuple[int, int]) -> None:
+            calls.append((resource_id, limit))
+
+    monkeypatch.setattr(assessment_execution, "resource", FakeResource)
+    monkeypatch.setattr(assessment_execution.sys, "platform", "linux")
+
+    assessment_execution._limit_worker_resources()
+
+    assert calls == [
+        (
+            FakeResource.RLIMIT_FSIZE,
+            (assessment_execution._WORKER_STREAM_LIMIT_BYTES, assessment_execution._WORKER_STREAM_LIMIT_BYTES),
+        ),
+        (
+            FakeResource.RLIMIT_AS,
+            (
+                ASSESSMENT_PROCESS_TREE_MEMORY_LIMIT_BYTES,
+                ASSESSMENT_PROCESS_TREE_MEMORY_LIMIT_BYTES,
+            ),
+        ),
+    ]
 
 
 def test_worker_artifact_budget_bounds_entry_count(tmp_path: Path) -> None:

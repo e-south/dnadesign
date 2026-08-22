@@ -100,7 +100,10 @@ to both ViennaRNA interfaces. On POSIX systems, cleanup terminates residual
 worker-group descendants after every completion or communication failure.
 Kernel file limits cap each worker output stream and each nested CLI-backend
 stream at 1,048,576 bytes, so a noisy backend fails instead of filling the
-worker or supervisor memory. The worker
+worker or supervisor memory. The supervisor also caps combined resident memory
+for the worker and its permitted backend at 536,870,912 bytes. Linux workers
+add a matching kernel address-space limit; other supported POSIX hosts retain
+the supervisor-enforced resident-memory limit. The worker
 disables the older low-level CLI deadline so the assessment supervisor is the
 only timeout authority. Publication is atomic and create-only. The target and
 worker-request artifacts are digest-pinned and semantically replayed against

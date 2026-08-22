@@ -702,6 +702,16 @@ def _verify_preflight(
         or backend.python_module != request_backend.python_module
     ):
         raise ValueError("Assessment preflight backend does not match the worker request.")
+    if backend.interface == "cli" and backend.resolved_executable is not None:
+        resolved_executable = PurePosixPath(backend.resolved_executable)
+        if (
+            not backend.resolved_executable.strip()
+            or not resolved_executable.is_absolute()
+            or "." in resolved_executable.parts
+            or ".." in resolved_executable.parts
+            or resolved_executable.as_posix() != backend.resolved_executable
+        ):
+            raise ValueError("Assessment preflight resolved executable must be an absolute normalized path.")
     expected_available = (
         backend.python_module is not None and backend.version is not None
         if backend.interface == "python_api"

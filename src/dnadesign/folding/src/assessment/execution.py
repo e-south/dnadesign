@@ -21,10 +21,16 @@ import time
 from pathlib import Path
 from typing import BinaryIO
 
+import psutil
+
 from dnadesign.contracts.folding import StructureAssessmentRequestV1
 
 from ..errors import FoldingExecutionError
-from ._limits import ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES, ARTIFACT_ENTRY_COUNT_LIMIT
+from ._limits import (
+    ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES,
+    ARTIFACT_ENTRY_COUNT_LIMIT,
+    ASSESSMENT_PROCESS_TREE_MEMORY_LIMIT_BYTES,
+)
 from .projection import project_prediction_request, project_target_sequence
 from .publication import write_model_json
 
@@ -60,13 +66,14 @@ def run_worker(
         request_path.as_posix(),
         output_path.as_posix(),
     ]
+    _require_worker_resource_containment()
     with tempfile.TemporaryFile(mode="w+b") as stdout_file, tempfile.TemporaryFile(mode="w+b") as stderr_file:
         process = subprocess.Popen(
             command,
             stdout=stdout_file,
             stderr=stderr_file,
             start_new_session=os.name == "posix",
-            preexec_fn=_limit_worker_file_output if resource is not None else None,
+            preexec_fn=_limit_worker_resources,
         )
         try:
             _wait_with_artifact_budget(
@@ -99,6 +106,7 @@ def _wait_with_artifact_budget(
     deadline = time.monotonic() + timeout_seconds
     while process.poll() is None:
         _enforce_artifact_budget(artifact_root_descriptor)
+        _enforce_process_tree_memory_budget(process.pid)
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise subprocess.TimeoutExpired(process.args, timeout_seconds)
@@ -107,6 +115,34 @@ def _wait_with_artifact_budget(
         except subprocess.TimeoutExpired:
             continue
     _enforce_artifact_budget(artifact_root_descriptor)
+
+
+def _enforce_process_tree_memory_budget(worker_pid: int) -> None:
+    """Fail once the worker and its one permitted backend exceed the RSS budget."""
+    try:
+        worker = psutil.Process(worker_pid)
+        processes = [worker, *worker.children(recursive=True)]
+        resident_bytes = 0
+        seen_pids: set[int] = set()
+        for process in processes:
+            if process.pid in seen_pids:
+                continue
+            seen_pids.add(process.pid)
+            try:
+                resident_bytes += process.memory_info().rss
+            except (psutil.NoSuchProcess, psutil.ZombieProcess):
+                continue
+            if resident_bytes >= ASSESSMENT_PROCESS_TREE_MEMORY_LIMIT_BYTES:
+                raise FoldingExecutionError(
+                    "Structure assessment process tree exceeded the "
+                    f"{ASSESSMENT_PROCESS_TREE_MEMORY_LIMIT_BYTES}-byte resident-memory limit."
+                )
+    except FoldingExecutionError:
+        raise
+    except psutil.NoSuchProcess:
+        return
+    except (psutil.AccessDenied, OSError) as exc:
+        raise FoldingExecutionError("Structure assessment memory budget could not be verified safely.") from exc
 
 
 def _enforce_artifact_budget(root_descriptor: int) -> None:
@@ -152,10 +188,22 @@ def _enforce_artifact_budget(root_descriptor: int) -> None:
             os.close(directory_descriptor)
 
 
-def _limit_worker_file_output() -> None:
-    if resource is None or not hasattr(resource, "RLIMIT_FSIZE"):
-        return
+def _require_worker_resource_containment() -> None:
+    if os.name != "posix" or resource is None or not hasattr(resource, "RLIMIT_FSIZE"):
+        raise FoldingExecutionError("Kernel resource containment is unavailable for structure assessment.")
+    if sys.platform.startswith("linux") and not hasattr(resource, "RLIMIT_AS"):
+        raise FoldingExecutionError("Kernel address-space containment is unavailable for structure assessment.")
+
+
+def _limit_worker_resources() -> None:
+    if resource is None:  # pragma: no cover - guarded before process creation
+        raise RuntimeError("Structure-assessment resource containment is unavailable.")
     resource.setrlimit(resource.RLIMIT_FSIZE, (_WORKER_STREAM_LIMIT_BYTES, _WORKER_STREAM_LIMIT_BYTES))
+    if sys.platform.startswith("linux"):
+        resource.setrlimit(
+            resource.RLIMIT_AS,
+            (ASSESSMENT_PROCESS_TREE_MEMORY_LIMIT_BYTES, ASSESSMENT_PROCESS_TREE_MEMORY_LIMIT_BYTES),
+        )
 
 
 def _read_worker_stream(stream: BinaryIO, *, label: str) -> str:
