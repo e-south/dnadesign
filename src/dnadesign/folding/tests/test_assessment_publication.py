@@ -406,7 +406,7 @@ def test_structure_assessment_rejects_prediction_result_without_log_evidence(
     monkeypatch.setattr(assessment_api, "run_worker", run_worker_then_mutate)
     output = tmp_path / "mutated-result-assessment"
 
-    with pytest.raises(ValueError, match="backend output evidence"):
+    with pytest.raises(ValueError, match="canonical producer evidence"):
         publish_structure_assessment(_request(), output_dir=output)
 
     assert not output.exists()
@@ -817,6 +817,36 @@ def test_structure_assessment_loader_replays_backend_bytes_from_the_inventory_sn
 
     assert mutated
     assert replayed == published
+
+
+@pytest.mark.parametrize(
+    ("log_name", "mutated_content"),
+    [
+        (
+            "ViennaRNA.python_api.stdout.txt",
+            b">hop:encoding/example\nGCAUGC\n((..)) (-1.20)\nfabricated warning\n",
+        ),
+        ("ViennaRNA.python_api.stderr.txt", b"fabricated warning\n"),
+    ],
+)
+def test_structure_assessment_loader_requires_canonical_python_success_logs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    log_name: str,
+    mutated_content: bytes,
+) -> None:
+    _install_fake_rna_module(tmp_path, monkeypatch)
+    output = tmp_path / "assessment"
+    publish_structure_assessment(_request(), output_dir=output)
+    relative_log = f"prediction/{log_name}"
+    (output / relative_log).write_bytes(mutated_content)
+    manifest_path = output / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifact_digests"][relative_log] = _content_digest(mutated_content)
+    manifest_path.write_bytes(_json_content(manifest))
+
+    with pytest.raises(ValueError, match="Python assessment logs are not canonical producer evidence"):
+        load_published_assessment(output)
 
 
 def test_structure_assessment_loader_enumerates_the_anchored_publication_root(

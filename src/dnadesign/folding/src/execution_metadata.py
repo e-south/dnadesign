@@ -44,6 +44,17 @@ def prediction_log_paths(*, interface: str) -> tuple[str, str]:
     return "RNAfold.stdout.txt", "RNAfold.stderr.txt"
 
 
+def python_api_success_stdout(
+    *,
+    sequence_id: str,
+    submitted_sequence: str,
+    dot_bracket: str,
+    mfe_kcal_mol: float,
+) -> str:
+    """Return the exact synthetic stdout emitted for one Python API success."""
+    return f">{sequence_id}\n{submitted_sequence}\n{dot_bracket} ({float(mfe_kcal_mol):.2f})\n"
+
+
 def exception_evidence_text(*, exception_type: str, message: str) -> str:
     """Return canonical backend-exception evidence for one generated stderr log."""
     return (
@@ -100,4 +111,5 @@ __all__ = [
     "parse_cli_failure_evidence",
     "prediction_command",
     "prediction_log_paths",
+    "python_api_success_stdout",
 ]

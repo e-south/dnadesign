@@ -42,6 +42,7 @@ from ..execution_metadata import (
     parse_cli_failure_evidence,
     prediction_command,
     prediction_log_paths,
+    python_api_success_stdout,
 )
 from ..rnafold import parse_rnafold_stdout
 from ._limits import (
@@ -588,16 +589,34 @@ def _verify_prediction_backend_output(
     if prediction.status != "ok":
         return
     stdout_ref = prediction.artifacts.stdout
-    if stdout_ref is None:
+    stderr_ref = prediction.artifacts.stderr
+    if stdout_ref is None or stderr_ref is None:
         raise ValueError("Successful assessment prediction lacks backend output evidence.")
     stdout = _inventory_bytes(
         inventory,
         (prediction_root / stdout_ref).as_posix(),
         label="prediction stdout",
     ).decode("utf-8")
+    stderr = _inventory_bytes(
+        inventory,
+        (prediction_root / stderr_ref).as_posix(),
+        label="prediction stderr",
+    ).decode("utf-8")
     submitted_sequence = request.target.sequence.upper()
     if request.backend.dna_policy.mode == "convert_t_to_u_for_rna_backend":
         submitted_sequence = submitted_sequence.replace("T", "U")
+    if request.backend.interface == "python_api":
+        result = prediction.result
+        if result is None or result.mfe_kcal_mol is None:
+            raise ValueError("Successful Python assessment lacks a complete structure result.")
+        expected_stdout = python_api_success_stdout(
+            sequence_id=request.target.sequence_id,
+            submitted_sequence=submitted_sequence,
+            dot_bracket=result.dot_bracket,
+            mfe_kcal_mol=result.mfe_kcal_mol,
+        )
+        if stdout != expected_stdout or stderr:
+            raise ValueError("Successful Python assessment logs are not canonical producer evidence.")
     try:
         replayed_result = parse_rnafold_stdout(
             stdout=stdout,

@@ -50,6 +50,7 @@ from .execution_metadata import (
     exception_evidence_text,
     prediction_command,
     prediction_log_paths,
+    python_api_success_stdout,
 )
 from .rnafold import parse_rnafold_stdout
 
@@ -523,7 +524,12 @@ def _run_python_api_mfe(
     if not isinstance(raw_result, (tuple, list)) or len(raw_result) != 2:
         raise FoldingExecutionError("ViennaRNA fold_compound.mfe() returned an unsupported result.")
     dot_bracket, mfe_kcal_mol = raw_result
-    return f">{sequence_id}\n{submitted_sequence}\n{dot_bracket} ({float(mfe_kcal_mol):.2f})\n"
+    return python_api_success_stdout(
+        sequence_id=sequence_id,
+        submitted_sequence=submitted_sequence,
+        dot_bracket=str(dot_bracket),
+        mfe_kcal_mol=float(mfe_kcal_mol),
+    )
 
 
 def _parse_failure_requires_raise(
