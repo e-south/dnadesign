@@ -623,8 +623,14 @@ def test_copy_failure_removes_adjacent_stage_and_never_exposes_final(
     monkeypatch.setattr("dnadesign.baserender.src.outputs.write_images", _fake_image_writer)
     real_copy = publication_module._copy_directory
 
-    def _copy_then_fail(source: Path, parent_descriptor: int, name: str) -> None:
-        real_copy(source, parent_descriptor, name)
+    def _copy_then_fail(
+        source: Path | int,
+        parent_descriptor: int,
+        name: str,
+        *,
+        budget: publication_module._CopyBudget,
+    ) -> None:
+        real_copy(source, parent_descriptor, name, budget=budget)
         raise OSError("simulated copy interruption")
 
     monkeypatch.setattr(publication_module, "_copy_directory", _copy_then_fail)

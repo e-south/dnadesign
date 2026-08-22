@@ -244,11 +244,12 @@ def _copy_directory(
     parent_descriptor: int,
     name: str,
     *,
-    budget: _CopyBudget,
+    budget: _CopyBudget | None = None,
 ) -> None:
+    active_budget = budget or _CopyBudget(file_limit_bytes=None, aggregate_limit_bytes=None)
     source_descriptor = _source_directory_descriptor(source)
     try:
-        _copy_directory_from_descriptor(source_descriptor, parent_descriptor, name, budget=budget)
+        _copy_directory_from_descriptor(source_descriptor, parent_descriptor, name, budget=active_budget)
     finally:
         os.close(source_descriptor)
 
