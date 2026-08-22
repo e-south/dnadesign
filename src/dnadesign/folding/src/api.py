@@ -45,7 +45,12 @@ from .errors import (
     FoldingLengthMismatchError,
     FoldingMalformedOutputError,
 )
-from .execution_metadata import exception_evidence_text, prediction_command, prediction_log_paths
+from .execution_metadata import (
+    cli_failure_evidence_text,
+    exception_evidence_text,
+    prediction_command,
+    prediction_log_paths,
+)
 from .rnafold import parse_rnafold_stdout
 
 try:
@@ -317,13 +322,16 @@ def run_prediction_request(
             raise FoldingExecutionError(prediction.qa.errors[0]) from exc
         return prediction
 
-    _write_backend_logs(
-        output_path,
-        interface=request.backend.interface,
-        stdout=completed.stdout,
-        stderr=completed.stderr,
-    )
     if completed.returncode != 0:
+        _write_backend_logs(
+            output_path,
+            interface=request.backend.interface,
+            stdout=completed.stdout,
+            stderr=cli_failure_evidence_text(
+                returncode=completed.returncode,
+                backend_stderr=completed.stderr,
+            ),
+        )
         prediction = _error_prediction(
             request,
             assembled=assembled,
@@ -338,6 +346,13 @@ def run_prediction_request(
         if request.policy.required and raise_on_required_failure:
             raise FoldingExecutionError(prediction.qa.errors[0])
         return prediction
+
+    _write_backend_logs(
+        output_path,
+        interface=request.backend.interface,
+        stdout=completed.stdout,
+        stderr=completed.stderr,
+    )
 
     try:
         result = parse_rnafold_stdout(

@@ -31,6 +31,7 @@ from dnadesign.folding import (
 from dnadesign.folding.tests._assessment_fixtures import (
     assessment_request as _request,
 )
+from dnadesign.folding.tests._assessment_fixtures import cli_assessment_request
 from dnadesign.folding.tests._assessment_fixtures import (
     install_fake_rna_module as _install_fake_rna_module,
 )
@@ -1170,6 +1171,57 @@ def test_structure_assessment_loader_binds_exception_type_to_backend_evidence(
     manifest_path.write_bytes(_json_content(manifest))
 
     with pytest.raises(ValueError, match="exception evidence does not match backend logs"):
+        load_published_assessment(output)
+
+
+def test_structure_assessment_loader_binds_nonzero_returncode_to_backend_evidence(
+    tmp_path: Path,
+) -> None:
+    executable = tmp_path / "RNAfold"
+    executable.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = "--version" ]; then\n'
+        '  printf "RNAfold 2.7.0\\n"\n'
+        "  exit 0\n"
+        "fi\n"
+        'printf "backend rejected input\\n" >&2\n'
+        "exit 7\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    base_request = cli_assessment_request(executable, timeout_seconds=5.0)
+    request = base_request.model_copy(
+        update={"policy": base_request.policy.model_copy(update={"required": False})},
+    )
+    output = tmp_path / "assessment"
+    published = publish_structure_assessment(request, output_dir=output)
+    assert published.record.prediction.failure is not None
+    assert published.record.prediction.failure.returncode == 7
+
+    prediction_path = output / "prediction/secondary_structure_prediction_v2.json"
+    record_path = output / "assessment-record.json"
+    manifest_path = output / "manifest.json"
+    prediction = json.loads(prediction_path.read_text(encoding="utf-8"))
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    prediction["failure"]["returncode"] = 8
+    prediction["failure"]["message"] = "ViennaRNA RNAfold CLI exited with status 8."
+    prediction["qa"]["errors"] = [prediction["failure"]["message"]]
+    record["prediction"] = prediction
+    prediction_content = _json_content(prediction)
+    prediction_digest = _content_digest(prediction_content)
+    record["prediction_digest"] = prediction_digest
+    record_content = _json_content(record)
+    record_digest = _content_digest(record_content)
+    prediction_path.write_bytes(prediction_content)
+    record_path.write_bytes(record_content)
+    manifest["prediction_digest"] = prediction_digest
+    manifest["record_digest"] = record_digest
+    manifest["artifact_digests"]["prediction/secondary_structure_prediction_v2.json"] = prediction_digest
+    manifest["artifact_digests"]["assessment-record.json"] = record_digest
+    manifest_path.write_bytes(_json_content(manifest))
+
+    with pytest.raises(ValueError, match="nonzero-exit evidence does not match backend logs"):
         load_published_assessment(output)
 
 

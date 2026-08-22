@@ -59,4 +59,45 @@ def exception_evidence_text(*, exception_type: str, message: str) -> str:
     )
 
 
-__all__ = ["exception_evidence_text", "prediction_command", "prediction_log_paths"]
+def cli_failure_evidence_text(*, returncode: int, backend_stderr: str) -> str:
+    """Return canonical evidence for one nonzero CLI process outcome."""
+    if isinstance(returncode, bool) or not isinstance(returncode, int) or returncode == 0:
+        raise ValueError("CLI failure evidence requires a nonzero integer return code.")
+    return (
+        json.dumps(
+            {
+                "backend_stderr": backend_stderr,
+                "contract": "folding_cli_failure_v1",
+                "returncode": returncode,
+            },
+            sort_keys=True,
+        )
+        + "\n"
+    )
+
+
+def parse_cli_failure_evidence(content: str) -> tuple[int, str]:
+    """Parse and require the canonical nonzero CLI process evidence form."""
+    try:
+        payload = json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise ValueError("CLI failure evidence is not valid JSON.") from exc
+    if not isinstance(payload, dict) or set(payload) != {"backend_stderr", "contract", "returncode"}:
+        raise ValueError("CLI failure evidence has an unsupported shape.")
+    returncode = payload["returncode"]
+    backend_stderr = payload["backend_stderr"]
+    if payload["contract"] != "folding_cli_failure_v1" or not isinstance(backend_stderr, str):
+        raise ValueError("CLI failure evidence has invalid fields.")
+    expected = cli_failure_evidence_text(returncode=returncode, backend_stderr=backend_stderr)
+    if content != expected:
+        raise ValueError("CLI failure evidence is not canonical.")
+    return returncode, backend_stderr
+
+
+__all__ = [
+    "cli_failure_evidence_text",
+    "exception_evidence_text",
+    "parse_cli_failure_evidence",
+    "prediction_command",
+    "prediction_log_paths",
+]

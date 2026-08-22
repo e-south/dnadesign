@@ -36,7 +36,7 @@ from dnadesign.folding import (
     run_prediction_request,
 )
 from dnadesign.folding.src.errors import FoldingConfigError, FoldingExecutionError
-from dnadesign.folding.src.execution_metadata import exception_evidence_text
+from dnadesign.folding.src.execution_metadata import cli_failure_evidence_text, exception_evidence_text
 from dnadesign.folding.src.viennarna_svg import _expand_root_viewbox, _stem_metric_label
 
 _CONTIGUOUS_STEM_SEQUENCE = "GACGATATCGTC"
@@ -397,6 +397,37 @@ def test_optional_cli_invocation_failure_materializes_exception_type_evidence(
     assert (tmp_path / "folding" / prediction.artifacts.stderr).read_text(encoding="utf-8") == exception_evidence_text(
         exception_type="PermissionError",
         message="ViennaRNA RNAfold CLI execution failed: execution denied",
+    )
+
+
+def test_optional_cli_nonzero_exit_materializes_returncode_evidence(tmp_path: Path) -> None:
+    executable = tmp_path / "RNAfold"
+    executable.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = "--version" ]; then\n'
+        '  printf "RNAfold 2.7.0\\n"\n'
+        "  exit 0\n"
+        "fi\n"
+        'printf "backend rejected input\\n" >&2\n'
+        "exit 7\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+
+    prediction = run_prediction_request(
+        _request(tmp_path, executable=executable.as_posix(), required=False),
+        output_dir=tmp_path / "folding",
+    )
+
+    assert prediction.failure is not None
+    assert prediction.failure.kind == "backend_nonzero_exit"
+    assert prediction.failure.returncode == 7
+    assert prediction.artifacts.stderr is not None
+    assert (tmp_path / "folding" / prediction.artifacts.stderr).read_text(
+        encoding="utf-8"
+    ) == cli_failure_evidence_text(
+        returncode=7,
+        backend_stderr="backend rejected input\n",
     )
 
 

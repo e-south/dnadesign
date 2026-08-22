@@ -37,7 +37,12 @@ from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
 )
 
 from ..errors import FoldingError, FoldingLengthMismatchError, FoldingMalformedOutputError
-from ..execution_metadata import exception_evidence_text, prediction_command, prediction_log_paths
+from ..execution_metadata import (
+    exception_evidence_text,
+    parse_cli_failure_evidence,
+    prediction_command,
+    prediction_log_paths,
+)
 from ..rnafold import parse_rnafold_stdout
 from ._limits import (
     ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES,
@@ -661,6 +666,12 @@ def _verify_prediction_failure(
         expected_message = f"ViennaRNA RNAfold CLI exited with status {failure.returncode}."
         if failure.message != expected_message:
             raise ValueError("Assessment nonzero-exit evidence is internally inconsistent.")
+        try:
+            evidence_returncode, _backend_stderr = parse_cli_failure_evidence(stderr)
+        except ValueError as exc:
+            raise ValueError("Assessment nonzero-exit evidence does not match backend logs.") from exc
+        if evidence_returncode != failure.returncode:
+            raise ValueError("Assessment nonzero-exit evidence does not match backend logs.")
         return
     exception_type = failure.exception_type
     if exception_type is None:
