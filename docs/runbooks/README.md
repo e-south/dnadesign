@@ -1,7 +1,7 @@
 ## Runbook Catalog
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-10
+**Last verified:** 2026-08-22
 
 For command-first routing, start with `uv run ops catalog list --simple`, then
 open the linked runbook or tool doc once you know the route.
@@ -67,7 +67,7 @@ This table is generated from `*.tool-source.yaml` sidecars. Edit those files ins
 | `opal` | [OPAL documentation](../../src/dnadesign/opal/docs/index.md) | Tool-owned active-learning workflows, campaign configuration references, and downstream infer-to-OPAL routes. |
 | `latentdna` | [LatentDNA Docs](../../src/dnadesign/latentdna/docs/README.md) | Representation-comparison workflows, workspace contracts, plots, snapshots, and notebook routes. |
 | `notify` | [Notify Operations](../notify/README.md) | Tool-owned operator routes for watcher setup, delivery validation, recovery, and scheduler-adjacent notification flows. |
-| `cruncher` | [Cruncher documentation](../../src/dnadesign/cruncher/docs/README.md) | Tool-owned design-family docs for optimization, cassettes, YIU, Snapback, scar-nick, studies, and portfolios. |
+| `cruncher` | [Cruncher documentation](../../src/dnadesign/cruncher/docs/README.md) | Tool-owned design-family docs for optimization, cassettes, YIU, studies, and portfolios. |
 | `ops` | [Ops docs](../../src/dnadesign/ops/docs/README.md) | Ops commands, packaged presets, and runbook lifecycle docs. |
 | `baserender` | [BaseRender documentation](../../src/dnadesign/baserender/docs/README.md) | Contract renderer for producer-emitted visual jobs, plus optional demo/ad hoc workspaces. |
 | `folding` | [Folding Docs](../../src/dnadesign/folding/docs/README.md) | Stateless secondary-structure preflight, ViennaRNA execution, and native structure plot publication for producer-owned artifacts. |

@@ -69,6 +69,35 @@ def test_dnadesign_source_does_not_import_external_reader_packages() -> None:
     assert violations == []
 
 
+def test_superseded_cruncher_hairpin_producers_do_not_return() -> None:
+    repo_root = Path(__file__).resolve().parents[5]
+    retired_paths = (
+        "src/dnadesign/cruncher/src/snapback",
+        "src/dnadesign/cruncher/src/scar_nick",
+        "src/dnadesign/cruncher/src/release_enzymes",
+        "src/dnadesign/baserender/src/integrations/snapback",
+        "src/dnadesign/baserender/src/integrations/scar_nick",
+        "src/dnadesign/contracts/visual/snapback_visual_v1.py",
+        "src/dnadesign/contracts/visual/scar_nick_visual_v1.py",
+    )
+
+    offenders: list[str] = []
+    for path in retired_paths:
+        candidate = repo_root / path
+        if candidate.is_file():
+            offenders.append(path)
+        elif candidate.is_dir():
+            offenders.extend(
+                str(nested.relative_to(repo_root))
+                for nested in candidate.rglob("*")
+                if nested.is_file() and nested.suffix in {".md", ".py", ".yaml"}
+            )
+
+    assert offenders == []
+    assert (repo_root / "src/dnadesign/cruncher/src/cassette").is_dir()
+    assert (repo_root / "src/dnadesign/cruncher/src/nickases").is_dir()
+
+
 def test_find_undeclared_cross_tool_imports_allows_declared_edge(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "dnadesign" / "foo" / "api.py", "from dnadesign.bar.api import run\n")
     _write(tmp_path / "src" / "dnadesign" / "bar" / "api.py", "def run():\n    return 1\n")

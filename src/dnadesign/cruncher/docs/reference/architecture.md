@@ -1,7 +1,7 @@
 ## Cruncher architecture
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-09
+**Last verified:** 2026-08-22
 
 
 **Last updated by:** cruncher-maintainers on 2026-07-13
@@ -12,8 +12,6 @@
 - [Fixed-length optimization lifecycle](#fixed-length-optimization-lifecycle)
 - [Cassette lifecycle](#cassette-lifecycle)
 - [YIU lifecycle](#yiu-lifecycle)
-- [Snapback lifecycle](#snapback-lifecycle)
-- [Scar-nick lifecycle](#scar-nick-lifecycle)
 - [Study lifecycle](#study-lifecycle)
 - [Portfolio lifecycle](#portfolio-lifecycle)
 - [Layers and responsibilities](#layers-and-responsibilities)
@@ -21,7 +19,6 @@
 - [Run artifacts](#run-artifacts)
 - [Cassette artifacts](#cassette-artifacts)
 - [YIU artifacts](#yiu-artifacts)
-- [Scar-nick artifacts](#scar-nick-artifacts)
 - [Study artifacts](#study-artifacts)
 - [Portfolio artifacts](#portfolio-artifacts)
 - [Reproducibility boundaries](#reproducibility-boundaries)
@@ -32,19 +29,15 @@ This doc describes the Cruncher run lifecycle, module boundaries, and on-disk ar
 
 #### Workflow families
 
-Registered family ids: `sample`, `cassette`, `yiu`, `snapback`, `scar_nick`, `study`, `portfolio`
+Registered family ids: `sample`, `cassette`, `yiu`, `study`, and `portfolio`.
 
-Cruncher is organized as seven peer workflow families, not one monolithic run shape:
+- **Sample workspaces** own fixed-length sequence optimization and its run artifacts.
+- **Cassette workspaces** own generic cassette planning and bounded solve search.
+- **YIU workspaces** own payload-centric YIU rendering bundles.
+- **Study workspaces** orchestrate explicit source-family artifacts without redefining them.
+- **Portfolio workspaces** aggregate study-ready workspaces into cross-study handoffs.
 
-- **Sample workspaces** (fixed-length optimization) use `fetch -> lock -> parse -> sample -> analyze -> export` and publish sequence-centric run artifacts for downstream operators.
-- **Cassette workspaces** use `cassette init-workspace|validate|design|solve|show` and publish cassette-specific artifacts plus optional baserender job files.
-- **YIU workspaces** use `yiu init-workspace|validate|render|show` and publish one payload bundle with three BaseRender-ready views.
-- **Snapback workspaces** use `snapback init-workspace|validate|design|target-search|solve|show` plus the released-product `released-design|released-target-search|released-solve|released-show` lane and publish snapback-specific reports, candidate tables, and QA views.
-- **Scar-nick workspaces** use `scar-nick validate|design|show` and publish retained-scar terminal-nick candidate tables, geometry audits, and BaseRender job handoffs.
-- **Study workspaces** use `study list|run|summarize|show` to orchestrate sweep-owned manifests, trial tables, and aggregate plots over explicit source-family artifacts without redefining those source contracts.
-- **Portfolio workspaces** use `portfolio run|show` to aggregate explicit source runs into one handoff package without implicit latest-run fallback.
-
-These families deliberately keep separate workspace contracts, output trees, and orchestration seams. New families should add their own lane-specific artifacts rather than overload `sample`, `cassette`, `yiu`, `snapback`, `scar_nick`, `study`, or `portfolio`.
+The families keep separate workspace contracts, output trees, and orchestration seams. A new family must define its own contracts rather than overload an existing lane.
 
 #### Fixed-length optimization lifecycle
 
@@ -80,38 +73,6 @@ The YIU workflow is a peer lane, not a cassette submode:
 5. **yiu show** -> inspect the bundle contract, provenance, selected junction window, PWM state, and available renders for one YIU bundle
 
 This workflow does not use `sample`, `gibbs_anneal`, `run_index.json`, cassette-specific render contracts, or any legacy state graph.
-
-#### Snapback lifecycle
-
-The snapback workflow is a peer lane, not a cassette or YIU submode:
-
-1. optional **snapback init-workspace** -> scaffold a runbook-only snapback workspace with one explicit v2 example and one solve example
-2. author `<workspace>/configs/snapback/<name>.snapback.yaml`, `<workspace>/configs/snapback/<name>.snapback.solve.yaml`, or `<workspace>/configs/snapback/<name>.released.snapback.yaml`
-3. author or select local nickase and release-enzyme catalogs or use preset-only resolved catalogs
-4. **snapback validate** -> strict schema + invariant check plus deterministic explicit report
-5. **snapback design** -> materialize one preserved-site explicit candidate bundle with reports, provenance snapshots, candidate table, and QA views
-6. **snapback released-design** -> project a two-stage precursor into a retained top plus exposed-bottom post-release product and materialize one released-product bundle
-7. **snapback solve** -> bounded preserved-site search, deterministic hit ranking, selected-hit materialization, and solve-level reports
-8. **snapback released-target-search** -> target-first paired nickase plus release-enzyme search in exposed-bottom geometry space
-9. **snapback show** / **snapback released-show** -> inspect the appropriate bundle type and fail fast on drift without guessing
-
-This workflow does not use `sample`, `gibbs_anneal`, `run_index.json`, cassette baserender jobs, or YIU payload render contracts.
-
-For operator-facing usage, start with [`../guides/snapback_workflow.md`](../guides/snapback_workflow.md) and [`../guides/snapback_released_workflow.md`](../guides/snapback_released_workflow.md). For the file-by-file output contracts, use [`snapback_artifacts.md`](snapback_artifacts.md) and [`released_snapback_artifacts.md`](released_snapback_artifacts.md).
-
-#### Scar-nick lifecycle
-
-The scar-nick workflow is a peer lane, not a Snapback or YIU submode:
-
-1. author `<workspace>/configs/scar_nick/<name>.scar_nick.yaml`
-2. **scar-nick validate** -> strict schema, release-enzyme, nickase, and pair-profile checks
-3. **scar-nick design** -> deterministic run bundle with candidate tables, geometry audit, provenance snapshots, QA views, and BaseRender jobs
-4. **scar-nick show** -> inspect one explicit run and fail fast on missing or drifted artifacts
-
-This workflow does not solve cap geometry, assemble Retron MSD products, run
-YIU payload rendering, or create one workspace per hit.
-
-For operator-facing usage, start with [`../guides/scar_nick_workflow.md`](../guides/scar_nick_workflow.md). For module ownership, use the [`scar_nick` package map](../../src/scar_nick/README.md).
 
 #### Study lifecycle
 
@@ -223,20 +184,6 @@ Core contract:
 - panel render/load/save helpers live in `yiu/render_panels.py`
 - no dependency on legacy `sample` or cassette-specific planner contracts
 
-#### `snapback/` (single-nick foldback domain)
-- snapback explicit `single_nick_snapback_v2` and co-design solve `single_nick_snapback_solve_v3` contracts
-- authored top-strand nick-relative geometry and bounded search
-- protected-region, homology, and extra-nick invariant enforcement
-- preserved-site target search orchestration is split by ownership under `snapback/preserved_search/`
-- `snapback/target_search.py` is the thin public facade; placement enumeration, candidate construction, ranking, and report shaping now live in `preserved_search/{placements.py,candidate_builder.py,ranking.py,reporting.py,runner.py}`
-- released explicit origin inference and typed report shaping live in `snapback/released_explicit_evaluation.py`, keeping `app/snapback_released_workflow.py` on orchestration and publication
-- released-product search orchestration is split by ownership under `snapback/released_search/`
-- `snapback/released_target_search.py` is the thin public facade; placement generation, precursor construction, pair evaluation, ranking, and report shaping now live in `released_search/{nick_placements.py,release_placements.py,precursor_builder.py,evaluator_adapter.py,ranking.py,reporting.py,runner.py}`
-- released precursor projection is split by ownership under `snapback/released_projection_{common,projection,candidate,selection}.py`; `snapback/released_projection.py` is the thin public facade and `snapback/released_models.py` is a model facade, not a legacy compatibility layer
-- typed producer-owned QA view models live in `snapback/view_models.py`
-- local view-contract assembly and validation live in `snapback/view_contracts.py`
-- no dependency on legacy `sample`, cassette render contracts, or YIU payload semantics
-
 #### `viz/` (plotting)
 - matplotlib/logomaker setup
 - PWM logo rendering + visualization helpers
@@ -263,20 +210,9 @@ Core contract:
 - trajectory plot/video render paths in `app/analyze/plotting_trajectory.py`
 - static and FIMO plot render paths in `app/analyze/plotting_static.py`
 - report/manifest/summary publication in `app/analyze/publish.py`
-- snapback CLI request construction lives in `app/snapback_cli_requests.py`, which owns typed preserved-site and released-product search/solve invocation factories
-- preserved-site snapback catalog loading and source-label normalization shared by explicit validate/design and solve now live in `app/snapback_catalogs.py`
-- preserved-site show/readback stays behind `app/snapback_workflow.py`, with bundle loading, drift validation, and payload assembly split across `app/snapback_show_{load,validate,present}.py`
-- preserved-site solve stays behind `app/snapback_solve_workflow.py`, with per-hit explicit-spec snapshot assembly, materialization, and report shaping split across `app/snapback_solve_{snapshot,materialize,reporting}.py`
-- released-product catalog loading and source-label normalization shared by explicit validate/design, target-search, and solve now live in `app/snapback_released_catalogs.py`
-- released-product show/readback stays behind `app/snapback_released_show.py`, with artifact loading, drift validation, and payload assembly split across `app/snapback_released_show_{load,validate,present}.py`
-- released-product solve stays behind `app/snapback_released_solve_workflow.py`, with request snapshot assembly, per-hit materialization, and report shaping split across `app/snapback_released_solve_{snapshot,materialize,reporting}.py`
-
 #### `cli/` (UX only)
 - Typer commands
 - argument parsing, output formatting
-- `cli/commands/snapback.py` is command registration only
-- snapback command handlers live in `cli/commands/snapback_{workspace,explicit,released,show}.py`
-- shared report/path presentation lives in `cli/commands/snapback_presenters.py`
 - delegates work to app modules and request factories (no business logic)
 
 #### Baserender integration boundary
@@ -309,16 +245,6 @@ For cassette runs, Cruncher now publishes shared, file-based visual contracts ra
 * sibling `baserender_jobs/*.job.yaml` files that reference those contracts by path
 
 Cassette runs do not call baserender directly; they publish the contracts and jobs for downstream consumers and fail fast on schema violations before write-out.
-
-For snapback runs, Cruncher publishes both producer-owned QA views and shared evidence-map contracts:
-
-* `analysis/views/pre_nick_duplex.v1.json`, `analysis/views/post_nick_exposed.v1.json`, `analysis/views/post_nick_foldback.v1.json`
-* `analysis/views/pre_nick_duplex.snapback_visual.v1.json`, `analysis/views/post_nick_exposed.snapback_visual.v1.json`, `analysis/views/post_nick_foldback.snapback_visual.v1.json`
-* `analysis/views/snapback_triptych.snapback_visual.v1.jsonl`
-* `analysis/views/views_manifest.v1.json`
-* sibling `baserender_jobs/snapback_triptych.job.yaml` that references the triptych evidence-map rows by path
-
-These views are a topology and coordinate QA surface, not a biophysical rendering claim. The producer-owned JSON captures snapback-specific semantics such as a nick-anchored retained stem, source-side cap, effective `3 nt` cap loop, active-strand foldback geometry, and the shared nick/origin boundary in the pre/exposed states. The shared `snapback_visual_v1` contracts carry the nucleotide-resolution publication surface for downstream BaseRender rendering.
 
 The showcase/video renderers do not require overlap tables; overlap metrics remain separate analysis artifacts.
 
@@ -480,61 +406,6 @@ YIU runs are intentionally isolated from both `sample` and `cassette` runs:
 
 ---
 
-#### Snapback artifacts
-
-A typical **snapback explicit** run directory at `<workspace>/outputs/design/` contains:
-
-- `meta/snapback_manifest.json`, `meta/snapback_status.json` - explicit-run metadata + status
-- `provenance/spec_used.yaml`, `provenance/nickase_catalog.yaml` - frozen input snapshots
-- `analysis/reports/report.json`, `analysis/reports/report.md` - deterministic explicit report
-- `export/table__candidates.csv` - candidate table with one row for the explicit candidate when satisfied
-- `analysis/views/pre_nick_duplex.v1.json`, `analysis/views/post_nick_exposed.v1.json`, `analysis/views/post_nick_foldback.v1.json` - producer-owned QA views
-- `analysis/views/*.snapback_visual.v1.json` - shared snapback visual contracts for the QA triptych
-- `analysis/views/snapback_triptych.snapback_visual.v1.jsonl` - ordered shared triptych contracts for one composite render
-- `analysis/views/views_manifest.v1.json` - grouped view inventory plus recommended render jobs
-- `baserender_jobs/snapback_triptych.job.yaml` - optional downstream render job for the composite QA triptych
-- `plots/snapback_triptych.<png|svg|pdf>` - optional rendered QA triptych after downstream BaseRender execution
-
-A typical **snapback solve** run directory at `<workspace>/outputs/solve/` contains:
-
-- `meta/solve_manifest.json`, `meta/solve_status.json` - solve metadata + status
-- `provenance/input_solve_spec.yaml`, `provenance/resolved_catalog.yaml` - frozen solve inputs
-- `analysis/reports/solve_report.json`, `analysis/reports/solve_report.md` - solve-level report outputs
-- `export/table__hits.csv`, `export/table__frontier.csv` - ranked hit table plus compactness frontier
-- `analysis/materialized_hits/hit_<rank>/...` - materialized explicit hit bundles under stable rank paths
-
-Snapback runs are intentionally isolated from `sample`, `cassette`, and `yiu` runs:
-
-- they do not write `meta/run_manifest.json`
-- they do not append to workspace `run_index.json`
-- they do not invoke baserender directly
-- they do not reuse cassette or YIU view contracts
-
----
-
-#### Scar-nick artifacts
-
-A typical **scar-nick** run directory at `<workspace>/outputs/scar_nick/<name>/` contains:
-
-- `meta/scar_nick_manifest.json`, `meta/scar_nick_status.json` - run metadata and status
-- `provenance/spec.snapshot.yaml` - frozen spec snapshot
-- `analysis/reports/report.md` - deterministic operator report
-- `export/table__scar_nick_candidates.csv` - accepted and reserve candidate table
-- `export/table__scar_nick_candidate_pair_calls.csv` - per-S-site pair calls
-- `export/table__scar_nick_nickase_geometry_audit.csv` - release/nickase geometry audit rows
-- `analysis/views/*.scar_nick_visual.v1.json` - producer-owned terminal-nick visual contracts
-- `baserender_jobs/scar_nick_terminal_nick.job.yaml` - optional downstream BaseRender job
-
-Scar-nick runs are intentionally isolated from `sample`, `cassette`, `yiu`, and
-`snapback` runs:
-
-- they do not write `meta/run_manifest.json`
-- they do not append to workspace `run_index.json`
-- they do not solve Snapback cap geometry
-- they do not assemble Retron MSD products
-
----
-
 #### Study artifacts
 
 Study runs are aggregate sweep workflows that keep deterministic workspace config separate from sweep intent.
@@ -621,8 +492,5 @@ Key points:
 #### Related docs
 
 - [Intent + lifecycle](../guides/intent_and_lifecycle.md)
-- [Snapback workflow](../guides/snapback_workflow.md)
-- [Scar-nick workflow](../guides/scar_nick_workflow.md)
 - [Portfolio aggregation](../guides/portfolio_aggregation.md)
 - [Config reference](config.md)
-- [Snapback artifacts](snapback_artifacts.md)

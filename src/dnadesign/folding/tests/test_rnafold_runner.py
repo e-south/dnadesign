@@ -1013,7 +1013,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
                         "short_label": "",
                     },
                     {
-                        "owner_id": "demo.snapback_foldback_geometry",
+                        "owner_id": "demo.foldback_geometry",
                         "row_id": "primary",
                         "start": 2,
                         "end": 4,
@@ -1036,8 +1036,8 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
                     "component_palette": {
                         "payload_primary": "#F58518",
                         "payload_complement": "#E45756",
-                        "snapback_foldback_geometry": "#64748B",
-                        "snapback_cap": "#16A34A",
+                        "foldback_geometry": "#64748B",
+                        "foldback_cap": "#16A34A",
                         "stem_base_left": "#7C3AED",
                         "stem_base_right": "#A16207",
                     },
@@ -1049,7 +1049,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
                             "edge_color": "#F58518",
                         },
                         {
-                            "semantic": "snapback_foldback_geometry",
+                            "semantic": "foldback_geometry",
                             "start": 2,
                             "end": 4,
                             "edge_color": "#64748B",
@@ -1128,7 +1128,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert len(semantic_edges) == len("GGCCAA") - 1
     assert {edge.attrib["data-dnadesign-edge-semantic"] for edge in semantic_edges} == {
         "payload_primary",
-        "snapback_foldback_geometry",
+        "foldback_geometry",
         "payload_complement",
     }
     edge_styles = [str(edge.attrib.get("style", "")) for edge in semantic_edges]
@@ -1202,9 +1202,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     assert "Retron 43 TetO x8" in text_values
     assert "Payload TetO | Left base G | Right base A | Pairing profile MXMM" in text_values
     assert "Cap CC (2 nt)" in text_values
-    assert not any(
-        str(value).startswith(("sections:", "components:", "snapback:", "scar_nick:")) for value in text_values
-    )
+    assert not any(str(value).startswith(("sections:", "components:")) for value in text_values)
     viewbox = [float(part) for part in root.attrib["viewBox"].split()]
     background = root.find("svg:rect[@id='dnadesign-secondary-structure-background']", namespace)
     assert background is not None
@@ -1433,8 +1431,8 @@ def test_enrich_prediction_pairing_qa_extends_payload_stem_metric_through_adjace
                         "short_label": "",
                     },
                     {
-                        "tag_id": "demo.snapback_retained_stem",
-                        "tag_kind": "snapback_retained_stem",
+                        "tag_id": "demo.foldback_retained_stem",
+                        "tag_kind": "foldback_retained_stem",
                         "row_id": "primary",
                         "start": 5,
                         "end": 7,
@@ -1442,8 +1440,8 @@ def test_enrich_prediction_pairing_qa_extends_payload_stem_metric_through_adjace
                         "short_label": "",
                     },
                     {
-                        "tag_id": "demo.snapback_cap",
-                        "tag_kind": "snapback_cap",
+                        "tag_id": "demo.foldback_cap",
+                        "tag_kind": "foldback_cap",
                         "row_id": "primary",
                         "start": 7,
                         "end": 9,
@@ -1451,8 +1449,8 @@ def test_enrich_prediction_pairing_qa_extends_payload_stem_metric_through_adjace
                         "short_label": "",
                     },
                     {
-                        "tag_id": "demo.snapback_foldback_return",
-                        "tag_kind": "snapback_foldback_return",
+                        "tag_id": "demo.foldback_return",
+                        "tag_kind": "foldback_return",
                         "row_id": "primary",
                         "start": 9,
                         "end": 11,
