@@ -27,10 +27,11 @@ Remove `dnadesign.msd`, its documentation, tests, banner, architecture edge,
 and coverage registration. Do not retain an import alias, HOP forwarding
 facade, schema reader, or fallback compiler.
 
-Keep `MsdDesignCatalogV1` and `MsdDesignReferenceV1` in the neutral sequence
-contracts package for now. Research Studies still consumes those contracts in
-review and artifact-validation code. Their later retirement requires a
-separate consumer audit and does not block removal of the compiler package.
+Remove `MsdDesignCatalogV1` and `MsdDesignReferenceV1` from the neutral sequence
+contracts package. The consumer audit found that only a dead study-side
+predecessor artifact generator imported them; the live review path verifies
+persisted evidence without those models. Historical JSON may remain as cited
+study evidence, but DNA Design does not parse or publish it.
 
 This decision does not remove Cruncher hairpin mechanics. Those capabilities
 require their own function-level consumer and parity audit.
@@ -51,8 +52,8 @@ require their own function-level consumer and parity audit.
 - HOP is the only generic hairpin compiler authority.
 - Research Studies fails explicitly when a requested production method is not
   supported; DNA Design cannot provide a silent substitute.
-- Construct, Folding, BaseRender, and the neutral sequence contracts remain
-  independent reusable services.
+- Construct, Folding, BaseRender, and genuinely neutral sequence contracts
+  remain independent reusable services.
 - Historical compiler specifications may remain when immutable study lineage
   cites them, but DNA Design no longer executes them.
 - Reintroducing a compiler or compatibility surface requires a new decision
