@@ -2,11 +2,11 @@
 
 **Owner:** dnadesign-maintainers
 **Doc kind:** reference
-**Audience:** cassette and snapback workflow users and maintainers
+**Audience:** cassette workflow users and maintainers
 **Last updated by:** cruncher-maintainers on 2026-04-21
 **Applies to:** workspace-local and built-in Cruncher nickase catalogs
-**Last verified:** 2026-04-21
-**Primary artifacts:** validated catalog entries used by `cassette validate|design` and `snapback validate|design|solve`
+**Last verified:** 2026-08-22
+**Primary artifacts:** validated catalog entries used by `cassette validate|design|solve`
 
 ### Contents
 - [File shape](#file-shape)
@@ -55,7 +55,6 @@ variants:
     vendor: NEB
     selection:
       outside_site: true
-      snapback_tier: tier1
       commercial_confidence: primary_vendor_current
     operational:
       incubation_temp_c: 50
@@ -65,7 +64,7 @@ product_aliases:
     alias_kind: formulation
 ```
 
-Snapback specs can compose multiple built-in presets without exporting them first:
+Cassette solve specs can compose multiple built-in presets without exporting them first:
 
 ```yaml
 catalog:
@@ -98,7 +97,7 @@ catalog:
 - `vendor`, `vendor_catalog_number`, `origin_class`, `source_family`: typed provenance fields for the catalytic entry.
 - `notes`: optional entry-scoped notes preserved alongside the normalized rule.
 - `selection`: optional typed machine-readable selection metadata.
-  Fields currently include `outside_site`, `snapback_tier`, `commercial_confidence`, and `warning_codes`.
+  Fields currently include `outside_site`, `commercial_confidence`, and `warning_codes`.
 - `operational`: optional typed bench-facing metadata.
   Fields currently include `incubation_temp_c`, `buffer_family`, `heat_inactivation`, `methylation_sensitivity`, `star_activity_warning`, and `double_strand_cleavage_warning`.
 - `metadata`: optional free-form dictionary preserved as normalized catalog metadata.

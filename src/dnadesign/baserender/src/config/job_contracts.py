@@ -25,7 +25,6 @@ _DESCRIPTORS: dict[str, RenderContractDescriptor] = {
             "nucleotide_evidence_map",
             "hairpin_cartoon",
             "topology_cartoon",
-            "snapback_map",
             "junction_annealed_fragments",
             "junction_three_way_assembly",
         ),
@@ -62,14 +61,6 @@ _DESCRIPTORS: dict[str, RenderContractDescriptor] = {
         purpose="Topology cartoon visualization for explicit segment-geometry payloads.",
         accepted_renderers=("topology_cartoon",),
         docs_slug="topology-cartoon-render-v3",
-    ),
-    "snapback_map_render_v3": RenderContractDescriptor(
-        kind="snapback_map_render_v3",
-        schema_version=3,
-        display_name="Snapback map render contract",
-        purpose="Snapback map visualization for explicit snapback visual payload contracts.",
-        accepted_renderers=("snapback_map",),
-        docs_slug="snapback-map-render-v3",
     ),
 }
 

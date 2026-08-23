@@ -43,7 +43,6 @@ from dnadesign.cruncher.nickases.scanning import (
     display_motif_for_orientation,
     enumerate_site_instances,
 )
-from dnadesign.cruncher.nickases.selection import snapback_entry_priority_key
 
 __all__ = [
     "EvaluatedMatch",
@@ -74,5 +73,4 @@ __all__ = [
     "resolve_workspace_relative_path",
     "reverse_complement",
     "reverse_complement_iupac",
-    "snapback_entry_priority_key",
 ]

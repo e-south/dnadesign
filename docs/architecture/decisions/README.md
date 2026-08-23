@@ -31,3 +31,4 @@ Use this directory for new decisions going forward.
 - [ADR 0003: junction as a peer three-way-junction planner](adr-0003-junction-peer-tool.md)
 - [ADR 0004: Retire the Retron MSD compiler](adr-0004-retire-msd-compiler.md)
 - [ADR 0005: Retire Cruncher hairpin primitive readers](adr-0005-retire-hairpin-primitive-readers.md)
+- [ADR 0006: Retire superseded Cruncher hairpin producers](adr-0006-retire-cruncher-hairpin-producers.md)

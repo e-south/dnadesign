@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/cruncher/tests/docs/test_docs_ontology_contracts.py
 
-Docs contracts for Cruncher workflow-family ontology and released Snapback route.
+Docs contracts for the current Cruncher workflow-family ontology.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -13,9 +13,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import get_args
 
-from dnadesign.cruncher.snapback.released_models import ReleasedFinalGeometrySource, ReleasedRouteFamily
 from dnadesign.cruncher.workspaces.families import workflow_family_descriptors
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
@@ -49,10 +47,9 @@ def test_architecture_reference_keeps_registered_peer_workflow_families_explicit
     architecture = _read_package("docs/reference/architecture.md")
 
     assert _documented_family_ids(architecture) == expected
-    assert "Cruncher is organized as seven peer workflow families" in architecture
-    assert "**Scar-nick workspaces** use `scar-nick validate|design|show`" in architecture
-    assert "**Study workspaces** use `study list|run|summarize|show`" in architecture
-    assert "**Portfolio workspaces** use `portfolio run|show`" in architecture
+    assert "Cruncher registers five peer command families" in _read_package("docs/reference/cli.md")
+    assert "**Study workspaces** orchestrate explicit source-family artifacts" in architecture
+    assert "**Portfolio workspaces** aggregate study-ready workspaces" in architecture
     assert "#### Study lifecycle" in architecture
     assert "#### Portfolio lifecycle" in architecture
     assert "**study list** -> inspect checked-in study specs" in architecture
@@ -77,17 +74,3 @@ def test_study_and_portfolio_docs_keep_peer_family_and_source_run_language_expli
     assert "does not make `study` a hidden `sample` submode" in studies
     assert "cross-workspace aggregation for experimental handoff across explicit source runs" in studies
     assert "they are still a distinct workflow family rather than a `sample` submode" in studies
-
-
-def test_released_snapback_docs_publish_route_and_geometry_literals() -> None:
-    combined = "\n".join(
-        (
-            _read_package("docs/guides/snapback_released_workflow.md"),
-            _read_package("docs/reference/cli.md"),
-        )
-    )
-
-    for route_family in get_args(ReleasedRouteFamily):
-        assert route_family in combined
-    for final_geometry_source in get_args(ReleasedFinalGeometrySource):
-        assert final_geometry_source in combined

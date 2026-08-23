@@ -19,7 +19,6 @@ variants:
     source_family: nicking_endonuclease
     selection:
       outside_site: false
-      snapback_tier: tier2
       commercial_confidence: primary_vendor_current
     operational:
       incubation_temp_c: 37
@@ -40,7 +39,6 @@ variants:
     source_family: nicking_endonuclease
     selection:
       outside_site: false
-      snapback_tier: tier2
       commercial_confidence: primary_vendor_current
       warning_codes:
         - DNA_BINDING_BAND_SHIFT_RISK
@@ -62,7 +60,6 @@ variants:
     source_family: nicking_endonuclease
     selection:
       outside_site: false
-      snapback_tier: tier3
       commercial_confidence: primary_vendor_current
       warning_codes:
         - NONSPECIFIC_NICKING_ASSAY_SIGNAL

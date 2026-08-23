@@ -51,7 +51,7 @@ def test_contract_family_defers_sibling_implementations() -> None:
                 "import dnadesign.contracts.visual as visual",
                 "visual.SequenceEvidenceMapV1",
                 "print('dnadesign.contracts.visual.sequence_evidence_map_v1' in sys.modules)",
-                "print('dnadesign.contracts.visual.snapback_visual_v1' in sys.modules)",
+                "print('dnadesign.contracts.visual.yiu_linear_state_v1' in sys.modules)",
             ]
         )
     )

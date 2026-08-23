@@ -266,10 +266,10 @@ def test_linear_ssdna_composition_contract_accepts_retron43_literal() -> None:
                             "source": {"kind": "literal", "label": "manual_teto_payload"},
                         },
                         {
-                            "segment_id": "snapback_foldback_geometry",
-                            "role": "snapback_foldback_geometry",
+                            "segment_id": "foldback_geometry",
+                            "role": "foldback_geometry",
                             "sequence": "tCCTCAGcccGCTGAGGa",
-                            "source": {"kind": "literal", "label": "manual_snapback_43_foldback"},
+                            "source": {"kind": "literal", "label": "declared_foldback"},
                         },
                         {
                             "segment_id": "payload_complement",
@@ -405,12 +405,12 @@ def test_linear_ssdna_composition_contract_rejects_retired_provider_source_kinds
 
 
 def test_linear_ssdna_composition_contract_rejects_study_specific_display_shape() -> None:
-    with pytest.raises(PydanticValidationError, match=r"(?s)scar_nick.*Extra inputs are not permitted"):
+    with pytest.raises(PydanticValidationError, match=r"(?s)unknown_surface.*Extra inputs are not permitted"):
         LinearSsdnaCompositionV1.model_validate(
             {
                 "composition_id": "study_display_shape",
                 "units": [{"unit_id": "unit", "segments": [{"segment_id": "payload", "sequence": "ACGT"}]}],
-                "visual": {"display_profile": {"scar_nick": {"payload": "TetR"}}},
+                "visual": {"display_profile": {"unknown_surface": {"payload": "TetR"}}},
             }
         )
 
