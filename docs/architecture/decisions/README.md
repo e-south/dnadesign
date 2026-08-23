@@ -1,7 +1,7 @@
 ## Architecture Decision Records
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+**Last verified:** 2026-08-22
 
 ### At a glance
 ADRs capture accepted architectural decisions and their consequences.
@@ -29,3 +29,4 @@ Use this directory for new decisions going forward.
 - [ADR 0001: Namespace-scoped compatibility hashes for USR overlays](adr-0001-usr-namespace-contract-hash.md)
 - [ADR 0002: Generic linear ssDNA composition in Construct](adr-0002-generic-linear-ssdna-composition.md)
 - [ADR 0003: junction as a peer three-way-junction planner](adr-0003-junction-peer-tool.md)
+- [ADR 0004: Retire the Retron MSD compiler](adr-0004-retire-msd-compiler.md)

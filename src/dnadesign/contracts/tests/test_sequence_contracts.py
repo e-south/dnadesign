@@ -23,8 +23,6 @@ from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
 )
 from dnadesign.contracts.sequence import (
     LinearSsdnaCompositionV1,
-    MsdDesignCatalogV1,
-    MsdDesignReferenceV1,
     RtPartPublicationV1,
 )
 from dnadesign.contracts.sequence.linear_ssdna_composition_v1 import (
@@ -239,84 +237,6 @@ def test_rt_part_publication_rejects_duplicate_provider_refs() -> None:
 
     with pytest.raises(PydanticValidationError, match="Duplicate provider_ref"):
         RtPartPublicationV1.model_validate(payload)
-
-
-def test_msd_design_reference_contract_accepts_scar_nick_reference() -> None:
-    reference = MsdDesignReferenceV1.model_validate(
-        {
-            "contract": "msd_design_reference_v1",
-            "schema_version": 1,
-            "construct_id": "pES-retron-177",
-            "construct_label": "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM",
-            "msd_design_id": "msd-tetr-c172-lcggt-racag-mxmm",
-            "payload_or_target": {"id": "TetR"},
-            "cap": {
-                "id": "C172",
-                "source_construct": "retron-172",
-                "snapback_topology": {
-                    "kind": "snapback_foldback_geometry_v1",
-                    "retained_stem_span": {"start": 0, "end": 3},
-                    "cap_span": {"start": 3, "end": 6},
-                    "foldback_return_span": {"start": 6, "end": 9},
-                },
-            },
-            "scar_nick": {
-                "left_base": "CGGT",
-                "right_base": "ACAG",
-                "profile_s3s2s1s0": "MXMM",
-                "route_status": "note_only",
-                "route_note": "26-derived base / 172-cap crossover",
-            },
-            "source_notes": "tests 172-cap permissiveness",
-        }
-    )
-
-    assert reference.scar_nick.profile_s3s2s1s0 == "MXMM"
-    assert reference.scar_nick.left_base == "CGGT"
-    assert reference.cap.snapback_topology is not None
-    assert reference.cap.snapback_topology.cap_span.model_dump(mode="json") == {"start": 3, "end": 6}
-
-
-def test_msd_design_reference_contract_rejects_profile_drift() -> None:
-    with pytest.raises(PydanticValidationError, match="profile_s3s2s1s0 does not match"):
-        MsdDesignReferenceV1.model_validate(
-            {
-                "contract": "msd_design_reference_v1",
-                "schema_version": 1,
-                "construct_id": "pES-retron-177",
-                "construct_label": "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM",
-                "msd_design_id": "msd-tetr-c172-lcggt-racag-mxmm",
-                "payload_or_target": {"id": "TetR"},
-                "cap": {"id": "C172"},
-                "scar_nick": {
-                    "left_base": "CGGT",
-                    "right_base": "ACAG",
-                    "profile_s3s2s1s0": "MMMM",
-                },
-            }
-        )
-
-
-def test_msd_design_catalog_contract_rejects_duplicate_design_ids() -> None:
-    row = {
-        "contract": "msd_design_reference_v1",
-        "schema_version": 1,
-        "construct_id": "pES-retron-177",
-        "construct_label": "pES-retron-177-msd[TetR]; C172-LCGGT-RACAG-MXMM",
-        "msd_design_id": "msd-tetr-c172-lcggt-racag-mxmm",
-        "payload_or_target": {"id": "TetR"},
-        "cap": {"id": "C172"},
-        "scar_nick": {"left_base": "CGGT", "right_base": "ACAG", "profile_s3s2s1s0": "MXMM"},
-    }
-
-    with pytest.raises(PydanticValidationError, match="Duplicate msd_design_id"):
-        MsdDesignCatalogV1.model_validate(
-            {
-                "contract": "msd_design_catalog_v1",
-                "schema_version": 1,
-                "records": [row, {**row, "construct_id": "pES-retron-177b"}],
-            }
-        )
 
 
 def test_linear_ssdna_composition_contract_accepts_retron43_literal() -> None:
