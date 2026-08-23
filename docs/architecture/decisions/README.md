@@ -30,3 +30,4 @@ Use this directory for new decisions going forward.
 - [ADR 0002: Generic linear ssDNA composition in Construct](adr-0002-generic-linear-ssdna-composition.md)
 - [ADR 0003: junction as a peer three-way-junction planner](adr-0003-junction-peer-tool.md)
 - [ADR 0004: Retire the Retron MSD compiler](adr-0004-retire-msd-compiler.md)
+- [ADR 0005: Retire Cruncher hairpin primitive readers](adr-0005-retire-hairpin-primitive-readers.md)
