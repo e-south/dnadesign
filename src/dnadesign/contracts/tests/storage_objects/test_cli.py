@@ -376,6 +376,30 @@ def test_inventory_rejects_symlinked_shared_lock(tmp_path: Path) -> None:
     assert external.read_text(encoding="utf-8") == "do not touch\n"
 
 
+def test_inventory_does_not_delete_preexisting_manifest_temp(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    temporary = root / f".{MANIFEST_NAME}.tmp"
+    temporary.write_text("pre-existing bytes\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="cannot write storage object manifest"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert temporary.read_text(encoding="utf-8") == "pre-existing bytes\n"
+    assert not (root / MANIFEST_NAME).exists()
+
+
 def test_concurrent_refresh_allows_exactly_one_compare_and_swap(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     (root / "inputs").mkdir(parents=True)

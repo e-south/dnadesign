@@ -50,17 +50,20 @@ def _write_manifest(
 ) -> dict[str, object]:
     manifest_text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     temporary = manifest_path.parent / f".{MANIFEST_NAME}.tmp"
+    temporary_created = False
     previous_mode: int | None = None
     try:
         if previous_bytes is not None:
             previous_mode = stat.S_IMODE(manifest_path.stat(follow_symlinks=False).st_mode)
         with temporary.open("x", encoding="utf-8") as handle:
+            temporary_created = True
             handle.write(manifest_text)
         if previous_mode is not None:
             temporary.chmod(previous_mode, follow_symlinks=False)
         os.replace(temporary, manifest_path)
     except OSError as exc:
-        temporary.unlink(missing_ok=True)
+        if temporary_created:
+            temporary.unlink(missing_ok=True)
         raise StorageObjectError(f"cannot write storage object manifest: {exc}") from exc
     try:
         summary = verify_storage_object(
