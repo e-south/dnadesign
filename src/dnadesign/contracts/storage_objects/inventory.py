@@ -601,6 +601,7 @@ def _assert_no_ambiguous_manifest_staging(root: Path) -> None:
     candidates = {root / f".{MANIFEST_NAME}.tmp"}
     candidates.update(root.glob(f".{MANIFEST_NAME}.tmp-*"))
     candidates.update(root.glob(f".{MANIFEST_NAME}.restore-*"))
+    candidates.update(root.glob(f".{MANIFEST_NAME}.rollback-*"))
     present = sorted(path.name for path in candidates if path.exists() or path.is_symlink())
     if present:
         raise StorageObjectError(

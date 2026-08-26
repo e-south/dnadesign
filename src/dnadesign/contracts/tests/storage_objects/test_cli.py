@@ -542,6 +542,62 @@ def test_inventory_fails_closed_on_user_file_that_resembles_manifest_staging(tmp
     assert not (root / MANIFEST_NAME).exists()
 
 
+def test_inventory_fails_closed_on_create_rollback_recovery_state(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    recovery = root / f".{MANIFEST_NAME}.rollback-user-data"
+    recovery.write_text("recoverable receipt\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match=r"ambiguous manifest staging state.*rollback-user-data"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert recovery.read_text(encoding="utf-8") == "recoverable receipt\n"
+    assert not (root / MANIFEST_NAME).exists()
+
+
+def test_refresh_fails_closed_on_create_rollback_recovery_state(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    original_manifest = manifest_path.read_bytes()
+    recovery = root / f".{MANIFEST_NAME}.rollback-recovery"
+    recovery.write_text("recoverable receipt\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match=r"ambiguous manifest staging state.*rollback-recovery"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert manifest_path.read_bytes() == original_manifest
+    assert recovery.read_text(encoding="utf-8") == "recoverable receipt\n"
+
+
 def test_refresh_rejects_missing_root_without_traceback(tmp_path: Path) -> None:
     root = tmp_path / "missing"
 
