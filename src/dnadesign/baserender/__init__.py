@@ -67,11 +67,15 @@ if TYPE_CHECKING:
         validate_job,
         validate_render_job,
     )
+    from dnadesign.baserender.src.render.layout import compute_layout  # noqa: F401
     from dnadesign.baserender.src.render.palette import Palette  # noqa: F401
+    from dnadesign.baserender.src.render.renderer import render_record  # noqa: F401
     from dnadesign.baserender.src.runtime import initialize_runtime  # noqa: F401
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "initialize_runtime": ("dnadesign.baserender.src.runtime", "initialize_runtime"),
+    "compute_layout": ("dnadesign.baserender.src.render.layout", "compute_layout"),
+    "render_record": ("dnadesign.baserender.src.render.renderer", "render_record"),
     "app": ("dnadesign.baserender.src.cli", "app"),
     "adapt_record": ("dnadesign.baserender.src.public", "adapt_record"),
     "adapt_records": ("dnadesign.baserender.src.public", "adapt_records"),

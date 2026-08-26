@@ -1,0 +1,69 @@
+schema: densegen.solution_path_playback_endpoint.v1
+endpoint_id: dense_array_constraint_showcase
+title: Dense-array fixed-element constraint showcase
+audience: public
+
+source:
+  kind: densegen_records
+  table: outputs/tables/records.parquet
+  selected_records_sha256: 1a1bbb70b9a7165349373ee05c7b54eb6301b4313656bbeee3bb6fb271f092dc  # pragma: allowlist secret
+  records:
+    - id: 31ac2fcba97e70f1ff13a881e56828193ecb20b6
+      scene: fixed_pair_a
+    - id: e989470a1bab43bf22ed5101ee3ceabac16ae020
+      scene: fixed_pair_c
+
+adapter:
+  kind: densegen_realized_array_v1
+  display_coordinate: offset
+  solver_coordinate_provenance: offset_raw
+
+playback:
+  authority: placement_reconstructed
+  ordering_policy:
+    - start
+    - shorter_first
+    - placement_id
+  graph_relation: coordinate_precedence
+  show_authority_notice: false
+
+labels:
+  forbidden_terms:
+    - sigma factor
+    - -35 element
+    - -10 element
+  overrides:
+    upstream: fixed upstream element
+    downstream: fixed downstream element
+    alpha_anchor: fixed pair A
+
+presentation:
+  layout: graph_left_duplex_right
+  color_profile: constraints
+  show_legend: false
+  graph_detail: reduced
+  graph_fraction: 0.32
+  show_edge_costs: false
+  seconds_per_step: 0.26
+  hold_seconds: 1.80
+  lead_seconds: 0.12
+  scene_transition_seconds: 0.24
+  show_distance_bracket: always
+  collection_order:
+    - fixed_pair_a
+    - fixed_pair_c
+
+duplex:
+  fixed_element_annotations: none
+  consensus_suffix: omit
+  anchored_illustration:
+    asset: rnap_sigma70
+    constraint: alpha_anchor
+    reveal: bindings_as_placed
+
+outputs:
+  directory: outputs/publication/playback/dense_array_constraint_showcase
+  formats:
+    - manifest.json
+    - playback.mp4
+    - poster.png

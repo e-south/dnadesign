@@ -29,11 +29,12 @@ from matplotlib.transforms import Affine2D
 
 from ..config import Style
 from ..core import Record, RenderingError
+from .effects.anchored_illustration import anchored_illustration_occupied_boxes
 from .effects.motif_logo import MotifLogoGeometry, compute_motif_logo_geometry
 from .effects.registry import draw_effect, validate_effect
 from .layout import LayoutContext, comp, compute_layout, measure_text_width_px
 from .palette import Palette
-from .sequence_rows_metadata import validate_sequence_rows_metadata
+from .sequence_rows_metadata import terminal_label_visibility, validate_sequence_rows_metadata
 
 
 def _add_fixed_layout_patch(ax, patch):
@@ -279,6 +280,7 @@ class SequenceRowsRenderer:
         ax._dnadesign_sequence_center_y = (float(layout.y_forward) + float(layout.y_reverse)) / 2.0
 
         x0 = layout.x_left
+        terminal_labels = terminal_label_visibility(record)
         _draw_span_backdrops(ax, layout, span_backdrops, show_two=show_two)
         _draw_span_edge_markers(ax, layout, span_edge_markers, show_two=show_two, motif_geometries=motif_geometries)
         _draw_panel_transition_arrows(ax, layout, panel_transition_arrows, show_two=show_two)
@@ -289,8 +291,8 @@ class SequenceRowsRenderer:
             layout.y_forward,
             layout.cw,
             style,
-            "5'",
-            "3'",
+            "5'" if terminal_labels.left else "",
+            "3'" if terminal_labels.right else "",
             tone_strengths=tone_fwd,
             row_id="fwd",
             highlight_indices=base_highlights.get("primary"),
@@ -308,8 +310,8 @@ class SequenceRowsRenderer:
                 layout.y_reverse,
                 layout.cw,
                 style,
-                "3'",
-                "5'",
+                "3'" if terminal_labels.left else "",
+                "5'" if terminal_labels.right else "",
                 tone_strengths=tone_rev,
                 row_id="rev",
                 highlight_indices=base_highlights.get("complement"),
@@ -693,6 +695,7 @@ def _span_link_label_boxes(
         base_fs = _span_link_label_font_size(style)
         avail = max(4.0, x2 - x1)
         label = str(effect.params.get("label", "")).strip()
+        shrink_to_fit = effect.params.get("shrink_label_to_fit", True)
         fs = base_fs
         text_h = max(8.0, (float(fs) / 72.0) * float(style.dpi))
         line_half_h = max(2.0, text_h * 0.33)
@@ -705,7 +708,7 @@ def _span_link_label_boxes(
             continue
 
         label_w = _text_px_width(label, style.font_label, fs, style.dpi)
-        if label_w + 12.0 > 0.85 * avail:
+        if shrink_to_fit and label_w + 12.0 > 0.85 * avail:
             scale = (0.85 * avail) / max(1.0, label_w)
             fs = max(6, int(base_fs * min(1.0, scale)))
             label_w = _text_px_width(label, style.font_label, fs, style.dpi)
@@ -815,6 +818,17 @@ def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, p
         )
     occupied_boxes.extend(_sequence_strand_occupied_boxes(layout, style))
     occupied_boxes.extend(_span_link_label_boxes(record, layout, style))
+    for effect in record.effects:
+        if effect.kind == "anchored_illustration":
+            occupied_boxes.extend(
+                anchored_illustration_occupied_boxes(
+                    effect,
+                    record,
+                    layout,
+                    style,
+                    layout.feature_boxes,
+                )
+            )
     if record.display.overlay_text:
         _x, _y, _ha, _title_size, overlay_box = _overlay_layout(
             layout,
@@ -976,7 +990,13 @@ def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, p
             continue
 
         x_anchor, y_anchor, ha, bbox = selected
-        annotation_color = _darken_rgb(palette.color_for(tag), factor=0.6)
+        annotation_color_raw = feature.attrs.get("annotation_color")
+        if annotation_color_raw is None:
+            annotation_color = _darken_rgb(palette.color_for(tag), factor=0.6)
+        else:
+            annotation_color = str(annotation_color_raw)
+            if not mcolors.is_color_like(annotation_color):
+                raise RenderingError(f"Feature {feature.id!r} annotation_color must be a valid color")
         ax.text(
             x_anchor,
             y_anchor,
@@ -1899,8 +1919,8 @@ def _draw_row_labels(ax, record: Record, layout: LayoutContext, style: Style) ->
         return
     terminal_dx = style.font_size_label / 72.0 * style.dpi * 0.8
     terminal_label_width = max(
-        measure_text_width_px("5'", style.font_label, style.font_size_label, style.dpi),
-        measure_text_width_px("3'", style.font_label, style.font_size_label, style.dpi),
+        measure_text_width_px("5'", style.font_mono, style.font_size_seq, style.dpi),
+        measure_text_width_px("3'", style.font_mono, style.font_size_seq, style.dpi),
     )
     row_gap = max(16.0, style.font_size_label / 72.0 * style.dpi * 0.7)
     x = layout.x_left - terminal_dx - terminal_label_width - row_gap
@@ -2054,6 +2074,74 @@ def _draw_coordinate_ticks(ax, record: Record, layout: LayoutContext, style: Sty
         )
 
 
+def _draw_mono_glyph(
+    ax,
+    char: str,
+    *,
+    x: float,
+    y_center: float,
+    style: Style,
+    color: str,
+    weight: str = "normal",
+    zorder: float = 2.0,
+    gid: str | None = None,
+) -> None:
+    """Draw one sequence-aligned glyph through the canonical monospace path."""
+
+    px_per_pt = style.dpi / 72.0
+    tp = _mono_text_path(char, style.font_mono, style.font_size_seq, weight)
+    y_mid_px = _mono_ag_mid_px(style.font_mono, style.font_size_seq, style.dpi, weight)
+    trans = Affine2D().scale(px_per_pt).translate(x, y_center - y_mid_px) + ax.transData
+    patch = PathPatch(
+        tp,
+        transform=trans,
+        facecolor=color,
+        edgecolor="none",
+        linewidth=0.0,
+        zorder=zorder,
+        clip_on=False,
+    )
+    if gid is not None:
+        patch.set_gid(gid)
+    _add_fixed_layout_patch(ax, patch)
+
+
+def _draw_terminal_label(
+    ax,
+    label: str,
+    *,
+    anchor_x: float,
+    y_center: float,
+    cw: float,
+    style: Style,
+    align: str,
+    row_id: str,
+) -> None:
+    if not label:
+        return
+    px_per_pt = style.dpi / 72.0
+    glyph_bounds = [
+        (
+            index * cw + _mono_text_path(char, style.font_mono, style.font_size_seq).get_extents().x0 * px_per_pt,
+            index * cw + _mono_text_path(char, style.font_mono, style.font_size_seq).get_extents().x1 * px_per_pt,
+        )
+        for index, char in enumerate(label)
+    ]
+    run_left = min(left for left, _right in glyph_bounds)
+    run_right = max(right for _left, right in glyph_bounds)
+    x0 = anchor_x - run_right if align == "right" else anchor_x - run_left
+    for index, char in enumerate(label):
+        _draw_mono_glyph(
+            ax,
+            char,
+            x=x0 + index * cw,
+            y_center=y_center,
+            style=style,
+            color=style.color_sequence,
+            gid=f"terminal:{row_id}:{align}:{index}:{char}",
+        )
+
+
 def _draw_sequence(
     ax,
     seq: str,
@@ -2074,30 +2162,27 @@ def _draw_sequence(
     hidden_indices: Sequence[int] | None = None,
 ) -> None:
     label_dx = style.font_size_label / 72.0 * style.dpi * 0.8
-    ax.text(
-        x0 - label_dx,
-        y_center,
+    _draw_terminal_label(
+        ax,
         left_label,
-        va="center",
-        ha="right",
-        fontsize=style.display_font_size() if bool(style.uniform_display_font_size) else style.font_size_label,
-        family=style.font_label,
-        color=style.color_sequence,
-        alpha=0.9,
+        anchor_x=x0 - label_dx,
+        y_center=y_center,
+        cw=cw,
+        style=style,
+        align="right",
+        row_id=row_id,
     )
-    ax.text(
-        x0 + len(seq) * cw + label_dx,
-        y_center,
+    _draw_terminal_label(
+        ax,
         right_label,
-        va="center",
-        ha="left",
-        fontsize=style.display_font_size() if bool(style.uniform_display_font_size) else style.font_size_label,
-        family=style.font_label,
-        color=style.color_sequence,
-        alpha=0.9,
+        anchor_x=x0 + len(seq) * cw + label_dx,
+        y_center=y_center,
+        cw=cw,
+        style=style,
+        align="left",
+        row_id=row_id,
     )
 
-    px_per_pt = style.dpi / 72.0
     highlight_set = {int(index) for index in (highlight_indices or ())}
     indexed_highlight_colors = {int(index): str(color) for index, color in (highlight_colors or {}).items()}
     dim_set = {int(index) for index in (dim_indices or ())}
@@ -2109,7 +2194,6 @@ def _draw_sequence(
             continue
         is_highlighted = idx in highlight_set
         weight = "bold" if is_highlighted else "normal"
-        tp = _mono_text_path(char, style.font_mono, style.font_size_seq, weight)
         glyph_color = style.color_sequence
         if tone_strengths is not None:
             strength = tone_strengths[idx] if idx < len(tone_strengths) else 0.0
@@ -2125,22 +2209,19 @@ def _draw_sequence(
                 if highlight_color
                 else _darken_rgb(glyph_color, factor=0.72)
             )
-        y_mid_px = _mono_ag_mid_px(style.font_mono, style.font_size_seq, style.dpi, weight)
-        trans = Affine2D().scale(px_per_pt).translate(x, y_center - y_mid_px) + ax.transData
-        patch = PathPatch(
-            tp,
-            transform=trans,
-            facecolor=glyph_color,
-            edgecolor="none",
-            linewidth=0.0,
-            zorder=2,
-            clip_on=False,
-        )
         gid = f"sequence:{row_id}:{idx}:{char}"
         if is_highlighted:
             gid = f"{gid}:highlight"
-        patch.set_gid(gid)
-        _add_fixed_layout_patch(ax, patch)
+        _draw_mono_glyph(
+            ax,
+            char,
+            x=x,
+            y_center=y_center,
+            style=style,
+            color=glyph_color,
+            weight=weight,
+            gid=gid,
+        )
         x += cw
 
 
