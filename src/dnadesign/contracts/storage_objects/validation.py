@@ -212,6 +212,11 @@ def verify_storage_object(
                 "group-writable storage object roots must set the setgid bit "
                 "so coordination files inherit the shared group"
             )
+        if root_mode & stat.S_IWGRP and not root_mode & stat.S_IXGRP:
+            raise StorageObjectError(
+                "group-writable storage object roots must be group-traversable "
+                "so collaborators can reach coordination files"
+            )
         manifest_stat = manifest_path.stat(follow_symlinks=False)
         if root_mode & stat.S_IWGRP and manifest_stat.st_gid != root_stat.st_gid:
             raise StorageObjectError(

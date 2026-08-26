@@ -135,6 +135,11 @@ def _manifest_lock(root: Path) -> Iterator[None]:
                 "group-writable storage object roots must set the setgid bit "
                 "so coordination files inherit the shared group"
             )
+        if root_mode & stat.S_IWGRP and not root_mode & stat.S_IXGRP:
+            raise StorageObjectError(
+                "group-writable storage object roots must be group-traversable "
+                "so collaborators can reach coordination files"
+            )
         if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
             raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
         if lock_path.exists() and lock_path.stat(follow_symlinks=False).st_size != 0:
