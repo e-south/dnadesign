@@ -27,7 +27,10 @@ from dnadesign.thread.structure_views import (
     summarize_pdb_atom_content,
     summarize_structure_atom_content,
 )
-from dnadesign.thread.structure_views._mmcif import serialize_mmcif_atom_sites_for_3dmol
+from dnadesign.thread.structure_views._mmcif import (
+    _browser_cif_token,
+    serialize_mmcif_atom_sites_for_3dmol,
+)
 
 _MINIMAL_PDB = """\
 ATOM      1  N   GLY A   1       0.000   0.000   0.000  1.00 80.00           N
@@ -729,6 +732,38 @@ def test_py3dmol_backend_quotes_whitespace_bearing_mmcif_identifiers() -> None:
     serialized = serialize_mmcif_atom_sites_for_3dmol(structure)
 
     assert '"chain A"' in serialized
+
+
+@pytest.mark.parametrize(
+    "identifier",
+    (
+        "#chain",
+        "_chain",
+        "$chain",
+        "[chain",
+        "]chain",
+        "data_chain",
+        "DaTa_chain",
+        "save_chain",
+        "SaVe_chain",
+        "STOP_",
+        "global_",
+    ),
+)
+def test_py3dmol_backend_quotes_reserved_mmcif_identifiers(identifier: str) -> None:
+    structure = _SIDECHAIN_MMCIF.replace(" SER A 1 3 ", f" SER '{identifier}' 1 3 ").replace(
+        " 0.000 A 3 ? ",
+        f" 0.000 '{identifier}' 3 ? ",
+    )
+
+    serialized = serialize_mmcif_atom_sites_for_3dmol(structure)
+
+    assert f'"{identifier}"' in serialized
+
+
+@pytest.mark.parametrize("value", ("loop_", "LOOP_", "stop_", "global_"))
+def test_mmcif_token_serializer_quotes_reserved_control_words(value: str) -> None:
+    assert _browser_cif_token(value, field="_atom_site.auth_asym_id") == f'"{value}"'
 
 
 def test_structure_atom_content_summary_detects_sidechain_atoms() -> None:

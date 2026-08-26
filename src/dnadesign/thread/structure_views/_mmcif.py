@@ -152,7 +152,15 @@ def _browser_cif_token(value: str, *, field: str) -> str:
         return value
     if not value or any(character in value for character in ("\n", "\r")):
         raise ValueError(f"mmCIF value cannot be serialized safely for 3Dmol at {field}: {value!r}")
-    if any(character.isspace() for character in value) or any(character in value for character in ("'", '"')):
+    lowered = value.casefold()
+    requires_quotes = (
+        any(character.isspace() for character in value)
+        or any(character in value for character in ("'", '"'))
+        or value.startswith(("_", "#", "$", "[", "]"))
+        or lowered.startswith(("data_", "save_"))
+        or lowered in {"loop_", "stop_", "global_"}
+    )
+    if requires_quotes:
         if '"' not in value:
             return f'"{value}"'
         if "'" not in value:
