@@ -495,12 +495,162 @@ def test_pinned_runtime_preserves_pdb_basename_for_upstream_score_output(tmp_pat
     assert (output_root / "target-complex.pt").read_text(encoding="utf-8") == "input-v1"
 
 
+def test_pinned_score_runtime_rolls_back_link_when_score_directory_fsync_fails_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "scores"
+    output_root.mkdir()
+    completion_path = tmp_path / ".test-ligandmpnn-execution.json"
+    original_link = os.link
+    original_fsync = os.fsync
+    score_link_created = False
+    score_directory_failure_injected = False
+
+    def _record_score_link(*args: object, **kwargs: object) -> None:
+        nonlocal score_link_created
+        original_link(*args, **kwargs)  # type: ignore[arg-type]
+        score_link_created = True
+
+    def _fail_score_directory_fsync_once(file_descriptor: int) -> None:
+        nonlocal score_directory_failure_injected
+        if (
+            score_link_created
+            and not score_directory_failure_injected
+            and stat.S_ISDIR(os.fstat(file_descriptor).st_mode)
+        ):
+            score_directory_failure_injected = True
+            assert (output_root / "input.pt").is_file()
+            raise OSError("simulated score directory fsync failure")
+        original_fsync(file_descriptor)
+
+    monkeypatch.setattr(os, "link", _record_score_link)
+    monkeypatch.setattr(os, "fsync", _fail_score_directory_fsync_once)
+
+    with pytest.raises(ValueError, match="score output publication could not be made durable"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert score_directory_failure_injected
+    assert not (output_root / "input.pt").exists()
+    assert not completion_path.exists()
+
+
+def test_pinned_score_runtime_reports_uncertainty_when_score_rollback_fsync_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "scores"
+    output_root.mkdir()
+    completion_path = tmp_path / ".test-ligandmpnn-execution.json"
+    original_link = os.link
+    original_fsync = os.fsync
+    score_link_created = False
+
+    def _record_score_link(*args: object, **kwargs: object) -> None:
+        nonlocal score_link_created
+        original_link(*args, **kwargs)  # type: ignore[arg-type]
+        score_link_created = True
+
+    def _fail_score_and_rollback_directory_fsync(file_descriptor: int) -> None:
+        if score_link_created and stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
+            raise OSError("simulated persistent score directory fsync failure")
+        original_fsync(file_descriptor)
+
+    monkeypatch.setattr(os, "link", _record_score_link)
+    monkeypatch.setattr(os, "fsync", _fail_score_and_rollback_directory_fsync)
+
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnScorePublicationUncertainError,
+        match="score publication rollback durability is uncertain",
+    ):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert not (output_root / "input.pt").exists()
+    assert not completion_path.exists()
+
+
+def test_open_directory_path_syncs_each_parent_receiving_a_new_seed_directory_link(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_root = tmp_path / "batch" / "seed-42"
+    original_mkdir = os.mkdir
+    original_fsync = os.fsync
+    receiving_parent_ids: list[tuple[int, int]] = []
+    synced_directory_ids: list[tuple[int, int]] = []
+
+    def _record_mkdir(
+        path: str | bytes,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> None:
+        assert dir_fd is not None
+        parent_stat = os.fstat(dir_fd)
+        receiving_parent_ids.append((parent_stat.st_dev, parent_stat.st_ino))
+        original_mkdir(path, mode=mode, dir_fd=dir_fd)
+
+    def _record_fsync(file_descriptor: int) -> None:
+        descriptor_stat = os.fstat(file_descriptor)
+        if stat.S_ISDIR(descriptor_stat.st_mode):
+            synced_directory_ids.append((descriptor_stat.st_dev, descriptor_stat.st_ino))
+        original_fsync(file_descriptor)
+
+    monkeypatch.setattr(os, "mkdir", _record_mkdir)
+    monkeypatch.setattr(os, "fsync", _record_fsync)
+
+    directory_fd = pinned_runtime_module._open_directory_path(output_root, create=True)
+    os.close(directory_fd)
+
+    assert len(receiving_parent_ids) == 2
+    assert set(receiving_parent_ids) <= set(synced_directory_ids)
+
+
 def test_pinned_score_runtime_rolls_back_output_when_completion_directory_fsync_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     output_root = tmp_path / "scores"
+    output_root.mkdir()
     completion_path = tmp_path / ".test-ligandmpnn-execution.json"
     original_fsync = os.fsync
     directory_fsync_count = 0
@@ -549,6 +699,7 @@ def test_pinned_score_runtime_reports_uncertainty_when_completion_rollback_fsync
 ) -> None:
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     output_root = tmp_path / "scores"
+    output_root.mkdir()
     completion_path = tmp_path / ".test-ligandmpnn-execution.json"
     original_fsync = os.fsync
     directory_fsync_count = 0

@@ -93,6 +93,10 @@ class LigandMpnnCompletionPublicationUncertainError(RuntimeError):
     """Completion rollback could not establish a durable absent lifecycle."""
 
 
+class LigandMpnnScorePublicationUncertainError(RuntimeError):
+    """Score rollback could not establish a durable absent artifact."""
+
+
 def pinned_runtime_prefix(
     *,
     checkout_root: Path,
@@ -391,9 +395,12 @@ def execute_pinned_entrypoint(
                 runtime_arguments,
                 pdb_path=staged_pdb,
             )
-            output_root.mkdir(parents=True, exist_ok=True)
-            if output_root.is_symlink() or not output_root.is_dir():
-                raise ValueError(f"score output directory must be a regular directory: {output_root}")
+            try:
+                output_directory_fd = _open_directory_path(output_root, create=True)
+            except OSError as exc:
+                raise ValueError(f"score output directory could not be opened safely: {output_root}") from exc
+            else:
+                os.close(output_directory_fd)
             score_temporary = tempfile.TemporaryDirectory(prefix=".dnadesign-score-", dir=output_root)
             temporary_output_root = Path(score_temporary.name)
             runtime_arguments[output_value_index] = str(temporary_output_root)
@@ -539,6 +546,8 @@ def _open_directory_path(path: Path, *, create: bool) -> int:
                     os.mkdir(component, mode=0o755, dir_fd=current_fd)
                 except FileExistsError:
                     pass
+                else:
+                    os.fsync(current_fd)
                 next_fd = os.open(component, directory_flags, dir_fd=current_fd)
             os.close(current_fd)
             current_fd = next_fd
@@ -687,25 +696,44 @@ def _reject_existing_score_output(arguments: list[str], *, pdb_path: Path) -> tu
 
 
 def _publish_score_output(source_path: Path, destination_path: Path) -> None:
-    """Publish one score artifact without allowing concurrent replacement."""
+    """Publish and durably commit one score without concurrent replacement."""
 
     if source_path.is_symlink() or not source_path.is_file():
         raise ValueError(f"pinned score execution did not produce a regular output: {source_path}")
     try:
-        os.link(source_path, destination_path, follow_symlinks=False)
-    except FileExistsError as exc:
-        raise ValueError(f"score output already exists; refuse concurrent result: {destination_path}") from exc
+        directory_fd = _open_directory_path(destination_path.parent, create=False)
     except OSError as exc:
         raise ValueError(f"score output could not be published atomically: {destination_path}") from exc
-    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
     try:
-        directory_fd = os.open(destination_path.parent, directory_flags)
+        try:
+            os.link(
+                source_path,
+                destination_path.name,
+                dst_dir_fd=directory_fd,
+                follow_symlinks=False,
+            )
+        except FileExistsError as exc:
+            raise ValueError(f"score output already exists; refuse concurrent result: {destination_path}") from exc
+        except OSError as exc:
+            raise ValueError(f"score output could not be published atomically: {destination_path}") from exc
         try:
             os.fsync(directory_fd)
-        finally:
-            os.close(directory_fd)
-    except OSError as exc:
-        raise ValueError(f"score output publication could not be made durable: {destination_path}") from exc
+        except OSError as publication_error:
+            try:
+                try:
+                    os.unlink(destination_path.name, dir_fd=directory_fd)
+                except FileNotFoundError:
+                    pass
+                os.fsync(directory_fd)
+            except OSError as rollback_error:
+                raise LigandMpnnScorePublicationUncertainError(
+                    "LigandMPNN score publication rollback durability is uncertain"
+                ) from rollback_error
+            raise ValueError(f"score output publication could not be made durable: {destination_path}") from (
+                publication_error
+            )
+    finally:
+        os.close(directory_fd)
 
 
 def _has_flag(arguments: list[str], flag: str) -> bool:

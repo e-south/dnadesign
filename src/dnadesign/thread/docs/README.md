@@ -88,6 +88,12 @@ its parent directory. If completion durability fails after score publication,
 the runtime removes and syncs both lifecycle entries before reporting ordinary
 failure; an unsuccessful rollback raises the public
 `LigandMpnnCompletionPublicationUncertainError` instead.
+Each newly created score-output directory link is likewise created through the
+no-follow descriptor chain and synced in its receiving parent. Score hard-link
+publication syncs the destination directory; if that sync fails, the runtime
+removes and syncs the score before reporting ordinary failure. An unsuccessful
+score rollback raises `LigandMpnnScorePublicationUncertainError`, and no
+completion record is published for either failure state.
 
 Probability probes use the official `score.py` single-AA or autoregressive
 mode with explicit sequence, atom-context, and fixed-side-chain-context flags.

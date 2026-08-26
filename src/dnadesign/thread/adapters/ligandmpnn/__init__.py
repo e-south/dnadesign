@@ -42,6 +42,7 @@ from dnadesign.thread.adapters.ligandmpnn.models import (
 )
 from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import (
     LigandMpnnCompletionPublicationUncertainError,
+    LigandMpnnScorePublicationUncertainError,
 )
 from dnadesign.thread.adapters.ligandmpnn.preflight import (
     LigandMpnnPreflightIssue,
@@ -94,6 +95,7 @@ __all__ = [
     "LigandMpnnRunReceipt",
     "LigandMpnnUpstreamPin",
     "LigandMpnnScoreMode",
+    "LigandMpnnScorePublicationUncertainError",
     "LigandMpnnCanonical20Policy",
     "LigandMpnnScoreOutput",
     "LigandMpnnScoreOutputTrust",
