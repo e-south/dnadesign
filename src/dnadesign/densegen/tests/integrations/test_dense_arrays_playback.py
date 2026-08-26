@@ -47,7 +47,7 @@ def _publisher_row(
         "sequence": "AAATTT",
         "densegen__used_tfbs_detail": [
             {
-                "part_kind": "tfbs",
+                "part_kind": "TFBS",
                 "sequence": "AAA",
                 "offset": 0,
                 "offset_raw": 0,
@@ -132,7 +132,7 @@ def test_reverse_placement_uses_realized_reverse_complement() -> None:
                 "offset": 3,
                 "offset_raw": 3,
                 "end": 7,
-                "orientation": "rev",
+                "orientation": "REV",
                 "tfbs_id": "tfbs-1",
                 "regulator": "TF_A",
             }
@@ -157,6 +157,18 @@ def test_missing_legacy_part_kind_defaults_to_tfbs() -> None:
     realized = realized_array_from_densegen_record(record, source_ref="fixture.parquet")
 
     assert realized.placements[0].kind is PlacementKind.TFBS
+
+
+def test_adapter_normalizes_uppercase_forward_orientation() -> None:
+    record = _publisher_row()
+    detail = record["densegen__used_tfbs_detail"][0]
+    detail["part_kind"] = "TFBS"
+    detail["orientation"] = "FWD"
+
+    realized = realized_array_from_densegen_record(record, source_ref="fixture.parquet")
+
+    assert realized.placements[0].kind is PlacementKind.TFBS
+    assert realized.placements[0].orientation is Orientation.FORWARD
 
 
 def test_fixed_element_recovers_sequence_consistent_raw_coordinate() -> None:

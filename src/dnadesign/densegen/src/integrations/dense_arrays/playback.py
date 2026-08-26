@@ -55,7 +55,7 @@ def _details(record: Mapping[str, object]) -> list[Mapping[str, object]]:
 
 
 def _placement_kind(value: object) -> PlacementKind:
-    text = str(value or PlacementKind.TFBS.value).strip()
+    text = str(value or PlacementKind.TFBS.value).strip().casefold()
     if text == PlacementKind.TFBS.value:
         return PlacementKind.TFBS
     if text == PlacementKind.FIXED_ELEMENT.value:
@@ -64,7 +64,7 @@ def _placement_kind(value: object) -> PlacementKind:
 
 
 def _orientation(value: object) -> Orientation:
-    text = str(value or "").strip()
+    text = str(value or "").strip().casefold()
     if text == Orientation.FORWARD.value:
         return Orientation.FORWARD
     if text == Orientation.REVERSE.value:
