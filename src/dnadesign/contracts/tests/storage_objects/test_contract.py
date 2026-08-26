@@ -169,6 +169,18 @@ def test_verify_storage_object_rejects_group_unreadable_shared_lock(tmp_path: Pa
         verify_storage_object(root)
 
 
+@pytest.mark.parametrize("mode", [0o200, 0o400])
+def test_verify_storage_object_rejects_owner_inaccessible_lock(tmp_path: Path, mode: int) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    lock_path = root / LOCK_NAME
+    lock_path.touch()
+    lock_path.chmod(mode)
+
+    with pytest.raises(StorageObjectError, match="lock must be owner-readable and owner-writable"):
+        verify_storage_object(root)
+
+
 def test_verify_storage_object_rejects_group_writable_root_without_setgid(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     _write_object(root)

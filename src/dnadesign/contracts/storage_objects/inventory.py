@@ -149,6 +149,11 @@ def _manifest_lock(root: Path) -> Iterator[None]:
             raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
         if lock_path.exists() and lock_path.stat(follow_symlinks=False).st_size != 0:
             raise StorageObjectError(f"storage object lock must be an empty coordination file: {lock_path}")
+        if lock_path.exists():
+            lock_mode = stat.S_IMODE(lock_path.stat(follow_symlinks=False).st_mode)
+            owner_required = stat.S_IRUSR | stat.S_IWUSR
+            if lock_mode & owner_required != owner_required:
+                raise StorageObjectError(f"storage object lock must be owner-readable and owner-writable: {lock_path}")
         if (
             root_mode & stat.S_IWGRP
             and lock_path.exists()
@@ -179,6 +184,10 @@ def _manifest_lock(root: Path) -> Iterator[None]:
         raise StorageObjectError(f"cannot acquire storage object manifest lock {lock_path}: {exc}") from exc
     try:
         lock_stat = lock_path.stat(follow_symlinks=False)
+        lock_mode = stat.S_IMODE(lock_stat.st_mode)
+        owner_required = stat.S_IRUSR | stat.S_IWUSR
+        if lock_mode & owner_required != owner_required:
+            raise StorageObjectError(f"storage object lock must be owner-readable and owner-writable: {lock_path}")
         if root_mode & stat.S_IWGRP and lock_stat.st_gid != root_stat.st_gid:
             raise StorageObjectError(f"storage object lock does not inherit the shared object group: {lock_path}")
         if root_mode & stat.S_IWGRP and not lock_stat.st_mode & stat.S_IWGRP:

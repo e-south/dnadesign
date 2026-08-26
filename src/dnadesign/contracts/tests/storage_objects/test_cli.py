@@ -382,6 +382,33 @@ def test_inventory_rejects_group_unreadable_lock_in_shared_object(tmp_path: Path
     assert not (root / MANIFEST_NAME).exists()
 
 
+@pytest.mark.parametrize("mode", [0o200, 0o400])
+def test_inventory_rejects_owner_inaccessible_lock(tmp_path: Path, mode: int) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    lock_path = root / LOCK_NAME
+    lock_path.touch()
+    lock_path.chmod(mode)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="lock must be owner-readable and owner-writable"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert stat.S_IMODE(lock_path.stat().st_mode) == mode
+    assert not (root / MANIFEST_NAME).exists()
+
+
 def test_inventory_rejects_group_writable_root_without_setgid(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     root.mkdir()
