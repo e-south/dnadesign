@@ -16,6 +16,7 @@ import json
 import os
 import shlex
 import stat
+import sys
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -92,8 +93,10 @@ def _write_manifest(
         if allow_untracked_demo_manifest:
             summary["status"] = "created-pending-git-add"
             object_root = shlex.quote(str(manifest_path.parent))
+            python_executable = shlex.quote(sys.executable)
             summary["next_step"] = (
-                f"git -C {object_root} add -- {MANIFEST_NAME} && dnadesign-storage validate {object_root}"
+                f"git -C {object_root} add -- {MANIFEST_NAME} "
+                f"&& {python_executable} -m dnadesign.contracts.storage_objects validate {object_root}"
             )
         return summary
     except Exception as validation_error:

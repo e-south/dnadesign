@@ -165,6 +165,17 @@ def test_verify_storage_object_rejects_group_writable_root_without_setgid(tmp_pa
         verify_storage_object(root)
 
 
+def test_verify_storage_object_rejects_private_manifest_in_shared_root(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    root.chmod(0o2770)
+    manifest_path = root / MANIFEST_NAME
+    manifest_path.chmod(0o600)
+
+    with pytest.raises(StorageObjectError, match="manifest must be group-readable"):
+        verify_storage_object(root)
+
+
 def test_verify_storage_object_wraps_resource_read_failures(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

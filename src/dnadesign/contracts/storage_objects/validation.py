@@ -208,6 +208,15 @@ def verify_storage_object(
                 "group-writable storage object roots must set the setgid bit "
                 "so coordination files inherit the shared group"
             )
+        manifest_stat = manifest_path.stat(follow_symlinks=False)
+        if root_mode & stat.S_IWGRP and manifest_stat.st_gid != root_stat.st_gid:
+            raise StorageObjectError(
+                f"storage object manifest does not inherit the shared object group: {manifest_path}"
+            )
+        if root_mode & stat.S_IWGRP and not manifest_stat.st_mode & stat.S_IRGRP:
+            raise StorageObjectError(
+                f"storage object manifest must be group-readable in a shared object root: {manifest_path}"
+            )
         if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
             raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
         if lock_path.exists() and lock_path.stat(follow_symlinks=False).st_size != 0:
