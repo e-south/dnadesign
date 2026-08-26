@@ -41,7 +41,9 @@ from .models import (
 )
 from .validation import resolve_storage_path, storage_file_paths, verify_storage_object
 
+_LINUX_RENAME_NOREPLACE = 0x00000001
 _RENAME_EXCHANGE = 0x00000002
+_DARWIN_RENAME_EXCL = 0x00000004
 
 
 def _sha256(path: Path) -> str:
@@ -85,7 +87,11 @@ def _rollback_manifest(
                 "storage object manifest changed after publication; refusing to overwrite unrelated receipt bytes"
             )
         if previous_bytes is None:
-            manifest_path.unlink()
+            _rollback_create_only_manifest(
+                manifest_path,
+                published_bytes=published_bytes,
+                operation_error=operation_error,
+            )
             return
         descriptor, restore_name = tempfile.mkstemp(
             dir=manifest_path.parent,
@@ -94,8 +100,27 @@ def _rollback_manifest(
         restore_path = Path(restore_name)
         with os.fdopen(descriptor, "wb") as handle:
             handle.write(previous_bytes)
+            handle.flush()
+            os.fsync(handle.fileno())
         restore_path.chmod(previous_mode, follow_symlinks=False)
-        os.replace(restore_path, manifest_path)
+        try:
+            _publish_refresh_manifest(
+                restore_path,
+                manifest_path,
+                previous_bytes=published_bytes,
+            )
+        except StorageObjectPublicationUncertain:
+            restore_path = None
+            raise
+        except BaseException as restore_error:
+            restore_path.unlink(missing_ok=True)
+            restore_path = None
+            if isinstance(restore_error, StorageObjectPublicationUnsupported):
+                raise
+            raise StorageObjectError(
+                f"storage object operation failed and conditional manifest rollback failed: {restore_error}"
+            ) from operation_error
+        restore_path = None
     except OSError as restore_error:
         if restore_path is not None:
             restore_path.unlink(missing_ok=True)
@@ -121,8 +146,39 @@ def _fsync_directory(directory: Path) -> None:
 def _atomic_exchange(source: Path, destination: Path) -> None:
     """Atomically exchange two same-directory entries on supported POSIX kernels."""
 
+    _atomic_rename(
+        source,
+        destination,
+        darwin_flags=_RENAME_EXCHANGE,
+        linux_flags=_RENAME_EXCHANGE,
+        operation="exchange",
+    )
+
+
+def _atomic_move_no_replace(source: Path, destination: Path) -> None:
+    """Atomically move one same-directory entry only when the destination is absent."""
+
+    _atomic_rename(
+        source,
+        destination,
+        darwin_flags=_DARWIN_RENAME_EXCL,
+        linux_flags=_LINUX_RENAME_NOREPLACE,
+        operation="no-replace move",
+    )
+
+
+def _atomic_rename(
+    source: Path,
+    destination: Path,
+    *,
+    darwin_flags: int,
+    linux_flags: int,
+    operation: str,
+) -> None:
+    """Invoke one supported same-directory native rename transaction."""
+
     if source.parent != destination.parent:
-        raise StorageObjectError("atomic manifest exchange requires same-directory entries")
+        raise StorageObjectError(f"atomic manifest {operation} requires same-directory entries")
     parent_descriptor = os.open(source.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
     try:
         libc = ctypes.CDLL(None, use_errno=True)
@@ -130,10 +186,14 @@ def _atomic_exchange(source: Path, destination: Path) -> None:
         destination_bytes = os.fsencode(destination.name)
         if sys.platform == "darwin" and hasattr(libc, "renameatx_np"):
             rename = libc.renameatx_np
+            flags = darwin_flags
         elif sys.platform.startswith("linux") and hasattr(libc, "renameat2"):
             rename = libc.renameat2
+            flags = linux_flags
         else:
-            raise StorageObjectPublicationUnsupported("this platform does not support atomic storage manifest exchange")
+            raise StorageObjectPublicationUnsupported(
+                f"this platform does not support atomic storage manifest {operation}"
+            )
         rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
         rename.restype = ctypes.c_int
         result = rename(
@@ -141,18 +201,70 @@ def _atomic_exchange(source: Path, destination: Path) -> None:
             source_bytes,
             parent_descriptor,
             destination_bytes,
-            _RENAME_EXCHANGE,
+            flags,
         )
         if result == 0:
             return
         error = ctypes.get_errno()
         if error in {errno.ENOSYS, errno.EOPNOTSUPP, errno.ENOTSUP, errno.EINVAL}:
             raise StorageObjectPublicationUnsupported(
-                "this filesystem does not support atomic storage manifest exchange"
+                f"this filesystem does not support atomic storage manifest {operation}"
             )
         raise OSError(error, os.strerror(error), destination)
     finally:
         os.close(parent_descriptor)
+
+
+def _rollback_create_only_manifest(
+    manifest_path: Path,
+    *,
+    published_bytes: bytes,
+    operation_error: BaseException,
+) -> None:
+    """Remove only the create-only receipt owned by the failed operation."""
+
+    descriptor, quarantine_name = tempfile.mkstemp(
+        dir=manifest_path.parent,
+        prefix=f".{MANIFEST_NAME}.rollback-",
+    )
+    os.close(descriptor)
+    quarantine = Path(quarantine_name)
+    quarantine.unlink()
+    try:
+        _atomic_move_no_replace(manifest_path, quarantine)
+    except FileNotFoundError:
+        return
+    except BaseException:
+        quarantine.unlink(missing_ok=True)
+        raise
+
+    try:
+        quarantine_stat = quarantine.lstat()
+        owns_receipt = stat.S_ISREG(quarantine_stat.st_mode) and quarantine.read_bytes() == published_bytes
+    except BaseException as inspection_error:
+        raise StorageObjectPublicationUncertain(
+            f"cannot identify the receipt moved during create-only rollback; retained at {quarantine}"
+        ) from inspection_error
+    if owns_receipt:
+        try:
+            quarantine.unlink()
+            _fsync_directory(manifest_path.parent)
+        except BaseException as cleanup_error:
+            raise StorageObjectPublicationUncertain(
+                f"create-only rollback cleanup is uncertain; inspect {quarantine} and {manifest_path}"
+            ) from cleanup_error
+        return
+
+    try:
+        _atomic_move_no_replace(quarantine, manifest_path)
+        _fsync_directory(manifest_path.parent)
+    except BaseException as restore_error:
+        raise StorageObjectPublicationUncertain(
+            f"create-only rollback moved an unrelated receipt; inspect {quarantine} and {manifest_path}"
+        ) from restore_error
+    raise StorageObjectError(
+        "storage object manifest changed after publication; refusing to remove unrelated receipt bytes"
+    ) from operation_error
 
 
 def _publish_create_only_manifest(

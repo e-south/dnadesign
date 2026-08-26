@@ -121,7 +121,11 @@ platform or filesystem without the required primitive fails closed as
 `StorageObjectPublicationUnsupported`. If an exchange cannot prove that its
 swap-back completed, it raises `StorageObjectPublicationUncertain` and retains
 both named files for explicit recovery rather than guessing which receipt may
-be deleted. A pre-existing
+be deleted. Rollback uses the same conditional primitives: refresh restores the
+prior receipt only after atomically displacing the receipt this operation
+published, while failed create-only inventory quarantines and identifies the
+current receipt before removing it. A competing receipt is restored or retained
+for recovery; it is never silently overwritten or deleted. A pre-existing
 staging-shaped name fails closed for explicit operator inspection; the tool
 never guesses that such bytes are safe to delete. Independently synced replicas,
 including separate Dropbox clients, are not one shared

@@ -1621,6 +1621,80 @@ def test_inventory_rolls_back_when_atomic_link_publication_is_interrupted(
     assert not (root / MANIFEST_NAME).exists()
 
 
+def test_inventory_rollback_preserves_receipt_replaced_at_commit_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    competitor_root = tmp_path / "competitor"
+    competitor_root.mkdir()
+    (competitor_root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        competitor_root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="competing-revision",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    competitor_bytes = (competitor_root / MANIFEST_NAME).read_bytes()
+
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    original_move = storage_inventory._atomic_move_no_replace
+    original_replace = storage_inventory.os.replace
+    original_unlink = storage_inventory.os.unlink
+    injected = False
+
+    def _inject_competitor() -> None:
+        nonlocal injected
+        staged = manifest_path.with_name(f".{MANIFEST_NAME}.competitor")
+        staged.write_bytes(competitor_bytes)
+        original_replace(staged, manifest_path)
+        injected = True
+
+    def _move_after_competing_receipt(source: Path, destination: Path) -> None:
+        if source == manifest_path and not injected:
+            _inject_competitor()
+        original_move(source, destination)
+
+    def _unlink_after_competing_receipt(path: str | bytes, *args: object, **kwargs: object) -> None:
+        if Path(path) == manifest_path and not injected:
+            _inject_competitor()
+        original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(storage_inventory, "_atomic_move_no_replace", _move_after_competing_receipt)
+    monkeypatch.setattr(storage_inventory.os, "unlink", _unlink_after_competing_receipt)
+
+    def _fail_verification(*_args: object, **_kwargs: object) -> None:
+        raise StorageObjectError("injected validation failure")
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _fail_verification)
+
+    with pytest.raises(StorageObjectError):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert injected
+    assert manifest_path.read_bytes() == competitor_bytes
+    assert not tuple(root.glob(f".{MANIFEST_NAME}.rollback-*"))
+
+
 def test_refresh_swaps_back_when_atomic_exchange_is_interrupted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1663,6 +1737,143 @@ def test_refresh_swaps_back_when_atomic_exchange_is_interrupted(
 
     assert manifest_path.read_bytes() == previous_bytes
     assert exchange_calls == 2
+
+
+def test_refresh_rollback_preserves_receipt_replaced_at_commit_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    previous_bytes = manifest_path.read_bytes()
+    competitor = json.loads(previous_bytes)
+    competitor["producer_revision"] = "competing-revision"
+    competitor_bytes = (json.dumps(competitor, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    original_exchange = storage_inventory._atomic_exchange
+    original_replace = storage_inventory.os.replace
+    exchange_calls = 0
+    injected = False
+
+    def _exchange_after_competing_receipt(source: Path, destination: Path) -> None:
+        nonlocal exchange_calls, injected
+        exchange_calls += 1
+        if exchange_calls == 2:
+            staged = destination.with_name(f".{MANIFEST_NAME}.competitor")
+            staged.write_bytes(competitor_bytes)
+            original_replace(staged, destination)
+            injected = True
+        original_exchange(source, destination)
+
+    def _replace_after_competing_receipt(source: Path, destination: Path) -> None:
+        nonlocal injected
+        if source.name.startswith(f".{MANIFEST_NAME}.restore-"):
+            destination.write_bytes(competitor_bytes)
+            injected = True
+        original_replace(source, destination)
+
+    monkeypatch.setattr(storage_inventory, "_atomic_exchange", _exchange_after_competing_receipt)
+    monkeypatch.setattr(storage_inventory.os, "replace", _replace_after_competing_receipt)
+
+    def _fail_verification(*_args: object, **_kwargs: object) -> None:
+        raise StorageObjectError("injected validation failure")
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _fail_verification)
+
+    with pytest.raises(StorageObjectError):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert injected
+    assert manifest_path.read_bytes() == competitor_bytes
+    assert not tuple(root.glob(f".{MANIFEST_NAME}.restore-*"))
+
+
+def test_refresh_rollback_retains_both_receipts_when_swap_back_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path = tmp_path / MANIFEST_NAME
+    previous_bytes = b"previous receipt\n"
+    published_bytes = b"published receipt\n"
+    competitor_bytes = b"competing receipt\n"
+    manifest_path.write_bytes(published_bytes)
+    original_exchange = storage_inventory._atomic_exchange
+    original_replace = storage_inventory.os.replace
+    exchange_calls = 0
+
+    def _fail_swap_back(source: Path, destination: Path) -> None:
+        nonlocal exchange_calls
+        exchange_calls += 1
+        if exchange_calls == 1:
+            staged = destination.with_name(f".{MANIFEST_NAME}.competitor")
+            staged.write_bytes(competitor_bytes)
+            original_replace(staged, destination)
+            original_exchange(source, destination)
+            return
+        raise OSError("injected rollback swap-back failure")
+
+    monkeypatch.setattr(storage_inventory, "_atomic_exchange", _fail_swap_back)
+
+    with pytest.raises(
+        StorageObjectPublicationUncertain,
+        match="rollback failed.*outcome is uncertain",
+    ):
+        storage_inventory._rollback_manifest(
+            manifest_path,
+            published_bytes=published_bytes,
+            previous_bytes=previous_bytes,
+            previous_mode=0o644,
+            operation_error=StorageObjectError("injected validation failure"),
+        )
+
+    assert exchange_calls == 2
+    assert manifest_path.read_bytes() == previous_bytes
+    recovery_paths = tuple(tmp_path.glob(f".{MANIFEST_NAME}.restore-*"))
+    assert len(recovery_paths) == 1
+    assert recovery_paths[0].read_bytes() == competitor_bytes
+
+
+def test_refresh_rollback_fails_typed_unsupported_without_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path = tmp_path / MANIFEST_NAME
+    published_bytes = b"published receipt\n"
+    manifest_path.write_bytes(published_bytes)
+
+    def _unsupported_exchange(*_args: object, **_kwargs: object) -> None:
+        raise StorageObjectPublicationUnsupported("injected unsupported exchange")
+
+    monkeypatch.setattr(storage_inventory, "_atomic_exchange", _unsupported_exchange)
+
+    with pytest.raises(StorageObjectPublicationUnsupported, match="injected unsupported exchange"):
+        storage_inventory._rollback_manifest(
+            manifest_path,
+            published_bytes=published_bytes,
+            previous_bytes=b"previous receipt\n",
+            previous_mode=0o644,
+            operation_error=StorageObjectError("injected validation failure"),
+        )
+
+    assert manifest_path.read_bytes() == published_bytes
+    assert not tuple(tmp_path.glob(f".{MANIFEST_NAME}.restore-*"))
 
 
 def test_refresh_rejects_duplicate_resource_paths_before_collapsing_roles(tmp_path: Path) -> None:
