@@ -39,6 +39,8 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
         "parser.add_argument('--checkpoint_ligand_mpnn', required=True)\n"
         "parser.add_argument('--pdb_path', required=True)\n"
         "parser.add_argument('--omit_AA_per_residue')\n"
+        "parser.add_argument('--fixed_residues')\n"
+        "parser.add_argument('--redesigned_residues')\n"
         "parser.add_argument('--output', required=True)\n"
         "args = parser.parse_args()\n"
         "checkpoint = Path(args.checkpoint_ligand_mpnn).read_text(encoding='utf-8')\n"
@@ -300,6 +302,37 @@ def test_pinned_runtime_stages_verified_sidecar_before_execution(tmp_path: Path)
     assert output.read_text(encoding="utf-8") == "attested:helper-attested:checkpoint-v1:input-v1:sidecar-v1"
 
 
+def test_pinned_runtime_allows_exact_singular_residue_selection_flags(tmp_path: Path) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output = tmp_path / "output.txt"
+
+    execute_pinned_entrypoint(
+        checkout_root=checkout,
+        upstream_commit=commit,
+        checkpoint_sha256=checkpoint_sha256,
+        pdb_sha256=pdb_sha256,
+        packing_checkpoint_sha256=None,
+        residue_alphabet_sha256=None,
+        entrypoint="run.py",
+        arguments=(
+            "--model_type",
+            "ligand_mpnn",
+            "--checkpoint_ligand_mpnn",
+            str(checkpoint),
+            "--pdb_path",
+            str(pdb),
+            "--fixed_residues",
+            "A1 A2",
+            "--redesigned_residues",
+            "A3",
+            "--output",
+            str(output),
+        ),
+    )
+
+    assert output.read_text(encoding="utf-8") == "attested:helper-attested:checkpoint-v1:input-v1:no-sidecar"
+
+
 def test_pinned_runtime_preserves_pdb_basename_for_upstream_score_output(tmp_path: Path) -> None:
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     named_pdb = pdb.with_name("target-complex.pdb")
@@ -444,7 +477,9 @@ def test_pinned_runtime_rejects_unpinned_attached_optional_file_flags(
         ("--checkpoint_protein_mpnn", "/unattested.pt"),
         ("--pdb_path_multi", "/unattested.json"),
         ("--fixed_residues_multi", "/unattested.json"),
+        ("--fixed_residues_m", "/ambiguous.json"),
         ("--redesigned_residues_multi", "/unattested.json"),
+        ("--redesigned_residues_m", "/ambiguous.json"),
         ("--bias_AA_per_residue", "/unattested.json"),
         ("--bias_AA_per_residue_multi", "/unattested.json"),
         ("--omit_AA_per_residue_multi", "/unattested.json"),

@@ -17,6 +17,8 @@ import os
 import py_compile
 import subprocess
 import sys
+import threading
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -295,33 +297,53 @@ def test_probe_does_not_import_helpers_from_mutable_checkout(tmp_path: Path) -> 
     assert not (tmp_path / request.output_path).exists()
 
 
-def test_probe_publishes_receipt_without_following_a_raced_symlink(
+def test_probe_rejects_ancestor_symlink_race_without_publishing_outside_execution_root(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     checkout, commit = _fake_upstream_checkout(tmp_path)
-    request = _request(tmp_path, checkout, commit)
-    output_path = tmp_path.resolve() / request.output_path
-    outside_path = tmp_path / "outside.txt"
-    outside_path.write_text("sentinel", encoding="utf-8")
-    path_type = type(output_path)
-    original_write_bytes = path_type.write_bytes
-
-    def _race_output_write(path: Path, payload: bytes) -> int:
-        if path == output_path and not path.exists() and not path.is_symlink():
-            path.symlink_to(outside_path)
-        return original_write_bytes(path, payload)
-
-    monkeypatch.setattr(path_type, "write_bytes", _race_output_write)
-
-    materialize_ligandmpnn_context_inventory(
-        request,
-        execution_root=tmp_path,
-        checkout_root=checkout,
+    request = replace(
+        _request(tmp_path, checkout, commit),
+        output_path=Path("evidence/context/context-inventory.json"),
     )
+    output_ancestor = tmp_path / "evidence"
+    output_parent = tmp_path / request.output_path.parent
+    output_parent.mkdir(parents=True)
+    displaced_parent = tmp_path / "displaced-evidence"
+    outside_parent = tmp_path / "outside"
+    (outside_parent / "context").mkdir(parents=True)
+    open_started = threading.Event()
+    race_finished = threading.Event()
+    original_open = os.open
 
-    assert not output_path.is_symlink()
-    assert outside_path.read_text(encoding="utf-8") == "sentinel"
+    def _race_ancestor() -> None:
+        assert open_started.wait(timeout=5)
+        os.rename(output_ancestor, displaced_parent)
+        os.symlink(outside_parent, output_ancestor, target_is_directory=True)
+        race_finished.set()
+
+    racer = threading.Thread(target=_race_ancestor, daemon=True)
+    racer.start()
+
+    def _synchronized_open(path: os.PathLike[str] | str, flags: int, *args: object, **kwargs: object) -> int:
+        candidate = Path(path)
+        if not open_started.is_set() and candidate.name in {output_ancestor.name, output_parent.name}:
+            open_started.set()
+            assert race_finished.wait(timeout=5)
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", _synchronized_open)
+
+    with pytest.raises(ValueError, match="context probe output directory could not be opened safely"):
+        materialize_ligandmpnn_context_inventory(
+            request,
+            execution_root=tmp_path,
+            checkout_root=checkout,
+        )
+
+    racer.join(timeout=5)
+    assert not racer.is_alive()
+    assert not (outside_parent / "context" / request.output_path.name).exists()
 
 
 def test_probe_command_is_explicit_and_portable(tmp_path: Path) -> None:

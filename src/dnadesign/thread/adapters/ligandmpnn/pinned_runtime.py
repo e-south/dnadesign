@@ -26,6 +26,8 @@ _CHECKPOINT_FLAG = "--checkpoint_ligand_mpnn"
 _PACKING_CHECKPOINT_FLAG = "--checkpoint_path_sc"
 _PDB_FLAG = "--pdb_path"
 _RESIDUE_ALPHABET_FLAG = "--omit_AA_per_residue"
+_FIXED_RESIDUES_FLAG = "--fixed_residues"
+_REDESIGNED_RESIDUES_FLAG = "--redesigned_residues"
 _MODEL_TYPE_FLAG = "--model_type"
 _OUTPUT_FOLDER_FLAG = "--out_folder"
 _ALTERNATE_SOURCE_FLAGS = frozenset(
@@ -49,6 +51,8 @@ _ATTESTATION_SENSITIVE_FLAGS = frozenset(
         _PACKING_CHECKPOINT_FLAG,
         _PDB_FLAG,
         _RESIDUE_ALPHABET_FLAG,
+        _FIXED_RESIDUES_FLAG,
+        _REDESIGNED_RESIDUES_FLAG,
         _OUTPUT_FOLDER_FLAG,
         *_ALTERNATE_SOURCE_FLAGS,
     }

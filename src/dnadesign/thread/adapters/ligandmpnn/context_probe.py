@@ -156,10 +156,8 @@ def materialize_ligandmpnn_context_inventory(
         checkout_root=checkout_root,
     )
     root = execution_root.expanduser().resolve()
-    output_path = _within_root(root, request.output_path, field_name="context probe output_path")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
     payload = (json.dumps(inventory.to_dict(), indent=2, sort_keys=True) + "\n").encode("utf-8")
-    _publish_context_inventory(output_path, payload)
+    _publish_context_inventory(root, request.output_path, payload)
     return LigandMpnnContextInventoryReference(path=request.output_path, sha256=hashlib.sha256(payload).hexdigest())
 
 
@@ -214,13 +212,12 @@ def _derive_ligandmpnn_context_inventory(
     )
 
 
-def _publish_context_inventory(output_path: Path, payload: bytes) -> None:
-    """Atomically replace one receipt without following a raced leaf symlink."""
+def _publish_context_inventory(execution_root: Path, output_path: Path, payload: bytes) -> None:
+    """Atomically replace one receipt through a descriptor-pinned directory chain."""
 
-    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
     temporary_name = f".{output_path.name}.{uuid.uuid4().hex}.tmp"
     try:
-        directory_fd = os.open(output_path.parent, directory_flags)
+        directory_fd = _open_output_directory(execution_root, output_path.parent)
     except OSError as error:
         raise ValueError("context probe output directory could not be opened safely") from error
     try:
@@ -251,6 +248,38 @@ def _publish_context_inventory(output_path: Path, payload: bytes) -> None:
             pass
         finally:
             os.close(directory_fd)
+
+
+def _open_output_directory(execution_root: Path, relative_parent: Path) -> int:
+    """Open or create an output parent without following any path component."""
+
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
+    root_parts = execution_root.parts
+    if not execution_root.is_absolute() or not root_parts:
+        raise OSError("execution_root must be absolute")
+    current_fd = os.open(execution_root.anchor, directory_flags)
+    try:
+        for component in root_parts[1:]:
+            next_fd = os.open(component, directory_flags, dir_fd=current_fd)
+            os.close(current_fd)
+            current_fd = next_fd
+        for component in relative_parent.parts:
+            if component in {"", "."}:
+                continue
+            try:
+                next_fd = os.open(component, directory_flags, dir_fd=current_fd)
+            except FileNotFoundError:
+                try:
+                    os.mkdir(component, mode=0o755, dir_fd=current_fd)
+                except FileExistsError:
+                    pass
+                next_fd = os.open(component, directory_flags, dir_fd=current_fd)
+            os.close(current_fd)
+            current_fd = next_fd
+        return current_fd
+    except BaseException:
+        os.close(current_fd)
+        raise
 
 
 def _run_pinned_upstream_parser(
