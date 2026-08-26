@@ -35,6 +35,7 @@ from dense_arrays.playback.theme import (
     PlaybackPresentation,
     legend_entries_for_profile,
 )
+from dense_arrays.realized import PlacementKind
 
 from .baserender_projection import (
     AnchoredIllustrationPresentation,
@@ -550,6 +551,15 @@ def publish_densegen_playback_endpoint(
         for term in forbidden_terms:
             if term and any(term in label.casefold() for label in placement_labels):
                 raise ValueError(f"record-derived placement label contains forbidden term: {term!r}")
+        if fixed_element_annotations == "variant":
+            variant_labels = tuple(
+                str(placement.metadata.get("variant_id") or "")
+                for placement in realized.placements
+                if placement.kind is PlacementKind.FIXED_ELEMENT
+            )
+            for term in forbidden_terms:
+                if term and any(term in label.casefold() for label in variant_labels):
+                    raise ValueError(f"record-derived variant annotation contains forbidden term: {term!r}")
         from dense_arrays.playback import reconstruct_playback
 
         plan = reconstruct_playback(realized)

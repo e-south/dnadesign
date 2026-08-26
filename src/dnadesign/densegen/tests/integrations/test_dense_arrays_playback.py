@@ -76,11 +76,12 @@ def _write_endpoint(
     scene: str = "clean_scene",
     formats: tuple[str, ...] = ("manifest.json",),
     placement_label: str = "TF_A",
+    record: dict[str, object] | None = None,
 ) -> Path:
     workspace = tmp_path / "workspace"
     table_path = workspace / "outputs" / "tables" / "records.parquet"
     table_path.parent.mkdir(parents=True)
-    row = _publisher_row(placement_label=placement_label)
+    row = record or _publisher_row(placement_label=placement_label)
     pq.write_table(pa.Table.from_pylist([row]), table_path)
     selected = _selected_rows(table_path, ("record-1",))
     selected_sha256 = _selected_records_sha256(selected, ("record-1",))
@@ -318,6 +319,45 @@ def test_publisher_validates_record_derived_placement_labels(tmp_path: Path) -> 
     config_path = _write_endpoint(tmp_path, placement_label="Sigma factor RpoD")
 
     with pytest.raises(ValueError, match="record-derived placement label contains forbidden term: 'sigma factor'"):
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+
+def test_publisher_validates_record_derived_variant_annotations(tmp_path: Path) -> None:
+    row = _publisher_row()
+    row["densegen__used_tfbs_detail"] = [
+        {
+            "part_kind": "fixed_element",
+            "sequence": "AAA",
+            "offset": 0,
+            "offset_raw": 0,
+            "end": 3,
+            "orientation": "fwd",
+            "constraint_name": "anchor",
+            "placement_index": 0,
+            "role": "upstream",
+            "variant_id": "Sigma factor variant",
+            "spacer_length": 0,
+        },
+        {
+            "part_kind": "fixed_element",
+            "sequence": "TTT",
+            "offset": 3,
+            "offset_raw": 3,
+            "end": 6,
+            "orientation": "fwd",
+            "constraint_name": "anchor",
+            "placement_index": 0,
+            "role": "downstream",
+            "variant_id": "consensus",
+            "spacer_length": 0,
+        },
+    ]
+    config_path = _write_endpoint(tmp_path, record=row)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    payload["duplex"] = {"fixed_element_annotations": "variant"}
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="record-derived variant annotation contains forbidden term: 'sigma factor'"):
         publisher.publish_densegen_playback_endpoint(config_path)
 
 
