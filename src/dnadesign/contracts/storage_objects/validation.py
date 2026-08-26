@@ -160,7 +160,15 @@ def _verify_demo(
         relative = path.relative_to(checkout).as_posix()
         try:
             completed = subprocess.run(
-                ["git", "-C", str(checkout), "ls-files", "--error-unmatch", "--", relative],
+                [
+                    "git",
+                    "-C",
+                    str(checkout),
+                    "ls-files",
+                    "--error-unmatch",
+                    "--",
+                    f":(literal){relative}",
+                ],
                 check=False,
                 capture_output=True,
                 text=True,

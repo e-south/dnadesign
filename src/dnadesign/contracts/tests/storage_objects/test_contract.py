@@ -249,6 +249,42 @@ def test_git_resident_demo_must_be_small_and_tracked(tmp_path: Path) -> None:
         verify_storage_object(root)
 
 
+def test_git_resident_demo_treats_resource_paths_literally(tmp_path: Path) -> None:
+    checkout = tmp_path / "checkout"
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    root = checkout / "examples" / "pilot"
+    _write_object(root, demo=True)
+    tracked = root / "foo1.txt"
+    tracked.write_text("tracked\n", encoding="utf-8")
+    untracked = root / "foo[1].txt"
+    untracked.write_text("untracked\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["resources"].extend(
+        [
+            {"path": "foo1.txt", "digest": _digest(tracked.read_bytes()), "role": "artifact"},
+            {"path": "foo[1].txt", "digest": _digest(untracked.read_bytes()), "role": "artifact"},
+        ]
+    )
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(checkout),
+            "add",
+            "examples/pilot/inputs",
+            "examples/pilot/outputs",
+            "examples/pilot/storage.object.json",
+            "examples/pilot/foo1.txt",
+        ],
+        check=True,
+    )
+
+    with pytest.raises(StorageObjectError, match=r"demo file is not tracked: .*foo\[1\]\.txt"):
+        verify_storage_object(root)
+
+
 def test_git_resident_demo_normalizes_missing_git_executable(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
