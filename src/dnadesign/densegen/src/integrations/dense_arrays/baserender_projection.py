@@ -12,7 +12,9 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import io
+import math
 import re
+from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 
@@ -39,6 +41,10 @@ from dnadesign.baserender import (
 _SVG_RE = re.compile(r"(<svg\b.*</svg>)", re.DOTALL)
 _DNA_COMPLEMENT = str.maketrans("ATCGRYSWKMBDHVN", "TAGCYRSWMKVHDBN")
 _ANCHORED_ILLUSTRATION_TOP_BAND_PX = 550.0
+_RASTER_DPI = 72
+_MAX_RGBA_EDGE_PX = 2400
+_MAX_RGBA_PIXELS = 3_000_000
+_RGBA_CACHE_SIZE = 2
 
 
 @dataclass(frozen=True)
@@ -155,12 +161,13 @@ class BaseRenderDuplexProjection:
                 weight="normal",
             ),
         ).get_extents()
-        self.native_nucleotide_cap_height_px = (
+        self._native_nucleotide_cap_height_px = (
             float(cap_bounds.height) * float(self._style.dpi) * float(self._style.figure_scale) / 72.0
         )
+        self.native_nucleotide_cap_height_px = self._native_nucleotide_cap_height_px
         self._records: dict[str, tuple[Record, ...]] = {}
         self._palettes: dict[str, Palette] = {}
-        self._rgba_cache: dict[tuple[str, int], np.ndarray] = {}
+        self._rgba_cache: OrderedDict[tuple[str, int], np.ndarray] = OrderedDict()
         self._svg_cache: dict[tuple[str, int], str] = {}
         for document in documents:
             records, palette = self._prepare_document(document)
@@ -308,15 +315,11 @@ class BaseRenderDuplexProjection:
                         render={"priority": 6},
                     )
                 )
-        reveal_end = max(step.end for step in placed)
-        is_final_step = step_index == len(plan.steps) - 1
-        reveals_right_terminus = reveal_end == len(plan.realized_sequence)
-        if is_final_step and not reveals_right_terminus:
-            raise ValueError(
-                "final dense-array playback step must reveal the complete realized sequence "
-                f"(revealed through {reveal_end}, sequence length {len(plan.realized_sequence)})"
-            )
-        hidden = tuple(range(reveal_end, len(plan.realized_sequence)))
+        revealed = {
+            coordinate for step in placed for span in step.added_spans for coordinate in range(span.start, span.end)
+        }
+        hidden = tuple(coordinate for coordinate in range(len(plan.realized_sequence)) if coordinate not in revealed)
+        reveals_right_terminus = len(plan.realized_sequence) - 1 in revealed
         record = Record(
             id=f"{plan.realization_digest}:{step_index}",
             alphabet="IUPAC_DNA",
@@ -386,18 +389,38 @@ class BaseRenderDuplexProjection:
         key = (document.plan.realization_digest, step_index)
         cached = self._rgba_cache.get(key)
         if cached is not None:
+            self._rgba_cache.move_to_end(key)
             return cached
         import matplotlib.pyplot as plt
 
         figure = self._figure(document, step_index)
         buffer = io.BytesIO()
-        figure.savefig(
-            buffer, format="png", dpi=self._style.dpi, bbox_inches="tight", pad_inches=0.01, facecolor="white"
-        )
+        figure.savefig(buffer, format="png", dpi=_RASTER_DPI, bbox_inches="tight", pad_inches=0.01, facecolor="white")
         plt.close(figure)
         buffer.seek(0)
-        rgba = np.asarray(Image.open(buffer).convert("RGBA")).copy()
+        image = Image.open(buffer).convert("RGBA")
+        source_width, source_height = image.size
+        scale = min(
+            1.0,
+            _MAX_RGBA_EDGE_PX / max(source_width, source_height, 1),
+            math.sqrt(_MAX_RGBA_PIXELS / max(source_width * source_height, 1)),
+        )
+        if scale < 1.0:
+            image = image.resize(
+                (
+                    max(1, round(source_width * scale)),
+                    max(1, round(source_height * scale)),
+                ),
+                resample=Image.Resampling.LANCZOS,
+            )
+        self.native_nucleotide_cap_height_px = (
+            self._native_nucleotide_cap_height_px * (_RASTER_DPI / self._style.dpi) * scale
+        )
+        rgba = np.asarray(image).copy()
         self._rgba_cache[key] = rgba
+        self._rgba_cache.move_to_end(key)
+        while len(self._rgba_cache) > _RGBA_CACHE_SIZE:
+            self._rgba_cache.popitem(last=False)
         return rgba
 
     def render_svg(self, document: PlaybackDocument, step_index: int) -> str:

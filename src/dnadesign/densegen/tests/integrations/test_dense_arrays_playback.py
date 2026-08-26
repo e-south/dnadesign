@@ -188,6 +188,17 @@ def test_selected_record_digest_ignores_unselected_runtime_columns(tmp_path: Pat
     )
 
 
+def test_selected_rows_rejects_duplicate_in_later_batch(tmp_path: Path) -> None:
+    table_path = tmp_path / "records.parquet"
+    rows = [_publisher_row(record_id="target")]
+    rows.extend(_publisher_row(record_id=f"filler-{index}") for index in range(2047))
+    rows.append(_publisher_row(record_id="target", generated_at="duplicate"))
+    pq.write_table(pa.Table.from_pylist(rows), table_path)
+
+    with pytest.raises(ValueError, match="record id 'target' occurs more than once"):
+        _selected_rows(table_path, ("target",))
+
+
 def test_publisher_confines_replace_to_dedicated_workspace_output(tmp_path: Path) -> None:
     config_path = _write_endpoint(tmp_path)
     payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
@@ -253,6 +264,41 @@ def test_publisher_removes_prior_bundle_after_successful_replacement(tmp_path: P
     assert not marker.exists()
     assert (output_path / "manifest.json").is_file()
     assert not tuple(output_path.parent.glob(f".{output_path.name}.backup-*"))
+
+
+def test_publisher_reports_success_when_only_backup_cleanup_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = _write_endpoint(tmp_path)
+    output_path = publisher.publish_densegen_playback_endpoint(config_path)
+    original_rmtree = publisher.shutil.rmtree
+
+    def _fail_backup_cleanup(path: Path, *args, **kwargs) -> None:
+        if Path(path).name.startswith(f".{output_path.name}.backup-"):
+            raise OSError("simulated cleanup denial")
+        original_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(publisher.shutil, "rmtree", _fail_backup_cleanup)
+
+    replaced_path = publisher.publish_densegen_playback_endpoint(config_path, replace=True)
+
+    assert replaced_path == output_path
+    assert (output_path / "manifest.json").is_file()
+    assert len(tuple(output_path.parent.glob(f".{output_path.name}.backup-*"))) == 1
+
+
+def test_publisher_recovers_prior_bundle_after_interrupted_rename(tmp_path: Path) -> None:
+    config_path = _write_endpoint(tmp_path)
+    output_path = publisher.publish_densegen_playback_endpoint(config_path)
+    backup_path = output_path.parent / f".{output_path.name}.backup-interrupted"
+    output_path.replace(backup_path)
+
+    replaced_path = publisher.publish_densegen_playback_endpoint(config_path, replace=True)
+
+    assert replaced_path == output_path
+    assert (output_path / "manifest.json").is_file()
+    assert not backup_path.exists()
 
 
 def test_publisher_validates_default_display_text(tmp_path: Path) -> None:
@@ -345,3 +391,78 @@ def test_baserender_projection_omits_disabled_distance_bracket() -> None:
         for projected_record in projection._records[plan.realization_digest]
         for effect in projected_record.effects
     )
+
+
+def test_baserender_projection_keeps_unplaced_internal_coordinates_hidden() -> None:
+    record = {
+        "id": "record-gap",
+        "sequence": "AAATTTCCC",
+        "densegen__used_tfbs_detail": [
+            {
+                "part_kind": "tfbs",
+                "sequence": "AAA",
+                "offset": 0,
+                "offset_raw": 0,
+                "end": 3,
+                "orientation": "fwd",
+                "tfbs_id": "site-1",
+                "regulator": "TF_A",
+            },
+            {
+                "part_kind": "tfbs",
+                "sequence": "CCC",
+                "offset": 6,
+                "offset_raw": 6,
+                "end": 9,
+                "orientation": "fwd",
+                "tfbs_id": "site-2",
+                "regulator": "TF_B",
+            },
+        ],
+    }
+    realized = realized_array_from_densegen_record(record, source_ref="fixture.parquet")
+    plan = reconstruct_playback(realized)
+    document = PlaybackDocument(plan=plan, title="Gap fixture")
+
+    projection = BaseRenderDuplexProjection((document,))
+    final_record = projection._records[plan.realization_digest][-1]
+
+    assert final_record.meta["base_hidden_indices"] == {
+        "primary": (3, 4, 5),
+        "complement": (3, 4, 5),
+    }
+
+
+def test_baserender_projection_bounds_long_record_raster_memory() -> None:
+    sequence = "A" * 100
+    details = []
+    for index, (start, end) in enumerate(((0, 33), (33, 66), (66, 100)), start=1):
+        details.append(
+            {
+                "part_kind": "tfbs",
+                "sequence": sequence[start:end],
+                "offset": start,
+                "offset_raw": start,
+                "end": end,
+                "orientation": "fwd",
+                "tfbs_id": f"site-{index}",
+                "regulator": f"TF_{index}",
+            }
+        )
+    realized = realized_array_from_densegen_record(
+        {
+            "id": "record-long",
+            "sequence": sequence,
+            "densegen__used_tfbs_detail": details,
+        },
+        source_ref="fixture.parquet",
+    )
+    plan = reconstruct_playback(realized)
+    document = PlaybackDocument(plan=plan, title="Long fixture")
+    projection = BaseRenderDuplexProjection((document,))
+
+    frames = tuple(projection.render_rgba(document, index) for index in range(len(plan.steps)))
+
+    assert all(max(frame.shape[:2]) <= 2400 for frame in frames)
+    assert all(frame.shape[0] * frame.shape[1] <= 3_000_000 for frame in frames)
+    assert len(projection._rgba_cache) <= 2

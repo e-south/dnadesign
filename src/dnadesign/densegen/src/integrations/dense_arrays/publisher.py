@@ -178,6 +178,7 @@ def _install_output_directory(
 ) -> None:
     """Install a completed bundle while retaining the prior bundle for rollback."""
 
+    _recover_output_replacement(output_path)
     if output_path.is_symlink():
         raise ValueError(f"output directory must not be a symlink: {output_path}")
     if not output_path.exists():
@@ -204,7 +205,33 @@ def _install_output_directory(
         except Exception as rollback_error:
             raise RuntimeError(f"replacement failed and prior output remains at {backup_path}") from rollback_error
         raise install_error
-    shutil.rmtree(backup_path)
+    try:
+        shutil.rmtree(backup_path)
+    except OSError:
+        # The new bundle is already committed. Retain the recoverable prior
+        # bundle rather than reporting an ambiguous installation failure.
+        pass
+
+
+def _recover_output_replacement(output_path: Path) -> None:
+    """Recover or retire backups left by an interrupted prior replacement."""
+
+    backups = sorted(output_path.parent.glob(f".{output_path.name}.backup-*"))
+    if not backups:
+        return
+    if output_path.exists():
+        retained: list[Path] = []
+        for backup in backups:
+            try:
+                shutil.rmtree(backup)
+            except OSError:
+                retained.append(backup)
+        if retained:
+            raise RuntimeError(f"cannot replace {output_path}: prior-output backup cleanup is still required")
+        return
+    if len(backups) != 1:
+        raise RuntimeError(f"cannot recover {output_path}: found {len(backups)} prior-output backups")
+    backups[0].replace(output_path)
 
 
 def _repository_root(config_path: Path, repository: str) -> Path:
@@ -286,8 +313,6 @@ def _selected_rows(table_path: Path, record_ids: tuple[str, ...]) -> dict[str, M
                     msg = f"record id {record_id!r} occurs more than once"
                     raise ValueError(msg)
                 selected[record_id] = row
-        if len(selected) == len(wanted):
-            break
     missing = sorted(wanted - set(selected))
     if missing:
         msg = f"configured playback records are absent from the source: {missing}"
