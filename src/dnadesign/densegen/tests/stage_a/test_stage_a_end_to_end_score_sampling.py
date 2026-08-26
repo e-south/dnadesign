@@ -21,8 +21,6 @@ import yaml
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.artifacts.pool import build_pool_artifact
 from dnadesign.densegen.src.core.pipeline import default_deps
-from dnadesign.densegen.src.core.stage_a import stage_a_selection
-from dnadesign.densegen.src.core.stage_a.stage_a_types import FimoCandidate
 from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
 from dnadesign.densegen.src.viz.plotting import plot_stage_a_summary
 
@@ -102,24 +100,6 @@ def _write_config(tmp_path: Path) -> Path:
     return cfg_path
 
 
-def _top_scoring_sequences(candidates: pd.DataFrame, count: int) -> list[str]:
-    ranked_rows = candidates.sort_values(["best_hit_score", "sequence"], ascending=[False, True])
-    ranked: list[FimoCandidate] = []
-    for row in ranked_rows.itertuples():
-        ranked.append(
-            FimoCandidate(
-                seq=str(row.sequence),
-                score=float(row.best_hit_score),
-                start=int(row.start),
-                stop=int(row.stop),
-                strand=str(row.strand or "+"),
-                matched_sequence=str(row.matched_sequence) if row.matched_sequence else None,
-            )
-        )
-    deduped, _collapsed = stage_a_selection._collapse_by_core_identity(ranked)
-    return [cand.seq for cand in deduped[:count]]
-
-
 @pytest.mark.skipif(
     _FIMO_MISSING,
     reason="fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).",
@@ -163,14 +143,18 @@ def test_stage_a_end_to_end_score_sampling(tmp_path: Path) -> None:
     assert not accepted.empty
     for reg in regulators:
         sub = df[df["tf"].astype(str) == reg].copy()
-        expected = _top_scoring_sequences(
-            accepted[accepted["motif_label"].astype(str) == reg],
-            len(sub),
-        )
-        retained_sorted = sub.sort_values(["best_hit_score", "tfbs_sequence"], ascending=[False, True])[
-            "tfbs_sequence"
-        ].tolist()
-        assert retained_sorted == expected
+        accepted_regulator = accepted[accepted["motif_label"].astype(str) == reg]
+        for retained in sub.itertuples():
+            matching_core = accepted_regulator[
+                accepted_regulator["matched_sequence"].astype(str) == str(retained.tfbs_core)
+            ]
+            assert not matching_core.empty
+            max_score = float(matching_core["best_hit_score"].max())
+            max_score_sequences = set(
+                matching_core[matching_core["best_hit_score"] == max_score]["sequence"].astype(str)
+            )
+            assert float(retained.best_hit_score) == max_score
+            assert str(retained.tfbs_sequence) in max_score_sequences
 
     entry = artifact.entry_for("demo_pwm")
     sampling = entry.stage_a_sampling

@@ -21,7 +21,6 @@ if TYPE_CHECKING:
         AnnotatedSequenceSourceRefV1,
     )
     from .linear_ssdna_composition_v1 import LinearSsdnaCompositionV1  # noqa: F401
-    from .msd_design_reference_v1 import MsdDesignCatalogV1, MsdDesignReferenceV1  # noqa: F401
     from .rt_part_publication_v1 import (  # noqa: F401
         RtPartPublicationProvenanceV1,
         RtPartPublicationV1,
@@ -42,8 +41,6 @@ _LAZY_EXPORTS = {
         "AnnotatedSequenceSourceRefV1",
     ),
     "LinearSsdnaCompositionV1": (".linear_ssdna_composition_v1", "LinearSsdnaCompositionV1"),
-    "MsdDesignCatalogV1": (".msd_design_reference_v1", "MsdDesignCatalogV1"),
-    "MsdDesignReferenceV1": (".msd_design_reference_v1", "MsdDesignReferenceV1"),
     "RtPartPublicationProvenanceV1": (
         ".rt_part_publication_v1",
         "RtPartPublicationProvenanceV1",
@@ -57,8 +54,6 @@ __all__ = [
     "AnnotatedSequencePartV1",
     "AnnotatedSequenceSourceRefV1",
     "LinearSsdnaCompositionV1",
-    "MsdDesignCatalogV1",
-    "MsdDesignReferenceV1",
     "RtPartPublicationProvenanceV1",
     "RtPartPublicationV1",
     "RtPartV1",

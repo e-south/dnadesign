@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from dnadesign.densegen.src.core.stage_a.stage_a_selection import _collapse_by_core_identity, _core_sequence
@@ -34,6 +35,39 @@ def test_core_identity_collapse_prefers_highest_score() -> None:
         FimoCandidate(seq="TTTAAA", score=8.0, start=4, stop=6, strand="+", matched_sequence="AAA"),
         FimoCandidate(seq="AAATTT", score=7.0, start=1, stop=3, strand="+", matched_sequence="AAA"),
     ]
-    deduped, collapsed = _collapse_by_core_identity(ranked)
+    deduped, collapsed = _collapse_by_core_identity(ranked, rng=np.random.default_rng(0))
     assert [cand.seq for cand in deduped] == ["AAAAAA"]
     assert collapsed == 2
+
+
+def test_core_identity_collapse_uses_seeded_choice_for_equal_scores() -> None:
+    candidates = [
+        FimoCandidate(seq="AAACCC", score=9.0, start=4, stop=6, strand="+", matched_sequence="CCC"),
+        FimoCandidate(seq="CCCAAA", score=9.0, start=1, stop=3, strand="+", matched_sequence="CCC"),
+        FimoCandidate(seq="TCCCAT", score=9.0, start=2, stop=4, strand="+", matched_sequence="CCC"),
+    ]
+
+    first, _ = _collapse_by_core_identity(candidates, rng=np.random.default_rng(7))
+    repeated, _ = _collapse_by_core_identity(candidates, rng=np.random.default_rng(7))
+    selected_across_seeds = {
+        _collapse_by_core_identity(candidates, rng=np.random.default_rng(seed))[0][0].seq for seed in range(16)
+    }
+
+    assert [candidate.seq for candidate in first] == [candidate.seq for candidate in repeated]
+    assert len(selected_across_seeds) > 1
+    assert selected_across_seeds != {min(candidate.seq for candidate in candidates)}
+
+
+def test_core_identity_collapse_is_independent_of_candidate_order() -> None:
+    candidates = [
+        FimoCandidate(seq="AAACCC", score=9.0, start=4, stop=6, strand="+", matched_sequence="CCC"),
+        FimoCandidate(seq="CCCAAA", score=9.0, start=1, stop=3, strand="+", matched_sequence="CCC"),
+        FimoCandidate(seq="TCCCAT", score=9.0, start=2, stop=4, strand="+", matched_sequence="CCC"),
+        FimoCandidate(seq="AACGGG", score=8.0, start=4, stop=6, strand="+", matched_sequence="GGG"),
+        FimoCandidate(seq="GGGTTA", score=8.0, start=1, stop=3, strand="+", matched_sequence="GGG"),
+    ]
+
+    forward, _ = _collapse_by_core_identity(candidates, rng=np.random.default_rng(7))
+    reversed_input, _ = _collapse_by_core_identity(list(reversed(candidates)), rng=np.random.default_rng(7))
+
+    assert [candidate.seq for candidate in forward] == [candidate.seq for candidate in reversed_input]

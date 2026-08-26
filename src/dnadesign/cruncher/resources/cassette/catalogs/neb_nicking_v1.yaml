@@ -19,7 +19,6 @@ variants:
     source_family: nicking_endonuclease
     selection:
       outside_site: true
-      snapback_tier: tier1
       commercial_confidence: primary_vendor_current
     operational:
       incubation_temp_c: 50
@@ -36,12 +35,11 @@ variants:
     source_family: nicking_endonuclease
     selection:
       outside_site: false
-      snapback_tier: tier3
       commercial_confidence: primary_vendor_current
       warning_codes:
         - FREQUENT_CUTTER
     notes:
-      - Degenerate 3-base specificity is commercially real but usually too frequent for precise snapback placement.
+      - Degenerate 3-base specificity is commercially real but usually too frequent for precise placement.
 
   - id: Nt.BstNBI
     specificity_id: BstNBI
@@ -56,7 +54,6 @@ variants:
     source_family: nicking_endonuclease
     selection:
       outside_site: true
-      snapback_tier: tier1
       commercial_confidence: primary_vendor_current
 
   - id: Nb.BsrDI
@@ -72,7 +69,6 @@ variants:
     source_family: nicking_endonuclease
     selection:
       outside_site: false
-      snapback_tier: tier2
       commercial_confidence: primary_vendor_current
     operational:
       incubation_temp_c: 37
@@ -90,7 +86,6 @@ variants:
     source_family: nicking_endonuclease
     selection:
       outside_site: false
-      snapback_tier: tier2
       commercial_confidence: primary_vendor_current
     operational:
       incubation_temp_c: 37
@@ -108,7 +103,6 @@ variants:
     source_family: nicking_endonuclease
     selection:
       outside_site: true
-      snapback_tier: tier1
       commercial_confidence: primary_vendor_current
       warning_codes:
         - DAM_METHYLATION_SENSITIVE
@@ -128,7 +122,6 @@ variants:
     source_family: nicking_endonuclease
     selection:
       outside_site: false
-      snapback_tier: tier2
       commercial_confidence: primary_vendor_current
 
   - id: Nt.BbvCI
@@ -143,7 +136,6 @@ variants:
     source_family: nicking_endonuclease
     selection:
       outside_site: false
-      snapback_tier: tier2
       commercial_confidence: primary_vendor_current
 
   - id: Nb.BsmI
@@ -158,7 +150,6 @@ variants:
     source_family: nicking_endonuclease
     selection:
       outside_site: false
-      snapback_tier: tier3
       commercial_confidence: primary_vendor_current
       warning_codes:
         - STAR_ACTIVITY_RISK
@@ -181,7 +172,6 @@ variants:
     source_family: nicking_endonuclease
     selection:
       outside_site: false
-      snapback_tier: tier2
       commercial_confidence: primary_vendor_current
     notes:
       - NEB notes a more robust related enzyme BssSI-v2 for the wild-type specificity, but this preset keeps the nicking variant entry as listed.
@@ -199,7 +189,6 @@ variants:
     source_family: nicking_endonuclease
     selection:
       outside_site: true
-      snapback_tier: tier1
       commercial_confidence: primary_vendor_current
       warning_codes:
         - CPG_METHYLATION_SENSITIVE

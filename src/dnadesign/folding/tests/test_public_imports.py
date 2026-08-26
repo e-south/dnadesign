@@ -56,3 +56,19 @@ def test_preflight_access_does_not_import_plotting() -> None:
     )
 
     assert lines == ["True", "False"]
+
+
+def test_assessment_access_does_not_import_plotting() -> None:
+    lines = _fresh_process_lines(
+        "\n".join(
+            [
+                "import sys",
+                "import dnadesign.folding as folding",
+                "folding.publish_structure_assessment",
+                "print('dnadesign.folding.src.assessment.api' in sys.modules)",
+                "print('dnadesign.folding.src.viennarna_plot' in sys.modules)",
+            ]
+        )
+    )
+
+    assert lines == ["True", "False"]

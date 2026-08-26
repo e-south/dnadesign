@@ -270,10 +270,10 @@ class LinearSsdnaFoldingBackendConfigV1(SequenceContractModel):
     interface: Literal["cli", "python_api"] = "cli"
     executable: str | None = None
     python_module: str | None = None
-    backend_contract: str | None = None
+    backend_contract: Literal["secondary_structure_prediction_v2"] | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("executable", "python_module", "backend_contract")
+    @field_validator("executable", "python_module")
     @classmethod
     def _optional_not_blank(cls, value: str | None) -> str | None:
         if value is None:

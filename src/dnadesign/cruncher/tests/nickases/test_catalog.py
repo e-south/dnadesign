@@ -22,7 +22,6 @@ from dnadesign.cruncher.nickases.catalog import (
     load_nickase_catalog,
 )
 from dnadesign.cruncher.nickases.errors import NickaseCatalogError
-from dnadesign.cruncher.snapback.models import build_catalog_info
 
 
 def test_shared_catalog_parses_raw_cut_notation_into_normalized_offsets(tmp_path: Path) -> None:
@@ -204,7 +203,7 @@ def test_shared_builtin_neb_preset_loads_and_preserves_product_alias_metadata() 
     assert aliases["SibEnzyme N.Bst9 I"].source_url == "https://sibenzyme.com/product/n-bst9-i/"
 
 
-def test_scar_nick_source_catalog_offsets_are_reviewed_against_vendor_notation(tmp_path: Path) -> None:
+def test_source_catalog_offsets_are_reviewed_against_vendor_notation(tmp_path: Path) -> None:
     catalog, _resolved_paths = load_merged_nickase_catalog(
         preset_id="neb_nicking_v1",
         additional_preset_ids=["thermo_nicking_v1"],
@@ -244,7 +243,7 @@ def test_scar_nick_source_catalog_offsets_are_reviewed_against_vendor_notation(t
 
 
 def test_shared_preset_overlay_merge_rejects_duplicate_variant_ids(tmp_path: Path) -> None:
-    workspace = tmp_path / "workspaces" / "demo_snapback"
+    workspace = tmp_path / "workspaces" / "demo_cassette"
     overlay_path = workspace / "inputs" / "nickases" / "overlay.yaml"
     overlay_path.parent.mkdir(parents=True, exist_ok=True)
     overlay_path.write_text(
@@ -274,7 +273,7 @@ def test_shared_preset_overlay_merge_rejects_duplicate_variant_ids(tmp_path: Pat
 
 
 def test_shared_multiple_builtin_presets_merge_and_preserve_typed_selection_metadata(tmp_path: Path) -> None:
-    workspace = tmp_path / "workspaces" / "demo_snapback"
+    workspace = tmp_path / "workspaces" / "demo_cassette"
     workspace.mkdir(parents=True, exist_ok=True)
 
     catalog, resolved_paths = load_merged_nickase_catalog(
@@ -296,11 +295,3 @@ def test_shared_multiple_builtin_presets_merge_and_preserve_typed_selection_meta
     assert entries["Nb.Mva1269I"].source_url == "https://www.thermofisher.com/order/catalog/product/ER2051"
     assert entries["Nt.Bpu10I"].selection is not None
     assert entries["Nt.Bpu10I"].selection.warning_codes == ["NONSPECIFIC_NICKING_ASSAY_SIGNAL"]
-
-
-def test_shared_catalog_info_builder_preserves_nickase_source_url() -> None:
-    catalog = load_builtin_nickase_catalog_preset("neb_nicking_v1")
-
-    info = build_catalog_info(catalog.by_id()["Nt.BstNBI"])
-
-    assert info.source_url == "https://www.neb.com/en-us/products/r0607-ntbstnbi"

@@ -63,10 +63,6 @@ def glyph(name: str) -> str:
         + '<circle cx="33" cy="27" r="5" fill="#D97757"/>'
         + '<circle cx="47" cy="41" r="4" fill="#969087"/>'
         + _line("M70 49L98 9L125 49", DIM, 3),
-        "msd": _rect(0, 22, 18, 14, MUTED)
-        + _rect(26, 22, 28, 14, INK)
-        + _line("M54 29C70 29 70 6 86 6C102 6 102 52 86 52C70 52 70 29 54 29", ACCENT, 4)
-        + _rect(106, 22, 18, 14, MUTED),
         "shuffle": _line("M0 12H24C48 12 48 46 72 46H104", MUTED, 3)
         + _line("M0 46H24C48 46 48 12 72 12H104", ACCENT, 3),
         "factor": _rect(0, 8, 44, 44, MUTED)

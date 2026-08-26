@@ -1,7 +1,7 @@
 ## Input model
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-08-26
 This concept page explains what DenseGen accepts as Stage-A inputs and how those inputs become retained candidate pools. Read it when you need to choose the right input type or diagnose Stage-A pool quality.
 
 ### How Stage-A builds input pools
@@ -23,6 +23,11 @@ This concept page explains what DenseGen accepts as Stage-A inputs and how those
 - Retained pool size is controlled by `sampling.n_sites`.
 - Selection policy is controlled by `sampling.selection.policy` (for example `top_score` or `mmr`).
 - Deduplication is controlled by `sampling.uniqueness.key` and optional cross-regulator collision rules.
+- With core uniqueness, DenseGen first preserves the maximum FIMO score for each matched core. Equal-score
+  complete sequences are resolved by the Stage-A seeded random process in stable order, so a fixed seed is
+  reproducible without introducing a nucleotide lexical preference.
+- `runtime.random_seed` is part of Stage-A pool provenance. Changing it makes existing pool artifacts stale
+  and requires an explicit rebuild.
 
 ### Path resolution
 

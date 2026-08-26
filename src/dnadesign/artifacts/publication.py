@@ -14,11 +14,11 @@ from __future__ import annotations
 import ctypes
 import errno
 import os
-import shutil
 import stat
 import sys
 import tempfile
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -48,6 +48,44 @@ _PRIVATE_DIRECTORY_MODE = 0o700
 _PRIVATE_FILE_MODE = 0o600
 _DEFAULT_PUBLISHED_ROOT_MODE = 0o755
 _PUBLICATION_SENSITIVITIES = frozenset({"public", "private"})
+_COPY_CHUNK_BYTES = 65_536
+
+
+@dataclass(slots=True)
+class _CopyBudget:
+    file_limit_bytes: int | None
+    aggregate_limit_bytes: int | None
+    entry_limit: int | None
+    copied_bytes: int = 0
+    copied_entries: int = 0
+
+    def charge_entry(self) -> None:
+        next_entries = self.copied_entries + 1
+        if self.entry_limit is not None and next_entries > self.entry_limit:
+            raise PublicationError(f"Bundle staging exceeded the {self.entry_limit}-entry copy limit")
+        self.copied_entries = next_entries
+
+    def charge(self, *, file_bytes: int, chunk_bytes: int, source_name: str) -> int:
+        next_file_bytes = file_bytes + chunk_bytes
+        next_total_bytes = self.copied_bytes + chunk_bytes
+        if self.file_limit_bytes is not None and next_file_bytes >= self.file_limit_bytes:
+            raise PublicationError(
+                f"Bundle staging file exceeded the {self.file_limit_bytes}-byte copy limit: {source_name}"
+            )
+        if self.aggregate_limit_bytes is not None and next_total_bytes >= self.aggregate_limit_bytes:
+            raise PublicationError(
+                f"Bundle staging exceeded the {self.aggregate_limit_bytes}-byte aggregate copy limit"
+            )
+        self.copied_bytes = next_total_bytes
+        return next_file_bytes
+
+
+def _validate_copy_limit(value: int | None, *, label: str) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise PublicationError(f"Artifact bundle {label} must be a positive integer")
+    return value
 
 
 def _validate_published_root_mode(mode: int) -> int:
@@ -143,17 +181,49 @@ def _entry_exists_at(parent_descriptor: int, name: str) -> bool:
     return True
 
 
-def _copy_file(source: Path, parent_descriptor: int, name: str) -> None:
+def _descriptor_entry_name(parent_descriptor: int, descriptor: int) -> str | None:
+    """Return the current name for one anchored directory in its parent."""
+    anchored = os.fstat(descriptor)
+    for name in os.listdir(parent_descriptor):
+        try:
+            candidate = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+        except FileNotFoundError:
+            continue
+        if stat.S_ISDIR(candidate.st_mode) and (candidate.st_dev, candidate.st_ino) == (
+            anchored.st_dev,
+            anchored.st_ino,
+        ):
+            return name
+    return None
+
+
+def _source_directory_descriptor(source: Path | int) -> int:
+    if isinstance(source, int):
+        return os.dup(source)
+    flags = os.O_RDONLY | os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    return os.open(source, flags)
+
+
+def _copy_file(
+    source_parent_descriptor: int,
+    source_name: str,
+    parent_descriptor: int,
+    name: str,
+    *,
+    budget: _CopyBudget,
+) -> None:
     source_flags = os.O_RDONLY
     destination_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     if hasattr(os, "O_NOFOLLOW"):
         source_flags |= os.O_NOFOLLOW
         destination_flags |= os.O_NOFOLLOW
-    source_descriptor = os.open(source, source_flags)
+    source_descriptor = os.open(source_name, source_flags, dir_fd=source_parent_descriptor)
     try:
         source_stat = os.fstat(source_descriptor)
         if not stat.S_ISREG(source_stat.st_mode):
-            raise PublicationError(f"Bundle staging must contain regular files: {source}")
+            raise PublicationError(f"Bundle staging must contain regular files: {source_name}")
         destination_descriptor = os.open(
             name,
             destination_flags,
@@ -161,59 +231,163 @@ def _copy_file(source: Path, parent_descriptor: int, name: str) -> None:
             dir_fd=parent_descriptor,
         )
         try:
+            file_bytes = 0
             with os.fdopen(os.dup(source_descriptor), "rb") as source_handle:
                 with os.fdopen(os.dup(destination_descriptor), "wb") as destination_handle:
-                    shutil.copyfileobj(source_handle, destination_handle)
+                    while chunk := source_handle.read(_COPY_CHUNK_BYTES):
+                        file_bytes = budget.charge(
+                            file_bytes=file_bytes,
+                            chunk_bytes=len(chunk),
+                            source_name=source_name,
+                        )
+                        destination_handle.write(chunk)
         finally:
             os.close(destination_descriptor)
     finally:
         os.close(source_descriptor)
 
 
-def _copy_directory(source: Path, parent_descriptor: int, name: str) -> None:
+def _copy_directory(
+    source: Path | int,
+    parent_descriptor: int,
+    name: str,
+    *,
+    budget: _CopyBudget | None = None,
+) -> None:
+    active_budget = budget or _CopyBudget(
+        file_limit_bytes=None,
+        aggregate_limit_bytes=None,
+        entry_limit=None,
+    )
+    source_descriptor = _source_directory_descriptor(source)
+    try:
+        _copy_directory_from_descriptor(source_descriptor, parent_descriptor, name, budget=active_budget)
+    finally:
+        os.close(source_descriptor)
+
+
+def _copy_directory_from_descriptor(
+    source_descriptor: int,
+    parent_descriptor: int,
+    name: str,
+    *,
+    budget: _CopyBudget,
+) -> None:
     os.mkdir(name, mode=_PRIVATE_DIRECTORY_MODE, dir_fd=parent_descriptor)
     flags = os.O_RDONLY | os.O_DIRECTORY
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     destination_descriptor = os.open(name, flags, dir_fd=parent_descriptor)
     try:
-        entries = sorted(os.scandir(source), key=lambda entry: (entry.name != _OWNER_FILE, entry.name))
+        entries = sorted(os.listdir(source_descriptor), key=lambda entry: (entry != _OWNER_FILE, entry))
         for entry in entries:
-            entry_path = Path(entry.path)
-            if entry.is_symlink():
-                raise PublicationError(f"Bundle staging must not contain symlinks: {entry_path}")
-            if entry.is_dir(follow_symlinks=False):
-                _copy_directory(entry_path, destination_descriptor, entry.name)
-            elif entry.is_file(follow_symlinks=False):
-                _copy_file(entry_path, destination_descriptor, entry.name)
+            budget.charge_entry()
+            entry_stat = os.stat(entry, dir_fd=source_descriptor, follow_symlinks=False)
+            if stat.S_ISLNK(entry_stat.st_mode):
+                raise PublicationError(f"Bundle staging must not contain symlinks: {entry}")
+            if stat.S_ISDIR(entry_stat.st_mode):
+                child_descriptor = os.open(entry, flags, dir_fd=source_descriptor)
+                try:
+                    _copy_directory_from_descriptor(
+                        child_descriptor,
+                        destination_descriptor,
+                        entry,
+                        budget=budget,
+                    )
+                finally:
+                    os.close(child_descriptor)
+            elif stat.S_ISREG(entry_stat.st_mode):
+                _copy_file(
+                    source_descriptor,
+                    entry,
+                    destination_descriptor,
+                    entry,
+                    budget=budget,
+                )
             else:
-                raise PublicationError(f"Bundle staging contains an unsupported entry: {entry_path}")
+                raise PublicationError(f"Bundle staging contains an unsupported entry: {entry}")
     finally:
         os.close(destination_descriptor)
 
 
-def _restore_published_modes(source: Path, destination_descriptor: int) -> None:
+def _restore_published_modes(source: Path | int, destination_descriptor: int) -> None:
     """Restore staged modes while the renamed bundle root remains owner-only."""
+    source_descriptor = _source_directory_descriptor(source)
+    try:
+        _restore_published_modes_from_descriptor(source_descriptor, destination_descriptor)
+    finally:
+        os.close(source_descriptor)
+
+
+def _restore_published_modes_from_descriptor(
+    source_descriptor: int,
+    destination_descriptor: int,
+) -> None:
     flags = os.O_RDONLY | os.O_DIRECTORY
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
-    for entry in os.scandir(source):
-        if entry.name == _OWNER_FILE:
+    for entry in os.listdir(source_descriptor):
+        if entry == _OWNER_FILE:
             continue
-        entry_path = Path(entry.path)
-        source_stat = entry_path.stat(follow_symlinks=False)
+        source_stat = os.stat(entry, dir_fd=source_descriptor, follow_symlinks=False)
         mode = stat.S_IMODE(source_stat.st_mode) & 0o777
-        if entry.is_dir(follow_symlinks=False):
-            child_descriptor = os.open(entry.name, flags, dir_fd=destination_descriptor)
+        if stat.S_ISDIR(source_stat.st_mode):
+            source_child_descriptor = os.open(entry, flags, dir_fd=source_descriptor)
+            child_descriptor = os.open(entry, flags, dir_fd=destination_descriptor)
             try:
-                _restore_published_modes(entry_path, child_descriptor)
+                _restore_published_modes_from_descriptor(source_child_descriptor, child_descriptor)
                 os.fchmod(child_descriptor, mode)
             finally:
+                os.close(source_child_descriptor)
                 os.close(child_descriptor)
-        elif entry.is_file(follow_symlinks=False):
-            os.chmod(entry.name, mode, dir_fd=destination_descriptor, follow_symlinks=False)
+        elif stat.S_ISREG(source_stat.st_mode):
+            os.chmod(entry, mode, dir_fd=destination_descriptor, follow_symlinks=False)
         else:
-            raise PublicationError(f"Bundle staging contains an unsupported entry: {entry_path}")
+            raise PublicationError(f"Bundle staging contains an unsupported entry: {entry}")
+
+
+def _descriptor_entry_files(descriptor: int, prefix: Path = Path()) -> dict[Path, bool]:
+    flags = os.O_RDONLY | os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    entries: dict[Path, bool] = {}
+    for name in os.listdir(descriptor):
+        relative = prefix / name
+        entry_stat = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
+        if stat.S_ISLNK(entry_stat.st_mode):
+            raise PublicationError(f"Bundle staging must not contain symlinks: {relative}")
+        if stat.S_ISDIR(entry_stat.st_mode):
+            entries[relative] = False
+            child_descriptor = os.open(name, flags, dir_fd=descriptor)
+            try:
+                entries.update(_descriptor_entry_files(child_descriptor, relative))
+            finally:
+                os.close(child_descriptor)
+        elif stat.S_ISREG(entry_stat.st_mode):
+            entries[relative] = True
+        else:
+            raise PublicationError(f"Bundle staging contains an unsupported entry: {relative}")
+    return entries
+
+
+def _required_manifest_is_regular(descriptor: int, relative: Path) -> bool:
+    flags = os.O_RDONLY | os.O_NOFOLLOW
+    directory_flags = flags | os.O_DIRECTORY
+    current_descriptor = os.dup(descriptor)
+    try:
+        for part in relative.parts[:-1]:
+            next_descriptor = os.open(part, directory_flags, dir_fd=current_descriptor)
+            os.close(current_descriptor)
+            current_descriptor = next_descriptor
+        manifest_descriptor = os.open(relative.parts[-1], flags, dir_fd=current_descriptor)
+        try:
+            return stat.S_ISREG(os.fstat(manifest_descriptor).st_mode)
+        finally:
+            os.close(manifest_descriptor)
+    except OSError:
+        return False
+    finally:
+        os.close(current_descriptor)
 
 
 def _rename_create_only(parent_descriptor: int, source: str, destination: str) -> None:
@@ -328,6 +502,8 @@ class CreateOnlyDirectoryPublication:
 
     final: Path
     stage: Path
+    stage_descriptor: int
+    _stage_parent_descriptor: int
     adjacent_stage_name: str
     parent_descriptor: int
     _owner: dict[str, object]
@@ -410,9 +586,17 @@ class CreateOnlyDirectoryPublication:
             stage = Path(tempfile.mkdtemp(prefix=private_prefix, dir=private_parent))
             stage.chmod(_PRIVATE_DIRECTORY_MODE)
             _write_owner(stage / _OWNER_FILE, owner)
+            stage_parent_descriptor = os.open(private_parent, private_flags)
+            try:
+                stage_descriptor = os.open(stage.name, private_flags, dir_fd=stage_parent_descriptor)
+            except BaseException:
+                os.close(stage_parent_descriptor)
+                raise
             return cls(
                 final=final,
                 stage=stage,
+                stage_descriptor=stage_descriptor,
+                _stage_parent_descriptor=stage_parent_descriptor,
                 adjacent_stage_name=f"{adjacent_prefix}u{uid}-p{os.getpid()}-{uuid.uuid4().hex}",
                 parent_descriptor=parent_descriptor,
                 _owner=owner,
@@ -434,37 +618,53 @@ class CreateOnlyDirectoryPublication:
             anchored.st_ino,
         )
 
-    def publish(self, *, required_manifest: str) -> None:
+    def publish(
+        self,
+        *,
+        required_manifest: str,
+        verify_copied_descriptor: Callable[[int], None] | None = None,
+        copy_file_size_limit_bytes: int | None = None,
+        copy_aggregate_size_limit_bytes: int | None = None,
+        copy_entry_count_limit: int | None = None,
+    ) -> None:
         if self._closed:
             raise PublicationError("Artifact publication is already closed")
         if self._published_descriptor is not None:
             raise PublicationError(f"Artifact bundle is already published: {self.final}")
+        copy_budget = _CopyBudget(
+            file_limit_bytes=_validate_copy_limit(
+                copy_file_size_limit_bytes,
+                label="copy file-size limit",
+            ),
+            aggregate_limit_bytes=_validate_copy_limit(
+                copy_aggregate_size_limit_bytes,
+                label="copy aggregate-size limit",
+            ),
+            entry_limit=_validate_copy_limit(
+                copy_entry_count_limit,
+                label="copy entry-count limit",
+            ),
+        )
         validated_published_root_mode = _validate_published_root_mode(self.published_root_mode)
         manifest_relative = Path(required_manifest)
-        if not required_manifest.strip() or manifest_relative.is_absolute() or ".." in manifest_relative.parts:
+        if (
+            not required_manifest.strip()
+            or not manifest_relative.parts
+            or manifest_relative.is_absolute()
+            or ".." in manifest_relative.parts
+        ):
             raise PublicationError("Artifact bundle required manifest must stay inside publication staging")
-        manifest = self.stage / manifest_relative
-        current = self.stage
-        manifest_is_safe = True
-        for index, part in enumerate(manifest_relative.parts):
-            current /= part
-            try:
-                entry_stat = current.lstat()
-            except FileNotFoundError:
-                manifest_is_safe = False
-                break
-            if stat.S_ISLNK(entry_stat.st_mode):
-                raise PublicationError("Artifact bundle required manifest must stay inside publication staging")
-            if index < len(manifest_relative.parts) - 1 and not stat.S_ISDIR(entry_stat.st_mode):
-                manifest_is_safe = False
-                break
-        if not manifest_is_safe or not manifest.is_file():
-            raise PublicationError(f"Artifact bundle staging is incomplete: {manifest}")
+        if not _required_manifest_is_regular(self.stage_descriptor, manifest_relative):
+            raise PublicationError("Artifact bundle required manifest must stay inside publication staging")
+        relative_entry_files = _descriptor_entry_files(self.stage_descriptor)
         validate_publication_metadata_paths(
             self.stage,
             required_manifest=manifest_relative,
             owner_file=_OWNER_FILE,
+            relative_entry_files=relative_entry_files,
         )
+        if not owner_matches_descriptor(self.stage_descriptor, self._owner, owner_file=_OWNER_FILE):
+            raise PublicationError("Artifact bundle publication owner sentinel is unavailable or unsafe")
         if not self._parent_matches_anchor():
             raise PublicationError(f"Artifact bundle parent changed during publication: {self.final.parent}")
         if _entry_exists_at(self.parent_descriptor, self.adjacent_stage_name):
@@ -472,7 +672,12 @@ class CreateOnlyDirectoryPublication:
         renamed = False
         published_descriptor: int | None = None
         try:
-            _copy_directory(self.stage, self.parent_descriptor, self.adjacent_stage_name)
+            _copy_directory(
+                self.stage_descriptor,
+                self.parent_descriptor,
+                self.adjacent_stage_name,
+                budget=copy_budget,
+            )
             if not self._parent_matches_anchor():
                 raise PublicationError(f"Artifact bundle parent changed during publication: {self.final.parent}")
             final_flags = os.O_RDONLY | os.O_DIRECTORY
@@ -489,12 +694,14 @@ class CreateOnlyDirectoryPublication:
                 owner_file=_OWNER_FILE,
             ):
                 raise PublicationError("Artifact bundle publication owner sentinel is unavailable or unsafe")
+            if verify_copied_descriptor is not None:
+                verify_copied_descriptor(published_descriptor)
             _rename_create_only(self.parent_descriptor, self.adjacent_stage_name, self.final.name)
             renamed = True
             if not descriptor_matches_entry(self.parent_descriptor, self.final.name, published_descriptor):
                 raise PublicationError("Published artifact bundle identity changed after atomic rename")
             if self.sensitivity == "public":
-                _restore_published_modes(self.stage, published_descriptor)
+                _restore_published_modes(self.stage_descriptor, published_descriptor)
             os.fchmod(published_descriptor, validated_published_root_mode)
             os.unlink(_OWNER_FILE, dir_fd=published_descriptor)
             self._published_descriptor = published_descriptor
@@ -540,6 +747,15 @@ class CreateOnlyDirectoryPublication:
             published_descriptor,
         ):
             raise PublicationError(f"Artifact bundle path identity changed after publication: {self.final}")
+
+    def duplicate_published_descriptor(self) -> int:
+        """Return a caller-owned descriptor for this transaction's publication."""
+        if self._closed:
+            raise PublicationError("Artifact publication is already closed")
+        published_descriptor = self._published_descriptor
+        if published_descriptor is None:
+            raise PublicationError(f"Artifact bundle is not published: {self.final}")
+        return os.dup(published_descriptor)
 
     def rollback(self) -> bool:
         """Atomically hide this transaction's publication before recursive cleanup."""
@@ -625,7 +841,14 @@ class CreateOnlyDirectoryPublication:
         if self._closed:
             return
         try:
-            shutil.rmtree(self.stage, ignore_errors=True)
+            stage_name = _descriptor_entry_name(self._stage_parent_descriptor, self.stage_descriptor)
+            if stage_name is not None:
+                remove_descriptor_anchored_directory(
+                    self._stage_parent_descriptor,
+                    stage_name,
+                    self.stage_descriptor,
+                    last_entry=_OWNER_FILE,
+                )
             remove_owned_named_directory(
                 self.parent_descriptor,
                 self.adjacent_stage_name,
@@ -639,6 +862,8 @@ class CreateOnlyDirectoryPublication:
                 os.close(self._published_descriptor)
                 self._published_descriptor = None
             self._rollback_name = None
+            os.close(self.stage_descriptor)
+            os.close(self._stage_parent_descriptor)
             os.close(self.parent_descriptor)
             self._closed = True
 
