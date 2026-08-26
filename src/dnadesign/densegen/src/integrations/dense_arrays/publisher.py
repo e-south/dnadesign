@@ -571,10 +571,13 @@ def publish_densegen_playback_endpoint(
         plan = reconstruct_playback(realized)
         realized_by_digest[plan.realization_digest] = realized
         scene_title = str(spec.get("title") or scene.replace("_", " ").title())
-        subtitle = str(spec.get("subtitle") or row.get("densegen__plan") or "")
+        persisted_plan = str(row.get("densegen__plan") or "")
+        subtitle = str(spec.get("subtitle") or persisted_plan)
         for term in forbidden_terms:
             if term and (term in scene_title.casefold() or term in subtitle.casefold()):
                 raise ValueError(f"configured presentation text contains forbidden term: {term!r}")
+            if term and term in persisted_plan.casefold():
+                raise ValueError(f"record-derived plan name contains forbidden term: {term!r}")
         documents.append(
             PlaybackDocument(
                 plan=plan,
@@ -590,7 +593,7 @@ def publish_densegen_playback_endpoint(
             {
                 "scene": scene,
                 "record_id": record_id,
-                "plan": row.get("densegen__plan"),
+                "plan": persisted_plan,
                 "authority": plan.authority.value,
                 "ordering_status": plan.ordering_status.value,
                 "realization_sha256": plan.realization_digest,

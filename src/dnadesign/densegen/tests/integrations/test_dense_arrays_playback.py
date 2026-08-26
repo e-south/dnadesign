@@ -358,6 +358,18 @@ def test_publisher_validates_record_derived_constraint_labels(tmp_path: Path) ->
         publisher.publish_densegen_playback_endpoint(config_path)
 
 
+def test_publisher_validates_persisted_plan_with_explicit_subtitle(tmp_path: Path) -> None:
+    row = _publisher_row()
+    row["densegen__plan"] = "sigma factor baseline"
+    config_path = _write_endpoint(tmp_path, record=row)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    payload["source"]["records"][0]["subtitle"] = "Clean public subtitle"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="record-derived plan name contains forbidden term: 'sigma factor'"):
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+
 def test_publisher_validates_record_derived_variant_annotations(tmp_path: Path) -> None:
     row = _publisher_row()
     row["densegen__used_tfbs_detail"] = [
