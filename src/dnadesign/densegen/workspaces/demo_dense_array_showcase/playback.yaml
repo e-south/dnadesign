@@ -6,7 +6,7 @@ audience: public
 source:
   kind: densegen_records
   table: ../demo_tfbs_baseline/outputs/tables/records.parquet
-  sha256: bb25efebf205c7a5db5c2f791c43e251dff8ce067374506fd7cb372b39a5d1f9  # pragma: allowlist secret
+  selected_records_sha256: ef114dcb2dd7a0fc660663351e75412c227af4171e3132907cef2ade4d4b8340  # pragma: allowlist secret
   records:
     - id: de0a47de9c0d6d9b5ba40a31372a09b1a24a4c36
       scene: unconstrained_packing_a

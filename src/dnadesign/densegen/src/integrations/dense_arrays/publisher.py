@@ -85,6 +85,9 @@ _DUPLEX_FIELDS = {
     "anchored_illustration",
 }
 _ANCHORED_ILLUSTRATION_FIELDS = {"asset", "constraint", "reveal"}
+_SOURCE_FIELDS = {"kind", "repository", "table", "selected_records_sha256", "records"}
+_OUTPUT_FIELDS = {"directory", "formats"}
+_OUTPUT_FORMATS = {"manifest.json", "playback.mp4", "poster.png"}
 
 
 def _sha256_file(path: Path) -> str:
@@ -93,6 +96,21 @@ def _sha256_file(path: Path) -> str:
         while chunk := handle.read(8 * 1024 * 1024):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _selected_records_sha256(
+    selected: Mapping[str, Mapping[str, object]],
+    record_ids: tuple[str, ...],
+) -> str:
+    payload = [selected[record_id] for record_id in sorted(record_ids)]
+    encoded = json.dumps(
+        payload,
+        allow_nan=False,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _required_mapping(value: object, *, field_name: str) -> Mapping[str, object]:
@@ -170,6 +188,50 @@ def _source_path(config_path: Path, source: Mapping[str, object]) -> Path:
     return (_repository_root(config_path, str(repository)) / relative).resolve()
 
 
+def _output_contract(
+    config_path: Path,
+    source_path: Path,
+    raw_outputs: object,
+) -> tuple[Path, frozenset[str]]:
+    outputs = _required_mapping(raw_outputs, field_name="outputs")
+    _strict_fields(outputs, _OUTPUT_FIELDS, field_name="outputs")
+    relative = Path(_required_text(outputs.get("directory"), field_name="outputs.directory"))
+    if relative.is_absolute() or ".." in relative.parts or relative.parts[:1] != ("outputs",):
+        raise ValueError("outputs.directory must be a relative descendant of the workspace outputs/ directory")
+    workspace = config_path.parent.resolve()
+    declared_outputs_root = workspace / "outputs"
+    declared_output_path = workspace / relative
+    current = declared_outputs_root
+    for part in relative.parts[1:]:
+        if current.is_symlink():
+            raise ValueError(f"outputs.directory must not traverse a symlink: {current}")
+        current /= part
+    if current.is_symlink():
+        raise ValueError(f"outputs.directory must not be a symlink: {current}")
+    outputs_root = declared_outputs_root.resolve()
+    output_path = declared_output_path.resolve()
+    try:
+        routed = output_path.relative_to(outputs_root)
+    except ValueError as exc:
+        raise ValueError("outputs.directory escapes the workspace outputs/ directory") from exc
+    if not routed.parts:
+        raise ValueError("outputs.directory must name a dedicated directory below workspace outputs/")
+    if output_path == source_path or output_path in source_path.parents:
+        raise ValueError("outputs.directory must not contain the configured source table")
+    raw_formats = outputs.get("formats")
+    if not isinstance(raw_formats, list) or not raw_formats:
+        raise ValueError("outputs.formats must be a non-empty list")
+    formats = tuple(_required_text(value, field_name="outputs.formats[]") for value in raw_formats)
+    if len(formats) != len(set(formats)):
+        raise ValueError("outputs.formats must not contain duplicates")
+    unsupported = sorted(set(formats) - _OUTPUT_FORMATS)
+    if unsupported:
+        raise ValueError(f"outputs.formats contains unsupported formats: {unsupported}")
+    if "manifest.json" not in formats:
+        raise ValueError("outputs.formats must include 'manifest.json'")
+    return output_path, frozenset(formats)
+
+
 def _selected_rows(table_path: Path, record_ids: tuple[str, ...]) -> dict[str, Mapping[str, object]]:
     parquet = pq.ParquetFile(table_path)
     missing_columns = sorted(set(_RECORD_COLUMNS) - set(parquet.schema_arrow.names))
@@ -213,12 +275,9 @@ def publish_densegen_playback_endpoint(
     config_path = Path(config_path).resolve()
     endpoint = _load_endpoint(config_path)
     source = _required_mapping(endpoint.get("source"), field_name="source")
+    _strict_fields(source, _SOURCE_FIELDS, field_name="source")
     source_path = _source_path(config_path, source)
-    expected_sha256 = _required_text(source.get("sha256"), field_name="source.sha256").lower()
-    observed_sha256 = _sha256_file(source_path)
-    if observed_sha256 != expected_sha256:
-        msg = f"source digest mismatch for {source_path}: expected {expected_sha256}, observed {observed_sha256}"
-        raise ValueError(msg)
+    output_path, output_formats = _output_contract(config_path, source_path, endpoint.get("outputs"))
     raw_records = source.get("records")
     if not isinstance(raw_records, list) or not raw_records:
         msg = "source.records must be a non-empty list"
@@ -237,6 +296,17 @@ def publish_densegen_playback_endpoint(
         if not _SCENE_ID.fullmatch(scene):
             raise ValueError(f"scene id must match {_SCENE_ID.pattern!r}: {scene!r}")
     selected = _selected_rows(source_path, record_ids)
+    expected_selected_sha256 = _required_text(
+        source.get("selected_records_sha256"),
+        field_name="source.selected_records_sha256",
+    ).lower()
+    observed_selected_sha256 = _selected_records_sha256(selected, record_ids)
+    if observed_selected_sha256 != expected_selected_sha256:
+        msg = (
+            "selected record digest mismatch for "
+            f"{source_path}: expected {expected_selected_sha256}, observed {observed_selected_sha256}"
+        )
+        raise ValueError(msg)
     adapter = _required_mapping(endpoint.get("adapter"), field_name="adapter")
     _strict_fields(adapter, _ADAPTER_FIELDS, field_name="adapter")
     expected_adapter = {
@@ -393,8 +463,6 @@ def publish_densegen_playback_endpoint(
         raise TypeError("labels.forbidden_terms must be a list")
     forbidden_terms = tuple(str(value).strip().casefold() for value in forbidden_raw)
     text_surfaces = [endpoint_title, *label_overrides.values()]
-    for spec in record_specs:
-        text_surfaces.extend((str(spec.get("title") or ""), str(spec.get("subtitle") or "")))
     for term in forbidden_terms:
         if term and any(term in surface.casefold() for surface in text_surfaces):
             raise ValueError(f"configured presentation text contains forbidden term: {term!r}")
@@ -413,7 +481,7 @@ def publish_densegen_playback_endpoint(
         realized = realized_array_from_densegen_record(
             row,
             source_ref=source_ref,
-            source_sha256=observed_sha256,
+            source_sha256=observed_selected_sha256,
         )
         from dense_arrays.playback import reconstruct_playback
 
@@ -421,6 +489,9 @@ def publish_densegen_playback_endpoint(
         realized_by_digest[plan.realization_digest] = realized
         scene_title = str(spec.get("title") or scene.replace("_", " ").title())
         subtitle = str(spec.get("subtitle") or row.get("densegen__plan") or "")
+        for term in forbidden_terms:
+            if term and (term in scene_title.casefold() or term in subtitle.casefold()):
+                raise ValueError(f"configured presentation text contains forbidden term: {term!r}")
         documents.append(
             PlaybackDocument(
                 plan=plan,
@@ -443,10 +514,6 @@ def publish_densegen_playback_endpoint(
             }
         )
 
-    outputs = _required_mapping(endpoint.get("outputs"), field_name="outputs")
-    output_path = (
-        config_path.parent / _required_text(outputs.get("directory"), field_name="outputs.directory")
-    ).resolve()
     if output_path.exists() and not replace:
         msg = f"output already exists: {output_path}; pass replace=True explicitly"
         raise FileExistsError(msg)
@@ -462,25 +529,31 @@ def publish_densegen_playback_endpoint(
         for scene, payload in plan_payloads.items():
             (plans_dir / f"{scene}.json").write_text(payload + "\n", encoding="utf-8")
         source_documents = tuple(documents)
-        projection = BaseRenderDuplexProjection(
-            source_documents,
-            realized_arrays=realized_by_digest,
-            presentation=duplex_presentation,
-        )
-        render_collection_poster_png(
-            source_documents,
-            temp_path / "poster.png",
-            duplex_frame_renderer=projection.render_rgba,
-        )
-        render_collection_mp4(
-            source_documents,
-            temp_path / "playback.mp4",
-            duplex_frame_renderer=projection.render_rgba,
-            seconds_per_step=seconds_per_step,
-            hold_seconds=hold_seconds,
-            lead_seconds=lead_seconds,
-            scene_transition_seconds=scene_transition_seconds,
-        )
+        projection = None
+        if output_formats & {"poster.png", "playback.mp4"}:
+            projection = BaseRenderDuplexProjection(
+                source_documents,
+                realized_arrays=realized_by_digest,
+                presentation=duplex_presentation,
+            )
+        if "poster.png" in output_formats:
+            assert projection is not None
+            render_collection_poster_png(
+                source_documents,
+                temp_path / "poster.png",
+                duplex_frame_renderer=projection.render_rgba,
+            )
+        if "playback.mp4" in output_formats:
+            assert projection is not None
+            render_collection_mp4(
+                source_documents,
+                temp_path / "playback.mp4",
+                duplex_frame_renderer=projection.render_rgba,
+                seconds_per_step=seconds_per_step,
+                hold_seconds=hold_seconds,
+                lead_seconds=lead_seconds,
+                scene_transition_seconds=scene_transition_seconds,
+            )
         artifact_paths = sorted(path for path in temp_path.rglob("*") if path.is_file())
         manifest = {
             "schema": "densegen.solution_path_playback_bundle.v1",
@@ -518,8 +591,9 @@ def publish_densegen_playback_endpoint(
                 "kind": source.get("kind"),
                 "repository": source.get("repository"),
                 "table": source_ref,
-                "sha256": observed_sha256,
+                "selected_records_sha256": observed_selected_sha256,
             },
+            "requested_formats": sorted(output_formats),
             "scenes": scene_manifest,
             "artifacts": [
                 {

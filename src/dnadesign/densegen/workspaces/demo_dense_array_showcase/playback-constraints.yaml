@@ -6,7 +6,7 @@ audience: public
 source:
   kind: densegen_records
   table: outputs/tables/records.parquet
-  sha256: 5c4add8ecb850c0d1a91a7d65ee3d253ee87f9f236777ca69f9569f41674d897  # pragma: allowlist secret
+  selected_records_sha256: 1a1bbb70b9a7165349373ee05c7b54eb6301b4313656bbeee3bb6fb271f092dc  # pragma: allowlist secret
   records:
     - id: 31ac2fcba97e70f1ff13a881e56828193ecb20b6
       scene: fixed_pair_a

@@ -11,12 +11,107 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dense_arrays.playback import reconstruct_playback
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
+import pyarrow as pa
+import pyarrow.parquet as pq
+import pytest
+import yaml
+from dense_arrays.playback import PlaybackDocument, reconstruct_playback
+from dense_arrays.playback.theme import PlaybackPresentation
 from dense_arrays.realized import Orientation
 
+from dnadesign.densegen.src.integrations.dense_arrays import publisher
+from dnadesign.densegen.src.integrations.dense_arrays.baserender_projection import (
+    BaseRenderDuplexProjection,
+)
 from dnadesign.densegen.src.integrations.dense_arrays.playback import (
     realized_array_from_densegen_record,
 )
+from dnadesign.densegen.src.integrations.dense_arrays.publisher import (
+    _selected_records_sha256,
+    _selected_rows,
+)
+
+
+def _publisher_row(*, record_id: str = "record-1", generated_at: str = "first") -> dict[str, object]:
+    return {
+        "id": record_id,
+        "sequence": "AAATTT",
+        "densegen__used_tfbs_detail": [
+            {
+                "part_kind": "tfbs",
+                "sequence": "AAA",
+                "offset": 0,
+                "offset_raw": 0,
+                "end": 3,
+                "orientation": "fwd",
+                "tfbs_id": "site-1",
+                "regulator": "TF_A",
+            }
+        ],
+        "densegen__schema_version": "2.9",
+        "densegen__run_id": "run-1",
+        "densegen__plan": "baseline",
+        "densegen__input_name": "fixture",
+        "densegen__sampling_library_hash": "library-1",
+        "densegen__sampling_library_index": 0,
+        "densegen__pad_used": False,
+        "densegen__pad_bases": 0,
+        "densegen__pad_end": "5prime",
+        "generated_at": generated_at,
+    }
+
+
+def _write_endpoint(
+    tmp_path: Path,
+    *,
+    scene: str = "clean_scene",
+    formats: tuple[str, ...] = ("manifest.json",),
+) -> Path:
+    workspace = tmp_path / "workspace"
+    table_path = workspace / "outputs" / "tables" / "records.parquet"
+    table_path.parent.mkdir(parents=True)
+    row = _publisher_row()
+    pq.write_table(pa.Table.from_pylist([row]), table_path)
+    selected = _selected_rows(table_path, ("record-1",))
+    selected_sha256 = _selected_records_sha256(selected, ("record-1",))
+    config = {
+        "schema": "densegen.solution_path_playback_endpoint.v1",
+        "endpoint_id": "fixture",
+        "title": "Fixture endpoint",
+        "source": {
+            "kind": "densegen_records",
+            "table": "outputs/tables/records.parquet",
+            "selected_records_sha256": selected_sha256,
+            "records": [{"id": "record-1", "scene": scene}],
+        },
+        "adapter": {
+            "kind": "densegen_realized_array_v1",
+            "display_coordinate": "offset",
+            "solver_coordinate_provenance": "offset_raw",
+        },
+        "playback": {
+            "authority": "placement_reconstructed",
+            "ordering_policy": ["start", "shorter_first", "placement_id"],
+            "graph_relation": "coordinate_precedence",
+            "show_authority_notice": False,
+        },
+        "labels": {"forbidden_terms": ["sigma factor"], "overrides": {}},
+        "presentation": {
+            "layout": "graph_left_duplex_right",
+            "collection_order": [scene],
+        },
+        "outputs": {
+            "directory": "outputs/publication/fixture",
+            "formats": list(formats),
+        },
+    }
+    config_path = workspace / "playback.yaml"
+    config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    return config_path
 
 
 def test_reverse_placement_uses_realized_reverse_complement() -> None:
@@ -76,3 +171,125 @@ def test_fixed_element_recovers_sequence_consistent_raw_coordinate() -> None:
     assert realized.placements[0].metadata["coordinate_source"] == "offset_raw"
     plan = reconstruct_playback(realized)
     assert any(notice.code == "coordinate_recovered" for notice in plan.notices)
+
+
+def test_selected_record_digest_ignores_unselected_runtime_columns(tmp_path: Path) -> None:
+    first = tmp_path / "first.parquet"
+    second = tmp_path / "second.parquet"
+    pq.write_table(pa.Table.from_pylist([_publisher_row(generated_at="first")]), first)
+    pq.write_table(pa.Table.from_pylist([_publisher_row(generated_at="second")]), second)
+
+    first_rows = _selected_rows(first, ("record-1",))
+    second_rows = _selected_rows(second, ("record-1",))
+
+    assert _selected_records_sha256(first_rows, ("record-1",)) == _selected_records_sha256(
+        second_rows,
+        ("record-1",),
+    )
+
+
+def test_publisher_confines_replace_to_dedicated_workspace_output(tmp_path: Path) -> None:
+    config_path = _write_endpoint(tmp_path)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    payload["outputs"]["directory"] = "../escape"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="relative descendant"):
+        publisher.publish_densegen_playback_endpoint(config_path, replace=True)
+
+    payload["outputs"]["directory"] = "outputs/tables"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    with pytest.raises(ValueError, match="must not contain the configured source table"):
+        publisher.publish_densegen_playback_endpoint(config_path, replace=True)
+
+
+def test_publisher_validates_default_display_text(tmp_path: Path) -> None:
+    config_path = _write_endpoint(tmp_path, scene="sigma_factor_example")
+
+    with pytest.raises(ValueError, match="forbidden term: 'sigma factor'"):
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+
+def test_publisher_honors_requested_render_formats(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = _write_endpoint(tmp_path, formats=("manifest.json", "poster.png"))
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        publisher,
+        "BaseRenderDuplexProjection",
+        lambda *_args, **_kwargs: SimpleNamespace(render_rgba=lambda *_inner: None),
+    )
+
+    def _poster(_documents, path: Path, **_kwargs) -> None:
+        calls.append("poster.png")
+        path.write_bytes(b"poster")
+
+    def _unexpected_mp4(*_args, **_kwargs) -> None:
+        raise AssertionError("MP4 renderer must not run for a poster-only endpoint")
+
+    monkeypatch.setattr(publisher, "render_collection_poster_png", _poster)
+    monkeypatch.setattr(publisher, "render_collection_mp4", _unexpected_mp4)
+
+    output = publisher.publish_densegen_playback_endpoint(config_path)
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+
+    assert calls == ["poster.png"]
+    assert (output / "poster.png").read_bytes() == b"poster"
+    assert not (output / "playback.mp4").exists()
+    assert manifest["requested_formats"] == ["manifest.json", "poster.png"]
+
+
+def test_baserender_projection_omits_disabled_distance_bracket() -> None:
+    record = {
+        "id": "record-constraint",
+        "sequence": "AAATTTCCC",
+        "densegen__used_tfbs_detail": [
+            {
+                "part_kind": "fixed_element",
+                "sequence": "AAA",
+                "offset": 0,
+                "offset_raw": 0,
+                "end": 3,
+                "orientation": "fwd",
+                "constraint_name": "anchor",
+                "placement_index": 0,
+                "role": "upstream",
+                "variant_id": "a",
+                "spacer_length": 3,
+            },
+            {
+                "part_kind": "fixed_element",
+                "sequence": "CCC",
+                "offset": 6,
+                "offset_raw": 6,
+                "end": 9,
+                "orientation": "fwd",
+                "constraint_name": "anchor",
+                "placement_index": 0,
+                "role": "downstream",
+                "variant_id": "a",
+                "spacer_length": 3,
+            },
+        ],
+    }
+    realized = realized_array_from_densegen_record(record, source_ref="fixture.parquet")
+    plan = reconstruct_playback(realized)
+    document = PlaybackDocument(
+        plan=plan,
+        title="Constraint fixture",
+        presentation=PlaybackPresentation(show_distance_bracket="never"),
+    )
+
+    projection = BaseRenderDuplexProjection(
+        (document,),
+        realized_arrays={plan.realization_digest: realized},
+    )
+
+    assert all(
+        effect.kind != "span_link"
+        for projected_record in projection._records[plan.realization_digest]
+        for effect in projected_record.effects
+    )

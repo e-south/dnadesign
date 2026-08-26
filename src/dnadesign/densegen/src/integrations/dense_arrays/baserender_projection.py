@@ -247,7 +247,7 @@ class BaseRenderDuplexProjection:
             )
         placed_ids = {feature.id for feature in features}
         effects: list[Effect] = []
-        for result in plan.constraint_results:
+        for result in constraint_results:
             if result.upstream_placement_id not in placed_ids or result.downstream_placement_id not in placed_ids:
                 continue
             effects.append(
