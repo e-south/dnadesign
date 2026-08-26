@@ -270,8 +270,8 @@ def _read_prior_receipt(directory_fd: int, output_name: str) -> bytes | None:
     except FileNotFoundError:
         return None
     if not stat.S_ISREG(status.st_mode):
-        return None
-    file_flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+        raise ValueError("context probe output must be absent or an existing regular file")
+    file_flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK
     try:
         file_descriptor = os.open(output_name, file_flags, dir_fd=directory_fd)
     except FileNotFoundError:
@@ -283,7 +283,7 @@ def _read_prior_receipt(directory_fd: int, output_name: str) -> bytes | None:
         raise
     with handle:
         if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
-            return None
+            raise ValueError("context probe output must be absent or an existing regular file")
         return handle.read()
 
 

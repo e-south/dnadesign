@@ -70,6 +70,8 @@ upstream consumes.
 Context receipts are published by an atomic no-follow replacement. If the
 post-replacement directory durability check fails, publication restores the
 prior regular-file bytes or prior absence before reporting ordinary failure.
+An existing symlink, FIFO, or other nonregular receipt is rejected before
+replacement because it cannot be restored as regular receipt content.
 If that restoration cannot itself be made durable, the public
 `LigandMpnnContextPublicationUncertainError` reports the uncertain state.
 Admission replays the exact pinned parser over the digest-matched PDB and

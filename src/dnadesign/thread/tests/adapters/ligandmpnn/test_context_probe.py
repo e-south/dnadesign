@@ -348,6 +348,45 @@ def test_probe_rejects_ancestor_symlink_race_without_publishing_outside_executio
     assert not (outside_parent / "context" / request.output_path.name).exists()
 
 
+def test_probe_rejects_and_preserves_existing_symlink_receipt(tmp_path: Path) -> None:
+    checkout, commit = _fake_upstream_checkout(tmp_path)
+    request = _request(tmp_path, checkout, commit)
+    output_path = tmp_path / request.output_path
+    output_path.parent.mkdir(parents=True)
+    outside_path = tmp_path / "outside-receipt.json"
+    outside_payload = b"outside sentinel\n"
+    outside_path.write_bytes(outside_payload)
+    output_path.symlink_to(outside_path)
+
+    with pytest.raises(ValueError, match="existing regular file"):
+        materialize_ligandmpnn_context_inventory(
+            request,
+            execution_root=tmp_path,
+            checkout_root=checkout,
+        )
+
+    assert output_path.is_symlink()
+    assert output_path.readlink() == outside_path
+    assert outside_path.read_bytes() == outside_payload
+
+
+def test_probe_rejects_and_preserves_existing_fifo_receipt(tmp_path: Path) -> None:
+    checkout, commit = _fake_upstream_checkout(tmp_path)
+    request = _request(tmp_path, checkout, commit)
+    output_path = tmp_path / request.output_path
+    output_path.parent.mkdir(parents=True)
+    os.mkfifo(output_path)
+
+    with pytest.raises(ValueError, match="existing regular file"):
+        materialize_ligandmpnn_context_inventory(
+            request,
+            execution_root=tmp_path,
+            checkout_root=checkout,
+        )
+
+    assert stat.S_ISFIFO(output_path.lstat().st_mode)
+
+
 def test_probe_restores_existing_receipt_when_post_replace_directory_fsync_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
