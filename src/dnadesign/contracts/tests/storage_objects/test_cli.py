@@ -1350,6 +1350,78 @@ def test_inventory_removes_manifest_when_verification_is_interrupted(
     assert not (root / MANIFEST_NAME).exists()
 
 
+def test_inventory_rolls_back_when_atomic_replace_is_interrupted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    original_replace = storage_inventory.os.replace
+
+    def _interrupt_after_replace(source: Path, destination: Path) -> None:
+        original_replace(source, destination)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(storage_inventory.os, "replace", _interrupt_after_replace)
+
+    with pytest.raises(KeyboardInterrupt):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert not (root / MANIFEST_NAME).exists()
+
+
+def test_refresh_rolls_back_when_atomic_replace_is_interrupted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    previous_bytes = manifest_path.read_bytes()
+    original_replace = storage_inventory.os.replace
+
+    def _interrupt_after_replace(source: Path, destination: Path) -> None:
+        original_replace(source, destination)
+        if Path(source).name.startswith(f".{MANIFEST_NAME}.tmp-"):
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(storage_inventory.os, "replace", _interrupt_after_replace)
+
+    with pytest.raises(KeyboardInterrupt):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert manifest_path.read_bytes() == previous_bytes
+
+
 def test_refresh_rejects_duplicate_resource_paths_before_collapsing_roles(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     root.mkdir()

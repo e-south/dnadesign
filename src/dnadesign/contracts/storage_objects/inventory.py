@@ -53,6 +53,51 @@ def _sha256_bytes(content: bytes) -> str:
     return f"sha256:{hashlib.sha256(content).hexdigest()}"
 
 
+def _rollback_manifest(
+    manifest_path: Path,
+    *,
+    published_bytes: bytes,
+    previous_bytes: bytes | None,
+    previous_mode: int,
+    operation_error: BaseException,
+) -> None:
+    """Undo only the manifest snapshot published by the failed operation."""
+
+    restore_path: Path | None = None
+    try:
+        if manifest_path.is_symlink():
+            raise StorageObjectError(f"cannot roll back a symlinked storage object manifest: {manifest_path}")
+        if not manifest_path.exists():
+            if previous_bytes is None:
+                return
+            raise StorageObjectError("storage object manifest disappeared before the prior receipt could be restored")
+        current_bytes = manifest_path.read_bytes()
+        if previous_bytes is not None and current_bytes == previous_bytes:
+            return
+        if current_bytes != published_bytes:
+            raise StorageObjectError(
+                "storage object manifest changed after publication; refusing to overwrite unrelated receipt bytes"
+            )
+        if previous_bytes is None:
+            manifest_path.unlink()
+            return
+        descriptor, restore_name = tempfile.mkstemp(
+            dir=manifest_path.parent,
+            prefix=f".{MANIFEST_NAME}.restore-",
+        )
+        restore_path = Path(restore_name)
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(previous_bytes)
+        restore_path.chmod(previous_mode, follow_symlinks=False)
+        os.replace(restore_path, manifest_path)
+    except OSError as restore_error:
+        if restore_path is not None:
+            restore_path.unlink(missing_ok=True)
+        raise StorageObjectError(
+            f"storage object operation failed and manifest rollback failed: {restore_error}"
+        ) from operation_error
+
+
 def _write_manifest(
     manifest_path: Path,
     payload: dict[str, object],
@@ -61,10 +106,12 @@ def _write_manifest(
     allow_untracked_demo_manifest: bool = False,
 ) -> dict[str, object]:
     manifest_text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    manifest_bytes = manifest_text.encode("utf-8")
     descriptor = -1
     temporary: Path | None = None
     temporary_created = False
-    previous_mode: int | None = None
+    previous_mode: int
+    replace_started = False
     try:
         if previous_bytes is not None:
             previous_mode = stat.S_IMODE(manifest_path.stat(follow_symlinks=False).st_mode)
@@ -82,13 +129,24 @@ def _write_manifest(
             handle.write(manifest_text)
         if previous_mode is not None:
             temporary.chmod(previous_mode, follow_symlinks=False)
+        replace_started = True
         os.replace(temporary, manifest_path)
-    except OSError as exc:
+    except BaseException as write_error:
         if descriptor >= 0:
             os.close(descriptor)
         if temporary_created and temporary is not None:
             temporary.unlink(missing_ok=True)
-        raise StorageObjectError(f"cannot write storage object manifest: {exc}") from exc
+        if replace_started:
+            _rollback_manifest(
+                manifest_path,
+                published_bytes=manifest_bytes,
+                previous_bytes=previous_bytes,
+                previous_mode=previous_mode,
+                operation_error=write_error,
+            )
+        if isinstance(write_error, OSError):
+            raise StorageObjectError(f"cannot write storage object manifest: {write_error}") from write_error
+        raise
     try:
         summary = verify_storage_object(
             manifest_path.parent,
@@ -104,27 +162,13 @@ def _write_manifest(
             )
         return summary
     except BaseException as validation_error:
-        if previous_bytes is None:
-            manifest_path.unlink(missing_ok=True)
-        else:
-            restore_path: Path | None = None
-            try:
-                descriptor, restore_name = tempfile.mkstemp(
-                    dir=manifest_path.parent,
-                    prefix=f".{MANIFEST_NAME}.restore-",
-                )
-                restore_path = Path(restore_name)
-                with os.fdopen(descriptor, "wb") as handle:
-                    handle.write(previous_bytes)
-                if previous_mode is not None:
-                    restore_path.chmod(previous_mode, follow_symlinks=False)
-                os.replace(restore_path, manifest_path)
-            except OSError as restore_error:
-                if restore_path is not None:
-                    restore_path.unlink(missing_ok=True)
-                raise StorageObjectError(
-                    f"storage object validation failed and the prior manifest could not be restored: {restore_error}"
-                ) from validation_error
+        _rollback_manifest(
+            manifest_path,
+            published_bytes=manifest_bytes,
+            previous_bytes=previous_bytes,
+            previous_mode=previous_mode,
+            operation_error=validation_error,
+        )
         raise
 
 
