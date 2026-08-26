@@ -208,6 +208,33 @@ def test_verify_storage_object_rejects_bytes_changed_during_validation(
         verify_storage_object(root)
 
 
+def test_verify_storage_object_rejects_manifest_changed_during_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    manifest_path = root / MANIFEST_NAME
+    initial_bytes = manifest_path.read_bytes()
+    changed = json.loads(initial_bytes)
+    changed["producer_revision"] = "test-revision-2"
+    changed_bytes = json.dumps(changed).encode("utf-8")
+    reads = 0
+    original_read_bytes = Path.read_bytes
+
+    def _read_bytes(path: Path) -> bytes:
+        nonlocal reads
+        if path == manifest_path:
+            reads += 1
+            return initial_bytes if reads == 1 else changed_bytes
+        return original_read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", _read_bytes)
+
+    with pytest.raises(StorageObjectError, match="storage object changed during validation"):
+        verify_storage_object(root)
+
+
 def test_storage_file_closure_propagates_unreadable_subtree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

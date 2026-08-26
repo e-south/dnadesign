@@ -17,7 +17,7 @@ import stat
 import subprocess
 from pathlib import Path
 
-from .loading import load_storage_object_manifest
+from .loading import load_storage_object_manifest_bytes
 from .models import (
     LOCK_NAME,
     MANIFEST_NAME,
@@ -226,7 +226,11 @@ def verify_storage_object(
             raise StorageObjectError(f"storage object lock must be group-writable in a shared object root: {lock_path}")
     except OSError as exc:
         raise StorageObjectError(f"cannot inspect storage object lock {lock_path}: {exc}") from exc
-    manifest = load_storage_object_manifest(manifest_path)
+    try:
+        manifest_bytes = manifest_path.read_bytes()
+    except OSError as exc:
+        raise StorageObjectError(f"cannot read storage object manifest {manifest_path}: {exc}") from exc
+    manifest = load_storage_object_manifest_bytes(manifest_bytes, source_label=str(manifest_path))
 
     declared_paths: set[str] = set()
     for resource in manifest.resources:
@@ -256,7 +260,11 @@ def verify_storage_object(
     }
     first_state = tuple((item.relative_path, item.digest, item.size_bytes) for item in resources)
     second_state = tuple((item.relative_path, item.digest, item.size_bytes) for item in second_resources)
-    if first_state != second_state or actual_paths != second_actual_paths:
+    try:
+        second_manifest_bytes = manifest_path.read_bytes()
+    except OSError as exc:
+        raise StorageObjectError(f"cannot reread storage object manifest {manifest_path}: {exc}") from exc
+    if manifest_bytes != second_manifest_bytes or first_state != second_state or actual_paths != second_actual_paths:
         raise StorageObjectError("storage object changed during validation; retry while the producer is quiescent")
 
     verified = VerifiedStorageObject(

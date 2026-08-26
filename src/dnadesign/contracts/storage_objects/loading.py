@@ -148,18 +148,19 @@ def _resources(value: object) -> tuple[StoredResource, ...]:
     return tuple(resources)
 
 
-def load_storage_object_manifest(manifest_path: Path) -> StorageObjectManifest:
-    """Parse one exact storage-object manifest without inferring defaults."""
+def load_storage_object_manifest_bytes(
+    manifest_bytes: bytes,
+    *,
+    source_label: str,
+) -> StorageObjectManifest:
+    """Parse one already-read manifest buffer without reopening its source."""
 
-    source = Path(manifest_path)
-    if source.is_symlink():
-        raise StorageObjectError(f"storage object manifest must not be a symlink: {source}")
     try:
-        raw = json.loads(source.read_text(encoding="utf-8"), object_pairs_hook=_strict_object)
+        raw = json.loads(manifest_bytes.decode("utf-8"), object_pairs_hook=_strict_object)
     except StorageObjectError:
         raise
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise StorageObjectError(f"cannot read storage object manifest {source}: {exc}") from exc
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise StorageObjectError(f"cannot parse storage object manifest {source_label}: {exc}") from exc
 
     payload = _mapping(raw, label="storage object manifest")
     _exact_fields(
@@ -211,3 +212,16 @@ def load_storage_object_manifest(manifest_path: Path) -> StorageObjectManifest:
             None if original_path is None else _text(original_path, label="original_execution_path")
         ),
     )
+
+
+def load_storage_object_manifest(manifest_path: Path) -> StorageObjectManifest:
+    """Read and parse one exact storage-object manifest without inferring defaults."""
+
+    source = Path(manifest_path)
+    if source.is_symlink():
+        raise StorageObjectError(f"storage object manifest must not be a symlink: {source}")
+    try:
+        manifest_bytes = source.read_bytes()
+    except OSError as exc:
+        raise StorageObjectError(f"cannot read storage object manifest {source}: {exc}") from exc
+    return load_storage_object_manifest_bytes(manifest_bytes, source_label=str(source))
