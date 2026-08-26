@@ -18,7 +18,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from dnadesign.latentdna.src.contracts.errors import ContractViolationError
+from dnadesign.latentdna.src.contracts.errors import ContractViolationError, WorkspaceValidationError
 from dnadesign.latentdna.src.contracts.plot_semantics import PlotSemantics
 from dnadesign.latentdna.src.notebooks.browser_runtime import (
     _parse_deliverable_markdown,
@@ -434,6 +434,21 @@ def test_browser_runtime_falls_back_to_persisted_controls_when_workspace_config_
                 "status": "ok",
                 "stale": False,
                 "outputs": [{"path": "plot.svg", "media_type": "image/svg+xml"}],
+                "semantics": {
+                    "plot_id": "selected_umap",
+                    "question": "Do designed families retain visible structure?",
+                    "decision_role": "primary",
+                    "encoding": "Points encode selected sequence embeddings.",
+                    "scope": "The selected persisted representation only.",
+                    "guardrails": ["Do not infer biological function from projection distance."],
+                    "caption": "Selected-view UMAP.",
+                    "alt_text": "UMAP of the selected representation.",
+                    "preprocessing_md": "Rows were selected before projection.",
+                    "math_md": "UMAP is descriptive here.",
+                    "rationale_md": "Inspect retained structure.",
+                    "limitations_md": "Projection geometry is not causal evidence.",
+                    "failure_modes_md": "Missing rows can distort the view.",
+                },
             }
         ),
         encoding="utf-8",
@@ -459,8 +474,6 @@ def test_browser_runtime_falls_back_to_persisted_controls_when_workspace_config_
                         "stale": False,
                         "question": "Do designed families retain visible structure?",
                         "decision_role": "orientation",
-                        "caption": "Selected-view UMAP.",
-                        "alt_text": "UMAP of the selected representation.",
                     }
                 ],
                 "exports": [],
@@ -548,8 +561,44 @@ def test_browser_runtime_falls_back_to_persisted_controls_when_workspace_config_
     card = runtime.plot_review.sections[0]["cards"][0]
     assert card["title"] == "Chosen UMAP"
     assert card["question"] == "Do designed families retain visible structure?"
+    assert card["decision_role"] == "primary"
+    assert card["encoding"] == "Points encode selected sequence embeddings."
+    assert card["scope"] == "The selected persisted representation only."
+    assert card["guardrails"] == ["Do not infer biological function from projection distance."]
+    assert card["caption_md"] == "Selected-view UMAP."
+    assert card["alt_text"] == "UMAP of the selected representation."
     assert card["render_path"] == plot_dir / "plot.svg"
     assert card["live_render"] is False
+
+
+@pytest.mark.parametrize("config_shape", ["directory", "broken-symlink"])
+def test_browser_runtime_rejects_malformed_present_workspace_config(
+    tmp_path: Path,
+    config_shape: str,
+) -> None:
+    workspace_dir = tmp_path / "workspace"
+    workspace_dir.mkdir()
+    config_path = workspace_dir / "config.yaml"
+    if config_shape == "directory":
+        config_path.mkdir()
+        message = "not a regular file"
+    else:
+        config_path.symlink_to(workspace_dir / "missing-config.yaml")
+        message = "broken symlink"
+
+    with pytest.raises(WorkspaceValidationError, match=message):
+        build_workspace_browser_runtime(
+            title="Malformed workspace",
+            description=None,
+            workspace_id="workspace",
+            notebook_id="latent_geometry_browser",
+            default_deliverable="representation_review",
+            workspace_dir=workspace_dir,
+            output_root=workspace_dir / "outputs",
+            catalog_path=workspace_dir / "outputs" / "catalog.json",
+            health_path=workspace_dir / "outputs" / "health.json",
+            controls={},
+        )
 
 
 def test_reference_annotation_options_keep_label_selection_separate_from_hues() -> None:

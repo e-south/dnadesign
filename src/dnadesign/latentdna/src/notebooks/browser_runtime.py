@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
+import stat
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
@@ -21,6 +22,8 @@ from types import ModuleType
 import marimo as mo
 import pandas as pd
 
+from ..contracts.errors import ContractViolationError, WorkspaceValidationError
+from ..contracts.plot_semantics import PlotSemantics
 from ..plots.recipes import resolve_plot_spec
 from ..studies.docs_refs import read_docs_ref
 from ..workspaces.loader import load_workspace_config
@@ -203,6 +206,40 @@ def _resolved_plot_semantics_payload(
 ) -> dict[str, object]:
     del manifest
     return resolve_plot_semantics(context, plot_id=plot_id).model_dump(mode="json")
+
+
+def _persisted_plot_semantics_payload(
+    manifest: dict[str, object],
+    *,
+    plot_id: str,
+) -> dict[str, object]:
+    payload = manifest.get("semantics")
+    if not isinstance(payload, dict):
+        raise ContractViolationError(f"persisted plot {plot_id!r} is missing a semantics mapping")
+    try:
+        semantics = PlotSemantics.model_validate(payload)
+    except ValueError as exc:
+        raise ContractViolationError(f"persisted plot {plot_id!r} has invalid semantics: {exc}") from exc
+    if semantics.plot_id != plot_id:
+        raise ContractViolationError(
+            f"persisted plot semantics plot_id mismatch for {plot_id!r}: {semantics.plot_id!r}"
+        )
+    return semantics.model_dump(mode="json")
+
+
+def _load_optional_workspace_context(workspace_dir: Path):
+    config_path = workspace_dir / "config.yaml"
+    try:
+        config_stat = config_path.stat()
+    except FileNotFoundError:
+        if config_path.is_symlink():
+            raise WorkspaceValidationError(f"workspace config.yaml is a broken symlink: {config_path}") from None
+        return None
+    except OSError as exc:
+        raise WorkspaceValidationError(f"workspace config.yaml cannot be inspected: {config_path}: {exc}") from exc
+    if not stat.S_ISREG(config_stat.st_mode):
+        raise WorkspaceValidationError(f"workspace config.yaml is not a regular file: {config_path}")
+    return load_workspace_config(workspace_dir)
 
 
 def _runtime_hue_columns(
@@ -524,11 +561,12 @@ def _plot_review_sections(
         except Exception as exc:
             manifest = {"status": "error", "stale": False}
             manifest_warning = f"Plot manifest could not be read for `{plot_id}`: {exc}"
-        semantics = (
-            _resolved_plot_semantics_payload(context, plot_id=plot_id, manifest=manifest)
-            if context is not None
-            else live_entry
-        )
+        if context is not None:
+            semantics = _resolved_plot_semantics_payload(context, plot_id=plot_id, manifest=manifest)
+        elif manifest_warning is None:
+            semantics = _persisted_plot_semantics_payload(manifest, plot_id=plot_id)
+        else:
+            semantics = live_entry
         output_paths = [
             plot_dir / str(output.get("path"))
             for output in manifest.get("outputs", [])
@@ -627,7 +665,7 @@ def build_workspace_browser_runtime(
     health_path: Path,
     controls: dict[str, object],
 ) -> WorkspaceBrowserRuntime:
-    context = load_workspace_config(workspace_dir) if (workspace_dir / "config.yaml").is_file() else None
+    context = _load_optional_workspace_context(workspace_dir)
     catalog = load_json(catalog_path)
     health = load_json(health_path)
     deliverables = [
