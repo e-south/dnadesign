@@ -50,6 +50,19 @@ from .playback import realized_array_from_densegen_record
 
 _ENDPOINT_SCHEMA = "densegen.solution_path_playback_endpoint.v1"
 _SCENE_ID = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+_ENDPOINT_FIELDS = {
+    "schema",
+    "endpoint_id",
+    "title",
+    "audience",
+    "source",
+    "adapter",
+    "playback",
+    "labels",
+    "presentation",
+    "duplex",
+    "outputs",
+}
 _RECORD_COLUMNS = (
     "id",
     "sequence",
@@ -93,6 +106,7 @@ _DUPLEX_FIELDS = {
 }
 _ANCHORED_ILLUSTRATION_FIELDS = {"asset", "constraint", "reveal"}
 _SOURCE_FIELDS = {"kind", "repository", "table", "selected_records_sha256", "records"}
+_RECORD_SPEC_FIELDS = {"id", "scene", "title", "subtitle"}
 _OUTPUT_FIELDS = {"directory", "formats"}
 _OUTPUT_FORMATS = {"manifest.json", "playback.mp4", "poster.png"}
 
@@ -360,6 +374,7 @@ def _load_endpoint(config_path: Path) -> Mapping[str, object]:
     if endpoint.get("schema") != _ENDPOINT_SCHEMA:
         msg = f"unsupported endpoint schema: {endpoint.get('schema')!r}"
         raise ValueError(msg)
+    _strict_fields(endpoint, _ENDPOINT_FIELDS, field_name="endpoint")
     return endpoint
 
 
@@ -371,17 +386,25 @@ def publish_densegen_playback_endpoint(
     """Publish one endpoint atomically from existing DenseGen records."""
     config_path = Path(config_path).resolve()
     endpoint = _load_endpoint(config_path)
+    endpoint_id = _required_text(endpoint.get("endpoint_id"), field_name="endpoint_id")
+    if not _SCENE_ID.fullmatch(endpoint_id):
+        raise ValueError(f"endpoint_id must match {_SCENE_ID.pattern!r}: {endpoint_id!r}")
+    audience = _choice(endpoint.get("audience"), {"public"}, field_name="audience")
     source = _required_mapping(endpoint.get("source"), field_name="source")
     _strict_fields(source, _SOURCE_FIELDS, field_name="source")
+    source_kind = _choice(source.get("kind"), {"densegen_records"}, field_name="source.kind")
     source_path = _source_path(config_path, source)
     output_path, output_formats = _output_contract(config_path, source_path, endpoint.get("outputs"))
     raw_records = source.get("records")
     if not isinstance(raw_records, list) or not raw_records:
         msg = "source.records must be a non-empty list"
         raise ValueError(msg)
-    record_specs = tuple(
-        _required_mapping(item, field_name=f"source.records[{index}]") for index, item in enumerate(raw_records)
-    )
+    record_specs_list: list[Mapping[str, object]] = []
+    for index, item in enumerate(raw_records):
+        spec = _required_mapping(item, field_name=f"source.records[{index}]")
+        _strict_fields(spec, _RECORD_SPEC_FIELDS, field_name=f"source.records[{index}]")
+        record_specs_list.append(spec)
+    record_specs = tuple(record_specs_list)
     record_ids = tuple(_required_text(item.get("id"), field_name="source.records[].id") for item in record_specs)
     if len(record_ids) != len(set(record_ids)):
         msg = "source.records ids must be unique"
@@ -689,8 +712,9 @@ def publish_densegen_playback_endpoint(
         artifact_paths = sorted(path for path in temp_path.rglob("*") if path.is_file())
         manifest = {
             "schema": "densegen.solution_path_playback_bundle.v1",
-            "endpoint_id": endpoint.get("endpoint_id"),
+            "endpoint_id": endpoint_id,
             "title": endpoint_title,
+            "audience": audience,
             "presentation": {
                 "color_profile": color_profile,
                 "show_legend": show_legend,
@@ -720,7 +744,7 @@ def publish_densegen_playback_endpoint(
             },
             "endpoint_spec_sha256": _sha256_file(config_path),
             "source": {
-                "kind": source.get("kind"),
+                "kind": source_kind,
                 "repository": source.get("repository"),
                 "table": source_ref,
                 "selected_records_sha256": observed_selected_sha256,

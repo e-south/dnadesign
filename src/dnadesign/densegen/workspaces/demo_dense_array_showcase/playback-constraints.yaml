@@ -28,11 +28,6 @@ playback:
   show_authority_notice: false
 
 labels:
-  profile: neutral_fixed_elements
-  tfbs: binding site
-  upstream: fixed upstream element
-  downstream: fixed downstream element
-  distance: required spacing
   forbidden_terms:
     - sigma factor
     - -35 element

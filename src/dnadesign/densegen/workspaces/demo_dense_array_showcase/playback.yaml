@@ -44,8 +44,6 @@ playback:
   show_authority_notice: false
 
 labels:
-  profile: neutral_binding_sites
-  tfbs: binding site
   forbidden_terms:
     - sigma factor
     - -35 element

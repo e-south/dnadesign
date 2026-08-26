@@ -89,6 +89,7 @@ def _write_endpoint(
         "schema": "densegen.solution_path_playback_endpoint.v1",
         "endpoint_id": "fixture",
         "title": "Fixture endpoint",
+        "audience": "public",
         "source": {
             "kind": "densegen_records",
             "table": "outputs/tables/records.parquet",
@@ -367,6 +368,79 @@ def test_publisher_rejects_unknown_label_fields(tmp_path: Path) -> None:
         publisher.publish_densegen_playback_endpoint(config_path)
 
 
+@pytest.mark.parametrize("config_name", ["playback.yaml", "playback-constraints.yaml"])
+def test_packaged_playback_configs_follow_supported_schema(config_name: str) -> None:
+    config_path = Path(__file__).resolve().parents[2] / "workspaces" / "demo_dense_array_showcase" / config_name
+    endpoint = publisher._load_endpoint(config_path)
+    source = publisher._required_mapping(endpoint["source"], field_name="source")
+    labels = publisher._required_mapping(endpoint["labels"], field_name="labels")
+
+    assert publisher._SCENE_ID.fullmatch(str(endpoint["endpoint_id"]))
+    assert endpoint["audience"] == "public"
+    assert source["kind"] == "densegen_records"
+    publisher._strict_fields(source, publisher._SOURCE_FIELDS, field_name="source")
+    publisher._strict_fields(labels, publisher._LABEL_FIELDS, field_name="labels")
+    for index, record in enumerate(source["records"]):
+        publisher._strict_fields(record, publisher._RECORD_SPEC_FIELDS, field_name=f"source.records[{index}]")
+
+
+def test_publisher_rejects_unknown_top_level_endpoint_fields(tmp_path: Path) -> None:
+    config_path = _write_endpoint(tmp_path)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    payload["unexpected"] = "ignored"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"endpoint contains unsupported fields: \['unexpected'\]"):
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+
+@pytest.mark.parametrize(
+    ("endpoint_id", "message"),
+    [(None, "endpoint_id must be a non-empty string"), ("Invalid ID", "endpoint_id must match")],
+)
+def test_publisher_requires_valid_endpoint_id(tmp_path: Path, endpoint_id: str | None, message: str) -> None:
+    config_path = _write_endpoint(tmp_path)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    if endpoint_id is None:
+        del payload["endpoint_id"]
+    else:
+        payload["endpoint_id"] = endpoint_id
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=message):
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+
+def test_publisher_rejects_nonpublic_audience(tmp_path: Path) -> None:
+    config_path = _write_endpoint(tmp_path)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    payload["audience"] = "internal"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"audience must be one of \['public'\]"):
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+
+def test_publisher_rejects_unsupported_source_kind(tmp_path: Path) -> None:
+    config_path = _write_endpoint(tmp_path)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    payload["source"]["kind"] = "unsupported_kind"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"source.kind must be one of \['densegen_records'\]"):
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+
+def test_publisher_rejects_unknown_record_fields(tmp_path: Path) -> None:
+    config_path = _write_endpoint(tmp_path)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    payload["source"]["records"][0]["subtitel"] = "misspelled"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"source.records\[0\] contains unsupported fields: \['subtitel'\]"):
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+
 def test_publisher_validates_record_derived_placement_labels(tmp_path: Path) -> None:
     config_path = _write_endpoint(tmp_path, placement_label="Sigma factor RpoD")
 
@@ -435,10 +509,11 @@ def test_publisher_validates_serialized_record_provenance(tmp_path: Path, field:
 def test_publisher_validates_serialized_manifest_fields(tmp_path: Path) -> None:
     config_path = _write_endpoint(tmp_path)
     payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    payload["endpoint_id"] = "private sigma factor endpoint"
+    payload["endpoint_id"] = "private_sigma_factor_endpoint"
+    payload["labels"]["forbidden_terms"] = ["sigma_factor"]
     config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
-    with pytest.raises(ValueError, match="serialized manifest payload contains forbidden term: 'sigma factor'"):
+    with pytest.raises(ValueError, match="serialized manifest payload contains forbidden term: 'sigma_factor'"):
         publisher.publish_densegen_playback_endpoint(config_path)
 
 
@@ -510,6 +585,8 @@ def test_publisher_honors_requested_render_formats(
     assert calls == ["poster.png"]
     assert (output / "poster.png").read_bytes() == b"poster"
     assert not (output / "playback.mp4").exists()
+    assert manifest["endpoint_id"] == "fixture"
+    assert manifest["audience"] == "public"
     assert manifest["requested_formats"] == ["manifest.json", "poster.png"]
 
 
