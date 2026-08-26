@@ -128,11 +128,7 @@ def validate_span_link(
     _ = (record, palette)
     geometry = compute_span_link_geometry(effect, layout, style, feature_boxes)
     if geometry.label:
-        base_fs = (
-            max(6, int(round(style.display_font_size())))
-            if bool(style.uniform_display_font_size)
-            else int(style.font_size_span_link_label or max(6, style.font_size_label - 2))
-        )
+        base_fs = int(style.font_size_span_link_label or max(6, style.font_size_seq))
         _text_px_width(geometry.label, style.font_label, base_fs, style.dpi)
 
 
@@ -150,11 +146,7 @@ def draw_span_link(
     color = "#9CA3AF"
     line_width = max(0.8, float(getattr(style, "span_link_line_width", 1.1)))
     tick_line_width = max(0.8, float(getattr(style, "span_link_tick_line_width", line_width)))
-    base_fs = (
-        max(6, int(round(style.display_font_size())))
-        if bool(style.uniform_display_font_size)
-        else int(style.font_size_span_link_label or max(6, style.font_size_label - 2))
-    )
+    base_fs = int(style.font_size_span_link_label or max(6, style.font_size_seq))
 
     if label:
         label_w = _text_px_width(label, style.font_label, base_fs, style.dpi)

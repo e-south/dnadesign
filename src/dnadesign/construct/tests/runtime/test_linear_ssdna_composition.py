@@ -90,7 +90,7 @@ folding:
     interface: {folding_interface}
     executable: {folding_executable}
     python_module: {folding_python_module or ""}
-    backend_contract: secondary_structure_prediction_v1
+    backend_contract: secondary_structure_prediction_v2
     parameters:
       temperature_c: 37.0
   dna_policy:
@@ -131,12 +131,12 @@ units:
         source:
           kind: literal
           label: manual_teto_payload
-      - segment_id: snapback_foldback_geometry
-        role: snapback_foldback_geometry
+      - segment_id: foldback_geometry
+        role: foldback_geometry
         sequence: tCCTCAGcccGCTGAGGa
         source:
           kind: literal
-          label: manual_snapback_43_foldback
+          label: declared_foldback
       - segment_id: payload_complement
         role: payload_complement
         sequence: {complement}
@@ -169,25 +169,25 @@ units:
           segment_id: payload_primary
           start: 0
           end: 19
-      - annotation_id: snapback_cap
-        role: snapback_cap
+      - annotation_id: foldback_cap
+        role: foldback_cap
         location:
           basis: segment
-          segment_id: snapback_foldback_geometry
+          segment_id: foldback_geometry
           start: 7
           end: 10
-      - annotation_id: snapback_retained_stem
-        role: snapback_retained_stem
+      - annotation_id: foldback_retained_stem
+        role: foldback_retained_stem
         location:
           basis: segment
-          segment_id: snapback_foldback_geometry
+          segment_id: foldback_geometry
           start: 0
           end: 7
-      - annotation_id: snapback_foldback_return
-        role: snapback_foldback_return
+      - annotation_id: foldback_return
+        role: foldback_return
         location:
           basis: segment
-          segment_id: snapback_foldback_geometry
+          segment_id: foldback_geometry
           start: 10
           end: 18
       - annotation_id: teto_complement
@@ -228,29 +228,29 @@ visual:
     component_labels:
       flank_5p: "5' flank"
       payload_primary: TetO primary
-      snapback_foldback_geometry: Foldback
+      foldback_geometry: Foldback
       payload_complement: TetO complement
       flank_3p: "3' flank"
     annotation_labels:
       stem_base_left: Left stem base
       stem_base_right: Right stem base
-      snapback_retained_stem: Foldback stem
-      snapback_cap: Cap
-      snapback_foldback_return: Foldback return
+      foldback_retained_stem: Foldback stem
+      foldback_cap: Cap
+      foldback_return: Foldback return
     overview_hidden_components:
-      - snapback_foldback_geometry
+      - foldback_geometry
     overview_hidden_annotations:
-      - snapback_retained_stem
-      - snapback_foldback_return
+      - foldback_retained_stem
+      - foldback_return
     component_hues:
       flank_5p: "#4C78A8"
       flank_3p: "#72B7B2"
       payload_primary: "#F58518"
       payload_complement: "#E45756"
-      snapback_foldback_geometry: "#64748B"
-      snapback_retained_stem: "#7C3AED"
-      snapback_cap: "#16A34A"
-      snapback_foldback_return: "#DB2777"
+      foldback_geometry: "#64748B"
+      foldback_retained_stem: "#7C3AED"
+      foldback_cap: "#16A34A"
+      foldback_return: "#DB2777"
       stem_base_left: "#B279A2"
       stem_base_right: "#9D755D"
     component_styles:
@@ -262,7 +262,7 @@ visual:
         fill: "#34D399"
         alpha: 0.58
         edge_color: "#059669"
-      snapback_cap:
+      foldback_cap:
         fill: "#86EFAC"
         alpha: 0.78
         edge_color: "#16A34A"
@@ -333,8 +333,8 @@ def test_run_linear_ssdna_composition_writes_retron43_bundle(tmp_path: Path) -> 
     }
     assert annotations_by_copy_id[(0, "stem_base_right")]["start"] == 71
     assert annotations_by_copy_id[(1, "stem_base_right")]["start"] == 159
-    assert annotations_by_copy_id[(0, "snapback_cap")]["start"] == 41
-    assert annotations_by_copy_id[(0, "snapback_cap")]["end"] == 44
+    assert annotations_by_copy_id[(0, "foldback_cap")]["start"] == 41
+    assert annotations_by_copy_id[(0, "foldback_cap")]["end"] == 44
 
     validation = json.loads((bundle / "validation_report.json").read_text(encoding="utf-8"))
     assert validation["status"] == "ok"
@@ -431,9 +431,9 @@ def test_run_linear_ssdna_composition_writes_retron43_bundle(tmp_path: Path) -> 
     ]
     assert {(tag["tag_kind"], tag["start"], tag["end"], tag["short_label"]) for tag in visual["effect_tags"]} == {
         ("stem_base_left", 11, 15, ""),
-        ("snapback_retained_stem", 34, 41, ""),
-        ("snapback_cap", 41, 44, ""),
-        ("snapback_foldback_return", 44, 52, ""),
+        ("foldback_retained_stem", 34, 41, ""),
+        ("foldback_cap", 41, 44, ""),
+        ("foldback_return", 44, 52, ""),
         ("stem_base_right", 71, 75, ""),
     }
     assert visual["boundaries"] == []
@@ -472,7 +472,7 @@ def test_run_linear_ssdna_composition_writes_retron43_bundle(tmp_path: Path) -> 
         ("payload_primary", 15, 34, "both", 0.58),
         ("payload_complement", 52, 71, "both", 0.58),
         ("flank_3p", 71, 88, "both", 0.70),
-        ("snapback_cap", 41, 44, "both", 0.78),
+        ("foldback_cap", 41, 44, "both", 0.78),
     ]
     labels_by_text = {label["text"]: label for label in visual["meta"]["segment_labels"]}
     assert labels_by_text["TetO primary"]["label_side"] == "above"
@@ -492,7 +492,7 @@ def test_run_linear_ssdna_composition_writes_advisory_folding_artifacts_when_bac
 
     bundle = result.artifact_bundle
     request_path = bundle / "folding" / "secondary_structure_prediction_request_v1.yaml"
-    prediction_path = bundle / "folding" / "secondary_structure_prediction_v1.json"
+    prediction_path = bundle / "folding" / "secondary_structure_prediction_v2.json"
     preflight_path = bundle / "folding" / "folding_preflight.json"
     assert request_path.is_file()
     assert prediction_path.is_file()
@@ -510,7 +510,7 @@ def test_run_linear_ssdna_composition_writes_advisory_folding_artifacts_when_bac
     assert prediction["input"]["length"] == 88
     assert prediction["input"]["sequence_sha256"] != result.sequence_sha256
     assert manifest["artifacts"]["folding_request"] == "folding/secondary_structure_prediction_request_v1.yaml"
-    assert manifest["artifacts"]["folding_prediction"] == "folding/secondary_structure_prediction_v1.json"
+    assert manifest["artifacts"]["folding_prediction"] == "folding/secondary_structure_prediction_v2.json"
     assert "viennarna_structure_plot" not in manifest["artifacts"]
 
 
@@ -579,7 +579,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
     result = run_linear_ssdna_composition(config_path)
 
     prediction = json.loads(
-        (result.artifact_bundle / "folding" / "secondary_structure_prediction_v1.json").read_text(encoding="utf-8")
+        (result.artifact_bundle / "folding" / "secondary_structure_prediction_v2.json").read_text(encoding="utf-8")
     )
     assert prediction["status"] == "ok"
     assert prediction["backend"]["name"] == "ViennaRNA"
@@ -738,7 +738,7 @@ def plot_structure_svg(filename, sequence, structure, layout=None):
 
     manifest = json.loads((result.artifact_bundle / "manifest.json").read_text(encoding="utf-8"))
     prediction = json.loads(
-        (result.artifact_bundle / "folding" / "secondary_structure_prediction_v1.json").read_text(encoding="utf-8")
+        (result.artifact_bundle / "folding" / "secondary_structure_prediction_v2.json").read_text(encoding="utf-8")
     )
     assert prediction["status"] == "ok"
     assert "viennarna_structure_plot" not in manifest["artifacts"]
@@ -868,7 +868,7 @@ def test_run_linear_ssdna_composition_writes_baserender_component_span_job(tmp_p
     assert "<!-- Foldback -->" not in svg_text
     assert "<!-- Foldback stem -->" not in svg_text
     assert "<!-- Foldback return -->" not in svg_text
-    for raw_slug in ["payload_primary", "snapback_foldback_geometry", "snapback_cap_segment", "payload_complement"]:
+    for raw_slug in ["payload_primary", "foldback_geometry", "foldback_cap_segment", "payload_complement"]:
         assert f"<!-- {raw_slug} -->" not in svg_text
 
 

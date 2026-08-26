@@ -7,14 +7,13 @@ shape. The packaged workspace roots here fall into three kinds:
   optional `configs/studies/*.study.yaml`, `configs/runbook.yaml`, and a sibling
   `runbook.md`
 - `runbook-family` workspaces: runbook-driven roots for peer families such as
-  cassette, snapback, or YIU, with `configs/runbook.yaml`, a sibling
+  cassette or YIU, with `configs/runbook.yaml`, a sibling
   `runbook.md`, and family-specific spec folders such as `configs/cassettes/`,
-  `configs/snapback/`, or `configs/yiu/`
+  or `configs/yiu/`
 - `family-spec` workspaces: roots discovered from family spec globs even when
   they do not expose a generic `configs/config.yaml`
 
-Optimization workspaces still require `configs/config.yaml`. Cassette, snapback,
-and YIU workspaces do not.
+Optimization workspaces still require `configs/config.yaml`. Cassette and YIU workspaces do not.
 
 Runbook coupling contract:
 
@@ -37,7 +36,6 @@ contract.
 Current layout:
 
 - didactic demos:
-  `demo_released_snapback/`,
   `demo_pairwise/`,
   `demo_multitf/`,
   `demo_monotypic_baer/`,
@@ -195,7 +193,6 @@ or `uv run ops catalog list --section tool-sources`.
 
 YIU bundle layout and sample-backed handoff rules live in [YIU Workflow](../docs/guides/yiu_workflow.md), [YIU Artifacts](../docs/reference/yiu_artifacts.md), and the relevant workspace runbook.
 
-Snapback workspace layout and narrow single-nick foldback scope live in [Snapback Workflow](../docs/guides/snapback_workflow.md), [Snapback Artifacts](../docs/reference/snapback_artifacts.md), and the [`demo_released_snapback` runbook](demo_released_snapback/runbook.md).
 
 Packaged workspace configs resolve `discover.tool_path` relative to their `configs/config.yaml`, so keep packaged workspaces under the repository layout (`src/dnadesign/cruncher/workspaces/...`). If you copy a workspace elsewhere, update `discover.tool_path` explicitly before running `discover motifs`.
 

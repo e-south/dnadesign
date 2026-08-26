@@ -36,7 +36,7 @@ def _pool_manifest(tmp_path: Path) -> TFBSPoolArtifact:
     manifest_path.write_text(
         json.dumps(
             {
-                "schema_version": "1.6",
+                "schema_version": "1.7",
                 "run_id": "demo",
                 "run_root": ".",
                 "config_path": "config.yaml",

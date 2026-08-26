@@ -1,7 +1,7 @@
 ## Linear ssDNA Composition
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-09
+**Last verified:** 2026-08-21
 **Surface role:** tool-local reference; generic authority for
 `linear_ssdna_composition_v1` and producer-owned Folding/BaseRender handoffs
 
@@ -78,7 +78,7 @@ study-specific IDs when applying those lists.
 
 `construct compose run` writes a producer-owned artifact bundle. Folding is a
 stateless service that may read the bundle manifest and write
-`secondary_structure_prediction_v1` plus ViennaRNA plot artifacts back into the
+`secondary_structure_prediction_v2` plus ViennaRNA plot artifacts back into the
 same bundle. BaseRender remains the linear/component evidence renderer and
 consumes the emitted visual contract or generated job handoff.
 

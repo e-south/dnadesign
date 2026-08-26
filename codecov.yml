@@ -123,11 +123,6 @@ component_management:
       name: junction
       paths:
         - src/dnadesign/junction/**
-    - component_id: msd
-      name: msd
-      paths:
-        - src/dnadesign/msd/**
-
 comment:
   require_changes: true
   layout: "reach,diff,flags,components,files"

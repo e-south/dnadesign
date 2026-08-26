@@ -3,7 +3,7 @@ doc_id: cruncher-intent-and-lifecycle
 title: Cruncher intent and lifecycle
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-08-22
 ---
 
 # Cruncher intent and lifecycle
@@ -47,10 +47,6 @@ artifact-native analysis.
   export.
 - `cassette` owns cassette validation, design, solve, and show surfaces.
 - `yiu` owns payload-centric validation, render, and show surfaces.
-- `snapback` owns preserved-site and released-product single-nick foldback
-  validation, search, solve, and show surfaces.
-- `scar_nick` owns retained-scar terminal-nick validation, design, and show
-  surfaces.
 - `study` owns study orchestration across workspace outputs.
 - `portfolio` owns cross-study aggregation and portfolio handoff tables.
 
@@ -58,10 +54,7 @@ artifact-native analysis.
 
 - Use `sample` for fixed-length promoter/operator design under pinned PWM
   objectives.
-- Use `cassette` or `snapback` when the contract is geometry-first and
-  recognition-site-aware rather than PWM-first.
-- Use `scar_nick` when the contract is a retained Type IIS scar plus exact
-  terminal nick feasibility panel.
+- Use `cassette` when the contract is geometry-first and recognition-site-aware rather than PWM-first.
 - Use `yiu` when the task is payload-centric mismatch rendering over a fixed
   internal window.
 - Use `study` and `portfolio` when the task is orchestration or aggregation over
@@ -69,8 +62,7 @@ artifact-native analysis.
 
 ### Non-goals
 
-- **No hidden family fallback:** `cassette`, `yiu`, `snapback`, `scar_nick`,
-  `study`, and `portfolio` are not secret modes of `sample`.
+- **No hidden family fallback:** `cassette`, `yiu`, `study`, and `portfolio` are not secret modes of `sample`.
 - **No one-size-fits-all run shape:** each family keeps its own command roots,
   output tree, and orchestration seam.
 - **No silent recovery:** invariant violations fail fast instead of downgrading
@@ -83,8 +75,6 @@ artifact-native analysis.
 - `sample` -> `fetch -> lock -> parse -> sample -> analyze -> export`
 - `cassette` -> `cassette init-workspace|validate|design|solve|show`
 - `yiu` -> `yiu init-workspace|validate|render|show`
-- `snapback` -> `snapback init-workspace|validate|design|released-design|solve|released-target-search|released-solve|show|released-show`
-- `scar_nick` -> `scar-nick validate|design|show`
 - `study` -> `study run|summarize|show`
 - `portfolio` -> `portfolio run|show`
 
@@ -273,7 +263,6 @@ For the full module layout and on-disk schema, see
 
 - [Sampling + analysis](sampling_and_analysis.md)
 - [Cassette workflow](cassette_workflow.md)
-- [Released-product snapback workflow](snapback_released_workflow.md)
 - [YIU workflow](yiu_workflow.md)
 - [Studies](studies.md)
 - [Portfolio aggregation](portfolio_aggregation.md)

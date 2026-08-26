@@ -16,6 +16,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from dnadesign.contracts.folding._viennarna_parameters import validate_viennarna_parameters
+
 
 class SequenceContractModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -264,19 +266,24 @@ class LinearSsdnaQaConfigV1(SequenceContractModel):
 
 
 class LinearSsdnaFoldingBackendConfigV1(SequenceContractModel):
-    name: str
+    name: Literal["ViennaRNA"]
     interface: Literal["cli", "python_api"] = "cli"
     executable: str | None = None
     python_module: str | None = None
-    backend_contract: str | None = None
+    backend_contract: Literal["secondary_structure_prediction_v2"] | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("name", "executable", "python_module", "backend_contract")
+    @field_validator("executable", "python_module")
     @classmethod
     def _optional_not_blank(cls, value: str | None) -> str | None:
         if value is None:
             return None
         return _not_blank(value, label="folding.backend field")
+
+    @field_validator("parameters", mode="before")
+    @classmethod
+    def _supported_parameters(cls, value: object) -> dict[str, Any]:
+        return validate_viennarna_parameters(value)
 
 
 class LinearSsdnaFoldingDnaPolicyConfigV1(SequenceContractModel):

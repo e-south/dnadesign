@@ -3,7 +3,7 @@ doc_id: construct-docs
 title: Construct documentation
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-08-21
 ---
 
 # Construct documentation
@@ -32,6 +32,7 @@ intended product is linear ssDNA.
 - [CLI reference](reference/cli.md): command surface and failure posture.
 - [Config reference](reference/config.md): job shape, placement rules, and output policy.
 - [Linear ssDNA composition](reference/linear-ssdna-composition.md): `construct compose` command route, bundle layout, and Folding/BaseRender handoffs.
+- [Annotated sequence-part placement](reference/annotated-sequence-parts.md): place one producer-authored sequence with nested digest-linked features without re-deriving it.
 - [Template/context contract](reference/template-contexts.md): the `construct__*` fields downstream infer uses for anchor-aware pooling.
 - [Outputs reference](reference/outputs.md): write behavior and lineage surfaces.
 - [Seed/import manifest reference](reference/seed-manifest.md): import schema for your own input and template records.
@@ -46,6 +47,7 @@ intended product is linear ssDNA.
 - Larger workflows stay explicit as multiple workspace projects, not one oversized config.
 - Packaged workspaces default to workspace-local `outputs/usr_datasets`; shared USR roots are always explicit.
 - `construct compose` writes caller-chosen local artifact bundles and does not create or register Construct workspaces.
+- Annotated-part placement preserves producer-owned sequence and feature authority; Construct owns only placement and coordinate transformation.
 - Provider and study names belong in caller-owned provenance values, not in the shared composition schema.
 
 ### Cross-tool examples

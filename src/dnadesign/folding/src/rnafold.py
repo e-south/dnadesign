@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 
-from dnadesign.contracts.folding.secondary_structure_prediction_v1 import (
+from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
     SecondaryStructurePairV1,
     SecondaryStructurePredictionResultV1,
 )
