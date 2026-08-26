@@ -190,6 +190,67 @@ def _verify_shared_resource_access(
             raise StorageObjectError(f"shared resource directory must be group-readable and traversable: {relative}")
 
 
+def _verify_coordination_posture(
+    root: Path,
+    manifest_path: Path,
+    lock_path: Path,
+) -> tuple[tuple[int, int], tuple[int, int], tuple[bool, int, int, int]]:
+    """Validate and fingerprint root, manifest, and lock coordination state."""
+
+    try:
+        root_stat = root.stat(follow_symlinks=False)
+        root_mode = stat.S_IMODE(root_stat.st_mode)
+        if root_mode & stat.S_IWGRP and not root_mode & stat.S_ISGID:
+            raise StorageObjectError(
+                "group-writable storage object roots must set the setgid bit "
+                "so coordination files inherit the shared group"
+            )
+        if root_mode & stat.S_IWGRP and not root_mode & stat.S_IXGRP:
+            raise StorageObjectError(
+                "group-writable storage object roots must be group-traversable "
+                "so collaborators can reach coordination files"
+            )
+        if root_mode & stat.S_IWGRP and not root_mode & stat.S_IRGRP:
+            raise StorageObjectError(
+                "group-writable storage object roots must be group-readable "
+                "so collaborators can enumerate declared content"
+            )
+        manifest_stat = manifest_path.stat(follow_symlinks=False)
+        manifest_mode = stat.S_IMODE(manifest_stat.st_mode)
+        if root_mode & stat.S_IWGRP and manifest_stat.st_gid != root_stat.st_gid:
+            raise StorageObjectError(
+                f"storage object manifest does not inherit the shared object group: {manifest_path}"
+            )
+        if root_mode & stat.S_IWGRP and not manifest_mode & stat.S_IRGRP:
+            raise StorageObjectError(
+                f"storage object manifest must be group-readable in a shared object root: {manifest_path}"
+            )
+        if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
+            raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
+        lock_exists = lock_path.exists()
+        if lock_exists:
+            lock_stat = lock_path.stat(follow_symlinks=False)
+            lock_mode = stat.S_IMODE(lock_stat.st_mode)
+            if lock_stat.st_size != 0:
+                raise StorageObjectError(f"storage object lock must be an empty coordination file: {lock_path}")
+            if root_mode & stat.S_IWGRP and lock_stat.st_gid != root_stat.st_gid:
+                raise StorageObjectError(f"storage object lock does not inherit the shared object group: {lock_path}")
+            if root_mode & stat.S_IWGRP and not lock_mode & stat.S_IWGRP:
+                raise StorageObjectError(
+                    f"storage object lock must be group-writable in a shared object root: {lock_path}"
+                )
+            lock_state = (True, lock_mode, lock_stat.st_gid, lock_stat.st_size)
+        else:
+            lock_state = (False, 0, 0, 0)
+    except OSError as exc:
+        raise StorageObjectError(f"cannot inspect storage object lock {lock_path}: {exc}") from exc
+    return (
+        (root_mode, root_stat.st_gid),
+        (manifest_mode, manifest_stat.st_gid),
+        lock_state,
+    )
+
+
 def _verify_demo(
     checkout: Path,
     verified: VerifiedStorageObject,
@@ -246,51 +307,8 @@ def verify_storage_object(
     if not manifest_path.is_file():
         raise StorageObjectError(f"storage object root is missing {MANIFEST_NAME}: {root}")
     lock_path = root / LOCK_NAME
-    try:
-        root_stat = root.stat(follow_symlinks=False)
-        root_mode = stat.S_IMODE(root_stat.st_mode)
-        if root_mode & stat.S_IWGRP and not root_mode & stat.S_ISGID:
-            raise StorageObjectError(
-                "group-writable storage object roots must set the setgid bit "
-                "so coordination files inherit the shared group"
-            )
-        if root_mode & stat.S_IWGRP and not root_mode & stat.S_IXGRP:
-            raise StorageObjectError(
-                "group-writable storage object roots must be group-traversable "
-                "so collaborators can reach coordination files"
-            )
-        if root_mode & stat.S_IWGRP and not root_mode & stat.S_IRGRP:
-            raise StorageObjectError(
-                "group-writable storage object roots must be group-readable "
-                "so collaborators can enumerate declared content"
-            )
-        manifest_stat = manifest_path.stat(follow_symlinks=False)
-        if root_mode & stat.S_IWGRP and manifest_stat.st_gid != root_stat.st_gid:
-            raise StorageObjectError(
-                f"storage object manifest does not inherit the shared object group: {manifest_path}"
-            )
-        if root_mode & stat.S_IWGRP and not manifest_stat.st_mode & stat.S_IRGRP:
-            raise StorageObjectError(
-                f"storage object manifest must be group-readable in a shared object root: {manifest_path}"
-            )
-        if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
-            raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
-        if lock_path.exists() and lock_path.stat(follow_symlinks=False).st_size != 0:
-            raise StorageObjectError(f"storage object lock must be an empty coordination file: {lock_path}")
-        if (
-            root_mode & stat.S_IWGRP
-            and lock_path.exists()
-            and lock_path.stat(follow_symlinks=False).st_gid != root_stat.st_gid
-        ):
-            raise StorageObjectError(f"storage object lock does not inherit the shared object group: {lock_path}")
-        if (
-            root_mode & stat.S_IWGRP
-            and lock_path.exists()
-            and not lock_path.stat(follow_symlinks=False).st_mode & stat.S_IWGRP
-        ):
-            raise StorageObjectError(f"storage object lock must be group-writable in a shared object root: {lock_path}")
-    except OSError as exc:
-        raise StorageObjectError(f"cannot inspect storage object lock {lock_path}: {exc}") from exc
+    coordination_state = _verify_coordination_posture(root, manifest_path, lock_path)
+    (root_mode, shared_group), _manifest_state, _lock_state = coordination_state
     try:
         manifest_bytes = manifest_path.read_bytes()
     except OSError as exc:
@@ -312,7 +330,7 @@ def verify_storage_object(
             root,
             resources,
             first_directory_paths,
-            shared_group=root_stat.st_gid,
+            shared_group=shared_group,
         )
     actual_paths = {
         path.relative_to(root).as_posix()
@@ -338,10 +356,19 @@ def verify_storage_object(
         second_manifest_bytes = manifest_path.read_bytes()
     except OSError as exc:
         raise StorageObjectError(f"cannot reread storage object manifest {manifest_path}: {exc}") from exc
+    second_coordination_state = _verify_coordination_posture(root, manifest_path, lock_path)
+    if root_mode & stat.S_IWGRP:
+        _verify_shared_resource_access(
+            root,
+            second_resources,
+            second_directory_paths,
+            shared_group=shared_group,
+        )
     first_directories = tuple(path.relative_to(root).as_posix() for path in first_directory_paths)
     second_directories = tuple(path.relative_to(root).as_posix() for path in second_directory_paths)
     if (
         manifest_bytes != second_manifest_bytes
+        or coordination_state != second_coordination_state
         or first_state != second_state
         or actual_paths != second_actual_paths
         or first_directories != second_directories

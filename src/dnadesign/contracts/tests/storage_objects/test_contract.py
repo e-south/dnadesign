@@ -291,6 +291,56 @@ def test_verify_storage_object_rejects_manifest_changed_during_validation(
         verify_storage_object(root)
 
 
+def test_verify_storage_object_rechecks_shared_resource_access_on_second_pass(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    root.chmod(0o2770)
+    payload_path = root / "inputs" / "payload.txt"
+    original_tree_paths = storage_validation._storage_tree_paths
+    calls = 0
+
+    def _tree_paths(root_path: Path):
+        nonlocal calls
+        paths = original_tree_paths(root_path)
+        calls += 1
+        if calls == 2:
+            payload_path.chmod(0o600)
+        return paths
+
+    monkeypatch.setattr(storage_validation, "_storage_tree_paths", _tree_paths)
+
+    with pytest.raises(StorageObjectError, match="shared resource must be group-readable"):
+        verify_storage_object(root)
+
+
+def test_verify_storage_object_rechecks_coordination_posture_on_second_pass(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    root.chmod(0o2770)
+    manifest_path = root / MANIFEST_NAME
+    original_tree_paths = storage_validation._storage_tree_paths
+    calls = 0
+
+    def _tree_paths(root_path: Path):
+        nonlocal calls
+        paths = original_tree_paths(root_path)
+        calls += 1
+        if calls == 2:
+            manifest_path.chmod(0o600)
+        return paths
+
+    monkeypatch.setattr(storage_validation, "_storage_tree_paths", _tree_paths)
+
+    with pytest.raises(StorageObjectError, match="manifest must be group-readable"):
+        verify_storage_object(root)
+
+
 def test_storage_file_closure_propagates_unreadable_subtree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
