@@ -126,6 +126,21 @@ def test_preflight_rejects_dirty_parser_after_context_evidence(tmp_path: Path) -
     ]
 
 
+def test_preflight_rejects_symlinked_checkpoint_before_execution(tmp_path: Path) -> None:
+    root, pin = _pinned_checkout(tmp_path)
+    checkpoint = root / pin.checkpoint_path
+    target = tmp_path / "checkpoint.pt"
+    checkpoint.replace(target)
+    checkpoint.symlink_to(target)
+
+    report = preflight_ligandmpnn(root, pin)
+
+    assert not report.ok
+    assert [(issue.check_id, issue.path) for issue in report.issues] == [
+        ("thread.ligandmpnn.checkpoint_not_regular", str(checkpoint))
+    ]
+
+
 def test_preflight_reads_pinned_blobs_without_replacement_refs(tmp_path: Path) -> None:
     root, pin = _pinned_checkout(tmp_path)
     (root / "run.py").write_text("# replacement entrypoint\n", encoding="utf-8")

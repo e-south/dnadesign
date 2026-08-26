@@ -378,7 +378,9 @@ def _validate_commands(request: LigandMpnnScoreRequest, commands: tuple[LigandMp
             first_argv,
             upstream_commit=request.upstream.commit,
             checkpoint_sha256=request.upstream.checkpoint_sha256,
+            pdb_sha256=request.pdb_sha256,
             packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
             entrypoint="score.py",
         )
     except ValueError as exc:

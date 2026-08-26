@@ -46,8 +46,11 @@ materialized directly from the pinned Git commit. They do not import helper
 modules or bytecode caches from the mutable checkout. Immediately before each
 run, the wrapper verifies the declared checkpoint digests, copies those exact
 bytes into the isolated runtime, and points the upstream entrypoint at the
-verified copies. Preflight remains an early diagnostic; execution repeats the
-source and weight identity boundary rather than trusting an earlier check.
+verified copies. The input PDB and optional residue-alphabet sidecar are
+verified and staged the same way, so execution cannot substitute changed input
+bytes after planning. Preflight remains an early diagnostic; execution repeats
+the source, input, and weight identity boundary rather than trusting an earlier
+check.
 
 An atom-context request is not evidence that context was parsed. Before a
 design or probability request is admitted, the context probe imports

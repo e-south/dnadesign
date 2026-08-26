@@ -16,10 +16,11 @@ import hashlib
 import json
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 
@@ -32,7 +33,10 @@ from dnadesign.thread.adapters.ligandmpnn.models import (
     LigandMpnnContextInventoryReference,
     LigandMpnnUpstreamPin,
 )
-from dnadesign.thread.adapters.ligandmpnn.pinned_checkout import attested_working_tree_path_bytes
+from dnadesign.thread.adapters.ligandmpnn.pinned_checkout import (
+    attested_working_tree_path_bytes,
+    materialize_pinned_tree,
+)
 
 _DNA_RESIDUE_NAMES = frozenset({"DA", "DC", "DG", "DI", "DT", "DU"})
 _RNA_RESIDUE_NAMES = frozenset({"A", "C", "G", "I", "U", "RA", "RC", "RG", "RI", "RU"})
@@ -150,18 +154,21 @@ def materialize_ligandmpnn_context_inventory(
     input_path = _within_root(root, request.pdb_path, field_name="context probe pdb_path")
     if input_path.is_symlink() or not input_path.is_file():
         raise ValueError("context probe input must be an existing regular file, not a symlink")
-    observed_input_sha256 = _sha256_file(input_path)
+    try:
+        input_bytes = input_path.read_bytes()
+    except OSError as error:
+        raise ValueError("context probe input could not be read") from error
+    observed_input_sha256 = hashlib.sha256(input_bytes).hexdigest()
     if observed_input_sha256 != request.pdb_sha256:
         raise ValueError(
             f"context probe input SHA256 mismatch: expected {request.pdb_sha256}, observed {observed_input_sha256}"
         )
-    parser, element_dict_rev, parser_sha256 = _load_pinned_upstream_parser(
-        checkout_root, expected_commit=request.upstream.commit
-    )
-    parsed, _, other_atoms, _, _ = parser(
-        str(input_path),
-        device="cpu",
-        chains=list(request.chains),
+    parsed, other_atoms, element_dict_rev, parser_sha256 = _run_pinned_upstream_parser(
+        checkout_root,
+        expected_commit=request.upstream.commit,
+        input_bytes=input_bytes,
+        input_name=request.pdb_path.name,
+        chains=request.chains,
         parse_all_atoms=request.parse_all_atoms,
         parse_atoms_with_zero_occupancy=request.parse_atoms_with_zero_occupancy,
     )
@@ -191,11 +198,16 @@ def materialize_ligandmpnn_context_inventory(
     return LigandMpnnContextInventoryReference(path=request.output_path, sha256=hashlib.sha256(payload).hexdigest())
 
 
-def _load_pinned_upstream_parser(
+def _run_pinned_upstream_parser(
     checkout_root: Path,
     *,
     expected_commit: str,
-) -> tuple[Callable[..., tuple[Any, ...]], dict[int, str], str]:
+    input_bytes: bytes,
+    input_name: str,
+    chains: tuple[str, ...],
+    parse_all_atoms: bool,
+    parse_atoms_with_zero_occupancy: bool,
+) -> tuple[Any, Any, dict[int, str], str]:
     checkout = checkout_root.expanduser().resolve()
     if not checkout.is_dir():
         raise ValueError("LigandMPNN checkout_root must be an existing directory")
@@ -208,33 +220,86 @@ def _load_pinned_upstream_parser(
     source_bytes = attested_working_tree_path_bytes(checkout, expected_commit, "data_utils.py")
     if source_bytes is None:
         raise ValueError("data_utils.py must be clean at the pinned commit")
-    source_path = checkout / "data_utils.py"
-    if source_path.is_symlink() or not source_path.is_file():
+    working_source_path = checkout / "data_utils.py"
+    if working_source_path.is_symlink() or not working_source_path.is_file():
         raise ValueError("pinned LigandMPNN data_utils.py must be a regular file")
-    module = _import_upstream_module(source_bytes, source_path=source_path, checkout=checkout)
-    parser = getattr(module, "parse_PDB", None)
-    if not callable(parser):
-        raise ValueError("pinned LigandMPNN data_utils.py does not expose parse_PDB")
-    element_dict_rev = getattr(module, "element_dict_rev", None)
-    if not isinstance(element_dict_rev, dict) or any(
-        not isinstance(key, int) or not isinstance(value, str) for key, value in element_dict_rev.items()
-    ):
-        raise ValueError("pinned LigandMPNN data_utils.py does not expose element_dict_rev")
-    return parser, element_dict_rev, hashlib.sha256(source_bytes).hexdigest()
+    with tempfile.TemporaryDirectory(prefix="dnadesign-ligandmpnn-context-") as temporary:
+        snapshot = Path(temporary) / "source"
+        snapshot.mkdir()
+        materialize_pinned_tree(checkout, expected_commit, snapshot)
+        source_path = snapshot / "data_utils.py"
+        snapshot_source_bytes = source_path.read_bytes()
+        if snapshot_source_bytes != source_bytes:
+            raise ValueError("materialized data_utils.py does not match the pinned commit")
+        input_path = snapshot / ".dnadesign-inputs" / input_name
+        input_path.parent.mkdir()
+        input_path.write_bytes(input_bytes)
+        input_path.chmod(0o400)
+        module = _import_upstream_module(
+            source_bytes,
+            source_path=source_path,
+            source_root=snapshot,
+            excluded_root=checkout,
+        )
+        parser = getattr(module, "parse_PDB", None)
+        if not callable(parser):
+            raise ValueError("pinned LigandMPNN data_utils.py does not expose parse_PDB")
+        element_dict_rev = getattr(module, "element_dict_rev", None)
+        if not isinstance(element_dict_rev, dict) or any(
+            not isinstance(key, int) or not isinstance(value, str) for key, value in element_dict_rev.items()
+        ):
+            raise ValueError("pinned LigandMPNN data_utils.py does not expose element_dict_rev")
+        parsed, _, other_atoms, _, _ = parser(
+            str(input_path),
+            device="cpu",
+            chains=list(chains),
+            parse_all_atoms=parse_all_atoms,
+            parse_atoms_with_zero_occupancy=parse_atoms_with_zero_occupancy,
+        )
+    return parsed, other_atoms, element_dict_rev, hashlib.sha256(source_bytes).hexdigest()
 
 
-def _import_upstream_module(source_bytes: bytes, *, source_path: Path, checkout: Path) -> ModuleType:
+def _import_upstream_module(
+    source_bytes: bytes,
+    *,
+    source_path: Path,
+    source_root: Path,
+    excluded_root: Path,
+) -> ModuleType:
     module_name = f"_dnadesign_ligandmpnn_data_utils_{hashlib.sha256(source_bytes).hexdigest()[:12]}"
     module = ModuleType(module_name)
     module.__file__ = str(source_path)
-    sys.path.insert(0, str(checkout))
+    previous_path = sys.path[:]
+    loaded_before = set(sys.modules)
+    excluded = excluded_root.resolve()
+    for loaded_name, loaded_module in tuple(sys.modules.items()):
+        if _module_is_within(loaded_module, excluded):
+            raise ValueError(f"mutable LigandMPNN checkout module is already loaded: {loaded_name}")
+    safe_path = [entry for entry in previous_path if entry and not _path_is_within(entry, excluded)]
+    sys.path[:] = [str(source_root), *safe_path]
     try:
         exec(compile(source_bytes, str(source_path), "exec"), module.__dict__)
     except Exception as error:
         raise ValueError(f"could not import pinned LigandMPNN data_utils.py: {error}") from error
     finally:
-        sys.path.pop(0)
+        sys.path[:] = previous_path
+        for loaded_name in set(sys.modules) - loaded_before:
+            if _module_is_within(sys.modules.get(loaded_name), source_root):
+                sys.modules.pop(loaded_name, None)
     return module
+
+
+def _path_is_within(value: str, root: Path) -> bool:
+    try:
+        path = Path(value).expanduser().resolve()
+    except (OSError, RuntimeError):
+        return False
+    return path == root or root in path.parents
+
+
+def _module_is_within(module: object, root: Path) -> bool:
+    module_file = getattr(module, "__file__", None)
+    return isinstance(module_file, str) and _path_is_within(module_file, root)
 
 
 def _effective_context_atoms(
@@ -370,14 +435,6 @@ def _require_relative_file(path: Path, *, field_name: str, suffix: str | None = 
         raise ValueError(f"{field_name} must be a safe relative file path")
     if suffix is not None and path.suffix.lower() != suffix:
         raise ValueError(f"{field_name} must end in {suffix}")
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _flag(value: bool) -> str:

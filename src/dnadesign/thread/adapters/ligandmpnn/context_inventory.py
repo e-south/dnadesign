@@ -361,13 +361,17 @@ def load_ligandmpnn_context_inventory(
         raise ValueError("context inventory must not be a symlink")
     if not path.is_file():
         raise ValueError(f"context inventory does not exist: {reference.path}")
-    observed_sha256 = _sha256_file(path)
+    try:
+        payload_bytes = path.read_bytes()
+    except OSError as error:
+        raise ValueError(f"context inventory could not be read: {reference.path}") from error
+    observed_sha256 = hashlib.sha256(payload_bytes).hexdigest()
     if observed_sha256 != reference.sha256:
         raise ValueError(
             f"context inventory SHA256 mismatch: expected sha256:{reference.sha256}, observed sha256:{observed_sha256}"
         )
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(payload_bytes.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ValueError(f"context inventory is not valid UTF-8 JSON: {reference.path}") from error
     if not isinstance(payload, dict):
@@ -439,11 +443,3 @@ def _within_root(root: Path, relative_path: Path) -> Path:
     if resolved_parent != root and root not in resolved_parent.parents:
         raise ValueError("context inventory path escapes execution_root")
     return resolved_parent / candidate.name
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()

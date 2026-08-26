@@ -103,6 +103,7 @@ def test_command_requires_and_verifies_typed_sidecar(tmp_path: Path) -> None:
         residue_alphabet_sidecar=sidecar,
     )[0].argv
     assert argv[argv.index("--omit_AA_per_residue") + 1] == str(sidecar.path)
+    assert argv[argv.index("--residue-alphabet-sha256") + 1] == sidecar.sha256.removeprefix("sha256:")
 
     sidecar.path.write_text("{}\n", encoding="utf-8")
     with pytest.raises(ValueError, match="SHA256 does not match"):

@@ -86,6 +86,8 @@ def test_build_commands_declares_exact_official_ligandmpnn_flags_per_seed() -> N
         _COMMIT,
         "--checkpoint-sha256",
         _DIGEST,
+        "--pdb-sha256",
+        _DIGEST,
         "--packing-checkpoint-sha256",
         _PACKING_DIGEST,
         "--entrypoint",

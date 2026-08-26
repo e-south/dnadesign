@@ -255,6 +255,45 @@ def test_probe_executes_attested_source_instead_of_valid_cached_bytecode(tmp_pat
     assert inventory.effective_nucleotide_atom_count == 4
 
 
+def test_probe_does_not_import_helpers_from_mutable_checkout(tmp_path: Path) -> None:
+    checkout, _ = _fake_upstream_checkout(tmp_path)
+    parser_path = checkout / "data_utils.py"
+    parser_path.write_text(
+        "from _ligandmpnn_untracked_probe_helper import VALUE\n" + parser_path.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "-C", str(checkout), "add", "data_utils.py"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(checkout),
+            "-c",
+            "user.name=Thread Test",
+            "-c",
+            "user.email=thread-test@example.invalid",
+            "commit",
+            "-qm",
+            "parser with unavailable dependency",
+        ],
+        check=True,
+    )
+    commit = subprocess.check_output(["git", "-C", str(checkout), "rev-parse", "HEAD"], text=True).strip()
+    (checkout / "_ligandmpnn_untracked_probe_helper.py").write_text(
+        "VALUE = 'mutable-checkout-import'\n", encoding="utf-8"
+    )
+    request = _request(tmp_path, checkout, commit)
+
+    with pytest.raises(ValueError, match="could not import pinned LigandMPNN data_utils.py"):
+        materialize_ligandmpnn_context_inventory(
+            request,
+            execution_root=tmp_path,
+            checkout_root=checkout,
+        )
+
+    assert not (tmp_path / request.output_path).exists()
+
+
 def test_probe_command_is_explicit_and_portable(tmp_path: Path) -> None:
     checkout, commit = _fake_upstream_checkout(tmp_path)
     request = _request(tmp_path, checkout, commit)

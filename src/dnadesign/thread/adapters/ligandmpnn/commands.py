@@ -36,8 +36,14 @@ def build_ligandmpnn_commands(
                 checkout_root=checkout_root,
                 upstream_commit=request.upstream.commit,
                 checkpoint_sha256=request.upstream.checkpoint_sha256,
+                pdb_sha256=request.pdb_sha256,
                 packing_checkpoint_sha256=(
                     request.upstream.packing_checkpoint_sha256 if request.packing.enabled else None
+                ),
+                residue_alphabet_sha256=(
+                    residue_alphabet_sidecar.sha256.removeprefix("sha256:")
+                    if residue_alphabet_sidecar is not None
+                    else None
                 ),
                 entrypoint="run.py",
                 python_executable=python_executable,

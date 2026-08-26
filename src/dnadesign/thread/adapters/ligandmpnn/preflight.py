@@ -136,10 +136,23 @@ def _check_digest(
     label: str,
     issues: list[LigandMpnnPreflightIssue],
 ) -> None:
+    if path.is_symlink():
+        issues.append(
+            _issue(
+                f"{label}_not_regular",
+                f"pinned {label.replace('_', ' ')} must be a regular file, not a symlink",
+                path,
+            )
+        )
+        return
     if not path.is_file():
         issues.append(_issue(f"missing_{label}", f"checkout is missing pinned {label.replace('_', ' ')}", path))
         return
-    observed = _sha256_file(path)
+    try:
+        observed = _sha256_file(path)
+    except OSError:
+        issues.append(_issue(f"unreadable_{label}", f"pinned {label.replace('_', ' ')} could not be read", path))
+        return
     if observed != expected:
         issues.append(_issue(f"{label}_hash_mismatch", f"expected sha256:{expected}, observed sha256:{observed}", path))
 
