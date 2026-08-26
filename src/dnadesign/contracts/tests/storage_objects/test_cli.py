@@ -344,6 +344,28 @@ def test_refresh_rejects_missing_root_without_traceback(tmp_path: Path) -> None:
     assert not (root / LOCK_NAME).exists()
 
 
+def test_validate_rejects_symlink_loop_root_without_traceback(tmp_path: Path) -> None:
+    (tmp_path / "a").symlink_to("b", target_is_directory=True)
+    (tmp_path / "b").symlink_to("a", target_is_directory=True)
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "dnadesign.contracts.storage_objects",
+            "validate",
+            str(tmp_path / "a" / "object"),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 2
+    assert "storage object root does not resolve" in completed.stderr
+    assert "Traceback" not in completed.stderr
+
+
 def test_inventory_and_refresh_reject_symlinked_object_root(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     root.mkdir()

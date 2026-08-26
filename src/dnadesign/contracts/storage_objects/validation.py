@@ -38,6 +38,15 @@ _SHELF_KINDS = {
 _ALLOWED_ROOT_FILES = {"AGENTS.md"}
 
 
+def resolve_storage_path(path: Path, *, label: str, strict: bool = False) -> Path:
+    """Resolve one contract path while normalizing filesystem-loop failures."""
+
+    try:
+        return path.resolve(strict=strict)
+    except (OSError, RuntimeError) as exc:
+        raise StorageObjectError(f"{label} does not resolve: {path}: {exc}") from exc
+
+
 def _directory_entries(directory: Path, *, label: str) -> tuple[Path, ...]:
     try:
         return tuple(directory.iterdir())
@@ -105,10 +114,11 @@ def _verify_resource(root: Path, resource: StoredResource) -> VerifiedStoredReso
     source_path = root / resource.relative_path
     if source_path.is_symlink():
         raise StorageObjectError(f"symlink is not allowed: {resource.relative_path}")
-    try:
-        resolved = source_path.resolve(strict=True)
-    except OSError as exc:
-        raise StorageObjectError(f"declared resource does not resolve: {resource.relative_path}") from exc
+    resolved = resolve_storage_path(
+        source_path,
+        label=f"declared resource {resource.relative_path}",
+        strict=True,
+    )
     try:
         resolved.relative_to(root)
     except ValueError as exc:
@@ -170,7 +180,7 @@ def verify_storage_object(
     requested_root = Path(storage_root).expanduser()
     if requested_root.is_symlink():
         raise StorageObjectError(f"storage object root must not be a symlink: {requested_root}")
-    root = requested_root.resolve()
+    root = resolve_storage_path(requested_root, label="storage object root")
     if not root.is_dir():
         raise StorageObjectError(f"storage object root is not a directory: {root}")
     manifest_path = root / MANIFEST_NAME
@@ -211,7 +221,7 @@ def verify_storage_object(
 
     verified = VerifiedStorageObject(
         root=root,
-        manifest_path=manifest_path.resolve(),
+        manifest_path=resolve_storage_path(manifest_path, label="storage object manifest", strict=True),
         manifest=manifest,
         resources=resources,
     )
@@ -240,7 +250,7 @@ def verify_storage_root(storage_root: Path) -> VerifiedStorageRoot:
     requested_root = Path(storage_root).expanduser()
     if requested_root.is_symlink():
         raise StorageObjectError(f"storage root must not be a symlink: {requested_root}")
-    root = requested_root.resolve()
+    root = resolve_storage_path(requested_root, label="storage root")
     if not root.is_dir():
         raise StorageObjectError(f"storage root is not a directory: {root}")
     allowed_shelves = set(_SHELF_KINDS) | _ALLOWED_ROOT_FILES

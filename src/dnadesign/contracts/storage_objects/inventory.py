@@ -33,7 +33,7 @@ from .models import (
     StorageClass,
     StorageObjectError,
 )
-from .validation import storage_file_paths, verify_storage_object
+from .validation import resolve_storage_path, storage_file_paths, verify_storage_object
 
 
 def _sha256(path: Path) -> str:
@@ -163,7 +163,7 @@ def inventory_storage_object(
     requested_root = Path(storage_root).expanduser()
     if requested_root.is_symlink():
         raise StorageObjectError(f"storage object root must not be a symlink: {requested_root}")
-    root = requested_root.resolve()
+    root = resolve_storage_path(requested_root, label="storage object root")
     if not root.is_dir():
         raise StorageObjectError(f"storage object root is not a directory: {root}")
     try:
@@ -245,7 +245,7 @@ def refresh_storage_object(
     requested_root = Path(storage_root).expanduser()
     if requested_root.is_symlink():
         raise StorageObjectError(f"storage object root must not be a symlink: {requested_root}")
-    root = requested_root.resolve()
+    root = resolve_storage_path(requested_root, label="storage object root")
     if not root.is_dir():
         raise StorageObjectError(f"storage object root is not a directory: {root}")
     with _manifest_lock(root):

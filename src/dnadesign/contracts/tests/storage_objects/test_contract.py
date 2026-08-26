@@ -187,6 +187,20 @@ def test_storage_file_closure_propagates_unreadable_subtree(
         storage_file_paths(tmp_path)
 
 
+def test_declared_resource_below_symlink_loop_is_contract_error(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    manifest_path = root / MANIFEST_NAME
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["resources"][0]["path"] = "a/payload.txt"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    (root / "a").symlink_to("b", target_is_directory=True)
+    (root / "b").symlink_to("a", target_is_directory=True)
+
+    with pytest.raises(StorageObjectError, match="declared resource a/payload.txt does not resolve"):
+        verify_storage_object(root)
+
+
 def test_git_resident_demo_must_be_small_and_tracked(tmp_path: Path) -> None:
     checkout = tmp_path / "checkout"
     subprocess.run(["git", "init", "-q", str(checkout)], check=True)
