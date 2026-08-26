@@ -551,6 +551,12 @@ def publish_densegen_playback_endpoint(
         for term in forbidden_terms:
             if term and any(term in label.casefold() for label in placement_labels):
                 raise ValueError(f"record-derived placement label contains forbidden term: {term!r}")
+        constraint_labels = tuple(
+            constraint.label for constraint in realized.constraints if constraint.label is not None
+        )
+        for term in forbidden_terms:
+            if term and any(term in label.casefold() for label in constraint_labels):
+                raise ValueError(f"record-derived constraint label contains forbidden term: {term!r}")
         if fixed_element_annotations == "variant":
             variant_labels = tuple(
                 str(placement.metadata.get("variant_id") or "")
