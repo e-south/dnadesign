@@ -29,6 +29,7 @@ from dnadesign.thread.structure_views import (
 )
 from dnadesign.thread.structure_views._mmcif import (
     _browser_cif_token,
+    _quote_3dmol_atom_name,
     serialize_mmcif_atom_sites_for_3dmol,
 )
 
@@ -721,6 +722,19 @@ def test_py3dmol_backend_serializes_mmcif_for_3dmol_without_prime_token_ambiguit
     assert "data_mixed_polymer" not in unescaped_html
     assert '","cif");' in unescaped_html
     assert '","mmcif");' not in unescaped_html
+
+
+def test_py3dmol_backend_uses_single_quotes_for_double_quote_atom_identifiers() -> None:
+    structure = _SIDECHAIN_MMCIF.replace("ATOM 3 C CB .", "ATOM 3 C 'C\"1' .")
+
+    serialized = serialize_mmcif_atom_sites_for_3dmol(structure)
+
+    assert "'C\"1'" in serialized
+
+
+def test_py3dmol_backend_rejects_atom_identifiers_with_both_quote_delimiters() -> None:
+    with pytest.raises(ValueError, match="atom name cannot be serialized safely"):
+        _quote_3dmol_atom_name("C'\"1")
 
 
 def test_py3dmol_backend_quotes_whitespace_bearing_mmcif_identifiers() -> None:

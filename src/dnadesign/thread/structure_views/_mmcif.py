@@ -57,7 +57,8 @@ def serialize_mmcif_atom_sites_for_3dmol(structure_text: str) -> str:
     3Dmol 2.5.5 treats apostrophes inside otherwise valid unquoted CIF tokens as
     quote delimiters. Nucleic-acid atom names such as ``O5'`` then shift the
     remaining atom-site columns. This adapter emits one canonical coordinate
-    loop and double-quotes every atom name, which 3Dmol explicitly unquotes.
+    loop and quotes every atom name with an available delimiter that 3Dmol
+    explicitly unquotes.
     """
 
     raw = MMCIF2Dict(StringIO(structure_text))
@@ -142,13 +143,17 @@ def _required_atom_site_column(
 
 
 def _quote_3dmol_atom_name(value: str) -> str:
-    if not value or any(character in value for character in ('"', "\n", "\r")):
+    if not value or any(character in value for character in ("\n", "\r")):
         raise ValueError(f"mmCIF atom name cannot be serialized safely for 3Dmol: {value!r}")
-    return f'"{value}"'
+    if '"' not in value:
+        return f'"{value}"'
+    if "'" not in value:
+        return f"'{value}'"
+    raise ValueError(f"mmCIF atom name cannot be serialized safely for 3Dmol: {value!r}")
 
 
 def _browser_cif_token(value: str, *, field: str) -> str:
-    if field == "_atom_site.label_atom_id" and value.startswith('"') and value.endswith('"'):
+    if field == "_atom_site.label_atom_id" and len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
         return value
     if not value or any(character in value for character in ("\n", "\r")):
         raise ValueError(f"mmCIF value cannot be serialized safely for 3Dmol at {field}: {value!r}")
