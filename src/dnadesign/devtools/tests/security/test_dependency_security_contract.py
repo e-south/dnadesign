@@ -81,11 +81,13 @@ def test_security_floors_are_published_by_their_owning_dependency_sets() -> None
     assert "pymdown-extensions>=11.0.1" in constraint_dependencies
     assert any(requirement.startswith("onnx>=1.22.0;") for requirement in evo2_dependencies)
     assert any(requirement.startswith("pip>=26.1.2;") for requirement in evo2_dependencies)
-    assert any(requirement.startswith("setuptools>=83.0.0;") for requirement in evo2_dependencies)
+    assert any(requirement.startswith("setuptools>=84.0.0;") for requirement in evo2_dependencies)
+    assert any(requirement.startswith("wheel>=0.48.0;") for requirement in evo2_dependencies)
     assert any(requirement.startswith("torch>=2.13,<2.14;") for requirement in dependencies)
     assert any(requirement.startswith("torch>=2.13,<2.14;") for requirement in evo2_dependencies)
     assert all(not requirement.startswith(("torchaudio", "torchvision")) for requirement in evo2_dependencies)
-    assert "setuptools>=83.0.0" in build_dependencies
+    assert "setuptools>=84.0.0" in build_dependencies
+    assert "wheel>=0.48.0" in build_dependencies
     assert all("email" not in author for author in project["authors"])
 
 
