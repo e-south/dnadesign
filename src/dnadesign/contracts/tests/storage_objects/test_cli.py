@@ -299,7 +299,7 @@ def test_refresh_preserves_existing_manifest_permissions(tmp_path: Path) -> None
 def test_inventory_creates_group_writable_lock_for_shared_object(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     root.mkdir()
-    root.chmod(0o770)
+    root.chmod(0o2770)
     (root / "payload.txt").write_text("payload\n", encoding="utf-8")
 
     inventory_storage_object(
@@ -317,6 +317,32 @@ def test_inventory_creates_group_writable_lock_for_shared_object(tmp_path: Path)
 
     assert stat.S_IMODE((root / LOCK_NAME).stat().st_mode) == 0o664
     assert stat.S_IMODE((root / MANIFEST_NAME).stat().st_mode) == 0o664
+    assert (root / LOCK_NAME).stat().st_gid == root.stat().st_gid
+    assert (root / MANIFEST_NAME).stat().st_gid == root.stat().st_gid
+
+
+def test_inventory_rejects_group_writable_root_without_setgid(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(0o770)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="must set the setgid bit"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert not (root / LOCK_NAME).exists()
+    assert not (root / MANIFEST_NAME).exists()
 
 
 def test_inventory_stages_manifest_on_object_filesystem(

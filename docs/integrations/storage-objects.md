@@ -97,9 +97,11 @@ receipt changes. Writers lock
 `<object>/.storage-object.lock`, so processes and compute nodes that see the
 same POSIX filesystem serialize receipt updates. The lock is contract-owned
 coordination state and is excluded from the content manifest. Group-writable
-object roots create group-writable lock files so collaborating accounts can
-participate in the same coordination boundary; newly inventoried manifests
-inherit that shared-write posture. Manifest staging occurs inside the object so
+object roots must set the POSIX setgid bit; this fail-fast requirement ensures
+lock files, staging files, and newly inventoried manifests inherit the shared
+directory group instead of the writer's primary group. They are created
+group-writable so collaborating accounts can participate in the same
+coordination boundary. Manifest staging occurs inside the object so
 the atomic replacement stays on the same filesystem. A pre-existing
 staging-shaped name fails closed for explicit operator inspection; the tool
 never guesses that such bytes are safe to delete. Independently synced replicas,
