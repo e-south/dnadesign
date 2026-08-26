@@ -11,11 +11,15 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import ctypes
+import errno
 import hashlib
 import json
 import math
+import os
 import re
 import shutil
+import sys
 import tempfile
 from collections.abc import Mapping
 from pathlib import Path
@@ -171,13 +175,44 @@ def _presentation_number(
     return number
 
 
+def _atomic_exchange_directories(first: Path, second: Path) -> None:
+    """Atomically exchange two directory names without removing either endpoint."""
+
+    rename_exchange = 0x00000002
+    if sys.platform == "darwin":
+        function_name = "renameatx_np"
+        at_fdcwd = -2
+    elif sys.platform.startswith("linux"):
+        function_name = "renameat2"
+        at_fdcwd = -100
+    else:
+        raise OSError(errno.ENOTSUP, f"atomic directory exchange is unsupported on {sys.platform}")
+    libc = ctypes.CDLL(None, use_errno=True)
+    try:
+        exchange = getattr(libc, function_name)
+    except AttributeError as exc:
+        raise OSError(errno.ENOTSUP, f"{function_name} is unavailable on {sys.platform}") from exc
+    exchange.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    exchange.restype = ctypes.c_int
+    ctypes.set_errno(0)
+    if exchange(at_fdcwd, os.fsencode(first), at_fdcwd, os.fsencode(second), rename_exchange) != 0:
+        error_number = ctypes.get_errno()
+        raise OSError(error_number, os.strerror(error_number), first, second)
+
+
 def _install_output_directory(
     temp_path: Path,
     output_path: Path,
     *,
     replace: bool,
 ) -> None:
-    """Install a completed bundle while retaining the prior bundle for rollback."""
+    """Install a completed bundle without removing the public endpoint name."""
 
     _recover_output_replacement(output_path)
     if output_path.is_symlink():
@@ -187,30 +222,12 @@ def _install_output_directory(
         return
     if not replace:
         raise FileExistsError(f"output already exists: {output_path}; pass replace=True explicitly")
-    backup_path = Path(
-        tempfile.mkdtemp(
-            prefix=f".{output_path.name}.backup-",
-            dir=output_path.parent,
-        )
-    )
+    _atomic_exchange_directories(temp_path, output_path)
     try:
-        output_path.replace(backup_path)
-    except Exception:
-        backup_path.rmdir()
-        raise
-    try:
-        temp_path.replace(output_path)
-    except Exception as install_error:
-        try:
-            backup_path.replace(output_path)
-        except Exception as rollback_error:
-            raise RuntimeError(f"replacement failed and prior output remains at {backup_path}") from rollback_error
-        raise install_error
-    try:
-        shutil.rmtree(backup_path)
+        shutil.rmtree(temp_path)
     except OSError:
-        # The new bundle is already committed. Retain the recoverable prior
-        # bundle rather than reporting an ambiguous installation failure.
+        # The new bundle is already committed. Retain the retired prior bundle
+        # rather than reporting an ambiguous installation failure.
         pass
 
 
@@ -233,6 +250,21 @@ def _recover_output_replacement(output_path: Path) -> None:
     if len(backups) != 1:
         raise RuntimeError(f"cannot recover {output_path}: found {len(backups)} prior-output backups")
     backups[0].replace(output_path)
+
+
+def _validate_serialized_public_payload(
+    payload: str,
+    forbidden_terms: tuple[str, ...],
+    *,
+    payload_name: str,
+) -> None:
+    """Reject forbidden text from the exact JSON surface written publicly."""
+
+    decoded = json.loads(payload)
+    public_text = json.dumps(decoded, ensure_ascii=False, separators=(",", ":"), sort_keys=True).casefold()
+    for term in forbidden_terms:
+        if term and term in public_text:
+            raise ValueError(f"serialized {payload_name} payload contains forbidden term: {term!r}")
 
 
 def _repository_root(config_path: Path, repository: str) -> Path:
@@ -587,8 +619,20 @@ def publish_densegen_playback_endpoint(
                 presentation=playback_presentation,
             )
         )
-        realized_payloads[scene] = dumps_realized_array(realized)
-        plan_payloads[scene] = dumps_playback_plan(plan)
+        realized_payload = dumps_realized_array(realized)
+        _validate_serialized_public_payload(
+            realized_payload,
+            forbidden_terms,
+            payload_name="realized-array",
+        )
+        plan_payload = dumps_playback_plan(plan)
+        _validate_serialized_public_payload(
+            plan_payload,
+            forbidden_terms,
+            payload_name="playback-plan",
+        )
+        realized_payloads[scene] = realized_payload
+        plan_payloads[scene] = plan_payload
         scene_manifest.append(
             {
                 "scene": scene,

@@ -240,19 +240,13 @@ def test_publisher_restores_prior_bundle_when_replacement_install_fails(
     output_path = publisher.publish_densegen_playback_endpoint(config_path)
     marker = output_path / "prior-bundle.txt"
     marker.write_text("prior\n", encoding="utf-8")
-    original_replace = Path.replace
-    replacement_calls = 0
 
-    def _replace(path: Path, target: Path) -> Path:
-        nonlocal replacement_calls
-        replacement_calls += 1
-        if replacement_calls == 2:
-            raise OSError("forced replacement failure")
-        return original_replace(path, target)
+    def _fail_exchange(_new_bundle: Path, _prior_bundle: Path) -> None:
+        raise OSError("forced atomic exchange failure")
 
-    monkeypatch.setattr(Path, "replace", _replace)
+    monkeypatch.setattr(publisher, "_atomic_exchange_directories", _fail_exchange)
 
-    with pytest.raises(OSError, match="forced replacement failure"):
+    with pytest.raises(OSError, match="forced atomic exchange failure"):
         publisher.publish_densegen_playback_endpoint(config_path, replace=True)
 
     assert marker.read_text(encoding="utf-8") == "prior\n"
@@ -273,7 +267,33 @@ def test_publisher_removes_prior_bundle_after_successful_replacement(tmp_path: P
     assert not tuple(output_path.parent.glob(f".{output_path.name}.backup-*"))
 
 
-def test_publisher_reports_success_when_only_backup_cleanup_fails(
+def test_publisher_keeps_endpoint_present_across_atomic_exchange(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = _write_endpoint(tmp_path)
+    output_path = publisher.publish_densegen_playback_endpoint(config_path)
+    marker = output_path / "prior-bundle.txt"
+    marker.write_text("prior\n", encoding="utf-8")
+    original_exchange = publisher._atomic_exchange_directories
+    observed: list[tuple[bool, bool]] = []
+
+    def _observe_exchange(new_bundle: Path, prior_bundle: Path) -> None:
+        observed.append((new_bundle.is_dir(), prior_bundle.is_dir()))
+        original_exchange(new_bundle, prior_bundle)
+        observed.append((new_bundle.is_dir(), prior_bundle.is_dir()))
+
+    monkeypatch.setattr(publisher, "_atomic_exchange_directories", _observe_exchange)
+
+    replaced_path = publisher.publish_densegen_playback_endpoint(config_path, replace=True)
+
+    assert replaced_path == output_path
+    assert observed == [(True, True), (True, True)]
+    assert not marker.exists()
+    assert (output_path / "manifest.json").is_file()
+
+
+def test_publisher_reports_success_when_only_retired_bundle_cleanup_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -281,18 +301,19 @@ def test_publisher_reports_success_when_only_backup_cleanup_fails(
     output_path = publisher.publish_densegen_playback_endpoint(config_path)
     original_rmtree = publisher.shutil.rmtree
 
-    def _fail_backup_cleanup(path: Path, *args, **kwargs) -> None:
-        if Path(path).name.startswith(f".{output_path.name}.backup-"):
+    def _fail_retired_bundle_cleanup(path: Path, *args, **kwargs) -> None:
+        candidate = Path(path)
+        if candidate.name.startswith(f".{output_path.name}.") and (candidate / "manifest.json").exists():
             raise OSError("simulated cleanup denial")
         original_rmtree(path, *args, **kwargs)
 
-    monkeypatch.setattr(publisher.shutil, "rmtree", _fail_backup_cleanup)
+    monkeypatch.setattr(publisher.shutil, "rmtree", _fail_retired_bundle_cleanup)
 
     replaced_path = publisher.publish_densegen_playback_endpoint(config_path, replace=True)
 
     assert replaced_path == output_path
     assert (output_path / "manifest.json").is_file()
-    assert len(tuple(output_path.parent.glob(f".{output_path.name}.backup-*"))) == 1
+    assert len(tuple(output_path.parent.glob(f".{output_path.name}.*"))) == 1
 
 
 def test_publisher_recovers_prior_bundle_after_interrupted_rename(tmp_path: Path) -> None:
@@ -367,6 +388,16 @@ def test_publisher_validates_persisted_plan_with_explicit_subtitle(tmp_path: Pat
     config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
     with pytest.raises(ValueError, match="record-derived plan name contains forbidden term: 'sigma factor'"):
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+
+@pytest.mark.parametrize("field", ["densegen__run_id", "densegen__input_name"])
+def test_publisher_validates_serialized_record_provenance(tmp_path: Path, field: str) -> None:
+    row = _publisher_row()
+    row[field] = "private sigma factor provenance"
+    config_path = _write_endpoint(tmp_path, record=row)
+
+    with pytest.raises(ValueError, match="serialized realized-array payload contains forbidden term: 'sigma factor'"):
         publisher.publish_densegen_playback_endpoint(config_path)
 
 
