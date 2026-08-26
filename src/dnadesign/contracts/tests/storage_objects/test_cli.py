@@ -76,7 +76,9 @@ def test_inventory_creates_a_closed_manifest_then_refuses_overwrite(tmp_path: Pa
     manifest_text = (root / MANIFEST_NAME).read_text(encoding="utf-8")
 
     assert manifest_text.endswith("\n")
-    assert json.loads(completed.stdout)["status"] == "verified"
+    summary = json.loads(completed.stdout)
+    assert summary["status"] == "verified"
+    assert summary["manifest_digest"] == _digest(root / MANIFEST_NAME)
     assert [row["path"] for row in json.loads(manifest_text)["resources"]] == [
         "inputs/payload.txt",
         "outputs/result.json",
@@ -809,6 +811,7 @@ def test_refresh_advances_authoritative_store_receipt(tmp_path: Path) -> None:
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert summary["status"] == "verified"
+    assert summary["manifest_digest"] == _digest(manifest_path)
     assert manifest["producer_revision"] == "test-revision-2"
     assert manifest["resources"][0]["digest"] == _digest(root / "payload.txt")
 
@@ -836,6 +839,88 @@ def test_refresh_rejects_tool_cache_receipts(tmp_path: Path) -> None:
             expected_manifest_digest=_digest(root / MANIFEST_NAME),
             producer_revision="test-revision-2",
         )
+
+
+def test_refresh_explicitly_reclassifies_mutable_metadata_as_artifact(tmp_path: Path) -> None:
+    root = tmp_path / "store"
+    root.mkdir()
+    event_log = root / ".events.log"
+    event_log.write_text('{"event":"created"}\n', encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="store",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="authoritative",
+        retention_policy="retain",
+        metadata_paths=(".events.log",),
+    )
+    manifest_path = root / MANIFEST_NAME
+    prior_digest = _digest(manifest_path)
+    with event_log.open("a", encoding="utf-8") as handle:
+        handle.write('{"event":"updated"}\n')
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "dnadesign.contracts.storage_objects",
+            "refresh",
+            str(root),
+            "--expected-manifest-digest",
+            prior_digest,
+            "--producer-revision",
+            "test-revision-2",
+            "--artifact",
+            ".events.log",
+            "--json",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    summary = json.loads(completed.stdout)
+    assert manifest["resources"][0]["role"] == "artifact"
+    assert manifest["resources"][0]["digest"] == _digest(event_log)
+    assert summary["manifest_digest"] == _digest(manifest_path)
+
+
+def test_refresh_never_reclassifies_inputs_as_artifacts(tmp_path: Path) -> None:
+    root = tmp_path / "store"
+    root.mkdir()
+    payload = root / "payload.txt"
+    payload.write_text("original\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="store",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="authoritative",
+        retention_policy="retain",
+        input_paths=("payload.txt",),
+    )
+    manifest_path = root / MANIFEST_NAME
+    prior_bytes = manifest_path.read_bytes()
+
+    with pytest.raises(StorageObjectError, match="input and cache roles remain protected"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+            artifact_paths=("payload.txt",),
+        )
+
+    assert manifest_path.read_bytes() == prior_bytes
 
 
 @pytest.mark.parametrize("protected_role", ["input", "metadata"])

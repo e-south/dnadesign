@@ -81,6 +81,7 @@ def test_verify_storage_object_requires_exact_file_closure(tmp_path: Path) -> No
     assert verified.manifest.object_kind.value == "workspace"
     assert [resource.role.value for resource in verified.resources] == ["input", "artifact"]
     assert verified.summary()["resource_count"] == 2
+    assert verified.summary()["manifest_digest"] == _digest((root / MANIFEST_NAME).read_bytes())
 
     (root / "undeclared.txt").write_text("not in manifest", encoding="utf-8")
     with pytest.raises(StorageObjectError, match="undeclared files: undeclared.txt"):
@@ -518,4 +519,28 @@ def test_verify_storage_root_wraps_directory_enumeration_failures(
     monkeypatch.setattr(Path, "iterdir", _iterdir)
 
     with pytest.raises(StorageObjectError, match="cannot enumerate storage root"):
+        verify_storage_root(storage_root)
+
+
+def test_verify_storage_root_rejects_object_created_during_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+    original_routes = storage_validation._routed_object_directories
+    calls = 0
+
+    def _routes(root: Path):
+        nonlocal calls
+        routes = original_routes(root)
+        calls += 1
+        if calls == 1:
+            _write_object(storage_root / "workspaces" / "cruncher" / "late")
+        return routes
+
+    monkeypatch.setattr(storage_validation, "_routed_object_directories", _routes)
+
+    with pytest.raises(StorageObjectError, match="storage root changed during validation"):
         verify_storage_root(storage_root)

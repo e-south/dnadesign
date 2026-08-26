@@ -102,6 +102,7 @@ class VerifiedStorageObject:
 
     root: Path
     manifest_path: Path
+    manifest_digest: str
     manifest: StorageObjectManifest
     resources: tuple[VerifiedStoredResource, ...]
 
@@ -110,6 +111,7 @@ class VerifiedStorageObject:
         for resource in self.resources:
             role_counts[resource.role.value] = role_counts.get(resource.role.value, 0) + 1
         return {
+            "manifest_digest": self.manifest_digest,
             "object_kind": self.manifest.object_kind.value,
             "owner_repository": self.manifest.owner_repository,
             "owner_tool": self.manifest.owner_tool,

@@ -73,6 +73,10 @@ def _sha256(path: Path) -> str:
     return f"sha256:{digest.hexdigest()}"
 
 
+def _sha256_bytes(content: bytes) -> str:
+    return f"sha256:{hashlib.sha256(content).hexdigest()}"
+
+
 def storage_file_paths(root: Path) -> tuple[Path, ...]:
     """Return every regular file while rejecting symlinks and special entries."""
 
@@ -279,6 +283,7 @@ def verify_storage_object(
     verified = VerifiedStorageObject(
         root=root,
         manifest_path=resolve_storage_path(manifest_path, label="storage object manifest", strict=True),
+        manifest_digest=_sha256_bytes(second_manifest_bytes),
         manifest=manifest,
         resources=second_resources,
     )
@@ -301,15 +306,9 @@ def verify_storage_object(
     return verified
 
 
-def verify_storage_root(storage_root: Path) -> VerifiedStorageRoot:
-    """Verify routed storage shelves and every contained object."""
+def _routed_object_directories(root: Path) -> tuple[tuple[Path, ObjectKind, str], ...]:
+    """Enumerate one exact routed-root snapshot without verifying object bytes."""
 
-    requested_root = Path(storage_root).expanduser()
-    if requested_root.is_symlink():
-        raise StorageObjectError(f"storage root must not be a symlink: {requested_root}")
-    root = resolve_storage_path(requested_root, label="storage root")
-    if not root.is_dir():
-        raise StorageObjectError(f"storage root is not a directory: {root}")
     allowed_shelves = set(_SHELF_KINDS) | _ALLOWED_ROOT_FILES
     root_entries = _directory_entries(root, label="storage root")
     unexpected_root_paths = sorted(path.name for path in root_entries if path.name not in allowed_shelves)
@@ -320,8 +319,7 @@ def verify_storage_root(storage_root: Path) -> VerifiedStorageRoot:
         raise StorageObjectError(f"storage root routing file must not be a symlink: {routing_file}")
     if routing_file.exists() and not routing_file.is_file():
         raise StorageObjectError(f"storage root routing file must be a regular file: {routing_file}")
-    objects: list[VerifiedStorageObject] = []
-    identities: set[tuple[str, str, str]] = set()
+    routes: list[tuple[Path, ObjectKind, str]] = []
     for shelf_name, expected_kind in _SHELF_KINDS.items():
         shelf = root / shelf_name
         if shelf.is_symlink():
@@ -347,27 +345,43 @@ def verify_storage_root(storage_root: Path) -> VerifiedStorageRoot:
             for object_directory in sorted(path for path in owner_entries if path.is_dir()):
                 if object_directory.is_symlink():
                     raise StorageObjectError(f"storage object directory must not be a symlink: {object_directory}")
-                verified = verify_storage_object(object_directory)
-                manifest = verified.manifest
-                if manifest.object_kind is not expected_kind:
-                    raise StorageObjectError(
-                        f"object_kind {manifest.object_kind.value!r} does not match shelf {shelf_name!r}"
-                    )
-                if manifest.owner_tool != owner_directory.name:
-                    raise StorageObjectError(
-                        f"owner_tool {manifest.owner_tool!r} does not match directory {owner_directory.name!r}"
-                    )
-                if manifest.storage_id != object_directory.name:
-                    raise StorageObjectError(
-                        f"storage_id {manifest.storage_id!r} does not match directory {object_directory.name!r}"
-                    )
-                identity = (
-                    manifest.owner_repository,
-                    manifest.owner_tool,
-                    manifest.storage_id,
-                )
-                if identity in identities:
-                    raise StorageObjectError(f"storage identity is duplicated: {identity}")
-                identities.add(identity)
-                objects.append(verified)
+                routes.append((object_directory, expected_kind, owner_directory.name))
+    return tuple(routes)
+
+
+def verify_storage_root(storage_root: Path) -> VerifiedStorageRoot:
+    """Verify routed storage shelves and every contained object."""
+
+    requested_root = Path(storage_root).expanduser()
+    if requested_root.is_symlink():
+        raise StorageObjectError(f"storage root must not be a symlink: {requested_root}")
+    root = resolve_storage_path(requested_root, label="storage root")
+    if not root.is_dir():
+        raise StorageObjectError(f"storage root is not a directory: {root}")
+    routes = _routed_object_directories(root)
+    objects: list[VerifiedStorageObject] = []
+    identities: set[tuple[str, str, str]] = set()
+    for object_directory, expected_kind, owner_name in routes:
+        verified = verify_storage_object(object_directory)
+        manifest = verified.manifest
+        if manifest.object_kind is not expected_kind:
+            shelf_name = object_directory.relative_to(root).parts[0]
+            raise StorageObjectError(f"object_kind {manifest.object_kind.value!r} does not match shelf {shelf_name!r}")
+        if manifest.owner_tool != owner_name:
+            raise StorageObjectError(f"owner_tool {manifest.owner_tool!r} does not match directory {owner_name!r}")
+        if manifest.storage_id != object_directory.name:
+            raise StorageObjectError(
+                f"storage_id {manifest.storage_id!r} does not match directory {object_directory.name!r}"
+            )
+        identity = (
+            manifest.owner_repository,
+            manifest.owner_tool,
+            manifest.storage_id,
+        )
+        if identity in identities:
+            raise StorageObjectError(f"storage identity is duplicated: {identity}")
+        identities.add(identity)
+        objects.append(verified)
+    if routes != _routed_object_directories(root):
+        raise StorageObjectError("storage root changed during validation; retry while object routing is quiescent")
     return VerifiedStorageRoot(root=root, objects=tuple(objects))

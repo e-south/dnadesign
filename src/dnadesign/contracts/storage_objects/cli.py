@@ -55,6 +55,7 @@ def _parser() -> argparse.ArgumentParser:
     refresh.add_argument("storage_root", type=Path)
     refresh.add_argument("--expected-manifest-digest", required=True)
     refresh.add_argument("--producer-revision", required=True)
+    refresh.add_argument("--artifact", action="append", default=[])
     refresh.add_argument("--cache", action="append", default=[])
     _add_json(refresh)
 
@@ -101,6 +102,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.storage_root,
                 expected_manifest_digest=args.expected_manifest_digest,
                 producer_revision=args.producer_revision,
+                artifact_paths=tuple(args.artifact),
                 cache_paths=tuple(args.cache),
             )
         elif args.command == "validate":

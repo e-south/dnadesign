@@ -317,9 +317,10 @@ def refresh_storage_object(
     *,
     expected_manifest_digest: str,
     producer_revision: str,
+    artifact_paths: tuple[str, ...] = (),
     cache_paths: tuple[str, ...] = (),
 ) -> dict[str, object]:
-    """Refresh a changed object while preserving identity and protected roles."""
+    """Refresh changed outputs and explicitly demote mistaken metadata roles."""
 
     requested_root = Path(storage_root).expanduser()
     if requested_root.is_symlink():
@@ -350,15 +351,38 @@ def refresh_storage_object(
             )
         prior_resources = {resource.relative_path: resource for resource in manifest.resources}
         prior_roles = {path: resource.role for path, resource in prior_resources.items()}
+        normalized_artifacts = {normalize_relative_path(path, label="artifact path") for path in artifact_paths}
         normalized_caches = {normalize_relative_path(path, label="cache path") for path in cache_paths}
+        duplicate_roles = sorted(normalized_artifacts & normalized_caches)
+        if duplicate_roles:
+            raise StorageObjectError(f"refresh paths have multiple roles: {', '.join(duplicate_roles)}")
         files = tuple(
             path
             for path in storage_file_paths(root)
             if path.name not in {MANIFEST_NAME, LOCK_NAME} or path.parent != root
         )
         relative_files = {path.relative_to(root).as_posix() for path in files}
+        unknown_artifacts = sorted(normalized_artifacts - set(prior_roles))
+        if unknown_artifacts:
+            raise StorageObjectError(
+                "artifact reclassification requires an existing receipt resource: " + ", ".join(unknown_artifacts)
+            )
+        invalid_artifact_roles = sorted(
+            path
+            for path in normalized_artifacts
+            if prior_roles[path] not in {ResourceRole.METADATA, ResourceRole.ARTIFACT}
+        )
+        if invalid_artifact_roles:
+            raise StorageObjectError(
+                "only metadata may be reclassified as artifact; input and cache roles remain protected: "
+                + ", ".join(invalid_artifact_roles)
+            )
+        effective_roles = {
+            path: (ResourceRole.ARTIFACT if path in normalized_artifacts else role)
+            for path, role in prior_roles.items()
+        }
         protected_paths = {
-            path for path, role in prior_roles.items() if role in {ResourceRole.INPUT, ResourceRole.METADATA}
+            path for path, role in effective_roles.items() if role in {ResourceRole.INPUT, ResourceRole.METADATA}
         }
         missing_protected = sorted(protected_paths - relative_files)
         if missing_protected:
@@ -383,7 +407,7 @@ def refresh_storage_object(
         resources = []
         for path in files:
             relative_path = path.relative_to(root).as_posix()
-            role = prior_roles.get(relative_path)
+            role = effective_roles.get(relative_path)
             if role is None:
                 role = ResourceRole.CACHE if relative_path in normalized_caches else ResourceRole.ARTIFACT
             resources.append(

@@ -92,6 +92,11 @@ Refresh preserves identity and existing roles, records the revision that
 produced the refreshed bytes, inventories new artifacts, and accepts `--cache`
 for newly created cache files. Input and metadata bytes are protected: removing
 or changing them fails rather than silently authorizing a new input identity.
+If an initial receipt incorrectly classified a mutable operational ledger as
+metadata, an operator may name that existing path with `--artifact`. This
+one-way, compare-and-swap-protected correction permits only `metadata` to
+`artifact`; inputs and caches cannot be reclassified. For example, USR
+`.events.log` is an append-only artifact, not immutable metadata.
 Refresh uses the expected digest as a compare-and-swap guard against concurrent
 receipt changes. Writers lock
 `<object>/.storage-object.lock`, so processes and compute nodes that see the
@@ -108,6 +113,10 @@ never guesses that such bytes are safe to delete. Independently synced replicas,
 including separate Dropbox clients, are not one shared
 filesystem; keep one writer or provide an external coordination service for
 those replicas.
+
+Every successful object inventory, validation, or refresh summary includes
+`manifest_digest`. Use that exact value as the next refresh command's
+`--expected-manifest-digest`; do not race by hashing the receipt separately.
 
 Verify one object before a tool consumes it:
 
