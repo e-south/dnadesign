@@ -16,6 +16,7 @@ import importlib.util
 import json
 import os
 import py_compile
+import stat
 import subprocess
 import sys
 import threading
@@ -492,6 +493,102 @@ def test_pinned_runtime_preserves_pdb_basename_for_upstream_score_output(tmp_pat
     )
 
     assert (output_root / "target-complex.pt").read_text(encoding="utf-8") == "input-v1"
+
+
+def test_pinned_score_runtime_rolls_back_output_when_completion_directory_fsync_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "scores"
+    completion_path = tmp_path / ".test-ligandmpnn-execution.json"
+    original_fsync = os.fsync
+    directory_fsync_count = 0
+
+    def _fail_completion_directory_fsync(file_descriptor: int) -> None:
+        nonlocal directory_fsync_count
+        if stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
+            directory_fsync_count += 1
+            if directory_fsync_count == 2:
+                assert (output_root / "input.pt").is_file()
+                assert completion_path.is_file()
+                raise OSError("simulated completion directory fsync failure")
+        original_fsync(file_descriptor)
+
+    monkeypatch.setattr(os, "fsync", _fail_completion_directory_fsync)
+
+    with pytest.raises(ValueError, match="completion record publication could not be made durable"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert directory_fsync_count >= 2
+    assert not (output_root / "input.pt").exists()
+    assert not completion_path.exists()
+
+
+def test_pinned_score_runtime_reports_uncertainty_when_completion_rollback_fsync_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "scores"
+    completion_path = tmp_path / ".test-ligandmpnn-execution.json"
+    original_fsync = os.fsync
+    directory_fsync_count = 0
+
+    def _fail_completion_and_rollback_directory_fsync(file_descriptor: int) -> None:
+        nonlocal directory_fsync_count
+        if stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
+            directory_fsync_count += 1
+            if directory_fsync_count >= 2:
+                raise OSError("simulated persistent completion directory fsync failure")
+        original_fsync(file_descriptor)
+
+    monkeypatch.setattr(os, "fsync", _fail_completion_and_rollback_directory_fsync)
+
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnCompletionPublicationUncertainError,
+        match="completion publication rollback durability is uncertain",
+    ):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert not (output_root / "input.pt").exists()
+    assert not completion_path.exists()
 
 
 def test_pinned_score_runtime_publishes_only_one_concurrent_same_name_output(

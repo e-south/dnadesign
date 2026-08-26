@@ -428,8 +428,11 @@ def _validate_execution_completions(
             residue_alphabet_sha256=None,
             entrypoint="score.py",
         )
-        resolved_path = _within_root(root, completion_path, field_name="execution completion record")
-        relative_path = resolved_path.relative_to(root)
+        relative_path = _lexical_relative_path_within_root(
+            root,
+            completion_path,
+            field_name="execution completion record",
+        )
         payload_bytes = _read_descriptor_relative_regular_bytes(
             root,
             relative_path,
@@ -632,6 +635,23 @@ def _within_root(root: Path, path: Path, *, field_name: str) -> Path:
     except ValueError as error:
         raise ValueError(f"{field_name} must resolve within execution_root") from error
     return resolved
+
+
+def _lexical_relative_path_within_root(root: Path, path: Path, *, field_name: str) -> Path:
+    """Return an in-root lexical path without resolving away symlink evidence."""
+
+    if not isinstance(path, Path):
+        raise ValueError(f"{field_name} must be a Path")
+    if path.is_absolute():
+        try:
+            relative_path = path.relative_to(root)
+        except ValueError as error:
+            raise ValueError(f"{field_name} must be within execution_root") from error
+    else:
+        relative_path = path
+    if not relative_path.name or ".." in relative_path.parts:
+        raise ValueError(f"{field_name} must be a safe path within execution_root")
+    return relative_path
 
 
 def _display_path(path: Path, root: Path) -> str:

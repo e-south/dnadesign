@@ -82,6 +82,13 @@ Admission replays the exact pinned parser over the digest-matched PDB and
 requires the loaded receipt to equal that derived inventory; a caller-authored
 JSON receipt cannot create observed context by assertion alone.
 
+Score execution completion records use the same lexical, descriptor-relative
+no-follow loading boundary. Runtime publication syncs the completion file and
+its parent directory. If completion durability fails after score publication,
+the runtime removes and syncs both lifecycle entries before reporting ordinary
+failure; an unsuccessful rollback raises the public
+`LigandMpnnCompletionPublicationUncertainError` instead.
+
 Probability probes use the official `score.py` single-AA or autoregressive
 mode with explicit sequence, atom-context, and fixed-side-chain-context flags.
 The request requires at least 10 batches because the pinned upstream recommends

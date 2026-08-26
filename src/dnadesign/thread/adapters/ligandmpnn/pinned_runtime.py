@@ -89,6 +89,10 @@ _CANONICAL_RUNTIME_FLAGS = frozenset(
 )
 
 
+class LigandMpnnCompletionPublicationUncertainError(RuntimeError):
+    """Completion rollback could not establish a durable absent lifecycle."""
+
+
 def pinned_runtime_prefix(
     *,
     checkout_root: Path,
@@ -381,6 +385,7 @@ def execute_pinned_entrypoint(
             )
         score_temporary: tempfile.TemporaryDirectory[str] | None = None
         score_publication: tuple[Path, Path] | None = None
+        published_score_path: Path | None = None
         if entrypoint == "score.py":
             output_value_index, output_root, expected_output = _reject_existing_score_output(
                 runtime_arguments,
@@ -400,12 +405,14 @@ def execute_pinned_entrypoint(
             )
             if score_publication is not None:
                 _publish_score_output(*score_publication)
+                published_score_path = score_publication[1]
         finally:
             if score_temporary is not None:
                 score_temporary.cleanup()
     _write_completion_record(
         completion_record_path,
         _completion_record(execution, observed_execution_sha256),
+        rollback_output_path=published_score_path,
     )
 
 
@@ -446,32 +453,152 @@ def _completion_record(execution: dict[str, object], execution_sha256: str) -> d
     }
 
 
-def _write_completion_record(path: Path, payload: dict[str, object]) -> None:
+def _write_completion_record(
+    path: Path,
+    payload: dict[str, object],
+    *,
+    rollback_output_path: Path | None,
+) -> None:
     if not isinstance(path, Path):
         raise ValueError("completion record path must be a Path")
-    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.name or ".." in path.parts:
+        raise ValueError("completion record path must not contain traversal")
     encoded = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
     try:
-        file_descriptor = os.open(path, flags, 0o600)
+        directory_fd = _open_directory_path(path.parent, create=True)
     except OSError as exc:
-        raise ValueError(f"LigandMPNN completion record could not be created exclusively: {path}") from exc
+        _rollback_output_after_completion_failure(rollback_output_path)
+        raise ValueError(f"LigandMPNN completion record directory could not be opened safely: {path}") from exc
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
+    completion_created = False
+    durability_failure = False
     try:
-        handle = os.fdopen(file_descriptor, "wb")
-    except BaseException:
-        os.close(file_descriptor)
-        raise
-    try:
-        with handle:
-            handle.write(encoded)
-            handle.flush()
-            os.fsync(handle.fileno())
-    except BaseException:
         try:
-            path.unlink()
-        except OSError:
-            pass
+            file_descriptor = os.open(path.name, flags, 0o600, dir_fd=directory_fd)
+            completion_created = True
+            try:
+                handle = os.fdopen(file_descriptor, "wb")
+            except BaseException:
+                os.close(file_descriptor)
+                raise
+            with handle:
+                handle.write(encoded)
+                handle.flush()
+                os.fsync(handle.fileno())
+            try:
+                os.fsync(directory_fd)
+            except OSError:
+                durability_failure = True
+                raise
+        except BaseException as publication_error:
+            try:
+                _rollback_completion_and_output(
+                    directory_fd,
+                    completion_name=path.name,
+                    completion_created=completion_created,
+                    rollback_output_path=rollback_output_path,
+                )
+            except OSError as rollback_error:
+                raise LigandMpnnCompletionPublicationUncertainError(
+                    "LigandMPNN completion publication rollback durability is uncertain"
+                ) from rollback_error
+            if isinstance(publication_error, OSError):
+                message = (
+                    "LigandMPNN completion record publication could not be made durable"
+                    if durability_failure
+                    else "LigandMPNN completion record could not be created durably"
+                )
+                raise ValueError(f"{message}: {path}") from publication_error
+            raise
+    finally:
+        os.close(directory_fd)
+
+
+def _open_directory_path(path: Path, *, create: bool) -> int:
+    """Open one directory through an entirely no-follow descriptor chain."""
+
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
+    if path.is_absolute():
+        current_fd = os.open(path.anchor, directory_flags)
+        components = path.parts[1:]
+    else:
+        current_fd = os.open(".", directory_flags)
+        components = path.parts
+    try:
+        for component in components:
+            if component in {"", "."}:
+                continue
+            if component == "..":
+                raise OSError("directory traversal is not allowed")
+            try:
+                next_fd = os.open(component, directory_flags, dir_fd=current_fd)
+            except FileNotFoundError:
+                if not create:
+                    raise
+                try:
+                    os.mkdir(component, mode=0o755, dir_fd=current_fd)
+                except FileExistsError:
+                    pass
+                next_fd = os.open(component, directory_flags, dir_fd=current_fd)
+            os.close(current_fd)
+            current_fd = next_fd
+        return current_fd
+    except BaseException:
+        os.close(current_fd)
         raise
+
+
+def _rollback_completion_and_output(
+    completion_directory_fd: int,
+    *,
+    completion_name: str,
+    completion_created: bool,
+    rollback_output_path: Path | None,
+) -> None:
+    """Remove incomplete lifecycle entries and make their absence durable."""
+
+    output_directory_fd: int | None = None
+    if rollback_output_path is not None:
+        output_directory_fd = _open_directory_path(rollback_output_path.parent, create=False)
+    try:
+        if completion_created:
+            try:
+                os.unlink(completion_name, dir_fd=completion_directory_fd)
+            except FileNotFoundError:
+                pass
+        if output_directory_fd is not None and rollback_output_path is not None:
+            try:
+                os.unlink(rollback_output_path.name, dir_fd=output_directory_fd)
+            except FileNotFoundError:
+                pass
+        if completion_created:
+            os.fsync(completion_directory_fd)
+        if output_directory_fd is not None:
+            os.fsync(output_directory_fd)
+    finally:
+        if output_directory_fd is not None:
+            os.close(output_directory_fd)
+
+
+def _rollback_output_after_completion_failure(rollback_output_path: Path | None) -> None:
+    """Roll back a score if its completion directory cannot be opened safely."""
+
+    if rollback_output_path is None:
+        return
+    try:
+        output_directory_fd = _open_directory_path(rollback_output_path.parent, create=False)
+        try:
+            try:
+                os.unlink(rollback_output_path.name, dir_fd=output_directory_fd)
+            except FileNotFoundError:
+                pass
+            os.fsync(output_directory_fd)
+        finally:
+            os.close(output_directory_fd)
+    except OSError as rollback_error:
+        raise LigandMpnnCompletionPublicationUncertainError(
+            "LigandMPNN completion publication rollback durability is uncertain"
+        ) from rollback_error
 
 
 def _split_option_value(argv: tuple[str, ...], option: str) -> str:

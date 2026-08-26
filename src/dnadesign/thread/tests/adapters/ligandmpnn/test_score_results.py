@@ -247,6 +247,40 @@ def test_parser_requires_exact_actual_execution_completion(tmp_path: Path) -> No
         _parse(tmp_path, request)
 
 
+def test_parser_rejects_symlinked_execution_completion_leaf(tmp_path: Path) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    _write_output(tmp_path, request, 7)
+    command = build_ligandmpnn_score_commands(request, checkout_root=tmp_path / "LigandMPNN")[0]
+    completion_path, _completion = pinned_runtime_completion_contract(
+        command.argv,
+        upstream_commit=request.upstream.commit,
+        checkpoint_sha256=request.upstream.checkpoint_sha256,
+        pdb_sha256=request.pdb_sha256,
+        packing_checkpoint_sha256=None,
+        residue_alphabet_sha256=None,
+        entrypoint="score.py",
+    )
+    absolute_completion_path = tmp_path / completion_path
+    matching_payload = tmp_path / "matching-completion.json"
+    absolute_completion_path.replace(matching_payload)
+    absolute_completion_path.symlink_to(matching_payload)
+
+    with pytest.raises(ValueError, match="execution completion record could not be opened safely"):
+        _parse(tmp_path, request)
+
+
+def test_parser_rejects_symlinked_execution_completion_ancestor(tmp_path: Path) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    _write_output(tmp_path, request, 7)
+    seed_directory = tmp_path / request.output_dir / "seed_7"
+    matching_directory = seed_directory.with_name("matching-seed-7")
+    seed_directory.replace(matching_directory)
+    seed_directory.symlink_to(matching_directory, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="execution completion record could not be opened safely"):
+        _parse(tmp_path, request)
+
+
 def test_request_digest_is_path_portable_and_context_off_is_explicit(tmp_path: Path) -> None:
     request = _prepare_request(tmp_path, seeds=(7,))
     context_off = replace(request, use_atom_context=False)
