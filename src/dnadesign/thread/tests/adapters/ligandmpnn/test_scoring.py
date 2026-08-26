@@ -56,7 +56,15 @@ def test_single_aa_probability_command_is_explicit() -> None:
 
     assert command.argv == (
         "python3",
-        "/opt/LigandMPNN/score.py",
+        "-m",
+        "dnadesign.thread.adapters.ligandmpnn.pinned_runtime",
+        "--checkout-root",
+        "/opt/LigandMPNN",
+        "--upstream-commit",
+        _COMMIT,
+        "--entrypoint",
+        "score.py",
+        "--",
         "--model_type",
         "ligand_mpnn",
         "--checkpoint_ligand_mpnn",

@@ -33,6 +33,7 @@ from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
     validate_context_inventory_for_input,
 )
 from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnCommand
+from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import parse_pinned_runtime_prefix
 from dnadesign.thread.adapters.ligandmpnn.receipts import (
     LigandMpnnProvenance,
 )
@@ -369,14 +370,21 @@ def parse_ligandmpnn_score_outputs(
 def _validate_commands(request: LigandMpnnScoreRequest, commands: tuple[LigandMpnnCommand, ...]) -> None:
     if not isinstance(commands, tuple) or len(commands) != len(request.seeds):
         raise ValueError("commands do not exactly match score request seeds")
-    if not commands or len(commands[0].argv) < 2:
+    if not commands:
         raise ValueError("commands do not exactly match score request")
     first_argv = commands[0].argv
-    checkout_root = Path(first_argv[1]).parent
+    try:
+        checkout_root, python_executable = parse_pinned_runtime_prefix(
+            first_argv,
+            upstream_commit=request.upstream.commit,
+            entrypoint="score.py",
+        )
+    except ValueError as exc:
+        raise ValueError("commands do not exactly match score request and context mode") from exc
     expected = build_ligandmpnn_score_commands(
         request,
         checkout_root=checkout_root,
-        python_executable=first_argv[0],
+        python_executable=python_executable,
     )
     if commands != expected:
         raise ValueError("commands do not exactly match score request and context mode")

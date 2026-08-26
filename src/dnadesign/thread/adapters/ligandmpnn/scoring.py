@@ -22,6 +22,7 @@ from dnadesign.thread.adapters.ligandmpnn.models import (
     LigandMpnnResidue,
     LigandMpnnUpstreamPin,
 )
+from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import pinned_runtime_prefix
 
 _REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 _HEX_64 = re.compile(r"[0-9a-fA-F]{64}")
@@ -105,8 +106,12 @@ def build_ligandmpnn_score_commands(
     for seed in request.seeds:
         output_dir = request.output_dir / f"seed_{seed}"
         argv = [
-            python_executable,
-            str(checkout_root / "score.py"),
+            *pinned_runtime_prefix(
+                checkout_root=checkout_root,
+                upstream_commit=request.upstream.commit,
+                entrypoint="score.py",
+                python_executable=python_executable,
+            ),
             "--model_type",
             "ligand_mpnn",
             "--checkpoint_ligand_mpnn",

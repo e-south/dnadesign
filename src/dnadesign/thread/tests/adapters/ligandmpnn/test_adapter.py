@@ -78,7 +78,15 @@ def test_build_commands_declares_exact_official_ligandmpnn_flags_per_seed() -> N
     assert len(commands) == 2
     assert commands[0].argv == (
         "python3",
-        "/opt/LigandMPNN/run.py",
+        "-m",
+        "dnadesign.thread.adapters.ligandmpnn.pinned_runtime",
+        "--checkout-root",
+        "/opt/LigandMPNN",
+        "--upstream-commit",
+        _COMMIT,
+        "--entrypoint",
+        "run.py",
+        "--",
         "--model_type",
         "ligand_mpnn",
         "--checkpoint_ligand_mpnn",
@@ -170,7 +178,12 @@ def test_planned_receipt_is_normalized_and_records_no_execution_claim(tmp_path: 
     request = _request(context_inventory=context_inventory)
     commands = build_ligandmpnn_commands(request, checkout_root=Path("tool"))
 
-    receipt = build_planned_receipt(request, commands, execution_root=tmp_path)
+    receipt = build_planned_receipt(
+        request,
+        commands,
+        execution_root=tmp_path,
+        checkout_root=Path("tool"),
+    )
 
     payload = receipt.to_dict()
     assert payload["schema_id"] == "thread.ligandmpnn.run_receipt"
@@ -190,6 +203,27 @@ def test_planned_receipt_is_normalized_and_records_no_execution_claim(tmp_path: 
         "path": "evidence/context-inventory.json",
         "sha256": f"sha256:{context_inventory.sha256}",
     }
+
+
+def test_planned_receipt_rejects_missing_or_partial_command_sets(tmp_path: Path) -> None:
+    context_inventory = write_context_inventory(
+        tmp_path,
+        input_path=Path("inputs/target.pdb"),
+        input_sha256=_DIGEST,
+        upstream_commit=_COMMIT,
+        parse_all_atoms=True,
+    )
+    request = _request(context_inventory=context_inventory)
+    commands = build_ligandmpnn_commands(request, checkout_root=Path("tool"))
+
+    for supplied in ((), commands[:-1]):
+        with pytest.raises(ValueError, match="commands do not match the deterministic request command set"):
+            build_planned_receipt(
+                request,
+                supplied,
+                execution_root=tmp_path,
+                checkout_root=Path("tool"),
+            )
 
 
 @pytest.mark.parametrize(
@@ -237,4 +271,9 @@ def test_planned_receipt_rejects_context_inventory_for_different_request(
     commands = build_ligandmpnn_commands(request, checkout_root=Path("tool"))
 
     with pytest.raises(ValueError, match=message):
-        build_planned_receipt(request, commands, execution_root=tmp_path)
+        build_planned_receipt(
+            request,
+            commands,
+            execution_root=tmp_path,
+            checkout_root=Path("tool"),
+        )

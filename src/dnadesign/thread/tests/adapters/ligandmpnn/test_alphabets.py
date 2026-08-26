@@ -159,15 +159,17 @@ def test_planned_receipt_binds_the_sidecar_digest(tmp_path: Path) -> None:
         request,
         commands,
         execution_root=tmp_path,
+        checkout_root=Path("tool"),
         residue_alphabet_sidecar=sidecar,
     ).to_dict()
 
     assert payload["residue_alphabet_sidecar"] == sidecar.to_dict()
 
-    with pytest.raises(ValueError, match="commands do not reference exact residue alphabet sidecar"):
+    with pytest.raises(ValueError, match="commands do not match the deterministic request command set"):
         build_planned_receipt(
             request,
             (),
             execution_root=tmp_path,
+            checkout_root=Path("tool"),
             residue_alphabet_sidecar=sidecar,
         )

@@ -15,6 +15,7 @@ from pathlib import Path
 
 from dnadesign.thread.adapters.ligandmpnn.alphabets import LigandMpnnResidueAlphabetSidecar
 from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnCommand, LigandMpnnRequest
+from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import pinned_runtime_prefix
 
 
 def build_ligandmpnn_commands(
@@ -31,8 +32,12 @@ def build_ligandmpnn_commands(
     for seed in request.seeds:
         output_dir = request.output_dir / f"seed_{seed}"
         argv = [
-            python_executable,
-            str(checkout_root / "run.py"),
+            *pinned_runtime_prefix(
+                checkout_root=checkout_root,
+                upstream_commit=request.upstream.commit,
+                entrypoint="run.py",
+                python_executable=python_executable,
+            ),
             "--model_type",
             "ligand_mpnn",
             "--checkpoint_ligand_mpnn",

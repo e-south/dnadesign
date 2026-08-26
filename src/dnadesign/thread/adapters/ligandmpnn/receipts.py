@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dnadesign.thread.adapters.ligandmpnn.alphabets import LigandMpnnResidueAlphabetSidecar
+from dnadesign.thread.adapters.ligandmpnn.commands import build_ligandmpnn_commands
 from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
     load_ligandmpnn_context_inventory,
     validate_context_inventory_for_input,
@@ -97,6 +98,8 @@ def build_planned_receipt(
     commands: tuple[LigandMpnnCommand, ...],
     *,
     execution_root: Path,
+    checkout_root: Path,
+    python_executable: str = "python",
     residue_alphabet_sidecar: LigandMpnnResidueAlphabetSidecar | None = None,
 ) -> LigandMpnnRunReceipt:
     """Normalize a validated request and its deterministic commands."""
@@ -116,9 +119,14 @@ def build_planned_receipt(
         raise ValueError("residue alphabets require a typed residue alphabet sidecar")
     if residue_alphabet_sidecar is not None:
         residue_alphabet_sidecar.validate_for(request)
-        expected_pair = ("--omit_AA_per_residue", str(residue_alphabet_sidecar.path))
-        if not commands or any(not _contains_pair(command.argv, expected_pair) for command in commands):
-            raise ValueError("commands do not reference exact residue alphabet sidecar")
+    expected_commands = build_ligandmpnn_commands(
+        request,
+        checkout_root=checkout_root,
+        python_executable=python_executable,
+        residue_alphabet_sidecar=residue_alphabet_sidecar,
+    )
+    if commands != expected_commands:
+        raise ValueError("commands do not match the deterministic request command set")
     command_payload = [command.to_dict() for command in commands]
     sidecar_payload = residue_alphabet_sidecar.to_dict() if residue_alphabet_sidecar is not None else None
     canonical = json.dumps(
@@ -143,7 +151,3 @@ def build_planned_receipt(
         context_inventory=request.context_inventory.to_dict(),
         residue_alphabet_sidecar=residue_alphabet_sidecar,
     )
-
-
-def _contains_pair(argv: tuple[str, ...], pair: tuple[str, str]) -> bool:
-    return any(argv[index : index + 2] == pair for index in range(len(argv) - 1))
