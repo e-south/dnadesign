@@ -161,6 +161,12 @@ def _manifest_lock(root: Path) -> Iterator[None]:
             and not lock_path.stat(follow_symlinks=False).st_mode & stat.S_IWGRP
         ):
             raise StorageObjectError(f"storage object lock must be group-writable in a shared object root: {lock_path}")
+        if (
+            root_mode & stat.S_IWGRP
+            and lock_path.exists()
+            and not lock_path.stat(follow_symlinks=False).st_mode & stat.S_IRGRP
+        ):
+            raise StorageObjectError(f"storage object lock must be group-readable in a shared object root: {lock_path}")
     except OSError as exc:
         raise StorageObjectError(f"cannot inspect storage object lock {lock_path}: {exc}") from exc
     lock_mode = 0o664 if root_mode & stat.S_IWGRP else 0o644
@@ -177,6 +183,8 @@ def _manifest_lock(root: Path) -> Iterator[None]:
             raise StorageObjectError(f"storage object lock does not inherit the shared object group: {lock_path}")
         if root_mode & stat.S_IWGRP and not lock_stat.st_mode & stat.S_IWGRP:
             raise StorageObjectError(f"storage object lock must be group-writable in a shared object root: {lock_path}")
+        if root_mode & stat.S_IWGRP and not lock_stat.st_mode & stat.S_IRGRP:
+            raise StorageObjectError(f"storage object lock must be group-readable in a shared object root: {lock_path}")
     except (OSError, StorageObjectError) as inspection_error:
         try:
             lock.release()

@@ -355,6 +355,33 @@ def test_inventory_rejects_non_group_writable_lock_in_shared_object(tmp_path: Pa
     assert not (root / MANIFEST_NAME).exists()
 
 
+def test_inventory_rejects_group_unreadable_lock_in_shared_object(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(0o2770)
+    lock_path = root / LOCK_NAME
+    lock_path.touch()
+    lock_path.chmod(0o620)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="lock must be group-readable"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert stat.S_IMODE(lock_path.stat().st_mode) == 0o620
+    assert not (root / MANIFEST_NAME).exists()
+
+
 def test_inventory_rejects_group_writable_root_without_setgid(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     root.mkdir()

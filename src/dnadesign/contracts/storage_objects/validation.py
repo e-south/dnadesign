@@ -239,6 +239,10 @@ def _verify_coordination_posture(
                 raise StorageObjectError(
                     f"storage object lock must be group-writable in a shared object root: {lock_path}"
                 )
+            if root_mode & stat.S_IWGRP and not lock_mode & stat.S_IRGRP:
+                raise StorageObjectError(
+                    f"storage object lock must be group-readable in a shared object root: {lock_path}"
+                )
             lock_state = (True, lock_mode, lock_stat.st_gid, lock_stat.st_size)
         else:
             lock_state = (False, 0, 0, 0)
