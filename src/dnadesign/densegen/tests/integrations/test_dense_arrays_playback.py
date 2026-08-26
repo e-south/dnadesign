@@ -36,7 +36,12 @@ from dnadesign.densegen.src.integrations.dense_arrays.publisher import (
 )
 
 
-def _publisher_row(*, record_id: str = "record-1", generated_at: str = "first") -> dict[str, object]:
+def _publisher_row(
+    *,
+    record_id: str = "record-1",
+    generated_at: str = "first",
+    placement_label: str = "TF_A",
+) -> dict[str, object]:
     return {
         "id": record_id,
         "sequence": "AAATTT",
@@ -49,7 +54,7 @@ def _publisher_row(*, record_id: str = "record-1", generated_at: str = "first") 
                 "end": 3,
                 "orientation": "fwd",
                 "tfbs_id": "site-1",
-                "regulator": "TF_A",
+                "regulator": placement_label,
             }
         ],
         "densegen__schema_version": "2.9",
@@ -70,11 +75,12 @@ def _write_endpoint(
     *,
     scene: str = "clean_scene",
     formats: tuple[str, ...] = ("manifest.json",),
+    placement_label: str = "TF_A",
 ) -> Path:
     workspace = tmp_path / "workspace"
     table_path = workspace / "outputs" / "tables" / "records.parquet"
     table_path.parent.mkdir(parents=True)
-    row = _publisher_row()
+    row = _publisher_row(placement_label=placement_label)
     pq.write_table(pa.Table.from_pylist([row]), table_path)
     selected = _selected_rows(table_path, ("record-1",))
     selected_sha256 = _selected_records_sha256(selected, ("record-1",))
@@ -305,6 +311,13 @@ def test_publisher_validates_default_display_text(tmp_path: Path) -> None:
     config_path = _write_endpoint(tmp_path, scene="sigma_factor_example")
 
     with pytest.raises(ValueError, match="forbidden term: 'sigma factor'"):
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+
+def test_publisher_validates_record_derived_placement_labels(tmp_path: Path) -> None:
+    config_path = _write_endpoint(tmp_path, placement_label="Sigma factor RpoD")
+
+    with pytest.raises(ValueError, match="record-derived placement label contains forbidden term: 'sigma factor'"):
         publisher.publish_densegen_playback_endpoint(config_path)
 
 

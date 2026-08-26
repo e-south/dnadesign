@@ -546,6 +546,10 @@ def publish_densegen_playback_endpoint(
             source_ref=source_ref,
             source_sha256=observed_selected_sha256,
         )
+        placement_labels = tuple(placement.label for placement in realized.placements if placement.label is not None)
+        for term in forbidden_terms:
+            if term and any(term in label.casefold() for label in placement_labels):
+                raise ValueError(f"record-derived placement label contains forbidden term: {term!r}")
         from dense_arrays.playback import reconstruct_playback
 
         plan = reconstruct_playback(realized)
