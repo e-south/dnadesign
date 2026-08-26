@@ -98,7 +98,10 @@ receipt changes. Writers lock
 same POSIX filesystem serialize receipt updates. The lock is contract-owned
 coordination state and is excluded from the content manifest. Group-writable
 object roots create group-writable lock files so collaborating accounts can
-participate in the same coordination boundary. Independently synced replicas,
+participate in the same coordination boundary; newly inventoried manifests
+inherit that shared-write posture. Manifest staging occurs beside, rather than
+inside, the object so a failed writer cannot collide with or delete object
+content. Independently synced replicas,
 including separate Dropbox clients, are not one shared
 filesystem; keep one writer or provide an external coordination service for
 those replicas.
