@@ -225,6 +225,11 @@ def _verify_coordination_posture(
                 "group-writable storage object roots must set the setgid bit "
                 "so coordination files inherit the shared group"
             )
+        if root_mode & stat.S_IWGRP and root_mode & stat.S_ISVTX:
+            raise StorageObjectError(
+                "group-writable storage object roots must not set the sticky bit "
+                "because collaborators must be able to replace contract-owned receipts"
+            )
         if root_mode & stat.S_IWGRP and not root_mode & stat.S_IXGRP:
             raise StorageObjectError(
                 "group-writable storage object roots must be group-traversable "

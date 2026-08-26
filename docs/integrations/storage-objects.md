@@ -105,10 +105,12 @@ receipt changes. Writers lock
 `<object>/.storage-object.lock`, so processes and compute nodes that see the
 same POSIX filesystem serialize receipt updates. The lock is contract-owned
 coordination state and is excluded from the content manifest. Group-writable
-object roots must also be group-traversable and set the POSIX setgid bit; these
-fail-fast requirements let collaborators reach coordination files and ensure
-locks, staging files, and newly inventoried manifests inherit the shared
-directory group instead of the writer's primary group. They are created
+object roots must also be group-traversable, set the POSIX setgid bit, and not
+set the sticky bit. These fail-fast requirements let collaborators reach
+coordination files, ensure locks, staging files, and newly inventoried manifests
+inherit the shared directory group instead of the writer's primary group, and
+allow a group collaborator to atomically replace a receipt owned by another
+collaborator. They are created
 group-writable so collaborating accounts can participate in the same
 coordination boundary. Declared resource files must inherit that group and be
 group-readable; their parent directories must inherit the group and be

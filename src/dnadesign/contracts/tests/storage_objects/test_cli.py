@@ -438,6 +438,52 @@ def test_inventory_rejects_group_writable_root_without_setgid(tmp_path: Path) ->
     assert not (root / MANIFEST_NAME).exists()
 
 
+def test_inventory_rejects_sticky_group_shared_root(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(0o3770)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="must not set the sticky bit"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert not (root / LOCK_NAME).exists()
+    assert not (root / MANIFEST_NAME).exists()
+
+
+def test_inventory_allows_sticky_private_root(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(0o1700)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+
+    assert summary["status"] == "verified"
+
+
 def test_inventory_rejects_shared_root_without_group_traversal(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     root.mkdir()

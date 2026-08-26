@@ -190,6 +190,15 @@ def test_verify_storage_object_rejects_group_writable_root_without_setgid(tmp_pa
         verify_storage_object(root)
 
 
+def test_verify_storage_object_rejects_sticky_group_shared_root(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    root.chmod(0o3770)
+
+    with pytest.raises(StorageObjectError, match="must not set the sticky bit"):
+        verify_storage_object(root)
+
+
 def test_verify_storage_object_rejects_shared_root_without_group_traversal(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     _write_object(root)
