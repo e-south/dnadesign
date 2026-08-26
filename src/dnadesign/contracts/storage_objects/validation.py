@@ -55,8 +55,17 @@ def _sha256(path: Path) -> str:
 def storage_file_paths(root: Path) -> tuple[Path, ...]:
     """Return every regular file while rejecting symlinks anywhere below root."""
 
+    def _raise_walk_error(error: OSError) -> None:
+        raise StorageObjectError(
+            f"cannot traverse storage object: {error.filename or root}: {error.strerror or error}"
+        ) from error
+
     files: list[Path] = []
-    for current, directory_names, file_names in os.walk(root, followlinks=False):
+    for current, directory_names, file_names in os.walk(
+        root,
+        followlinks=False,
+        onerror=_raise_walk_error,
+    ):
         current_path = Path(current)
         directory_names.sort()
         file_names.sort()
@@ -104,11 +113,19 @@ def _verify_resource(root: Path, resource: StoredResource) -> VerifiedStoredReso
     )
 
 
-def _verify_demo(checkout: Path, verified: VerifiedStorageObject) -> None:
+def _verify_demo(
+    checkout: Path,
+    verified: VerifiedStorageObject,
+    *,
+    allow_untracked_manifest: bool,
+) -> None:
     total_bytes = verified.manifest_path.stat().st_size + sum(resource.size_bytes for resource in verified.resources)
     if total_bytes > MAX_DEMO_BYTES:
         raise StorageObjectError(f"demo exceeds {MAX_DEMO_BYTES} bytes: {total_bytes}")
-    for path in (verified.manifest_path, *(resource.path for resource in verified.resources)):
+    for path in (
+        verified.manifest_path,
+        *(resource.path for resource in verified.resources),
+    ):
         relative = path.relative_to(checkout).as_posix()
         completed = subprocess.run(
             ["git", "-C", str(checkout), "ls-files", "--error-unmatch", "--", relative],
@@ -117,10 +134,16 @@ def _verify_demo(checkout: Path, verified: VerifiedStorageObject) -> None:
             text=True,
         )
         if completed.returncode != 0:
+            if allow_untracked_manifest and path == verified.manifest_path:
+                continue
             raise StorageObjectError(f"demo file is not tracked: {relative}")
 
 
-def verify_storage_object(storage_root: Path) -> VerifiedStorageObject:
+def verify_storage_object(
+    storage_root: Path,
+    *,
+    _allow_untracked_demo_manifest: bool = False,
+) -> VerifiedStorageObject:
     """Verify one explicit storage object and require exact file closure."""
 
     requested_root = Path(storage_root).expanduser()
@@ -165,14 +188,20 @@ def verify_storage_object(storage_root: Path) -> VerifiedStorageObject:
     )
     checkout = _git_checkout_ancestor(
         root,
-        include_root=manifest.object_kind is not ObjectKind.TOOL_CACHE,
+        include_root=(manifest.demo or manifest.object_kind is not ObjectKind.TOOL_CACHE),
     )
-    if checkout is not None:
-        if not manifest.demo:
-            raise StorageObjectError(
-                f"non-demo storage object cannot live inside a Git checkout: object={root}, checkout={checkout}"
-            )
-        _verify_demo(checkout, verified)
+    if manifest.demo:
+        if checkout is None:
+            raise StorageObjectError(f"demo storage object must live inside a Git checkout: {root}")
+        _verify_demo(
+            checkout,
+            verified,
+            allow_untracked_manifest=_allow_untracked_demo_manifest,
+        )
+    elif checkout is not None:
+        raise StorageObjectError(
+            f"non-demo storage object cannot live inside a Git checkout: object={root}, checkout={checkout}"
+        )
     return verified
 
 

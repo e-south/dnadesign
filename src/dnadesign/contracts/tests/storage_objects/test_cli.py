@@ -84,6 +84,80 @@ def test_inventory_creates_a_closed_manifest_then_refuses_overwrite(tmp_path: Pa
     assert "already exists" in repeated.stderr
 
 
+def test_inventory_bootstraps_demo_then_requires_manifest_to_be_tracked(
+    tmp_path: Path,
+) -> None:
+    checkout = tmp_path / "checkout"
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    root = checkout / "examples" / "pilot"
+    root.mkdir(parents=True)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot"], check=True)
+    command = [
+        sys.executable,
+        "-m",
+        "dnadesign.contracts.storage_objects",
+        "inventory",
+        str(root),
+        "--storage-id",
+        "pilot",
+        "--owner-repository",
+        "dnadesign",
+        "--owner-tool",
+        "cruncher",
+        "--object-kind",
+        "workspace",
+        "--content-schema",
+        "cruncher.workspace",
+        "--content-schema-version",
+        "1",
+        "--producer-revision",
+        "test-revision-1",
+        "--storage-class",
+        "reproducible",
+        "--retention-policy",
+        "review-before-delete",
+        "--demo",
+        "--json",
+    ]
+
+    completed = subprocess.run(command, check=True, capture_output=True, text=True)
+    before_add = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "dnadesign.contracts.storage_objects",
+            "validate",
+            str(root),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(checkout), "add", "examples/pilot/storage.object.json"],
+        check=True,
+    )
+    after_add = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "dnadesign.contracts.storage_objects",
+            "validate",
+            str(root),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(completed.stdout)["status"] == "created-pending-git-add"
+    assert (root / MANIFEST_NAME).is_file()
+    assert before_add.returncode == 2
+    assert "demo file is not tracked" in before_add.stderr
+    assert json.loads(after_add.stdout)["status"] == "verified"
+
+
 def test_validate_root_emits_inventory_summary(tmp_path: Path) -> None:
     storage_root = tmp_path / "storage"
     for shelf in ("workspaces", "stores", "tool-cache"):

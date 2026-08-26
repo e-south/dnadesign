@@ -45,6 +45,7 @@ def _write_manifest(
     payload: dict[str, object],
     *,
     previous_bytes: bytes | None = None,
+    allow_untracked_demo_manifest: bool = False,
 ) -> dict[str, object]:
     manifest_text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     temporary = manifest_path.parent / f".{MANIFEST_NAME}.tmp"
@@ -56,7 +57,14 @@ def _write_manifest(
         temporary.unlink(missing_ok=True)
         raise StorageObjectError(f"cannot write storage object manifest: {exc}") from exc
     try:
-        return verify_storage_object(manifest_path.parent).summary()
+        summary = verify_storage_object(
+            manifest_path.parent,
+            _allow_untracked_demo_manifest=allow_untracked_demo_manifest,
+        ).summary()
+        if allow_untracked_demo_manifest:
+            summary["status"] = "created-pending-git-add"
+            summary["next_step"] = f"git add {MANIFEST_NAME} && dnadesign-storage validate {manifest_path.parent}"
+        return summary
     except Exception:
         if previous_bytes is None:
             manifest_path.unlink(missing_ok=True)
@@ -154,7 +162,11 @@ def inventory_storage_object(
             }
             if original_execution_path is not None:
                 payload["original_execution_path"] = original_execution_path
-            return _write_manifest(manifest_path, payload)
+            return _write_manifest(
+                manifest_path,
+                payload,
+                allow_untracked_demo_manifest=demo,
+            )
     except Timeout as exc:
         raise StorageObjectError(f"timed out waiting for storage object manifest lock: {root}") from exc
 

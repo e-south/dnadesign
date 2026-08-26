@@ -30,7 +30,10 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="dnadesign-storage")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    inventory = subparsers.add_parser("inventory", help="create and verify one exact manifest")
+    inventory = subparsers.add_parser(
+        "inventory",
+        help="create one exact manifest and verify non-demo objects",
+    )
     inventory.add_argument("storage_root", type=Path)
     inventory.add_argument("--storage-id", required=True)
     inventory.add_argument("--owner-repository", required=True)

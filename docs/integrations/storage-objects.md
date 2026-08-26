@@ -68,6 +68,11 @@ existing manifest. Paths passed with `--input` or `--metadata` receive those
 roles; remaining workspace/store files are artifacts, while all tool-cache
 files are cache material.
 
+For `--demo`, existing resources must already be small and tracked. Inventory
+creates the new manifest with status `created-pending-git-add`; add that
+manifest to Git, then run `dnadesign-storage validate` to reach `verified`.
+Operational objects never use this two-step exception.
+
 An active workspace may change only through its owning tool. After a successful
 run, refresh its receipt with the digest of the receipt that authorized the run:
 

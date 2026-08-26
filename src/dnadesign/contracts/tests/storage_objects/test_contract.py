@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -24,6 +25,7 @@ from dnadesign.contracts.storage_objects import (
     verify_storage_object,
     verify_storage_root,
 )
+from dnadesign.contracts.storage_objects.validation import storage_file_paths
 
 
 def _digest(content: bytes) -> str:
@@ -96,6 +98,28 @@ def test_verify_storage_object_rejects_symlinks(tmp_path: Path) -> None:
         verify_storage_object(linked_root)
 
 
+def test_storage_file_closure_propagates_unreadable_subtree(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = PermissionError(13, "Permission denied", str(tmp_path / "blocked"))
+
+    def _walk_with_error(
+        _root: Path,
+        *,
+        followlinks: bool,
+        onerror,
+    ):
+        assert followlinks is False
+        onerror(error)
+        return iter(())
+
+    monkeypatch.setattr(os, "walk", _walk_with_error)
+
+    with pytest.raises(StorageObjectError, match="cannot traverse storage object"):
+        storage_file_paths(tmp_path)
+
+
 def test_git_resident_demo_must_be_small_and_tracked(tmp_path: Path) -> None:
     checkout = tmp_path / "checkout"
     subprocess.run(["git", "init", "-q", str(checkout)], check=True)
@@ -118,6 +142,14 @@ def test_git_resident_demo_must_be_small_and_tracked(tmp_path: Path) -> None:
     subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot"], check=True)
 
     with pytest.raises(StorageObjectError, match="demo exceeds 2000000 bytes"):
+        verify_storage_object(root)
+
+
+def test_demo_outside_git_checkout_is_rejected(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root, demo=True)
+
+    with pytest.raises(StorageObjectError, match="must live inside a Git checkout"):
         verify_storage_object(root)
 
 
