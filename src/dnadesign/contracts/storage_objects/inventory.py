@@ -66,8 +66,8 @@ def _write_manifest(
             root_mode = stat.S_IMODE(manifest_path.parent.stat(follow_symlinks=False).st_mode)
             previous_mode = 0o664 if root_mode & stat.S_IWGRP else 0o644
         descriptor, temporary_name = tempfile.mkstemp(
-            dir=manifest_path.parent.parent,
-            prefix=f".{manifest_path.parent.name}.{MANIFEST_NAME}.tmp-",
+            dir=manifest_path.parent,
+            prefix=f".{MANIFEST_NAME}.tmp-",
         )
         temporary = Path(temporary_name)
         temporary_created = True
@@ -99,8 +99,8 @@ def _write_manifest(
             restore_path: Path | None = None
             try:
                 descriptor, restore_name = tempfile.mkstemp(
-                    dir=manifest_path.parent.parent,
-                    prefix=f".{manifest_path.parent.name}.{MANIFEST_NAME}.restore-",
+                    dir=manifest_path.parent,
+                    prefix=f".{MANIFEST_NAME}.restore-",
                 )
                 restore_path = Path(restore_name)
                 with os.fdopen(descriptor, "wb") as handle:
@@ -153,6 +153,20 @@ def _manifest_lock(root: Path) -> Iterator[None]:
             raise StorageObjectError(f"cannot release storage object manifest lock {lock_path}: {exc}") from exc
 
 
+def _assert_no_ambiguous_manifest_staging(root: Path) -> None:
+    """Fail closed rather than deleting a staging-shaped user file."""
+
+    candidates = {root / f".{MANIFEST_NAME}.tmp"}
+    candidates.update(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    candidates.update(root.glob(f".{MANIFEST_NAME}.restore-*"))
+    present = sorted(path.name for path in candidates if path.exists() or path.is_symlink())
+    if present:
+        raise StorageObjectError(
+            "storage object contains ambiguous manifest staging state; inspect and remove it explicitly: "
+            + ", ".join(present)
+        )
+
+
 def inventory_storage_object(
     storage_root: Path,
     *,
@@ -197,6 +211,7 @@ def inventory_storage_object(
     if duplicate_roles:
         raise StorageObjectError(f"inventory paths have multiple roles: {', '.join(duplicate_roles)}")
     with _manifest_lock(root):
+        _assert_no_ambiguous_manifest_staging(root)
         manifest_path = root / MANIFEST_NAME
         if manifest_path.exists() or manifest_path.is_symlink():
             raise StorageObjectError(f"storage object manifest already exists: {manifest_path}")
@@ -269,6 +284,7 @@ def refresh_storage_object(
     if not root.is_dir():
         raise StorageObjectError(f"storage object root is not a directory: {root}")
     with _manifest_lock(root):
+        _assert_no_ambiguous_manifest_staging(root)
         manifest_path = root / MANIFEST_NAME
         if not manifest_path.is_file() or manifest_path.is_symlink():
             raise StorageObjectError(f"storage object root is missing a regular {MANIFEST_NAME}: {root}")

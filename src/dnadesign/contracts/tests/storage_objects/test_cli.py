@@ -319,11 +319,21 @@ def test_inventory_creates_group_writable_lock_for_shared_object(tmp_path: Path)
     assert stat.S_IMODE((root / MANIFEST_NAME).stat().st_mode) == 0o664
 
 
-def test_inventory_preserves_user_file_that_resembles_old_manifest_staging(tmp_path: Path) -> None:
+def test_inventory_stages_manifest_on_object_filesystem(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     root = tmp_path / "pilot"
     root.mkdir()
-    collision = root / f".{MANIFEST_NAME}.tmp-user-data"
-    collision.write_text("user-owned\n", encoding="utf-8")
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    observed_directories: list[Path] = []
+    real_mkstemp = storage_inventory.tempfile.mkstemp
+
+    def _capture_mkstemp(*, dir: Path, prefix: str) -> tuple[int, str]:
+        observed_directories.append(Path(dir))
+        return real_mkstemp(dir=dir, prefix=prefix)
+
+    monkeypatch.setattr(storage_inventory.tempfile, "mkstemp", _capture_mkstemp)
 
     inventory_storage_object(
         root,
@@ -338,9 +348,31 @@ def test_inventory_preserves_user_file_that_resembles_old_manifest_staging(tmp_p
         retention_policy="review-before-delete",
     )
 
+    assert observed_directories == [root]
+
+
+def test_inventory_fails_closed_on_user_file_that_resembles_manifest_staging(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    collision = root / f".{MANIFEST_NAME}.tmp-user-data"
+    collision.write_text("user-owned\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="ambiguous manifest staging state"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
     assert collision.read_text(encoding="utf-8") == "user-owned\n"
-    manifest = json.loads((root / MANIFEST_NAME).read_text(encoding="utf-8"))
-    assert collision.name in {resource["path"] for resource in manifest["resources"]}
+    assert not (root / MANIFEST_NAME).exists()
 
 
 def test_refresh_rejects_missing_root_without_traceback(tmp_path: Path) -> None:
@@ -573,29 +605,28 @@ def test_refresh_wraps_lock_acquisition_failures(
         )
 
 
-def test_inventory_preserves_preexisting_manifest_temp_as_user_content(tmp_path: Path) -> None:
+def test_inventory_fails_closed_on_preexisting_manifest_temp(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     root.mkdir()
     temporary = root / f".{MANIFEST_NAME}.tmp"
     temporary.write_text("pre-existing bytes\n", encoding="utf-8")
 
-    inventory_storage_object(
-        root,
-        storage_id="pilot",
-        owner_repository="dnadesign",
-        owner_tool="cruncher",
-        object_kind="workspace",
-        content_schema="cruncher.workspace",
-        content_schema_version="1",
-        producer_revision="test-revision-1",
-        storage_class="reproducible",
-        retention_policy="review-before-delete",
-    )
+    with pytest.raises(StorageObjectError, match="ambiguous manifest staging state"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
 
     assert temporary.read_text(encoding="utf-8") == "pre-existing bytes\n"
-    assert (root / MANIFEST_NAME).is_file()
-    manifest = json.loads((root / MANIFEST_NAME).read_text(encoding="utf-8"))
-    assert temporary.name in {resource["path"] for resource in manifest["resources"]}
+    assert not (root / MANIFEST_NAME).exists()
 
 
 def test_concurrent_refresh_allows_exactly_one_compare_and_swap(tmp_path: Path) -> None:
