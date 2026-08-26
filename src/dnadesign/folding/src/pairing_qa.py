@@ -21,7 +21,7 @@ from dnadesign.contracts.folding.secondary_structure_prediction_v2 import (
 from dnadesign.contracts.visual import SequenceEvidenceMapV1
 
 _WATSON_CRICK_PAIRS = frozenset({"AU", "UA", "AT", "TA", "GC", "CG"})
-_STEM_METRIC_EXCLUDED_TAG_KINDS = frozenset({"snapback_cap"})
+_STEM_METRIC_EXCLUDED_TAG_KINDS = frozenset({"foldback_cap"})
 
 
 def cross_copy_pairing_annotations(

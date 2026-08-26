@@ -3,7 +3,7 @@ doc_id: cruncher-docs-map
 title: Cruncher documentation map
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-08-22
 ---
 
 # Cruncher documentation map
@@ -15,7 +15,7 @@ last_verified: 2026-08-09
 ### Workflow routes
 
 Cruncher exposes separate routes for sequence optimization, cassette design,
-payload inspection, foldback and nick geometry, parameter sweeps, and artifact
+payload inspection, parameter sweeps, and artifact
 aggregation. Each route owns its input and output contract. Exact route IDs are
 listed in the [CLI reference](reference/cli.md), where command vocabulary is
 useful rather than architectural.
@@ -48,17 +48,6 @@ useful rather than architectural.
 - [YIU Artifacts](reference/yiu_artifacts.md)
 - [YIU Visual System](reference/yiu_visual_system.md)
 
-#### Validate and Search Single-Nick Foldbacks
-- [Snapback Workflow](guides/snapback_workflow.md)
-- [Released-product Snapback Workflow](guides/snapback_released_workflow.md)
-- [Snapback Artifacts](reference/snapback_artifacts.md)
-- [Released-product Snapback Artifacts](reference/released_snapback_artifacts.md)
-- [Release-enzyme Catalogs](reference/release_enzyme_catalogs.md)
-
-#### Design Retained-Scar Terminal Nicks
-- [Scar-Nick Workflow](guides/scar_nick_workflow.md)
-- [scar_nick Package Map](../src/scar_nick/README.md)
-
 #### Summarize Sweeps and Aggregate Artifacts
 - [Studies](guides/studies.md)
 - [Study Length vs Score](guides/study_length_vs_score.md)
@@ -76,9 +65,6 @@ useful rather than architectural.
 - [Cassette Solve Spec Reference](reference/cassette_solve_spec.md)
 - [Nickase Catalog Reference](reference/nickase_catalog.md)
 - [Cassette Artifacts](reference/cassette_artifacts.md)
-- [Snapback Artifacts](reference/snapback_artifacts.md)
-- [Released-product Snapback Artifacts](reference/released_snapback_artifacts.md)
-- [Release-enzyme Catalogs](reference/release_enzyme_catalogs.md)
 - [YIU Spec Reference](reference/yiu_spec.md)
 - [YIU Artifacts](reference/yiu_artifacts.md)
 - [YIU Visual System](reference/yiu_visual_system.md)

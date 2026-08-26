@@ -48,7 +48,6 @@ _ENTRY_METADATA_EXCLUDE = {
     "selection",
     "operational",
     "outside_site",
-    "snapback_tier",
     "commercial_confidence",
     "warning_codes",
     "incubation_temp_c",
@@ -122,7 +121,7 @@ def _normalize_selection(entry: dict[str, Any]) -> dict[str, Any] | None:
     else:
         raise NickaseCatalogError("entry.selection must be a mapping when present.")
 
-    for key in ("outside_site", "snapback_tier", "commercial_confidence", "warning_codes"):
+    for key in ("outside_site", "commercial_confidence", "warning_codes"):
         if key in entry:
             if key in selection and selection[key] != entry[key]:
                 raise NickaseCatalogError(f"entry.selection.{key} must not conflict with top-level {key}.")

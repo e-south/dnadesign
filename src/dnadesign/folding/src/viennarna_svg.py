@@ -915,13 +915,13 @@ def _section_semantic(label: str) -> str:
     if lowered == "right base":
         return "stem_base_right"
     if lowered == "foldback":
-        return "snapback_foldback_geometry"
+        return "foldback_geometry"
     if lowered == "cap":
-        return "snapback_cap"
+        return "foldback_cap"
     if lowered == "foldback stem":
-        return "snapback_retained_stem"
+        return "foldback_retained_stem"
     if lowered == "foldback return":
-        return "snapback_foldback_return"
+        return "foldback_return"
     return ""
 
 

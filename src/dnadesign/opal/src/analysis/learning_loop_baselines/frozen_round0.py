@@ -77,7 +77,6 @@ def frozen_round0_scores(
         model_ctx=mctx,
         transform_ctx=tctx,
         candidate_ids=candidate_ids,
-        selection_view_id=selection_view_id,
         batch_size=int(cfg.scoring.score_batch_size),
     )
     y_hat, _ = inverse_yops_outputs(rctx=rctx, y_ops_cfg=cfg.training.y_ops or [], y_pred=y_hat_fit, y_pred_std=None)
@@ -88,6 +87,7 @@ def frozen_round0_scores(
         y_train=y_train,
         r_train=r_train,
         candidate_ids=candidate_ids,
+        selection_view_id=selection_view_id,
     )
     scores = pd.DataFrame(
         {

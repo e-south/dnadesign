@@ -67,7 +67,6 @@ CommercialConfidence = Literal[
     "produced_on_demand",
     "literature_only",
 ]
-SnapbackTier = Literal["tier1", "tier2", "tier3"]
 YesNoUnknown = Literal["yes", "no", "unknown"]
 RawCutOffsetReference = Literal["motif_start", "motif_end"]
 
@@ -117,7 +116,6 @@ def motif_matches(sequence: str, motif: str) -> bool:
 
 class NickaseSelectionProfile(StrictNickaseModel):
     outside_site: bool | None = None
-    snapback_tier: SnapbackTier | None = None
     commercial_confidence: CommercialConfidence | None = None
     warning_codes: list[str] = Field(default_factory=list)
 

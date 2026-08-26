@@ -133,14 +133,6 @@ BANNERS = (
         "shuffle",
     ),
     BannerSpec(
-        "src/dnadesign/msd/assets/msd-banner.svg",
-        "src/dnadesign/msd/README.md",
-        "msd",
-        "COMPILE MSD DESIGNS",
-        "Resolve typed Retron MSD parts into explicit DNA sequences.",
-        "msd",
-    ),
-    BannerSpec(
         "src/dnadesign/nmf/assets/nmf-banner.svg",
         "src/dnadesign/nmf/README.md",
         "nmf",
