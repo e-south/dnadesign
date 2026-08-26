@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import stat
 import subprocess
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -357,15 +359,11 @@ def load_ligandmpnn_context_inventory(
     if not isinstance(reference, LigandMpnnContextInventoryReference):
         raise ValueError("reference must be a LigandMpnnContextInventoryReference")
     root = execution_root.expanduser().resolve()
-    path = _within_root(root, reference.path)
-    if path.is_symlink():
-        raise ValueError("context inventory must not be a symlink")
-    if not path.is_file():
-        raise ValueError(f"context inventory does not exist: {reference.path}")
-    try:
-        payload_bytes = path.read_bytes()
-    except OSError as error:
-        raise ValueError(f"context inventory could not be read: {reference.path}") from error
+    payload_bytes = _read_descriptor_relative_regular_bytes(
+        root,
+        reference.path,
+        label="context inventory",
+    )
     observed_sha256 = hashlib.sha256(payload_bytes).hexdigest()
     if observed_sha256 != reference.sha256:
         raise ValueError(
@@ -378,6 +376,56 @@ def load_ligandmpnn_context_inventory(
     if not isinstance(payload, dict):
         raise ValueError("context inventory root must be an object")
     return LigandMpnnContextInventory.from_dict(payload)
+
+
+def _read_descriptor_relative_regular_bytes(
+    execution_root: Path,
+    relative_path: Path,
+    *,
+    label: str,
+) -> bytes:
+    """Read one regular leaf through a no-follow descriptor chain exactly once."""
+
+    _require_relative_path(relative_path, field_name=f"{label} path")
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
+    leaf_flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK
+    root_parts = execution_root.parts
+    if not execution_root.is_absolute() or not root_parts:
+        raise ValueError("execution_root must resolve to an absolute directory")
+    try:
+        directory_fd = os.open(execution_root.anchor, directory_flags)
+        try:
+            for component in (*root_parts[1:], *relative_path.parent.parts):
+                if component in {"", "."}:
+                    continue
+                next_fd = os.open(component, directory_flags, dir_fd=directory_fd)
+                os.close(directory_fd)
+                directory_fd = next_fd
+            leaf_fd = os.open(relative_path.name, leaf_flags, dir_fd=directory_fd)
+        finally:
+            os.close(directory_fd)
+    except FileNotFoundError as error:
+        raise ValueError(f"{label} does not exist: {relative_path}") from error
+    except OSError as error:
+        raise ValueError(f"{label} could not be opened safely: {relative_path}") from error
+    try:
+        leaf_status = os.fstat(leaf_fd)
+    except OSError as error:
+        os.close(leaf_fd)
+        raise ValueError(f"{label} could not be inspected safely: {relative_path}") from error
+    if not stat.S_ISREG(leaf_status.st_mode):
+        os.close(leaf_fd)
+        raise ValueError(f"{label} must be a regular file")
+    try:
+        handle = os.fdopen(leaf_fd, "rb")
+    except BaseException:
+        os.close(leaf_fd)
+        raise
+    try:
+        with handle:
+            return handle.read()
+    except OSError as error:
+        raise ValueError(f"{label} could not be read: {relative_path}") from error
 
 
 def validate_context_inventory_for_input(

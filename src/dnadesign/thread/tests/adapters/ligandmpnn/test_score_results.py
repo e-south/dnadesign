@@ -32,6 +32,7 @@ from dnadesign.thread.adapters.ligandmpnn import (
     parse_ligandmpnn_score_outputs,
     score_request_sha256,
 )
+from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import pinned_runtime_completion_contract
 from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import (
     create_pinned_context_checkout,
     write_context_inventory,
@@ -140,6 +141,22 @@ def _write_output(
     path = root / request.output_dir / f"seed_{expected_seed}" / f"{request.pdb_path.stem}.pt"
     path.parent.mkdir(parents=True)
     torch.save(payload, path)
+    command = next(
+        command
+        for command in build_ligandmpnn_score_commands(request, checkout_root=root / "LigandMPNN")
+        if command.seed == expected_seed
+    )
+    completion_path, completion = pinned_runtime_completion_contract(
+        command.argv,
+        upstream_commit=request.upstream.commit,
+        checkpoint_sha256=request.upstream.checkpoint_sha256,
+        pdb_sha256=request.pdb_sha256,
+        packing_checkpoint_sha256=None,
+        residue_alphabet_sha256=None,
+        entrypoint="score.py",
+    )
+    absolute_completion_path = completion_path if completion_path.is_absolute() else root / completion_path
+    absolute_completion_path.write_text(json.dumps(completion, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 
 
@@ -186,18 +203,48 @@ def test_parser_binds_exact_request_commands_inputs_and_raw_probabilities(tmp_pa
 
     receipt = result.to_dict()
     assert receipt["schema_id"] == "thread.ligandmpnn.score_result"
-    assert receipt["schema_version"] == 2
+    assert receipt["schema_version"] == 3
     assert receipt["status"] == "completed_validated"
     assert receipt["input"] == {
         "path": "inputs/target.pdb",
         "sha256": f"sha256:{request.pdb_sha256}",
     }
     assert receipt["outputs"][0]["command_sha256"].startswith("sha256:")
+    assert receipt["outputs"][0]["execution_sha256"].startswith("sha256:")
     assert receipt["outputs"][0]["output_sha256"].startswith("sha256:")
     assert "raw_x_probability" in receipt["outputs"][0]
     assert receipt["context"]["atom_context_status"] == "enabled_with_observed_nucleotide_context"
     assert receipt["context"]["inventory_reference"] == request.context_inventory.to_dict()
     assert receipt["context"]["observed_inventory"]["observed"]["effective_nucleotide_atom_count"] == 2
+
+
+def test_parser_requires_exact_actual_execution_completion(tmp_path: Path) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    _write_output(tmp_path, request, 7)
+    command = build_ligandmpnn_score_commands(request, checkout_root=tmp_path / "LigandMPNN")[0]
+    completion_path, completion = pinned_runtime_completion_contract(
+        command.argv,
+        upstream_commit=request.upstream.commit,
+        checkpoint_sha256=request.upstream.checkpoint_sha256,
+        pdb_sha256=request.pdb_sha256,
+        packing_checkpoint_sha256=None,
+        residue_alphabet_sha256=None,
+        entrypoint="score.py",
+    )
+    absolute_completion_path = tmp_path / completion_path
+    absolute_completion_path.unlink()
+    with pytest.raises(ValueError, match="execution completion record does not exist"):
+        _parse(tmp_path, request)
+
+    absolute_completion_path.write_text(
+        json.dumps(completion, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    payload = json.loads(absolute_completion_path.read_text(encoding="utf-8"))
+    payload["execution"]["arguments"].extend(["--unplanned_unique_override", "1"])
+    absolute_completion_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="execution completion does not match planned command"):
+        _parse(tmp_path, request)
 
 
 def test_request_digest_is_path_portable_and_context_off_is_explicit(tmp_path: Path) -> None:

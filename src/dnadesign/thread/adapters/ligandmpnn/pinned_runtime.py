@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -30,6 +32,7 @@ _FIXED_RESIDUES_FLAG = "--fixed_residues"
 _REDESIGNED_RESIDUES_FLAG = "--redesigned_residues"
 _MODEL_TYPE_FLAG = "--model_type"
 _OUTPUT_FOLDER_FLAG = "--out_folder"
+_COMPLETION_RECORD_NAME = ".dnadesign-ligandmpnn-execution.json"
 _ALTERNATE_SOURCE_FLAGS = frozenset(
     {
         "--checkpoint_protein_mpnn",
@@ -66,6 +69,24 @@ _SEPARATELY_VALIDATED_SINGLETON_FLAGS = frozenset(
         _RESIDUE_ALPHABET_FLAG,
     }
 )
+_CANONICAL_RUNTIME_FLAGS = frozenset(
+    {
+        *_ATTESTATION_SENSITIVE_FLAGS,
+        "--autoregressive_score",
+        "--batch_size",
+        "--ligand_mpnn_use_atom_context",
+        "--ligand_mpnn_use_side_chain_context",
+        "--number_of_batches",
+        "--number_of_packs_per_design",
+        "--pack_side_chains",
+        "--pack_with_ligand_context",
+        "--repack_everything",
+        "--seed",
+        "--single_aa_score",
+        "--temperature",
+        "--use_sequence",
+    }
+)
 
 
 def pinned_runtime_prefix(
@@ -78,6 +99,8 @@ def pinned_runtime_prefix(
     residue_alphabet_sha256: str | None,
     entrypoint: str,
     python_executable: str,
+    planned_execution_sha256: str,
+    completion_record_path: Path,
 ) -> tuple[str, ...]:
     """Return the deterministic wrapper prefix for one official entrypoint."""
 
@@ -102,12 +125,89 @@ def pinned_runtime_prefix(
         prefix.extend(["--residue-alphabet-sha256", residue_alphabet_sha256])
     prefix.extend(
         [
+            "--planned-execution-sha256",
+            planned_execution_sha256,
+            "--completion-record",
+            str(completion_record_path),
             "--entrypoint",
             entrypoint,
             "--",
         ]
     )
     return tuple(prefix)
+
+
+def build_pinned_runtime_command(
+    *,
+    checkout_root: Path,
+    upstream_commit: str,
+    checkpoint_sha256: str,
+    pdb_sha256: str,
+    packing_checkpoint_sha256: str | None,
+    residue_alphabet_sha256: str | None,
+    entrypoint: str,
+    python_executable: str,
+    output_dir: Path,
+    arguments: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Bind a generated command to its complete semantic execution payload."""
+
+    completion_record_path = output_dir / _COMPLETION_RECORD_NAME
+    planned_execution_sha256 = pinned_execution_sha256(
+        checkout_root=checkout_root,
+        upstream_commit=upstream_commit,
+        checkpoint_sha256=checkpoint_sha256,
+        pdb_sha256=pdb_sha256,
+        packing_checkpoint_sha256=packing_checkpoint_sha256,
+        residue_alphabet_sha256=residue_alphabet_sha256,
+        entrypoint=entrypoint,
+        completion_record_path=completion_record_path,
+        arguments=arguments,
+    )
+    return (
+        *pinned_runtime_prefix(
+            checkout_root=checkout_root,
+            upstream_commit=upstream_commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=packing_checkpoint_sha256,
+            residue_alphabet_sha256=residue_alphabet_sha256,
+            entrypoint=entrypoint,
+            python_executable=python_executable,
+            planned_execution_sha256=planned_execution_sha256,
+            completion_record_path=completion_record_path,
+        ),
+        *arguments,
+    )
+
+
+def pinned_execution_sha256(
+    *,
+    checkout_root: Path,
+    upstream_commit: str,
+    checkpoint_sha256: str,
+    pdb_sha256: str,
+    packing_checkpoint_sha256: str | None,
+    residue_alphabet_sha256: str | None,
+    entrypoint: str,
+    completion_record_path: Path,
+    arguments: tuple[str, ...],
+) -> str:
+    """Return the canonical digest of every result-affecting execution field."""
+
+    payload = _pinned_execution_payload(
+        checkout_root=checkout_root,
+        upstream_commit=upstream_commit,
+        checkpoint_sha256=checkpoint_sha256,
+        pdb_sha256=pdb_sha256,
+        packing_checkpoint_sha256=packing_checkpoint_sha256,
+        residue_alphabet_sha256=residue_alphabet_sha256,
+        entrypoint=entrypoint,
+        completion_record_path=completion_record_path,
+        arguments=arguments,
+    )
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def parse_pinned_runtime_prefix(
@@ -119,11 +219,26 @@ def parse_pinned_runtime_prefix(
     packing_checkpoint_sha256: str | None,
     residue_alphabet_sha256: str | None,
     entrypoint: str,
-) -> tuple[Path, str]:
+) -> tuple[Path, str, Path, str]:
     """Recover only the two caller-owned fields from an exact wrapper prefix."""
 
-    if len(argv) < 14:
+    if len(argv) < 20 or "--" not in argv:
         raise ValueError("command does not use the pinned LigandMPNN runtime")
+    delimiter = argv.index("--")
+    arguments = argv[delimiter + 1 :]
+    prefix = argv[: delimiter + 1]
+    completion_record_path = Path(_split_option_value(prefix, "--completion-record"))
+    planned_execution_sha256 = pinned_execution_sha256(
+        checkout_root=Path(argv[4]),
+        upstream_commit=upstream_commit,
+        checkpoint_sha256=checkpoint_sha256,
+        pdb_sha256=pdb_sha256,
+        packing_checkpoint_sha256=packing_checkpoint_sha256,
+        residue_alphabet_sha256=residue_alphabet_sha256,
+        entrypoint=entrypoint,
+        completion_record_path=completion_record_path,
+        arguments=arguments,
+    )
     expected = pinned_runtime_prefix(
         checkout_root=Path(argv[4]),
         upstream_commit=upstream_commit,
@@ -133,10 +248,48 @@ def parse_pinned_runtime_prefix(
         residue_alphabet_sha256=residue_alphabet_sha256,
         entrypoint=entrypoint,
         python_executable=argv[0],
+        planned_execution_sha256=planned_execution_sha256,
+        completion_record_path=completion_record_path,
     )
-    if argv[: len(expected)] != expected:
+    if prefix != expected:
         raise ValueError("command does not use the pinned LigandMPNN runtime")
-    return Path(argv[4]), argv[0]
+    return Path(argv[4]), argv[0], completion_record_path, planned_execution_sha256
+
+
+def pinned_runtime_completion_contract(
+    argv: tuple[str, ...],
+    *,
+    upstream_commit: str,
+    checkpoint_sha256: str,
+    pdb_sha256: str,
+    packing_checkpoint_sha256: str | None,
+    residue_alphabet_sha256: str | None,
+    entrypoint: str,
+) -> tuple[Path, dict[str, object]]:
+    """Return the exact completion record required for one planned command."""
+
+    checkout_root, _python, completion_record_path, execution_sha256 = parse_pinned_runtime_prefix(
+        argv,
+        upstream_commit=upstream_commit,
+        checkpoint_sha256=checkpoint_sha256,
+        pdb_sha256=pdb_sha256,
+        packing_checkpoint_sha256=packing_checkpoint_sha256,
+        residue_alphabet_sha256=residue_alphabet_sha256,
+        entrypoint=entrypoint,
+    )
+    arguments = argv[argv.index("--") + 1 :]
+    execution = _pinned_execution_payload(
+        checkout_root=checkout_root,
+        upstream_commit=upstream_commit,
+        checkpoint_sha256=checkpoint_sha256,
+        pdb_sha256=pdb_sha256,
+        packing_checkpoint_sha256=packing_checkpoint_sha256,
+        residue_alphabet_sha256=residue_alphabet_sha256,
+        entrypoint=entrypoint,
+        completion_record_path=completion_record_path,
+        arguments=arguments,
+    )
+    return completion_record_path, _completion_record(execution, execution_sha256)
 
 
 def execute_pinned_entrypoint(
@@ -148,12 +301,32 @@ def execute_pinned_entrypoint(
     packing_checkpoint_sha256: str | None,
     residue_alphabet_sha256: str | None,
     entrypoint: str,
+    planned_execution_sha256: str,
+    completion_record_path: Path,
     arguments: tuple[str, ...],
 ) -> None:
     """Execute one pinned source snapshot with digest-verified weight bytes."""
 
     if entrypoint not in _ENTRYPOINTS:
         raise ValueError(f"unsupported LigandMPNN entrypoint: {entrypoint!r}")
+    execution = _pinned_execution_payload(
+        checkout_root=checkout_root,
+        upstream_commit=upstream_commit,
+        checkpoint_sha256=checkpoint_sha256,
+        pdb_sha256=pdb_sha256,
+        packing_checkpoint_sha256=packing_checkpoint_sha256,
+        residue_alphabet_sha256=residue_alphabet_sha256,
+        entrypoint=entrypoint,
+        completion_record_path=completion_record_path,
+        arguments=arguments,
+    )
+    observed_execution_sha256 = hashlib.sha256(
+        json.dumps(execution, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    if observed_execution_sha256 != planned_execution_sha256:
+        raise ValueError("actual LigandMPNN execution does not match the complete planned arguments")
+    if os.path.lexists(completion_record_path):
+        raise ValueError(f"LigandMPNN completion record already exists: {completion_record_path}")
     _validate_runtime_option_contract(arguments)
     checkout = checkout_root.expanduser().resolve()
     if not checkout.is_dir():
@@ -206,12 +379,106 @@ def execute_pinned_entrypoint(
                 expected_sha256=residue_alphabet_sha256,
                 destination=inputs_root / "residue-alphabet.json",
             )
+        score_temporary: tempfile.TemporaryDirectory[str] | None = None
+        score_publication: tuple[Path, Path] | None = None
         if entrypoint == "score.py":
-            _reject_existing_score_output(runtime_arguments, pdb_path=staged_pdb)
-        subprocess.run(
-            [sys.executable, "-B", "-E", "-s", str(entrypoint_path), *runtime_arguments],
-            check=True,
-        )
+            output_value_index, output_root, expected_output = _reject_existing_score_output(
+                runtime_arguments,
+                pdb_path=staged_pdb,
+            )
+            output_root.mkdir(parents=True, exist_ok=True)
+            if output_root.is_symlink() or not output_root.is_dir():
+                raise ValueError(f"score output directory must be a regular directory: {output_root}")
+            score_temporary = tempfile.TemporaryDirectory(prefix=".dnadesign-score-", dir=output_root)
+            temporary_output_root = Path(score_temporary.name)
+            runtime_arguments[output_value_index] = str(temporary_output_root)
+            score_publication = (temporary_output_root / staged_pdb.with_suffix(".pt").name, expected_output)
+        try:
+            subprocess.run(
+                [sys.executable, "-B", "-E", "-s", str(entrypoint_path), *runtime_arguments],
+                check=True,
+            )
+            if score_publication is not None:
+                _publish_score_output(*score_publication)
+        finally:
+            if score_temporary is not None:
+                score_temporary.cleanup()
+    _write_completion_record(
+        completion_record_path,
+        _completion_record(execution, observed_execution_sha256),
+    )
+
+
+def _pinned_execution_payload(
+    *,
+    checkout_root: Path,
+    upstream_commit: str,
+    checkpoint_sha256: str,
+    pdb_sha256: str,
+    packing_checkpoint_sha256: str | None,
+    residue_alphabet_sha256: str | None,
+    entrypoint: str,
+    completion_record_path: Path,
+    arguments: tuple[str, ...],
+) -> dict[str, object]:
+    if not isinstance(arguments, tuple) or any(not isinstance(value, str) for value in arguments):
+        raise ValueError("LigandMPNN runtime arguments must be a tuple of strings")
+    return {
+        "checkout_root": str(checkout_root),
+        "upstream_commit": upstream_commit,
+        "checkpoint_sha256": checkpoint_sha256,
+        "pdb_sha256": pdb_sha256,
+        "packing_checkpoint_sha256": packing_checkpoint_sha256,
+        "residue_alphabet_sha256": residue_alphabet_sha256,
+        "entrypoint": entrypoint,
+        "completion_record_path": str(completion_record_path),
+        "arguments": list(arguments),
+    }
+
+
+def _completion_record(execution: dict[str, object], execution_sha256: str) -> dict[str, object]:
+    return {
+        "schema_id": "thread.ligandmpnn.execution_completion",
+        "schema_version": 1,
+        "status": "completed",
+        "execution_sha256": f"sha256:{execution_sha256}",
+        "execution": execution,
+    }
+
+
+def _write_completion_record(path: Path, payload: dict[str, object]) -> None:
+    if not isinstance(path, Path):
+        raise ValueError("completion record path must be a Path")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    encoded = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
+    try:
+        file_descriptor = os.open(path, flags, 0o600)
+    except OSError as exc:
+        raise ValueError(f"LigandMPNN completion record could not be created exclusively: {path}") from exc
+    try:
+        handle = os.fdopen(file_descriptor, "wb")
+    except BaseException:
+        os.close(file_descriptor)
+        raise
+    try:
+        with handle:
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except BaseException:
+        try:
+            path.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def _split_option_value(argv: tuple[str, ...], option: str) -> str:
+    positions = [index for index, value in enumerate(argv) if value == option]
+    if len(positions) != 1 or positions[0] + 1 >= len(argv):
+        raise ValueError("command does not use the pinned LigandMPNN runtime")
+    return argv[positions[0] + 1]
 
 
 def _replace_verified_file(
@@ -255,8 +522,8 @@ def _validate_runtime_option_contract(arguments: tuple[str, ...]) -> None:
     option_names = tuple(value.partition("=")[0] for value in arguments if value.startswith("--"))
     for option_name in option_names:
         if option_name in _ALTERNATE_SOURCE_FLAGS or (
-            option_name not in _ATTESTATION_SENSITIVE_FLAGS
-            and any(protected.startswith(option_name) for protected in _ATTESTATION_SENSITIVE_FLAGS)
+            option_name not in _CANONICAL_RUNTIME_FLAGS
+            and any(canonical.startswith(option_name) for canonical in _CANONICAL_RUNTIME_FLAGS)
         ):
             raise ValueError(f"unattested or ambiguous LigandMPNN runtime option: {option_name}")
     model_positions = [index for index, value in enumerate(arguments) if value == _MODEL_TYPE_FLAG]
@@ -267,6 +534,8 @@ def _validate_runtime_option_contract(arguments: tuple[str, ...]) -> None:
         or arguments[model_positions[0] + 1] != "ligand_mpnn"
     ):
         raise ValueError(f"unattested or ambiguous LigandMPNN runtime option: {_MODEL_TYPE_FLAG}")
+    if _FIXED_RESIDUES_FLAG in option_names and _REDESIGNED_RESIDUES_FLAG in option_names:
+        raise ValueError("fixed_residues and redesigned_residues runtime options are mutually exclusive")
     for index, option_name in enumerate(option_names):
         for earlier_name in option_names[:index]:
             if option_name == earlier_name and option_name in _SEPARATELY_VALIDATED_SINGLETON_FLAGS:
@@ -275,7 +544,7 @@ def _validate_runtime_option_contract(arguments: tuple[str, ...]) -> None:
                 raise ValueError(f"duplicate LigandMPNN runtime option or abbreviation: {option_name}")
 
 
-def _reject_existing_score_output(arguments: list[str], *, pdb_path: Path) -> None:
+def _reject_existing_score_output(arguments: list[str], *, pdb_path: Path) -> tuple[int, Path, Path]:
     output_flag = "--out_folder"
     attached_prefix = f"{output_flag}="
     if any(value.startswith(attached_prefix) for value in arguments):
@@ -287,6 +556,29 @@ def _reject_existing_score_output(arguments: list[str], *, pdb_path: Path) -> No
     expected_output = output_root / f"{pdb_path.stem}.pt"
     if expected_output.exists() or expected_output.is_symlink():
         raise ValueError(f"score output already exists; refuse stale or ambiguous result: {expected_output}")
+    return positions[0] + 1, output_root, expected_output
+
+
+def _publish_score_output(source_path: Path, destination_path: Path) -> None:
+    """Publish one score artifact without allowing concurrent replacement."""
+
+    if source_path.is_symlink() or not source_path.is_file():
+        raise ValueError(f"pinned score execution did not produce a regular output: {source_path}")
+    try:
+        os.link(source_path, destination_path, follow_symlinks=False)
+    except FileExistsError as exc:
+        raise ValueError(f"score output already exists; refuse concurrent result: {destination_path}") from exc
+    except OSError as exc:
+        raise ValueError(f"score output could not be published atomically: {destination_path}") from exc
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
+    try:
+        directory_fd = os.open(destination_path.parent, directory_flags)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except OSError as exc:
+        raise ValueError(f"score output publication could not be made durable: {destination_path}") from exc
 
 
 def _has_flag(arguments: list[str], flag: str) -> bool:
@@ -308,13 +600,15 @@ def _git_head(checkout: Path) -> str:
 def main() -> None:
     """Run one attested official entrypoint from a generated command."""
 
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("--checkout-root", type=Path, required=True)
     parser.add_argument("--upstream-commit", required=True)
     parser.add_argument("--checkpoint-sha256", required=True)
     parser.add_argument("--pdb-sha256", required=True)
     parser.add_argument("--packing-checkpoint-sha256")
     parser.add_argument("--residue-alphabet-sha256")
+    parser.add_argument("--planned-execution-sha256", required=True)
+    parser.add_argument("--completion-record", type=Path, required=True)
     parser.add_argument("--entrypoint", choices=sorted(_ENTRYPOINTS), required=True)
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     args = parser.parse_args()
@@ -327,6 +621,8 @@ def main() -> None:
         packing_checkpoint_sha256=args.packing_checkpoint_sha256,
         residue_alphabet_sha256=args.residue_alphabet_sha256,
         entrypoint=args.entrypoint,
+        planned_execution_sha256=args.planned_execution_sha256,
+        completion_record_path=args.completion_record,
         arguments=arguments,
     )
 

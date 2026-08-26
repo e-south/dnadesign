@@ -81,6 +81,23 @@ def _request(**overrides: object) -> LigandMpnnRequest:
     return LigandMpnnRequest(**values)  # type: ignore[arg-type]
 
 
+@pytest.mark.parametrize(
+    ("field_name", "value", "message"),
+    [
+        ("pdb_path", Path("/tmp/target.pdb"), "safe non-option relative"),
+        ("pdb_path", Path("-option-like-input.pdb"), "safe non-option relative"),
+        ("output_dir", Path("-option-like-output"), "must not begin with a hyphen"),
+    ],
+)
+def test_request_rejects_paths_that_cannot_round_trip_through_runtime_argv(
+    field_name: str,
+    value: Path,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        _request(**{field_name: value})
+
+
 def test_build_commands_declares_exact_official_ligandmpnn_flags_per_seed() -> None:
     request = _request()
 
@@ -91,6 +108,8 @@ def test_build_commands_declares_exact_official_ligandmpnn_flags_per_seed() -> N
     )
 
     assert len(commands) == 2
+    planned_execution_sha256 = commands[0].argv[commands[0].argv.index("--planned-execution-sha256") + 1]
+    assert len(planned_execution_sha256) == 64
     assert commands[0].argv == (
         "python3",
         "-m",
@@ -105,6 +124,10 @@ def test_build_commands_declares_exact_official_ligandmpnn_flags_per_seed() -> N
         _DIGEST,
         "--packing-checkpoint-sha256",
         _PACKING_DIGEST,
+        "--planned-execution-sha256",
+        planned_execution_sha256,
+        "--completion-record",
+        "outputs/designs/seed_7/.dnadesign-ligandmpnn-execution.json",
         "--entrypoint",
         "run.py",
         "--",

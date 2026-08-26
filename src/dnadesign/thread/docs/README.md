@@ -70,6 +70,10 @@ upstream consumes.
 Context receipts are published by an atomic no-follow replacement. If the
 post-replacement directory durability check fails, publication restores the
 prior regular-file bytes or prior absence before reporting ordinary failure.
+Every newly created output-directory entry is synced in its parent before the
+receipt can be reported durable. Public receipt loading opens every ancestor
+and the leaf descriptor-relatively with no-follow flags, verifies the opened
+leaf is regular, and hashes the same single byte read that is decoded.
 An existing symlink, FIFO, or other nonregular receipt is rejected before
 replacement because it cannot be restored as regular receipt content.
 If that restoration cannot itself be made durable, the public
@@ -87,9 +91,19 @@ stability policy, not a universal biological or statistical threshold.
 Each score request binds the input PDB digest and an immutable context-inventory
 receipt before execution. Result parsing requires that receipt to match the
 same PDB, upstream commit, all-chain parser scope, side-chain parsing mode, and
-positive-occupancy default. It then requires the exact planned command tuple
-and exactly one upstream `.pt` artifact per requested seed. The executed receipt
-records the semantic request, input, command-set, per-command, checkpoint,
+positive-occupancy default. PDB request paths are safe, non-option relative paths; an
+option-looking output directory is rejected before command construction.
+Each generated command binds every parsed wrapper field and the complete
+upstream argument vector to a canonical digest. Successful execution emits an
+exclusive per-seed completion record containing the actual parsed arguments,
+and result admission requires that record to equal the planned command before
+accepting artifacts. Standalone abbreviations, changed values, simultaneous
+fixed/redesigned selectors, and unique unplanned overrides therefore fail
+closed. Score execution uses a uniquely owned temporary output directory and
+atomically publishes the final `.pt` without replacement, so concurrent
+requests cannot overwrite a shared basename. Result parsing then requires
+exactly one upstream `.pt` artifact per requested seed. The executed receipt
+records the semantic request, input, command-set, execution, per-command, checkpoint,
 upstream-commit, output identities, parser source digest, and full observed
 context inventory. `atom_context_status` can become
 `enabled_with_observed_nucleotide_context` only after those checks pass; it is

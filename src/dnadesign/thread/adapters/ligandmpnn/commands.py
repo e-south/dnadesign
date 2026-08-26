@@ -15,7 +15,7 @@ from pathlib import Path
 
 from dnadesign.thread.adapters.ligandmpnn.alphabets import LigandMpnnResidueAlphabetSidecar
 from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnCommand, LigandMpnnRequest
-from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import pinned_runtime_prefix
+from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import build_pinned_runtime_command
 
 
 def build_ligandmpnn_commands(
@@ -31,23 +31,7 @@ def build_ligandmpnn_commands(
     commands: list[LigandMpnnCommand] = []
     for seed in request.seeds:
         output_dir = request.output_dir / f"seed_{seed}"
-        argv = [
-            *pinned_runtime_prefix(
-                checkout_root=checkout_root,
-                upstream_commit=request.upstream.commit,
-                checkpoint_sha256=request.upstream.checkpoint_sha256,
-                pdb_sha256=request.pdb_sha256,
-                packing_checkpoint_sha256=(
-                    request.upstream.packing_checkpoint_sha256 if request.packing.enabled else None
-                ),
-                residue_alphabet_sha256=(
-                    residue_alphabet_sidecar.sha256.removeprefix("sha256:")
-                    if residue_alphabet_sidecar is not None
-                    else None
-                ),
-                entrypoint="run.py",
-                python_executable=python_executable,
-            ),
+        runtime_arguments = [
             "--model_type",
             "ligand_mpnn",
             "--checkpoint_ligand_mpnn",
@@ -69,10 +53,10 @@ def build_ligandmpnn_commands(
             "--ligand_mpnn_use_side_chain_context",
             _flag(request.use_side_chain_context),
         ]
-        _append_residue_selection(argv, request)
+        _append_residue_selection(runtime_arguments, request)
         if residue_alphabet_sidecar is not None:
-            argv.extend(["--omit_AA_per_residue", str(residue_alphabet_sidecar.path)])
-        argv.extend(
+            runtime_arguments.extend(["--omit_AA_per_residue", str(residue_alphabet_sidecar.path)])
+        runtime_arguments.extend(
             [
                 "--pack_side_chains",
                 _flag(request.packing.enabled),
@@ -85,8 +69,26 @@ def build_ligandmpnn_commands(
             ]
         )
         if request.packing.enabled:
-            argv.extend(["--checkpoint_path_sc", str(checkout_root / request.upstream.packing_checkpoint_path)])
-        commands.append(LigandMpnnCommand(seed=seed, output_dir=output_dir, argv=tuple(argv)))
+            runtime_arguments.extend(
+                ["--checkpoint_path_sc", str(checkout_root / request.upstream.packing_checkpoint_path)]
+            )
+        argv = build_pinned_runtime_command(
+            checkout_root=checkout_root,
+            upstream_commit=request.upstream.commit,
+            checkpoint_sha256=request.upstream.checkpoint_sha256,
+            pdb_sha256=request.pdb_sha256,
+            packing_checkpoint_sha256=(request.upstream.packing_checkpoint_sha256 if request.packing.enabled else None),
+            residue_alphabet_sha256=(
+                residue_alphabet_sidecar.sha256.removeprefix("sha256:")
+                if residue_alphabet_sidecar is not None
+                else None
+            ),
+            entrypoint="run.py",
+            python_executable=python_executable,
+            output_dir=output_dir,
+            arguments=tuple(runtime_arguments),
+        )
+        commands.append(LigandMpnnCommand(seed=seed, output_dir=output_dir, argv=argv))
     return tuple(commands)
 
 

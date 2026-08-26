@@ -191,12 +191,20 @@ class LigandMpnnRequest:
             or self.number_of_batches <= 0
         ):
             raise ValueError("number_of_batches must be positive")
-        if not isinstance(self.pdb_path, Path) or self.pdb_path.suffix.lower() != ".pdb":
-            raise ValueError("pdb_path must be a Path ending in .pdb")
+        if (
+            not isinstance(self.pdb_path, Path)
+            or self.pdb_path.is_absolute()
+            or ".." in self.pdb_path.parts
+            or str(self.pdb_path).startswith("-")
+            or self.pdb_path.suffix.lower() != ".pdb"
+        ):
+            raise ValueError("pdb_path must be a safe non-option relative Path ending in .pdb")
         _require_sha256(self.pdb_sha256, field_name="pdb_sha256")
         object.__setattr__(self, "pdb_sha256", self.pdb_sha256.lower())
         if not isinstance(self.output_dir, Path):
             raise ValueError("output_dir must be a Path")
+        if str(self.output_dir).startswith("-"):
+            raise ValueError("output_dir must not begin with a hyphen")
         if not isinstance(self.context_inventory, LigandMpnnContextInventoryReference):
             raise ValueError("context_inventory must be a LigandMpnnContextInventoryReference")
         _require_bools(

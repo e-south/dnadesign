@@ -422,6 +422,52 @@ def test_probe_restores_existing_receipt_when_post_replace_directory_fsync_fails
     assert not list(output_path.parent.glob(f".{output_path.name}.*.tmp"))
 
 
+def test_probe_syncs_each_parent_that_receives_a_new_output_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit = _fake_upstream_checkout(tmp_path)
+    request = replace(
+        _request(tmp_path, checkout, commit),
+        output_path=Path("new-evidence/nested/context-inventory.json"),
+    )
+    original_mkdir = os.mkdir
+    original_fsync = os.fsync
+    created_in_parent: list[tuple[int, int]] = []
+    fsynced_directories: list[tuple[int, int]] = []
+
+    def _record_mkdir(
+        path: os.PathLike[str] | str,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> None:
+        if dir_fd is None:
+            original_mkdir(path, mode=mode)
+        else:
+            parent_status = os.fstat(dir_fd)
+            created_in_parent.append((parent_status.st_dev, parent_status.st_ino))
+            original_mkdir(path, mode=mode, dir_fd=dir_fd)
+
+    def _record_fsync(file_descriptor: int) -> None:
+        status = os.fstat(file_descriptor)
+        if stat.S_ISDIR(status.st_mode):
+            fsynced_directories.append((status.st_dev, status.st_ino))
+        original_fsync(file_descriptor)
+
+    monkeypatch.setattr(os, "mkdir", _record_mkdir)
+    monkeypatch.setattr(os, "fsync", _record_fsync)
+
+    materialize_ligandmpnn_context_inventory(
+        request,
+        execution_root=tmp_path,
+        checkout_root=checkout,
+    )
+
+    assert created_in_parent
+    assert set(created_in_parent) <= set(fsynced_directories)
+
+
 def test_probe_removes_new_receipt_when_post_replace_directory_fsync_fails_without_prior_receipt(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -429,6 +475,7 @@ def test_probe_removes_new_receipt_when_post_replace_directory_fsync_fails_witho
     checkout, commit = _fake_upstream_checkout(tmp_path)
     request = _request(tmp_path, checkout, commit)
     output_path = tmp_path / request.output_path
+    output_path.parent.mkdir(parents=True)
     original_fsync = os.fsync
     failed = False
 
@@ -609,6 +656,57 @@ def test_probe_command_executes_headlessly_and_emits_a_reference(tmp_path: Path)
     )
     inventory = load_ligandmpnn_context_inventory(reference, execution_root=tmp_path)
     assert inventory.effective_nucleotide_atom_count == 4
+
+
+def test_inventory_loader_rejects_ancestor_symlink_swap_before_leaf_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit = _fake_upstream_checkout(tmp_path)
+    request = _request(tmp_path, checkout, commit)
+    reference = materialize_ligandmpnn_context_inventory(
+        request,
+        execution_root=tmp_path,
+        checkout_root=checkout,
+    )
+    inventory_path = tmp_path / reference.path
+    safe_parent = inventory_path.parent
+    displaced_parent = tmp_path / "displaced-evidence"
+    outside_parent = tmp_path / "outside-evidence"
+    outside_parent.mkdir()
+    (outside_parent / inventory_path.name).write_bytes(inventory_path.read_bytes())
+    original_open = os.open
+    swapped = False
+
+    def _swap_before_ancestor_open(
+        path: os.PathLike[str] | str,
+        flags: int,
+        *args: object,
+        **kwargs: object,
+    ) -> int:
+        nonlocal swapped
+        if str(path) == safe_parent.name and not swapped:
+            safe_parent.rename(displaced_parent)
+            safe_parent.symlink_to(outside_parent, target_is_directory=True)
+            swapped = True
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", _swap_before_ancestor_open)
+
+    with pytest.raises(ValueError, match="context inventory could not be opened safely"):
+        load_ligandmpnn_context_inventory(reference, execution_root=tmp_path)
+
+    assert swapped
+
+
+def test_inventory_loader_rejects_nonregular_leaf_without_blocking(tmp_path: Path) -> None:
+    inventory_path = tmp_path / "evidence/context-inventory.json"
+    inventory_path.parent.mkdir(parents=True)
+    os.mkfifo(inventory_path)
+    reference = LigandMpnnContextInventoryReference(path=Path("evidence/context-inventory.json"), sha256=_DIGEST)
+
+    with pytest.raises(ValueError, match="context inventory must be a regular file"):
+        load_ligandmpnn_context_inventory(reference, execution_root=tmp_path)
 
 
 def test_inventory_parser_rejects_nested_schema_drift(tmp_path: Path) -> None:

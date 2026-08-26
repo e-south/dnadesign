@@ -13,15 +13,54 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import json
 import os
 import py_compile
 import subprocess
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
 
-from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import execute_pinned_entrypoint
+import dnadesign.thread.adapters.ligandmpnn.pinned_runtime as pinned_runtime_module
+from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import (
+    _validate_runtime_option_contract,
+    build_pinned_runtime_command,
+    pinned_execution_sha256,
+)
+from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import (
+    execute_pinned_entrypoint as _execute_pinned_entrypoint,
+)
+
+
+def execute_pinned_entrypoint(**kwargs: object) -> None:
+    """Exercise the direct runtime boundary with a canonical planned execution."""
+
+    arguments = kwargs["arguments"]
+    assert isinstance(arguments, tuple)
+    checkout_root = kwargs["checkout_root"]
+    assert isinstance(checkout_root, Path)
+    completion_record_path = checkout_root.parent / ".test-ligandmpnn-execution.json"
+    planned_arguments = kwargs.pop("planned_arguments", arguments)
+    assert isinstance(planned_arguments, tuple)
+    planned_execution_sha256 = pinned_execution_sha256(
+        checkout_root=checkout_root,
+        upstream_commit=str(kwargs["upstream_commit"]),
+        checkpoint_sha256=str(kwargs["checkpoint_sha256"]),
+        pdb_sha256=str(kwargs["pdb_sha256"]),
+        packing_checkpoint_sha256=kwargs["packing_checkpoint_sha256"],  # type: ignore[arg-type]
+        residue_alphabet_sha256=kwargs["residue_alphabet_sha256"],  # type: ignore[arg-type]
+        entrypoint=str(kwargs["entrypoint"]),
+        completion_record_path=completion_record_path,
+        arguments=planned_arguments,
+    )
+    _execute_pinned_entrypoint(
+        **kwargs,  # type: ignore[arg-type]
+        planned_execution_sha256=planned_execution_sha256,
+        completion_record_path=completion_record_path,
+    )
 
 
 def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
@@ -67,7 +106,7 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
         "args = parser.parse_args()\n"
         "output = Path(args.out_folder) / f'{Path(args.pdb_path).stem}.pt'\n"
         "output.parent.mkdir(parents=True, exist_ok=True)\n"
-        "output.write_text('score', encoding='utf-8')\n",
+        "output.write_text(Path(args.pdb_path).read_text(encoding='utf-8'), encoding='utf-8')\n",
         encoding="utf-8",
     )
     subprocess.run(["git", "init", "-q", str(root)], check=True)
@@ -157,6 +196,49 @@ def test_pinned_runtime_ignores_timestamp_valid_poisoned_parser_bytecode(tmp_pat
     )
 
     assert attested_output.read_text(encoding="utf-8") == "attested:helper-attested:checkpoint-v1:input-v1:no-sidecar"
+    completion = json.loads((tmp_path / ".test-ligandmpnn-execution.json").read_text(encoding="utf-8"))
+    assert completion["status"] == "completed"
+    assert completion["execution"]["arguments"][-1] == str(attested_output)
+
+
+@pytest.mark.parametrize(
+    "actual_suffix",
+    [
+        ("--ligand_mpnn_use_atom_context", "0"),
+        ("--ligand_mpnn_use_atom_con", "0"),
+        ("--unplanned_unique_override", "1"),
+    ],
+)
+def test_pinned_runtime_rejects_actual_arguments_that_differ_from_complete_plan(
+    tmp_path: Path,
+    actual_suffix: tuple[str, ...],
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    planned_arguments = (
+        "--model_type",
+        "ligand_mpnn",
+        "--checkpoint_ligand_mpnn",
+        str(checkpoint),
+        "--pdb_path",
+        str(pdb),
+        "--ligand_mpnn_use_atom_context",
+        "1",
+        "--output",
+        str(tmp_path / "output.txt"),
+    )
+
+    with pytest.raises(ValueError, match="does not match the complete planned arguments"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            planned_arguments=planned_arguments,
+            arguments=(*planned_arguments, *actual_suffix),
+        )
 
 
 def test_pinned_runtime_executes_pinned_tree_when_checkout_sources_are_dirty(tmp_path: Path) -> None:
@@ -186,6 +268,40 @@ def test_pinned_runtime_executes_pinned_tree_when_checkout_sources_are_dirty(tmp
     )
 
     assert output.read_text(encoding="utf-8") == "attested:helper-attested:checkpoint-v1:input-v1:no-sidecar"
+
+
+def test_generated_runtime_command_executes_and_records_complete_cli_arguments(tmp_path: Path) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output = tmp_path / "output.txt"
+    output_dir = tmp_path / "runtime"
+    arguments = (
+        "--model_type",
+        "ligand_mpnn",
+        "--checkpoint_ligand_mpnn",
+        str(checkpoint),
+        "--pdb_path",
+        str(pdb),
+        "--output",
+        str(output),
+    )
+    command = build_pinned_runtime_command(
+        checkout_root=checkout,
+        upstream_commit=commit,
+        checkpoint_sha256=checkpoint_sha256,
+        pdb_sha256=pdb_sha256,
+        packing_checkpoint_sha256=None,
+        residue_alphabet_sha256=None,
+        entrypoint="run.py",
+        python_executable=sys.executable,
+        output_dir=output_dir,
+        arguments=arguments,
+    )
+
+    subprocess.run(command, cwd=tmp_path, check=True)
+
+    completion = json.loads((output_dir / ".dnadesign-ligandmpnn-execution.json").read_text(encoding="utf-8"))
+    assert completion["execution"]["arguments"] == list(arguments)
+    assert completion["execution_sha256"].startswith("sha256:")
 
 
 def test_pinned_runtime_rejects_checkpoint_changed_after_planning(tmp_path: Path) -> None:
@@ -303,35 +419,50 @@ def test_pinned_runtime_stages_verified_sidecar_before_execution(tmp_path: Path)
     assert output.read_text(encoding="utf-8") == "attested:helper-attested:checkpoint-v1:input-v1:sidecar-v1"
 
 
-def test_pinned_runtime_allows_exact_singular_residue_selection_flags(tmp_path: Path) -> None:
+def test_pinned_runtime_rejects_simultaneous_singular_residue_selection_flags(tmp_path: Path) -> None:
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     output = tmp_path / "output.txt"
 
-    execute_pinned_entrypoint(
-        checkout_root=checkout,
-        upstream_commit=commit,
-        checkpoint_sha256=checkpoint_sha256,
-        pdb_sha256=pdb_sha256,
-        packing_checkpoint_sha256=None,
-        residue_alphabet_sha256=None,
-        entrypoint="run.py",
-        arguments=(
-            "--model_type",
-            "ligand_mpnn",
-            "--checkpoint_ligand_mpnn",
-            str(checkpoint),
-            "--pdb_path",
-            str(pdb),
-            "--fixed_residues",
-            "A1 A2",
-            "--redesigned_residues",
-            "A3",
-            "--output",
-            str(output),
-        ),
-    )
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--fixed_residues",
+                "A1 A2",
+                "--redesigned_residues",
+                "A3",
+                "--output",
+                str(output),
+            ),
+        )
 
-    assert output.read_text(encoding="utf-8") == "attested:helper-attested:checkpoint-v1:input-v1:no-sidecar"
+
+def test_pinned_runtime_rejects_standalone_semantic_abbreviation() -> None:
+    with pytest.raises(ValueError, match="unattested or ambiguous"):
+        _validate_runtime_option_contract(
+            (
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                "/tmp/checkpoint.pt",
+                "--pdb_path",
+                "/tmp/input.pdb",
+                "--ligand_mpnn_use_atom_con",
+                "0",
+            )
+        )
 
 
 def test_pinned_runtime_preserves_pdb_basename_for_upstream_score_output(tmp_path: Path) -> None:
@@ -360,7 +491,62 @@ def test_pinned_runtime_preserves_pdb_basename_for_upstream_score_output(tmp_pat
         ),
     )
 
-    assert (output_root / "target-complex.pt").read_text(encoding="utf-8") == "score"
+    assert (output_root / "target-complex.pt").read_text(encoding="utf-8") == "input-v1"
+
+
+def test_pinned_score_runtime_publishes_only_one_concurrent_same_name_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, _pdb_sha256 = _checkout(tmp_path)
+    second_root = tmp_path / "second"
+    second_root.mkdir()
+    second_pdb = second_root / pdb.name
+    pdb.write_text("first", encoding="utf-8")
+    second_pdb.write_text("second", encoding="utf-8")
+    output_root = tmp_path / "scores"
+    barrier = threading.Barrier(2)
+    original_reject = pinned_runtime_module._reject_existing_score_output
+
+    def _synchronize(arguments: list[str], *, pdb_path: Path) -> tuple[int, Path, Path]:
+        publication = original_reject(arguments, pdb_path=pdb_path)
+        barrier.wait(timeout=5)
+        return publication
+
+    monkeypatch.setattr(pinned_runtime_module, "_reject_existing_score_output", _synchronize)
+
+    def _execute(label: str, input_path: Path) -> tuple[str, str]:
+        arguments = (
+            "--model_type",
+            "ligand_mpnn",
+            "--checkpoint_ligand_mpnn",
+            str(checkpoint),
+            "--pdb_path",
+            str(input_path),
+            "--out_folder",
+            str(output_root),
+        )
+        try:
+            execute_pinned_entrypoint(
+                checkout_root=checkout,
+                upstream_commit=commit,
+                checkpoint_sha256=checkpoint_sha256,
+                pdb_sha256=hashlib.sha256(input_path.read_bytes()).hexdigest(),
+                packing_checkpoint_sha256=None,
+                residue_alphabet_sha256=None,
+                entrypoint="score.py",
+                arguments=arguments,
+            )
+        except ValueError:
+            return label, "rejected"
+        return label, "completed"
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        outcomes = list(executor.map(lambda item: _execute(*item), (("first", pdb), ("second", second_pdb))))
+
+    completed = [label for label, status in outcomes if status == "completed"]
+    assert len(completed) == 1
+    assert (output_root / "input.pt").read_text(encoding="utf-8") == completed[0]
 
 
 def test_pinned_runtime_rejects_preexisting_score_output(tmp_path: Path) -> None:
@@ -445,7 +631,7 @@ def test_pinned_runtime_rejects_duplicate_semantic_flags(
 ) -> None:
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
 
-    with pytest.raises(ValueError, match="duplicate LigandMPNN runtime option"):
+    with pytest.raises(ValueError, match="duplicate LigandMPNN runtime option|unattested or ambiguous"):
         execute_pinned_entrypoint(
             checkout_root=checkout,
             upstream_commit=commit,

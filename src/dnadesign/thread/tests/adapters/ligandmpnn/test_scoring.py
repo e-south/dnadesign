@@ -49,11 +49,30 @@ def _request(**overrides: object) -> LigandMpnnScoreRequest:
     return LigandMpnnScoreRequest(**values)  # type: ignore[arg-type]
 
 
+@pytest.mark.parametrize(
+    ("field_name", "value", "message"),
+    [
+        ("pdb_path", Path("/tmp/target.pdb"), "safe non-option relative"),
+        ("pdb_path", Path("-option-like-input.pdb"), "safe non-option relative"),
+        ("output_dir", Path("-option-like-output"), "must not begin with a hyphen"),
+    ],
+)
+def test_score_request_rejects_paths_that_cannot_round_trip_through_runtime_argv(
+    field_name: str,
+    value: Path,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        _request(**{field_name: value})
+
+
 def test_single_aa_probability_command_is_explicit() -> None:
     command = build_ligandmpnn_score_commands(
         _request(), checkout_root=Path("/opt/LigandMPNN"), python_executable="python3"
     )[0]
 
+    planned_execution_sha256 = command.argv[command.argv.index("--planned-execution-sha256") + 1]
+    assert len(planned_execution_sha256) == 64
     assert command.argv == (
         "python3",
         "-m",
@@ -66,6 +85,10 @@ def test_single_aa_probability_command_is_explicit() -> None:
         _DIGEST,
         "--pdb-sha256",
         _DIGEST,
+        "--planned-execution-sha256",
+        planned_execution_sha256,
+        "--completion-record",
+        "outputs/scores/seed_7/.dnadesign-ligandmpnn-execution.json",
         "--entrypoint",
         "score.py",
         "--",

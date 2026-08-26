@@ -348,10 +348,14 @@ def _open_output_directory(execution_root: Path, relative_parent: Path) -> int:
             try:
                 next_fd = os.open(component, directory_flags, dir_fd=current_fd)
             except FileNotFoundError:
+                created = False
                 try:
                     os.mkdir(component, mode=0o755, dir_fd=current_fd)
+                    created = True
                 except FileExistsError:
                     pass
+                if created:
+                    os.fsync(current_fd)
                 next_fd = os.open(component, directory_flags, dir_fd=current_fd)
             os.close(current_fd)
             current_fd = next_fd

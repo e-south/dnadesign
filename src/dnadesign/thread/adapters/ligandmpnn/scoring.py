@@ -22,7 +22,7 @@ from dnadesign.thread.adapters.ligandmpnn.models import (
     LigandMpnnResidue,
     LigandMpnnUpstreamPin,
 )
-from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import pinned_runtime_prefix
+from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import build_pinned_runtime_command
 
 _REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 _HEX_64 = re.compile(r"[0-9a-fA-F]{64}")
@@ -58,13 +58,21 @@ class LigandMpnnScoreRequest:
     def __post_init__(self) -> None:
         if _REQUEST_ID.fullmatch(self.request_id) is None:
             raise ValueError("request_id must contain only letters, numbers, dots, underscores, or hyphens")
-        if not isinstance(self.pdb_path, Path) or self.pdb_path.suffix.lower() != ".pdb":
-            raise ValueError("pdb_path must be a Path ending in .pdb")
+        if (
+            not isinstance(self.pdb_path, Path)
+            or self.pdb_path.is_absolute()
+            or ".." in self.pdb_path.parts
+            or str(self.pdb_path).startswith("-")
+            or self.pdb_path.suffix.lower() != ".pdb"
+        ):
+            raise ValueError("pdb_path must be a safe non-option relative Path ending in .pdb")
         if _HEX_64.fullmatch(self.pdb_sha256) is None:
             raise ValueError("pdb_sha256 must be a 64-character SHA256 digest")
         object.__setattr__(self, "pdb_sha256", self.pdb_sha256.lower())
         if not isinstance(self.output_dir, Path):
             raise ValueError("output_dir must be a Path")
+        if str(self.output_dir).startswith("-"):
+            raise ValueError("output_dir must not begin with a hyphen")
         if not isinstance(self.upstream, LigandMpnnUpstreamPin):
             raise ValueError("upstream must be a LigandMpnnUpstreamPin")
         if not isinstance(self.context_inventory, LigandMpnnContextInventoryReference):
@@ -105,17 +113,7 @@ def build_ligandmpnn_score_commands(
     commands: list[LigandMpnnCommand] = []
     for seed in request.seeds:
         output_dir = request.output_dir / f"seed_{seed}"
-        argv = [
-            *pinned_runtime_prefix(
-                checkout_root=checkout_root,
-                upstream_commit=request.upstream.commit,
-                checkpoint_sha256=request.upstream.checkpoint_sha256,
-                pdb_sha256=request.pdb_sha256,
-                packing_checkpoint_sha256=None,
-                residue_alphabet_sha256=None,
-                entrypoint="score.py",
-                python_executable=python_executable,
-            ),
+        runtime_arguments = [
             "--model_type",
             "ligand_mpnn",
             "--checkpoint_ligand_mpnn",
@@ -141,8 +139,20 @@ def build_ligandmpnn_score_commands(
             "--single_aa_score",
             _flag(request.mode is LigandMpnnScoreMode.SINGLE_AA),
         ]
-        _append_residue_selection(argv, request)
-        commands.append(LigandMpnnCommand(seed=seed, output_dir=output_dir, argv=tuple(argv)))
+        _append_residue_selection(runtime_arguments, request)
+        argv = build_pinned_runtime_command(
+            checkout_root=checkout_root,
+            upstream_commit=request.upstream.commit,
+            checkpoint_sha256=request.upstream.checkpoint_sha256,
+            pdb_sha256=request.pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+            python_executable=python_executable,
+            output_dir=output_dir,
+            arguments=tuple(runtime_arguments),
+        )
+        commands.append(LigandMpnnCommand(seed=seed, output_dir=output_dir, argv=argv))
     return tuple(commands)
 
 

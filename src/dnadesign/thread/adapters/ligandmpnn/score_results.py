@@ -29,11 +29,15 @@ import torch
 
 from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
     LigandMpnnContextInventory,
+    _read_descriptor_relative_regular_bytes,
     load_ligandmpnn_context_inventory,
     validate_context_inventory_for_input,
 )
 from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnCommand
-from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import parse_pinned_runtime_prefix
+from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import (
+    parse_pinned_runtime_prefix,
+    pinned_runtime_completion_contract,
+)
 from dnadesign.thread.adapters.ligandmpnn.receipts import (
     LigandMpnnProvenance,
 )
@@ -96,6 +100,7 @@ class LigandMpnnScoreOutput:
     artifact_path: Path
     output_sha256: str
     command_sha256: str
+    execution_sha256: str
     residue_names: tuple[str, ...]
     _raw_probabilities: np.ndarray = field(repr=False, compare=False)
 
@@ -154,6 +159,7 @@ class LigandMpnnScoreOutput:
             "artifact_path": self.artifact_path.as_posix(),
             "output_sha256": self.output_sha256,
             "command_sha256": self.command_sha256,
+            "execution_sha256": self.execution_sha256,
             "draw_count": self.draw_count,
             "residue_count": self.residue_count,
             "raw_alphabet": EXPECTED_LIGANDMPNN_SCORE_ALPHABET,
@@ -194,7 +200,7 @@ class LigandMpnnScoreResult:
     def to_dict(self) -> dict[str, object]:
         return {
             "schema_id": "thread.ligandmpnn.score_result",
-            "schema_version": 2,
+            "schema_version": 3,
             "status": "completed_validated",
             "model_type": "ligand_mpnn",
             "request_id": self.request_id,
@@ -322,9 +328,16 @@ def parse_ligandmpnn_score_outputs(
         raise ValueError(
             "unexpected LigandMPNN score outputs: " + ", ".join(_display_path(path, root) for path in extra)
         )
+    execution_digests = _validate_execution_completions(request, commands, root=root)
 
     outputs: list[LigandMpnnScoreOutput] = []
-    for command, command_sha256, output_path in zip(commands, command_digests, expected_paths, strict=True):
+    for command, command_sha256, execution_sha256, output_path in zip(
+        commands,
+        command_digests,
+        execution_digests,
+        expected_paths,
+        strict=True,
+    ):
         payload_bytes = output_path.read_bytes()
         payload = _load_weights_only_payload(payload_bytes, artifact_path=output_path.relative_to(root))
         residue_names, raw_probabilities = _validate_payload(
@@ -339,6 +352,7 @@ def parse_ligandmpnn_score_outputs(
                 artifact_path=output_path.relative_to(root),
                 output_sha256=_sha256_bytes(payload_bytes),
                 command_sha256=command_sha256,
+                execution_sha256=execution_sha256,
                 residue_names=residue_names,
                 _raw_probabilities=raw_probabilities,
             )
@@ -376,7 +390,7 @@ def _validate_commands(request: LigandMpnnScoreRequest, commands: tuple[LigandMp
         raise ValueError("commands do not exactly match score request")
     first_argv = commands[0].argv
     try:
-        checkout_root, python_executable = parse_pinned_runtime_prefix(
+        checkout_root, python_executable, _completion_record_path, _execution_sha256 = parse_pinned_runtime_prefix(
             first_argv,
             upstream_commit=request.upstream.commit,
             checkpoint_sha256=request.upstream.checkpoint_sha256,
@@ -395,6 +409,43 @@ def _validate_commands(request: LigandMpnnScoreRequest, commands: tuple[LigandMp
     if commands != expected:
         raise ValueError("commands do not exactly match score request and context mode")
     return checkout_root
+
+
+def _validate_execution_completions(
+    request: LigandMpnnScoreRequest,
+    commands: tuple[LigandMpnnCommand, ...],
+    *,
+    root: Path,
+) -> tuple[str, ...]:
+    digests: list[str] = []
+    for command in commands:
+        completion_path, expected = pinned_runtime_completion_contract(
+            command.argv,
+            upstream_commit=request.upstream.commit,
+            checkpoint_sha256=request.upstream.checkpoint_sha256,
+            pdb_sha256=request.pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+        )
+        resolved_path = _within_root(root, completion_path, field_name="execution completion record")
+        relative_path = resolved_path.relative_to(root)
+        payload_bytes = _read_descriptor_relative_regular_bytes(
+            root,
+            relative_path,
+            label="LigandMPNN execution completion record",
+        )
+        try:
+            observed = json.loads(payload_bytes.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError(f"LigandMPNN execution completion record is not valid JSON: {relative_path}") from exc
+        if observed != expected:
+            raise ValueError(f"LigandMPNN execution completion does not match planned command: {relative_path}")
+        digest = expected.get("execution_sha256")
+        if not isinstance(digest, str) or not digest.startswith("sha256:"):
+            raise ValueError("LigandMPNN execution completion digest is invalid")
+        digests.append(digest)
+    return tuple(digests)
 
 
 def _load_weights_only_payload(payload: bytes, *, artifact_path: Path) -> dict[str, Any]:
