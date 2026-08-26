@@ -57,6 +57,15 @@ _ATTESTATION_SENSITIVE_FLAGS = frozenset(
         *_ALTERNATE_SOURCE_FLAGS,
     }
 )
+_SEPARATELY_VALIDATED_SINGLETON_FLAGS = frozenset(
+    {
+        _MODEL_TYPE_FLAG,
+        _CHECKPOINT_FLAG,
+        _PACKING_CHECKPOINT_FLAG,
+        _PDB_FLAG,
+        _RESIDUE_ALPHABET_FLAG,
+    }
+)
 
 
 def pinned_runtime_prefix(
@@ -258,6 +267,12 @@ def _validate_runtime_option_contract(arguments: tuple[str, ...]) -> None:
         or arguments[model_positions[0] + 1] != "ligand_mpnn"
     ):
         raise ValueError(f"unattested or ambiguous LigandMPNN runtime option: {_MODEL_TYPE_FLAG}")
+    for index, option_name in enumerate(option_names):
+        for earlier_name in option_names[:index]:
+            if option_name == earlier_name and option_name in _SEPARATELY_VALIDATED_SINGLETON_FLAGS:
+                continue
+            if option_name.startswith(earlier_name) or earlier_name.startswith(option_name):
+                raise ValueError(f"duplicate LigandMPNN runtime option or abbreviation: {option_name}")
 
 
 def _reject_existing_score_output(arguments: list[str], *, pdb_path: Path) -> None:

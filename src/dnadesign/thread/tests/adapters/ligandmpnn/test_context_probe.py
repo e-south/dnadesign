@@ -505,6 +505,44 @@ def test_probe_command_preserves_blank_chain_selection(
     assert observed[0].chains == ("",)
 
 
+def test_probe_command_preserves_option_looking_values(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit = _fake_upstream_checkout(tmp_path)
+    request = replace(
+        _request(tmp_path, checkout, commit),
+        request_id="-control",
+        pdb_path=Path("-input.pdb"),
+        output_path=Path("-inventory.json"),
+        chains=("-",),
+    )
+    command = build_ligandmpnn_context_probe_command(
+        request,
+        checkout_root=Path("-checkout"),
+    )
+    observed: list[tuple[LigandMpnnContextProbeRequest, Path]] = []
+
+    def _capture(
+        parsed_request: LigandMpnnContextProbeRequest,
+        *,
+        checkout_root: Path,
+        **_kwargs: object,
+    ) -> LigandMpnnContextInventoryReference:
+        observed.append((parsed_request, checkout_root))
+        return LigandMpnnContextInventoryReference(path=parsed_request.output_path, sha256=_DIGEST)
+
+    monkeypatch.setattr(context_probe_module, "materialize_ligandmpnn_context_inventory", _capture)
+
+    assert context_probe_module._main(list(command.argv[3:])) == 0
+    parsed_request, parsed_checkout = observed[0]
+    assert parsed_request.request_id == request.request_id
+    assert parsed_request.pdb_path == request.pdb_path
+    assert parsed_request.output_path == request.output_path
+    assert parsed_request.chains == request.chains
+    assert parsed_checkout == Path("-checkout")
+
+
 def test_reference_rejects_unsafe_paths_and_non_digests() -> None:
     with pytest.raises(ValueError, match="context inventory path"):
         LigandMpnnContextInventoryReference(path=Path("../inventory.json"), sha256=_DIGEST)

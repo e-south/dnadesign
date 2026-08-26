@@ -121,30 +121,35 @@ def build_ligandmpnn_context_probe_command(
         "-m",
         "dnadesign.thread.adapters.ligandmpnn.context_probe_cli",
         "materialize",
-        "--request-id",
-        request.request_id,
-        "--checkout-root",
-        str(checkout_root),
-        "--upstream-commit",
-        request.upstream.commit,
-        "--pdb-path",
-        request.pdb_path.as_posix(),
-        "--pdb-sha256",
-        request.pdb_sha256,
-        "--output-path",
-        request.output_path.as_posix(),
-        "--minimum-nucleotide-atoms",
-        str(request.minimum_nucleotide_atoms),
+    ]
+    _append_cli_option(argv, "--request-id", request.request_id)
+    _append_cli_option(argv, "--checkout-root", str(checkout_root))
+    _append_cli_option(argv, "--upstream-commit", request.upstream.commit)
+    _append_cli_option(argv, "--pdb-path", request.pdb_path.as_posix())
+    _append_cli_option(argv, "--pdb-sha256", request.pdb_sha256)
+    _append_cli_option(argv, "--output-path", request.output_path.as_posix())
+    _append_cli_option(argv, "--minimum-nucleotide-atoms", str(request.minimum_nucleotide_atoms))
+    _append_cli_option(
+        argv,
         "--required-polymer-types",
         ",".join(item.value for item in request.required_polymer_types),
-        "--parse-all-atoms",
-        _flag(request.parse_all_atoms),
+    )
+    _append_cli_option(argv, "--parse-all-atoms", _flag(request.parse_all_atoms))
+    _append_cli_option(
+        argv,
         "--parse-atoms-with-zero-occupancy",
         _flag(request.parse_atoms_with_zero_occupancy),
-    ]
+    )
     for chain in request.chains:
-        argv.extend(["--chain", chain])
+        _append_cli_option(argv, "--chain", chain)
     return LigandMpnnContextProbeCommand(output_path=request.output_path, argv=tuple(argv))
+
+
+def _append_cli_option(argv: list[str], option: str, value: str) -> None:
+    if value.startswith("-"):
+        argv.append(f"{option}={value}")
+    else:
+        argv.extend([option, value])
 
 
 def materialize_ligandmpnn_context_inventory(

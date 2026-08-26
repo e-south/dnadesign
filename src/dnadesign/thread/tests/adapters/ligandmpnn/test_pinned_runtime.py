@@ -41,6 +41,7 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
         "parser.add_argument('--omit_AA_per_residue')\n"
         "parser.add_argument('--fixed_residues')\n"
         "parser.add_argument('--redesigned_residues')\n"
+        "parser.add_argument('--ligand_mpnn_use_atom_context')\n"
         "parser.add_argument('--output', required=True)\n"
         "args = parser.parse_args()\n"
         "checkpoint = Path(args.checkpoint_ligand_mpnn).read_text(encoding='utf-8')\n"
@@ -424,6 +425,45 @@ def test_pinned_runtime_rejects_attached_duplicate_file_flags(
                 "--pdb_path",
                 str(pdb),
                 attached_argument,
+                "--output",
+                str(tmp_path / "output.txt"),
+            ),
+        )
+
+
+@pytest.mark.parametrize(
+    "duplicate_arguments",
+    [
+        ("--ligand_mpnn_use_atom_context", "0"),
+        ("--ligand_mpnn_use_atom_context=0",),
+        ("--ligand_mpnn_use_atom_con", "0"),
+    ],
+)
+def test_pinned_runtime_rejects_duplicate_semantic_flags(
+    tmp_path: Path,
+    duplicate_arguments: tuple[str, ...],
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+
+    with pytest.raises(ValueError, match="duplicate LigandMPNN runtime option"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--ligand_mpnn_use_atom_context",
+                "1",
+                *duplicate_arguments,
                 "--output",
                 str(tmp_path / "output.txt"),
             ),
