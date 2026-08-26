@@ -1285,7 +1285,47 @@ def test_failed_refresh_atomically_restores_readonly_manifest(
     assert not tuple(root.glob(f".{MANIFEST_NAME}.restore-*"))
 
 
-def test_refresh_hashes_and_parses_one_manifest_snapshot(
+def test_inventory_refuses_manifest_created_before_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    external_bytes = b'{"external":"receipt"}\n'
+    original_chmod = Path.chmod
+    injected = False
+
+    def _create_external_receipt(path: Path, mode: int, *, follow_symlinks: bool = True) -> None:
+        nonlocal injected
+        original_chmod(path, mode, follow_symlinks=follow_symlinks)
+        if path.name.startswith(f".{MANIFEST_NAME}.tmp-") and not injected:
+            injected = True
+            manifest_path.write_bytes(external_bytes)
+
+    monkeypatch.setattr(Path, "chmod", _create_external_receipt)
+
+    with pytest.raises(StorageObjectError, match="manifest appeared before publication"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert injected
+    assert manifest_path.read_bytes() == external_bytes
+    assert not tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+
+
+def test_refresh_hashes_and_parses_one_snapshot_then_rejects_manifest_replaced_before_publication(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1311,6 +1351,8 @@ def test_refresh_hashes_and_parses_one_manifest_snapshot(
     replacement_bytes = (json.dumps(replacement, indent=2, sort_keys=True) + "\n").encode("utf-8")
     expected_digest = _digest(manifest_path)
     original_read_bytes = Path.read_bytes
+    original_load = storage_inventory.load_storage_object_manifest_bytes
+    parsed_snapshots: list[bytes] = []
     swapped = False
 
     def _read_bytes(path: Path) -> bytes:
@@ -1321,17 +1363,23 @@ def test_refresh_hashes_and_parses_one_manifest_snapshot(
             path.write_bytes(replacement_bytes)
         return content
 
+    def _record_parsed_snapshot(content: bytes, *, source_label: str) -> object:
+        parsed_snapshots.append(content)
+        return original_load(content, source_label=source_label)
+
     monkeypatch.setattr(Path, "read_bytes", _read_bytes)
+    monkeypatch.setattr(storage_inventory, "load_storage_object_manifest_bytes", _record_parsed_snapshot)
 
-    refresh_storage_object(
-        root,
-        expected_manifest_digest=expected_digest,
-        producer_revision="test-revision-2",
-    )
+    with pytest.raises(StorageObjectError, match="manifest changed before publication"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=expected_digest,
+            producer_revision="test-revision-2",
+        )
 
-    refreshed = json.loads(original_read_bytes(manifest_path))
-    assert refreshed["owner_tool"] == "cruncher"
-    assert refreshed["producer_revision"] == "test-revision-2"
+    assert parsed_snapshots == [initial_bytes]
+    assert original_read_bytes(manifest_path) == replacement_bytes
+    assert not tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
 
 
 def test_refresh_restores_manifest_when_verification_is_interrupted(

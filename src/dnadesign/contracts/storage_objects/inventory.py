@@ -98,6 +98,28 @@ def _rollback_manifest(
         ) from operation_error
 
 
+def _assert_manifest_commit_precondition(manifest_path: Path, *, previous_bytes: bytes | None) -> None:
+    """Require the destination to still match the state that authorized publication."""
+
+    if previous_bytes is None:
+        try:
+            manifest_path.lstat()
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            raise StorageObjectError(f"cannot inspect storage object manifest before publication: {exc}") from exc
+        raise StorageObjectError("storage object manifest appeared before publication; refusing to overwrite it")
+
+    if manifest_path.is_symlink():
+        raise StorageObjectError("storage object manifest changed before publication; refusing to overwrite it")
+    try:
+        current_bytes = manifest_path.read_bytes()
+    except OSError as exc:
+        raise StorageObjectError(f"cannot read storage object manifest before publication: {exc}") from exc
+    if current_bytes != previous_bytes:
+        raise StorageObjectError("storage object manifest changed before publication; refusing to overwrite it")
+
+
 def _write_manifest(
     manifest_path: Path,
     payload: dict[str, object],
@@ -129,6 +151,7 @@ def _write_manifest(
             handle.write(manifest_text)
         if previous_mode is not None:
             temporary.chmod(previous_mode, follow_symlinks=False)
+        _assert_manifest_commit_precondition(manifest_path, previous_bytes=previous_bytes)
         replace_started = True
         os.replace(temporary, manifest_path)
     except BaseException as write_error:
