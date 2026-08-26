@@ -311,6 +311,35 @@ def test_pinned_runtime_preserves_pdb_basename_for_upstream_score_output(tmp_pat
     assert (output_root / "target-complex.pt").read_text(encoding="utf-8") == "score"
 
 
+def test_pinned_runtime_rejects_preexisting_score_output(tmp_path: Path) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "scores"
+    output_root.mkdir()
+    stale_output = output_root / "input.pt"
+    stale_output.write_text("stale", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="refuse stale or ambiguous result"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+            arguments=(
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert stale_output.read_text(encoding="utf-8") == "stale"
+
+
 @pytest.mark.parametrize(
     ("attached_argument", "message"),
     [

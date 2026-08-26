@@ -148,7 +148,7 @@ def execute_pinned_entrypoint(
             )
         inputs_root = snapshot / ".dnadesign-inputs"
         inputs_root.mkdir()
-        _replace_verified_file(
+        staged_pdb = _replace_verified_file(
             runtime_arguments,
             flag=_PDB_FLAG,
             expected_sha256=pdb_sha256,
@@ -165,6 +165,8 @@ def execute_pinned_entrypoint(
                 expected_sha256=residue_alphabet_sha256,
                 destination=inputs_root / "residue-alphabet.json",
             )
+        if entrypoint == "score.py":
+            _reject_existing_score_output(runtime_arguments, pdb_path=staged_pdb)
         subprocess.run(
             [sys.executable, "-B", "-E", "-s", str(entrypoint_path), *runtime_arguments],
             check=True,
@@ -178,7 +180,7 @@ def _replace_verified_file(
     expected_sha256: str,
     destination: Path,
     preserve_source_name: bool = False,
-) -> None:
+) -> Path:
     if len(expected_sha256) != 64 or any(character not in "0123456789abcdef" for character in expected_sha256):
         raise ValueError(f"{flag} expected digest must be a lowercase SHA256")
     attached_prefix = f"{flag}="
@@ -205,6 +207,21 @@ def _replace_verified_file(
     staged_path.write_bytes(payload)
     staged_path.chmod(0o400)
     arguments[value_index] = str(staged_path)
+    return staged_path
+
+
+def _reject_existing_score_output(arguments: list[str], *, pdb_path: Path) -> None:
+    output_flag = "--out_folder"
+    attached_prefix = f"{output_flag}="
+    if any(value.startswith(attached_prefix) for value in arguments):
+        raise ValueError(f"runtime arguments must use the split form of {output_flag} exactly once")
+    positions = [index for index, value in enumerate(arguments) if value == output_flag]
+    if len(positions) != 1 or positions[0] + 1 >= len(arguments):
+        raise ValueError(f"runtime arguments must contain exactly one {output_flag}")
+    output_root = Path(arguments[positions[0] + 1]).expanduser()
+    expected_output = output_root / f"{pdb_path.stem}.pt"
+    if expected_output.exists() or expected_output.is_symlink():
+        raise ValueError(f"score output already exists; refuse stale or ambiguous result: {expected_output}")
 
 
 def _has_flag(arguments: list[str], flag: str) -> bool:

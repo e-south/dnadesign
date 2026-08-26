@@ -150,11 +150,13 @@ def _quote_3dmol_atom_name(value: str) -> str:
 def _browser_cif_token(value: str, *, field: str) -> str:
     if field == "_atom_site.label_atom_id" and value.startswith('"') and value.endswith('"'):
         return value
-    if (
-        not value
-        or any(character.isspace() for character in value)
-        or any(character in value for character in ("'", '"'))
-    ):
+    if not value or any(character in value for character in ("\n", "\r")):
+        raise ValueError(f"mmCIF value cannot be serialized safely for 3Dmol at {field}: {value!r}")
+    if any(character.isspace() for character in value) or any(character in value for character in ("'", '"')):
+        if '"' not in value:
+            return f'"{value}"'
+        if "'" not in value:
+            return f"'{value}'"
         raise ValueError(f"mmCIF value cannot be serialized safely for 3Dmol at {field}: {value!r}")
     return value
 

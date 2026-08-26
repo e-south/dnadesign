@@ -27,6 +27,7 @@ from dnadesign.thread.structure_views import (
     summarize_pdb_atom_content,
     summarize_structure_atom_content,
 )
+from dnadesign.thread.structure_views._mmcif import serialize_mmcif_atom_sites_for_3dmol
 
 _MINIMAL_PDB = """\
 ATOM      1  N   GLY A   1       0.000   0.000   0.000  1.00 80.00           N
@@ -717,6 +718,17 @@ def test_py3dmol_backend_serializes_mmcif_for_3dmol_without_prime_token_ambiguit
     assert "data_mixed_polymer" not in unescaped_html
     assert '","cif");' in unescaped_html
     assert '","mmcif");' not in unescaped_html
+
+
+def test_py3dmol_backend_quotes_whitespace_bearing_mmcif_identifiers() -> None:
+    structure = _SIDECHAIN_MMCIF.replace(" SER A 1 3 ", " SER 'chain A' 1 3 ").replace(
+        " 0.000 A 3 ? ",
+        " 0.000 'chain A' 3 ? ",
+    )
+
+    serialized = serialize_mmcif_atom_sites_for_3dmol(structure)
+
+    assert '"chain A"' in serialized
 
 
 def test_structure_atom_content_summary_detects_sidechain_atoms() -> None:
