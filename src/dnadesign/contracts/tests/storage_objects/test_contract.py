@@ -223,3 +223,15 @@ def test_verify_storage_root_rejects_routing_symlinks(
 
     with pytest.raises(StorageObjectError, match="symlink"):
         verify_storage_root(storage_root)
+
+
+def test_verify_storage_root_rejects_symlinked_agents_router(tmp_path: Path) -> None:
+    storage_root = tmp_path / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+    external = tmp_path / "external-agents.md"
+    external.write_text("# External\n", encoding="utf-8")
+    (storage_root / "AGENTS.md").symlink_to(external)
+
+    with pytest.raises(StorageObjectError, match="routing file must not be a symlink"):
+        verify_storage_root(storage_root)

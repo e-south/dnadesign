@@ -189,6 +189,11 @@ def verify_storage_root(storage_root: Path) -> VerifiedStorageRoot:
     unexpected_root_paths = sorted(path.name for path in root.iterdir() if path.name not in allowed_shelves)
     if unexpected_root_paths:
         raise StorageObjectError(f"unexpected path in storage root: {', '.join(unexpected_root_paths)}")
+    routing_file = root / "AGENTS.md"
+    if routing_file.is_symlink():
+        raise StorageObjectError(f"storage root routing file must not be a symlink: {routing_file}")
+    if routing_file.exists() and not routing_file.is_file():
+        raise StorageObjectError(f"storage root routing file must be a regular file: {routing_file}")
     objects: list[VerifiedStorageObject] = []
     identities: set[tuple[str, str, str]] = set()
     for shelf_name, expected_kind in _SHELF_KINDS.items():

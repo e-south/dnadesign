@@ -74,6 +74,10 @@ def build_root_callback(
         try:
             selected_root = root or resolve_usr_root_from_env() or default_usr_root()
             normalized_root = normalize_usr_root(selected_root)
+            if not normalized_root.is_dir():
+                raise SequencesError(f"USR root is not an existing directory: {normalized_root}")
+            if not os.access(normalized_root, os.R_OK):
+                raise SequencesError(f"USR root is not readable: {normalized_root}")
             assert_supported_root(normalized_root)
         except SequencesError as exc:
             raise typer.BadParameter(str(exc), param_hint="--root") from exc
