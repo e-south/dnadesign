@@ -19,6 +19,7 @@ import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 
 import pytest
 
@@ -30,6 +31,7 @@ from dnadesign.contracts.storage_objects import (
     StorageObjectPublicationUnsupported,
     inventory_storage_object,
     refresh_storage_object,
+    verify_storage_object,
 )
 from dnadesign.contracts.storage_objects.models import LOCK_NAME
 
@@ -913,6 +915,72 @@ def test_concurrent_refresh_allows_exactly_one_compare_and_swap(tmp_path: Path) 
 
     assert outcomes.count("verified") == 1
     assert sum("manifest changed before refresh" in outcome for outcome in outcomes) == 1
+
+
+def test_validation_rejects_transient_refresh_candidate_until_cas_finishes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    initial_bytes = manifest_path.read_bytes()
+    competitor = json.loads(initial_bytes)
+    competitor["producer_revision"] = "competing-revision"
+    competitor_bytes = (json.dumps(competitor, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    original_exchange = storage_inventory._atomic_exchange
+    original_replace = storage_inventory.os.replace
+    exchange_paused = Event()
+    allow_refresh_to_finish = Event()
+    exchange_calls = 0
+
+    def _pause_after_exchange(source: Path, destination: Path) -> None:
+        nonlocal exchange_calls
+        exchange_calls += 1
+        if exchange_calls == 1:
+            staged = destination.with_name(f".{MANIFEST_NAME}.competitor")
+            staged.write_bytes(competitor_bytes)
+            original_replace(staged, destination)
+            original_exchange(source, destination)
+            exchange_paused.set()
+            if not allow_refresh_to_finish.wait(timeout=5):
+                raise RuntimeError("test did not release paused refresh")
+            return
+        original_exchange(source, destination)
+
+    monkeypatch.setattr(storage_inventory, "_atomic_exchange", _pause_after_exchange)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        refresh_future = executor.submit(
+            refresh_storage_object,
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+        assert exchange_paused.wait(timeout=5)
+        try:
+            with pytest.raises(StorageObjectError, match=r"undeclared files: \.storage\.object\.json\.tmp-"):
+                verify_storage_object(root)
+        finally:
+            allow_refresh_to_finish.set()
+        with pytest.raises(StorageObjectError, match="manifest changed before publication"):
+            refresh_future.result(timeout=5)
+
+    verified = verify_storage_object(root)
+    assert verified.manifest.producer_revision == "competing-revision"
 
 
 def test_refresh_advances_authoritative_store_receipt(tmp_path: Path) -> None:
