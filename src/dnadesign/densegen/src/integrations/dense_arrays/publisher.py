@@ -22,6 +22,7 @@ import shutil
 import sys
 import tempfile
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -111,6 +112,12 @@ _OUTPUT_FIELDS = {"directory", "formats"}
 _OUTPUT_FORMATS = {"manifest.json", "playback.mp4", "poster.png"}
 
 
+@dataclass(frozen=True)
+class _LoadedEndpoint:
+    endpoint: Mapping[str, object]
+    sha256: str
+
+
 def _sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -142,7 +149,11 @@ def _required_mapping(value: object, *, field_name: str) -> Mapping[str, object]
 
 
 def _required_text(value: object, *, field_name: str) -> str:
-    text = str(value or "").strip()
+    if value is None:
+        raise ValueError(f"{field_name} must be a non-empty string")
+    if not isinstance(value, str):
+        raise TypeError(f"{field_name} must be a string")
+    text = value.strip()
     if not text:
         msg = f"{field_name} must be a non-empty string"
         raise ValueError(msg)
@@ -237,9 +248,21 @@ def _install_output_directory(
         return
     if not replace:
         raise FileExistsError(f"output already exists: {output_path}; pass replace=True explicitly")
-    _atomic_exchange_directories(temp_path, output_path)
+    staging_suffix = temp_path.name.removeprefix(f".{output_path.name}.")
+    retired_path = temp_path.with_name(f".{output_path.name}.backup-{staging_suffix}")
+    temp_path.replace(retired_path)
     try:
-        shutil.rmtree(temp_path)
+        _atomic_exchange_directories(retired_path, output_path)
+    except OSError:
+        try:
+            retired_path.replace(temp_path)
+        except OSError:
+            # The published endpoint is still the prior bundle. Recovery can
+            # remove the discoverable staged backup on the next invocation.
+            pass
+        raise
+    try:
+        shutil.rmtree(retired_path)
     except OSError:
         # The new bundle is already committed. Retain the retired prior bundle
         # rather than reporting an ambiguous installation failure.
@@ -298,7 +321,8 @@ def _source_path(config_path: Path, source: Mapping[str, object]) -> Path:
     repository = source.get("repository")
     if repository is None:
         return (config_path.parent / relative).resolve()
-    return (_repository_root(config_path, str(repository)) / relative).resolve()
+    repository_name = _required_text(repository, field_name="source.repository")
+    return (_repository_root(config_path, repository_name) / relative).resolve()
 
 
 def _output_contract(
@@ -368,14 +392,18 @@ def _selected_rows(table_path: Path, record_ids: tuple[str, ...]) -> dict[str, M
     return selected
 
 
-def _load_endpoint(config_path: Path) -> Mapping[str, object]:
-    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+def _load_endpoint(config_path: Path) -> _LoadedEndpoint:
+    endpoint_bytes = config_path.read_bytes()
+    payload = yaml.safe_load(endpoint_bytes)
     endpoint = _required_mapping(payload, field_name="endpoint")
     if endpoint.get("schema") != _ENDPOINT_SCHEMA:
         msg = f"unsupported endpoint schema: {endpoint.get('schema')!r}"
         raise ValueError(msg)
     _strict_fields(endpoint, _ENDPOINT_FIELDS, field_name="endpoint")
-    return endpoint
+    return _LoadedEndpoint(
+        endpoint=endpoint,
+        sha256=hashlib.sha256(endpoint_bytes).hexdigest(),
+    )
 
 
 def publish_densegen_playback_endpoint(
@@ -385,7 +413,8 @@ def publish_densegen_playback_endpoint(
 ) -> Path:
     """Publish one endpoint atomically from existing DenseGen records."""
     config_path = Path(config_path).resolve()
-    endpoint = _load_endpoint(config_path)
+    loaded_endpoint = _load_endpoint(config_path)
+    endpoint = loaded_endpoint.endpoint
     endpoint_id = _required_text(endpoint.get("endpoint_id"), field_name="endpoint_id")
     if not _SCENE_ID.fullmatch(endpoint_id):
         raise ValueError(f"endpoint_id must match {_SCENE_ID.pattern!r}: {endpoint_id!r}")
@@ -448,10 +477,16 @@ def publish_densegen_playback_endpoint(
         playback.get("show_authority_notice"),
         field_name="playback.show_authority_notice",
     )
-    labels = _required_mapping(endpoint.get("labels") or {}, field_name="labels")
+    labels = _required_mapping(endpoint.get("labels", {}), field_name="labels")
     _strict_fields(labels, _LABEL_FIELDS, field_name="labels")
-    overrides_raw = _required_mapping(labels.get("overrides") or {}, field_name="labels.overrides")
-    label_overrides = {str(key): str(value) for key, value in overrides_raw.items()}
+    overrides_raw = _required_mapping(labels.get("overrides", {}), field_name="labels.overrides")
+    label_overrides = {
+        _required_text(key, field_name="labels.overrides key"): _required_text(
+            value,
+            field_name=f"labels.overrides[{key}]",
+        )
+        for key, value in overrides_raw.items()
+    }
     presentation_spec = _required_mapping(
         endpoint.get("presentation") or {},
         field_name="presentation",
@@ -460,7 +495,7 @@ def publish_densegen_playback_endpoint(
     if presentation_spec.get("layout") != "graph_left_duplex_right":
         raise ValueError("presentation.layout must be 'graph_left_duplex_right'")
     color_profile = _required_text(
-        presentation_spec.get("color_profile") or "categorical",
+        presentation_spec.get("color_profile", "categorical"),
         field_name="presentation.color_profile",
     )
     show_legend = _required_bool(
@@ -568,10 +603,16 @@ def publish_densegen_playback_endpoint(
     )
     endpoint_title = _required_text(endpoint.get("title"), field_name="title")
     source_ref = _required_text(source.get("table"), field_name="source.table")
+    source_repository_raw = source.get("repository")
+    source_repository = (
+        None if source_repository_raw is None else _required_text(source_repository_raw, field_name="source.repository")
+    )
     raw_collection_order = presentation_spec.get("collection_order")
     if not isinstance(raw_collection_order, list) or not raw_collection_order:
         raise ValueError("presentation.collection_order must be a non-empty list")
-    collection_order = tuple(str(value) for value in raw_collection_order)
+    collection_order = tuple(
+        _required_text(value, field_name="presentation.collection_order[]") for value in raw_collection_order
+    )
     if len(collection_order) != len(set(collection_order)):
         raise ValueError("presentation.collection_order must not contain duplicates")
     if set(collection_order) != set(scenes):
@@ -579,10 +620,12 @@ def publish_densegen_playback_endpoint(
     spec_by_scene = {str(spec["scene"]): spec for spec in record_specs}
     record_specs = tuple(spec_by_scene[scene] for scene in collection_order)
     record_ids = tuple(str(spec["id"]) for spec in record_specs)
-    forbidden_raw = labels.get("forbidden_terms") or []
+    forbidden_raw = labels.get("forbidden_terms", [])
     if not isinstance(forbidden_raw, list):
         raise TypeError("labels.forbidden_terms must be a list")
-    forbidden_terms = tuple(str(value).strip().casefold() for value in forbidden_raw)
+    forbidden_terms = tuple(
+        _required_text(value, field_name="labels.forbidden_terms[]").casefold() for value in forbidden_raw
+    )
     text_surfaces = [endpoint_title, *label_overrides.values()]
     for term in forbidden_terms:
         if term and any(term in surface.casefold() for surface in text_surfaces):
@@ -627,9 +670,19 @@ def publish_densegen_playback_endpoint(
 
         plan = reconstruct_playback(realized)
         realized_by_digest[plan.realization_digest] = realized
-        scene_title = str(spec.get("title") or scene.replace("_", " ").title())
+        scene_title_raw = spec.get("title")
+        scene_title = (
+            scene.replace("_", " ").title()
+            if scene_title_raw is None
+            else _required_text(scene_title_raw, field_name="source.records[].title")
+        )
         persisted_plan = str(row.get("densegen__plan") or "")
-        subtitle = str(spec.get("subtitle") or persisted_plan)
+        subtitle_raw = spec.get("subtitle")
+        subtitle = (
+            persisted_plan
+            if subtitle_raw is None
+            else _required_text(subtitle_raw, field_name="source.records[].subtitle")
+        )
         for term in forbidden_terms:
             if term and (term in scene_title.casefold() or term in subtitle.casefold()):
                 raise ValueError(f"configured presentation text contains forbidden term: {term!r}")
@@ -742,10 +795,10 @@ def publish_densegen_playback_endpoint(
                     }
                 ),
             },
-            "endpoint_spec_sha256": _sha256_file(config_path),
+            "endpoint_spec_sha256": loaded_endpoint.sha256,
             "source": {
                 "kind": source_kind,
-                "repository": source.get("repository"),
+                "repository": source_repository,
                 "table": source_ref,
                 "selected_records_sha256": observed_selected_sha256,
             },

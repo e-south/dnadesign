@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -338,6 +339,37 @@ def test_publisher_reports_success_when_only_retired_bundle_cleanup_fails(
     assert len(tuple(output_path.parent.glob(f".{output_path.name}.*"))) == 1
 
 
+def test_publisher_retries_retired_bundle_cleanup_on_next_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = _write_endpoint(tmp_path)
+    output_path = publisher.publish_densegen_playback_endpoint(config_path)
+    original_rmtree = publisher.shutil.rmtree
+    denied_once = False
+
+    def _deny_first_retired_bundle_cleanup(path: Path, *args, **kwargs) -> None:
+        nonlocal denied_once
+        candidate = Path(path)
+        if not denied_once and candidate.name.startswith(f".{output_path.name}."):
+            denied_once = True
+            raise OSError("simulated transient cleanup denial")
+        original_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(publisher.shutil, "rmtree", _deny_first_retired_bundle_cleanup)
+
+    publisher.publish_densegen_playback_endpoint(config_path, replace=True)
+
+    retained = tuple(output_path.parent.glob(f".{output_path.name}.backup-*"))
+    assert len(retained) == 1
+    assert (retained[0] / "manifest.json").is_file()
+
+    monkeypatch.setattr(publisher.shutil, "rmtree", original_rmtree)
+    publisher.publish_densegen_playback_endpoint(config_path, replace=True)
+
+    assert not tuple(output_path.parent.glob(f".{output_path.name}.backup-*"))
+
+
 def test_publisher_recovers_prior_bundle_after_interrupted_rename(tmp_path: Path) -> None:
     config_path = _write_endpoint(tmp_path)
     output_path = publisher.publish_densegen_playback_endpoint(config_path)
@@ -371,7 +403,7 @@ def test_publisher_rejects_unknown_label_fields(tmp_path: Path) -> None:
 @pytest.mark.parametrize("config_name", ["playback.yaml", "playback-constraints.yaml"])
 def test_packaged_playback_configs_follow_supported_schema(config_name: str) -> None:
     config_path = Path(__file__).resolve().parents[2] / "workspaces" / "demo_dense_array_showcase" / config_name
-    endpoint = publisher._load_endpoint(config_path)
+    endpoint = publisher._load_endpoint(config_path).endpoint
     source = publisher._required_mapping(endpoint["source"], field_name="source")
     labels = publisher._required_mapping(endpoint["labels"], field_name="labels")
 
@@ -408,6 +440,71 @@ def test_publisher_requires_valid_endpoint_id(tmp_path: Path, endpoint_id: str |
     config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
     with pytest.raises(ValueError, match=message):
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+
+@pytest.mark.parametrize(
+    ("field_path", "value", "message"),
+    [
+        (("endpoint_id",), 123, "endpoint_id must be a string"),
+        (("source", "records", 0, "title"), 7, "source.records\\[\\].title must be a string"),
+        (
+            ("labels", "forbidden_terms", 0),
+            False,
+            "labels.forbidden_terms\\[\\] must be a string",
+        ),
+        (
+            ("labels", "overrides", "TF_A"),
+            False,
+            "labels.overrides\\[TF_A\\] must be a string",
+        ),
+        (
+            ("presentation", "collection_order", 0),
+            False,
+            "presentation.collection_order\\[\\] must be a string",
+        ),
+    ],
+)
+def test_publisher_rejects_non_string_yaml_text_scalars(
+    tmp_path: Path,
+    field_path: tuple[str | int, ...],
+    value: object,
+    message: str,
+) -> None:
+    config_path = _write_endpoint(tmp_path)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    target = payload
+    for key in field_path[:-1]:
+        target = target[key]
+    target[field_path[-1]] = value
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(TypeError, match=message):
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+
+@pytest.mark.parametrize(
+    ("field_path", "message"),
+    [
+        (("labels",), "labels must be a mapping"),
+        (("labels", "overrides"), "labels.overrides must be a mapping"),
+        (("labels", "forbidden_terms"), "labels.forbidden_terms must be a list"),
+    ],
+)
+def test_publisher_rejects_false_yaml_label_containers(
+    tmp_path: Path,
+    field_path: tuple[str, ...],
+    message: str,
+) -> None:
+    config_path = _write_endpoint(tmp_path)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    target = payload
+    for key in field_path[:-1]:
+        target = target[key]
+    target[field_path[-1]] = False
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(TypeError, match=message):
         publisher.publish_densegen_playback_endpoint(config_path)
 
 
@@ -588,6 +685,33 @@ def test_publisher_honors_requested_render_formats(
     assert manifest["endpoint_id"] == "fixture"
     assert manifest["audience"] == "public"
     assert manifest["requested_formats"] == ["manifest.json", "poster.png"]
+
+
+def test_manifest_digest_binds_endpoint_bytes_used_before_render_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = _write_endpoint(tmp_path, formats=("manifest.json", "poster.png"))
+    endpoint_bytes = config_path.read_bytes()
+    expected_digest = hashlib.sha256(endpoint_bytes).hexdigest()
+
+    monkeypatch.setattr(
+        publisher,
+        "BaseRenderDuplexProjection",
+        lambda *_args, **_kwargs: SimpleNamespace(render_rgba=lambda *_inner: None),
+    )
+
+    def _mutating_poster(_documents, path: Path, **_kwargs) -> None:
+        config_path.write_bytes(endpoint_bytes + b"\n# mutated during render\n")
+        path.write_bytes(b"poster")
+
+    monkeypatch.setattr(publisher, "render_collection_poster_png", _mutating_poster)
+
+    output = publisher.publish_densegen_playback_endpoint(config_path)
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+
+    assert manifest["endpoint_spec_sha256"] == expected_digest
+    assert manifest["endpoint_spec_sha256"] != hashlib.sha256(config_path.read_bytes()).hexdigest()
 
 
 def test_baserender_projection_omits_disabled_distance_bracket() -> None:
