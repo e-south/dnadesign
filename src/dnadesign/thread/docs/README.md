@@ -67,10 +67,14 @@ forms) are classified; any other residue identity remains explicitly `other`.
 This classification labels the observed atoms—it does not decide which atoms
 upstream consumes.
 
-Context receipts are published by an atomic no-follow replacement. Admission
-replays the exact pinned parser over the digest-matched PDB and requires the
-loaded receipt to equal that derived inventory; a caller-authored JSON receipt
-cannot create observed context by assertion alone.
+Context receipts are published by an atomic no-follow replacement. If the
+post-replacement directory durability check fails, publication restores the
+prior regular-file bytes or prior absence before reporting ordinary failure.
+If that restoration cannot itself be made durable, the public
+`LigandMpnnContextPublicationUncertainError` reports the uncertain state.
+Admission replays the exact pinned parser over the digest-matched PDB and
+requires the loaded receipt to equal that derived inventory; a caller-authored
+JSON receipt cannot create observed context by assertion alone.
 
 Probability probes use the official `score.py` single-AA or autoregressive
 mode with explicit sequence, atom-context, and fixed-side-chain-context flags.

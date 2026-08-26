@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import json
 import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -42,6 +43,10 @@ from dnadesign.thread.adapters.ligandmpnn.pinned_checkout import (
 
 _DNA_RESIDUE_NAMES = frozenset({"DA", "DC", "DG", "DI", "DT", "DU"})
 _RNA_RESIDUE_NAMES = frozenset({"A", "C", "G", "I", "U", "RA", "RC", "RG", "RI", "RU"})
+
+
+class LigandMpnnContextPublicationUncertainError(RuntimeError):
+    """Receipt rollback could not establish a durable pre-publication state."""
 
 
 @dataclass(frozen=True)
@@ -221,24 +226,26 @@ def _publish_context_inventory(execution_root: Path, output_path: Path, payload:
     except OSError as error:
         raise ValueError("context probe output directory could not be opened safely") from error
     try:
-        file_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
-        file_descriptor = os.open(temporary_name, file_flags, 0o600, dir_fd=directory_fd)
-        try:
-            handle = os.fdopen(file_descriptor, "wb")
-        except BaseException:
-            os.close(file_descriptor)
-            raise
-        with handle:
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
+        prior_payload = _read_prior_receipt(directory_fd, output_path.name)
+        _write_temporary_receipt(directory_fd, temporary_name, payload)
         os.replace(
             temporary_name,
             output_path.name,
             src_dir_fd=directory_fd,
             dst_dir_fd=directory_fd,
         )
-        os.fsync(directory_fd)
+        try:
+            os.fsync(directory_fd)
+        except OSError as durability_error:
+            try:
+                _restore_prior_receipt(directory_fd, output_path.name, prior_payload)
+            except OSError as restoration_error:
+                raise LigandMpnnContextPublicationUncertainError(
+                    "context probe receipt restoration could not be made durable after publication failure"
+                ) from restoration_error
+            raise ValueError("context probe output could not be published atomically") from durability_error
+    except LigandMpnnContextPublicationUncertainError:
+        raise
     except OSError as error:
         raise ValueError("context probe output could not be published atomically") from error
     finally:
@@ -248,6 +255,73 @@ def _publish_context_inventory(execution_root: Path, output_path: Path, payload:
             pass
         finally:
             os.close(directory_fd)
+
+
+def _read_prior_receipt(directory_fd: int, output_name: str) -> bytes | None:
+    """Read restorable regular-file bytes without following a receipt symlink."""
+
+    try:
+        status = os.stat(output_name, dir_fd=directory_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISREG(status.st_mode):
+        return None
+    file_flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+    try:
+        file_descriptor = os.open(output_name, file_flags, dir_fd=directory_fd)
+    except FileNotFoundError:
+        return None
+    try:
+        handle = os.fdopen(file_descriptor, "rb")
+    except BaseException:
+        os.close(file_descriptor)
+        raise
+    with handle:
+        if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+            return None
+        return handle.read()
+
+
+def _write_temporary_receipt(directory_fd: int, temporary_name: str, payload: bytes) -> None:
+    """Write and sync one no-follow temporary receipt in an opened directory."""
+
+    file_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
+    file_descriptor = os.open(temporary_name, file_flags, 0o600, dir_fd=directory_fd)
+    try:
+        handle = os.fdopen(file_descriptor, "wb")
+    except BaseException:
+        os.close(file_descriptor)
+        raise
+    with handle:
+        handle.write(payload)
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def _restore_prior_receipt(directory_fd: int, output_name: str, prior_payload: bytes | None) -> None:
+    """Restore the descriptor-relative pre-publication state and sync it."""
+
+    if prior_payload is None:
+        try:
+            os.unlink(output_name, dir_fd=directory_fd)
+        except FileNotFoundError:
+            pass
+    else:
+        restoration_name = f".{output_name}.{uuid.uuid4().hex}.restore.tmp"
+        try:
+            _write_temporary_receipt(directory_fd, restoration_name, prior_payload)
+            os.replace(
+                restoration_name,
+                output_name,
+                src_dir_fd=directory_fd,
+                dst_dir_fd=directory_fd,
+            )
+        finally:
+            try:
+                os.unlink(restoration_name, dir_fd=directory_fd)
+            except FileNotFoundError:
+                pass
+    os.fsync(directory_fd)
 
 
 def _open_output_directory(execution_root: Path, relative_parent: Path) -> int:

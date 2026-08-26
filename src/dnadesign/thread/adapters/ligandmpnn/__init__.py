@@ -23,6 +23,7 @@ from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
 from dnadesign.thread.adapters.ligandmpnn.context_probe import (
     LigandMpnnContextProbeCommand,
     LigandMpnnContextProbeRequest,
+    LigandMpnnContextPublicationUncertainError,
     build_ligandmpnn_context_probe_command,
     materialize_ligandmpnn_context_inventory,
 )
@@ -75,6 +76,7 @@ __all__ = [
     "LigandMpnnContextInventory",
     "LigandMpnnContextInventoryReference",
     "LigandMpnnContextPolymer",
+    "LigandMpnnContextPublicationUncertainError",
     "LigandMpnnContextProbeCommand",
     "LigandMpnnContextProbeRequest",
     "LigandMpnnPackingConfig",

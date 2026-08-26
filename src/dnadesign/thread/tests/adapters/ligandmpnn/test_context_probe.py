@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import py_compile
+import stat
 import subprocess
 import sys
 import threading
@@ -28,6 +29,7 @@ from dnadesign.thread.adapters.ligandmpnn import (
     LigandMpnnContextInventoryReference,
     LigandMpnnContextPolymer,
     LigandMpnnContextProbeRequest,
+    LigandMpnnContextPublicationUncertainError,
     LigandMpnnUpstreamPin,
     build_ligandmpnn_context_probe_command,
     load_ligandmpnn_context_inventory,
@@ -344,6 +346,105 @@ def test_probe_rejects_ancestor_symlink_race_without_publishing_outside_executio
     racer.join(timeout=5)
     assert not racer.is_alive()
     assert not (outside_parent / "context" / request.output_path.name).exists()
+
+
+def test_probe_restores_existing_receipt_when_post_replace_directory_fsync_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit = _fake_upstream_checkout(tmp_path)
+    request = _request(tmp_path, checkout, commit)
+    output_path = tmp_path / request.output_path
+    output_path.parent.mkdir(parents=True)
+    prior_payload = b"prior receipt bytes\n"
+    output_path.write_bytes(prior_payload)
+    original_fsync = os.fsync
+    failed = False
+
+    def _fail_post_replace_directory_fsync(file_descriptor: int) -> None:
+        nonlocal failed
+        if not failed and stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
+            assert output_path.read_bytes() != prior_payload
+            failed = True
+            raise OSError("simulated directory fsync failure")
+        original_fsync(file_descriptor)
+
+    monkeypatch.setattr(os, "fsync", _fail_post_replace_directory_fsync)
+
+    with pytest.raises(ValueError, match="context probe output could not be published atomically"):
+        materialize_ligandmpnn_context_inventory(
+            request,
+            execution_root=tmp_path,
+            checkout_root=checkout,
+        )
+
+    assert failed
+    assert output_path.read_bytes() == prior_payload
+    assert not list(output_path.parent.glob(f".{output_path.name}.*.tmp"))
+
+
+def test_probe_removes_new_receipt_when_post_replace_directory_fsync_fails_without_prior_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit = _fake_upstream_checkout(tmp_path)
+    request = _request(tmp_path, checkout, commit)
+    output_path = tmp_path / request.output_path
+    original_fsync = os.fsync
+    failed = False
+
+    def _fail_post_replace_directory_fsync(file_descriptor: int) -> None:
+        nonlocal failed
+        if not failed and stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
+            assert output_path.is_file()
+            failed = True
+            raise OSError("simulated directory fsync failure")
+        original_fsync(file_descriptor)
+
+    monkeypatch.setattr(os, "fsync", _fail_post_replace_directory_fsync)
+
+    with pytest.raises(ValueError, match="context probe output could not be published atomically"):
+        materialize_ligandmpnn_context_inventory(
+            request,
+            execution_root=tmp_path,
+            checkout_root=checkout,
+        )
+
+    assert failed
+    assert not output_path.exists()
+    assert not list(output_path.parent.glob(f".{output_path.name}.*.tmp"))
+
+
+def test_probe_reports_typed_uncertainty_when_restoration_directory_fsync_also_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit = _fake_upstream_checkout(tmp_path)
+    request = _request(tmp_path, checkout, commit)
+    output_path = tmp_path / request.output_path
+    output_path.parent.mkdir(parents=True)
+    prior_payload = b"prior receipt bytes\n"
+    output_path.write_bytes(prior_payload)
+    original_fsync = os.fsync
+
+    def _fail_directory_fsync(file_descriptor: int) -> None:
+        if stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
+            raise OSError("simulated persistent directory fsync failure")
+        original_fsync(file_descriptor)
+
+    monkeypatch.setattr(os, "fsync", _fail_directory_fsync)
+
+    with pytest.raises(
+        LigandMpnnContextPublicationUncertainError,
+        match="restoration could not be made durable",
+    ):
+        materialize_ligandmpnn_context_inventory(
+            request,
+            execution_root=tmp_path,
+            checkout_root=checkout,
+        )
+
+    assert output_path.read_bytes() == prior_payload
 
 
 def test_probe_command_is_explicit_and_portable(tmp_path: Path) -> None:
