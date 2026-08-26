@@ -201,10 +201,29 @@ def verify_storage_object(
         raise StorageObjectError(f"storage object root is missing {MANIFEST_NAME}: {root}")
     lock_path = root / LOCK_NAME
     try:
+        root_stat = root.stat(follow_symlinks=False)
+        root_mode = stat.S_IMODE(root_stat.st_mode)
+        if root_mode & stat.S_IWGRP and not root_mode & stat.S_ISGID:
+            raise StorageObjectError(
+                "group-writable storage object roots must set the setgid bit "
+                "so coordination files inherit the shared group"
+            )
         if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
             raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
         if lock_path.exists() and lock_path.stat(follow_symlinks=False).st_size != 0:
             raise StorageObjectError(f"storage object lock must be an empty coordination file: {lock_path}")
+        if (
+            root_mode & stat.S_IWGRP
+            and lock_path.exists()
+            and lock_path.stat(follow_symlinks=False).st_gid != root_stat.st_gid
+        ):
+            raise StorageObjectError(f"storage object lock does not inherit the shared object group: {lock_path}")
+        if (
+            root_mode & stat.S_IWGRP
+            and lock_path.exists()
+            and not lock_path.stat(follow_symlinks=False).st_mode & stat.S_IWGRP
+        ):
+            raise StorageObjectError(f"storage object lock must be group-writable in a shared object root: {lock_path}")
     except OSError as exc:
         raise StorageObjectError(f"cannot inspect storage object lock {lock_path}: {exc}") from exc
     manifest = load_storage_object_manifest(manifest_path)

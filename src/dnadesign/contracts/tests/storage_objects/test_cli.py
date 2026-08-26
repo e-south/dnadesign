@@ -629,6 +629,46 @@ def test_inventory_wraps_lock_acquisition_failures(
         )
 
 
+def test_manifest_lock_releases_after_post_acquisition_inspection_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(0o2770)
+    acquired = False
+    released = False
+
+    class _FakeLock:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            pass
+
+        def acquire(self) -> None:
+            nonlocal acquired
+            acquired = True
+
+        def release(self) -> None:
+            nonlocal released
+            released = True
+
+    real_stat = Path.stat
+
+    def _stat(path: Path, *args: object, **kwargs: object):
+        if acquired and path == root / LOCK_NAME:
+            raise PermissionError("simulated post-acquisition inspection denial")
+        return real_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(storage_inventory, "FileLock", _FakeLock)
+    monkeypatch.setattr(Path, "stat", _stat)
+
+    with pytest.raises(StorageObjectError, match="cannot inspect storage object lock after acquisition"):
+        with storage_inventory._manifest_lock(root):
+            raise AssertionError("lock body must not run")
+
+    assert acquired is True
+    assert released is True
+
+
 def test_refresh_wraps_lock_acquisition_failures(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

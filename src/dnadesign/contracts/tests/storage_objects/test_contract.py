@@ -145,6 +145,26 @@ def test_verify_storage_object_rejects_nonempty_shared_lock(tmp_path: Path) -> N
     assert lock_path.read_text(encoding="utf-8") == "unexpected bytes\n"
 
 
+def test_verify_storage_object_rejects_invalid_shared_lock_posture(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    root.chmod(0o2770)
+    lock_path = root / LOCK_NAME
+    lock_path.touch(mode=0o644)
+
+    with pytest.raises(StorageObjectError, match="lock must be group-writable"):
+        verify_storage_object(root)
+
+
+def test_verify_storage_object_rejects_group_writable_root_without_setgid(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    root.chmod(0o770)
+
+    with pytest.raises(StorageObjectError, match="must set the setgid bit"):
+        verify_storage_object(root)
+
+
 def test_verify_storage_object_wraps_resource_read_failures(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

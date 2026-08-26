@@ -158,9 +158,25 @@ def _manifest_lock(root: Path) -> Iterator[None]:
         raise StorageObjectError(f"timed out waiting for storage object manifest lock: {root}") from exc
     except OSError as exc:
         raise StorageObjectError(f"cannot acquire storage object manifest lock {lock_path}: {exc}") from exc
-    if root_mode & stat.S_IWGRP and lock_path.stat(follow_symlinks=False).st_gid != root_stat.st_gid:
-        lock.release()
-        raise StorageObjectError(f"storage object lock does not inherit the shared object group: {lock_path}")
+    try:
+        lock_stat = lock_path.stat(follow_symlinks=False)
+        if root_mode & stat.S_IWGRP and lock_stat.st_gid != root_stat.st_gid:
+            raise StorageObjectError(f"storage object lock does not inherit the shared object group: {lock_path}")
+        if root_mode & stat.S_IWGRP and not lock_stat.st_mode & stat.S_IWGRP:
+            raise StorageObjectError(f"storage object lock must be group-writable in a shared object root: {lock_path}")
+    except (OSError, StorageObjectError) as inspection_error:
+        try:
+            lock.release()
+        except OSError as release_error:
+            raise StorageObjectError(
+                f"cannot inspect storage object lock after acquisition and lock {lock_path} could not be released: "
+                f"{release_error}"
+            ) from inspection_error
+        if isinstance(inspection_error, StorageObjectError):
+            raise
+        raise StorageObjectError(
+            f"cannot inspect storage object lock after acquisition {lock_path}: {inspection_error}"
+        ) from inspection_error
     try:
         yield
     except BaseException as body_error:
