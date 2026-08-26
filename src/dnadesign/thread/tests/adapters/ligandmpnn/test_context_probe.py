@@ -295,6 +295,35 @@ def test_probe_does_not_import_helpers_from_mutable_checkout(tmp_path: Path) -> 
     assert not (tmp_path / request.output_path).exists()
 
 
+def test_probe_publishes_receipt_without_following_a_raced_symlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit = _fake_upstream_checkout(tmp_path)
+    request = _request(tmp_path, checkout, commit)
+    output_path = tmp_path.resolve() / request.output_path
+    outside_path = tmp_path / "outside.txt"
+    outside_path.write_text("sentinel", encoding="utf-8")
+    path_type = type(output_path)
+    original_write_bytes = path_type.write_bytes
+
+    def _race_output_write(path: Path, payload: bytes) -> int:
+        if path == output_path and not path.exists() and not path.is_symlink():
+            path.symlink_to(outside_path)
+        return original_write_bytes(path, payload)
+
+    monkeypatch.setattr(path_type, "write_bytes", _race_output_write)
+
+    materialize_ligandmpnn_context_inventory(
+        request,
+        execution_root=tmp_path,
+        checkout_root=checkout,
+    )
+
+    assert not output_path.is_symlink()
+    assert outside_path.read_text(encoding="utf-8") == "sentinel"
+
+
 def test_probe_command_is_explicit_and_portable(tmp_path: Path) -> None:
     checkout, commit = _fake_upstream_checkout(tmp_path)
     request = _request(tmp_path, checkout, commit)

@@ -291,6 +291,7 @@ def parse_ligandmpnn_score_outputs(
         upstream=request.upstream,
         use_side_chain_context=request.use_side_chain_context,
         checkout_root=checkout_root,
+        execution_root=root,
     )
 
     command_digests = tuple(_command_sha256(command) for command in commands)

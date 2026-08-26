@@ -23,10 +23,7 @@ import torch
 from dnadesign.thread.adapters.ligandmpnn import (
     EXPECTED_LIGANDMPNN_SCORE_ALPHABET,
     LigandMpnnCanonical20Policy,
-    LigandMpnnContextAtom,
-    LigandMpnnContextInventory,
     LigandMpnnContextInventoryReference,
-    LigandMpnnContextPolymer,
     LigandMpnnScoreMode,
     LigandMpnnScoreOutputTrust,
     LigandMpnnScoreRequest,
@@ -35,7 +32,10 @@ from dnadesign.thread.adapters.ligandmpnn import (
     parse_ligandmpnn_score_outputs,
     score_request_sha256,
 )
-from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import create_pinned_context_checkout
+from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import (
+    create_pinned_context_checkout,
+    write_context_inventory,
+)
 
 _CHECKPOINT_SHA256 = "a" * 64
 
@@ -80,33 +80,13 @@ def _write_context_inventory(
     upstream_commit: str,
     parser_sha256: str,
 ) -> LigandMpnnContextInventoryReference:
-    atoms = (
-        LigandMpnnContextAtom(1, "P", "P", 15, "D", "DC", 12, "", LigandMpnnContextPolymer.DNA),
-        LigandMpnnContextAtom(2, "P", "P", 15, "E", "G", 66, "", LigandMpnnContextPolymer.RNA),
-    )
-    inventory = LigandMpnnContextInventory(
-        request_id="generic_context_inventory",
-        request_sha256="b" * 64,
+    return write_context_inventory(
+        root,
         input_path=Path("inputs/target.pdb"),
         input_sha256=pdb_sha256,
         upstream_commit=upstream_commit,
-        parser_path=Path("data_utils.py"),
         parser_sha256=parser_sha256,
-        parser_callable="parse_PDB",
-        chains=(),
         parse_all_atoms=False,
-        parse_atoms_with_zero_occupancy=False,
-        minimum_nucleotide_atoms=1,
-        required_polymer_types=(LigandMpnnContextPolymer.DNA, LigandMpnnContextPolymer.RNA),
-        atoms=atoms,
-    )
-    payload = (json.dumps(inventory.to_dict(), indent=2, sort_keys=True) + "\n").encode("utf-8")
-    path = root / "evidence/context-inventory.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(payload)
-    return LigandMpnnContextInventoryReference(
-        path=Path("evidence/context-inventory.json"),
-        sha256=_sha256(payload),
     )
 
 

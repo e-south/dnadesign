@@ -388,6 +388,7 @@ def validate_context_inventory_for_input(
     upstream: LigandMpnnUpstreamPin,
     use_side_chain_context: bool,
     checkout_root: Path,
+    execution_root: Path,
 ) -> None:
     """Require an inventory produced for the exact input and context settings."""
 
@@ -410,6 +411,29 @@ def validate_context_inventory_for_input(
         raise ValueError("score requests require the upstream positive-occupancy parser default")
     if inventory.effective_nucleotide_atom_count <= 0:
         raise ValueError("context inventory proves zero effective DNA/RNA context atoms")
+    from dnadesign.thread.adapters.ligandmpnn.context_probe import (
+        LigandMpnnContextProbeRequest,
+        _derive_ligandmpnn_context_inventory,
+    )
+
+    derived = _derive_ligandmpnn_context_inventory(
+        LigandMpnnContextProbeRequest(
+            request_id=inventory.request_id,
+            pdb_path=inventory.input_path,
+            pdb_sha256=inventory.input_sha256,
+            output_path=Path("context-inventory.json"),
+            upstream=upstream,
+            minimum_nucleotide_atoms=inventory.minimum_nucleotide_atoms,
+            required_polymer_types=inventory.required_polymer_types,
+            chains=inventory.chains,
+            parse_all_atoms=inventory.parse_all_atoms,
+            parse_atoms_with_zero_occupancy=inventory.parse_atoms_with_zero_occupancy,
+        ),
+        execution_root=execution_root,
+        checkout_root=checkout_root,
+    )
+    if inventory != derived:
+        raise ValueError("context inventory does not match pinned parser derivation")
 
 
 def _pinned_parser_sha256(checkout_root: Path, *, upstream_commit: str, parser_path: Path) -> str:

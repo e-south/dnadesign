@@ -26,6 +26,33 @@ _CHECKPOINT_FLAG = "--checkpoint_ligand_mpnn"
 _PACKING_CHECKPOINT_FLAG = "--checkpoint_path_sc"
 _PDB_FLAG = "--pdb_path"
 _RESIDUE_ALPHABET_FLAG = "--omit_AA_per_residue"
+_MODEL_TYPE_FLAG = "--model_type"
+_OUTPUT_FOLDER_FLAG = "--out_folder"
+_ALTERNATE_SOURCE_FLAGS = frozenset(
+    {
+        "--checkpoint_protein_mpnn",
+        "--checkpoint_per_residue_label_membrane_mpnn",
+        "--checkpoint_global_label_membrane_mpnn",
+        "--checkpoint_soluble_mpnn",
+        "--pdb_path_multi",
+        "--fixed_residues_multi",
+        "--redesigned_residues_multi",
+        "--bias_AA_per_residue",
+        "--bias_AA_per_residue_multi",
+        "--omit_AA_per_residue_multi",
+    }
+)
+_ATTESTATION_SENSITIVE_FLAGS = frozenset(
+    {
+        _MODEL_TYPE_FLAG,
+        _CHECKPOINT_FLAG,
+        _PACKING_CHECKPOINT_FLAG,
+        _PDB_FLAG,
+        _RESIDUE_ALPHABET_FLAG,
+        _OUTPUT_FOLDER_FLAG,
+        *_ALTERNATE_SOURCE_FLAGS,
+    }
+)
 
 
 def pinned_runtime_prefix(
@@ -114,6 +141,7 @@ def execute_pinned_entrypoint(
 
     if entrypoint not in _ENTRYPOINTS:
         raise ValueError(f"unsupported LigandMPNN entrypoint: {entrypoint!r}")
+    _validate_runtime_option_contract(arguments)
     checkout = checkout_root.expanduser().resolve()
     if not checkout.is_dir():
         raise ValueError("LigandMPNN checkout_root must be an existing directory")
@@ -208,6 +236,24 @@ def _replace_verified_file(
     staged_path.chmod(0o400)
     arguments[value_index] = str(staged_path)
     return staged_path
+
+
+def _validate_runtime_option_contract(arguments: tuple[str, ...]) -> None:
+    option_names = tuple(value.partition("=")[0] for value in arguments if value.startswith("--"))
+    for option_name in option_names:
+        if option_name in _ALTERNATE_SOURCE_FLAGS or (
+            option_name not in _ATTESTATION_SENSITIVE_FLAGS
+            and any(protected.startswith(option_name) for protected in _ATTESTATION_SENSITIVE_FLAGS)
+        ):
+            raise ValueError(f"unattested or ambiguous LigandMPNN runtime option: {option_name}")
+    model_positions = [index for index, value in enumerate(arguments) if value == _MODEL_TYPE_FLAG]
+    if (
+        option_names.count(_MODEL_TYPE_FLAG) != 1
+        or len(model_positions) != 1
+        or model_positions[0] + 1 >= len(arguments)
+        or arguments[model_positions[0] + 1] != "ligand_mpnn"
+    ):
+        raise ValueError(f"unattested or ambiguous LigandMPNN runtime option: {_MODEL_TYPE_FLAG}")
 
 
 def _reject_existing_score_output(arguments: list[str], *, pdb_path: Path) -> None:

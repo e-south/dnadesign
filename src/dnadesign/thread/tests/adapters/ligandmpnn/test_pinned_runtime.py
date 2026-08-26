@@ -35,6 +35,7 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
         "from data_utils import VALUE\n"
         "from model_utils import HELPER\n"
         "parser = argparse.ArgumentParser()\n"
+        "parser.add_argument('--model_type', required=True)\n"
         "parser.add_argument('--checkpoint_ligand_mpnn', required=True)\n"
         "parser.add_argument('--pdb_path', required=True)\n"
         "parser.add_argument('--omit_AA_per_residue')\n"
@@ -56,6 +57,7 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
         "import argparse\n"
         "from pathlib import Path\n"
         "parser = argparse.ArgumentParser()\n"
+        "parser.add_argument('--model_type', required=True)\n"
         "parser.add_argument('--checkpoint_ligand_mpnn', required=True)\n"
         "parser.add_argument('--pdb_path', required=True)\n"
         "parser.add_argument('--out_folder', required=True)\n"
@@ -117,6 +119,8 @@ def test_pinned_runtime_ignores_timestamp_valid_poisoned_parser_bytecode(tmp_pat
         [
             sys.executable,
             str(checkout / "run.py"),
+            "--model_type",
+            "ligand_mpnn",
             "--checkpoint_ligand_mpnn",
             str(checkpoint),
             "--pdb_path",
@@ -138,6 +142,8 @@ def test_pinned_runtime_ignores_timestamp_valid_poisoned_parser_bytecode(tmp_pat
         residue_alphabet_sha256=None,
         entrypoint="run.py",
         arguments=(
+            "--model_type",
+            "ligand_mpnn",
             "--checkpoint_ligand_mpnn",
             str(checkpoint),
             "--pdb_path",
@@ -165,6 +171,8 @@ def test_pinned_runtime_executes_pinned_tree_when_checkout_sources_are_dirty(tmp
         residue_alphabet_sha256=None,
         entrypoint="run.py",
         arguments=(
+            "--model_type",
+            "ligand_mpnn",
             "--checkpoint_ligand_mpnn",
             str(checkpoint),
             "--pdb_path",
@@ -191,6 +199,8 @@ def test_pinned_runtime_rejects_checkpoint_changed_after_planning(tmp_path: Path
             residue_alphabet_sha256=None,
             entrypoint="run.py",
             arguments=(
+                "--model_type",
+                "ligand_mpnn",
                 "--checkpoint_ligand_mpnn",
                 str(checkpoint),
                 "--pdb_path",
@@ -215,6 +225,8 @@ def test_pinned_runtime_rejects_pdb_changed_after_planning(tmp_path: Path) -> No
             residue_alphabet_sha256=None,
             entrypoint="run.py",
             arguments=(
+                "--model_type",
+                "ligand_mpnn",
                 "--checkpoint_ligand_mpnn",
                 str(checkpoint),
                 "--pdb_path",
@@ -242,6 +254,8 @@ def test_pinned_runtime_rejects_sidecar_changed_after_planning(tmp_path: Path) -
             residue_alphabet_sha256=sidecar_sha256,
             entrypoint="run.py",
             arguments=(
+                "--model_type",
+                "ligand_mpnn",
                 "--checkpoint_ligand_mpnn",
                 str(checkpoint),
                 "--pdb_path",
@@ -270,6 +284,8 @@ def test_pinned_runtime_stages_verified_sidecar_before_execution(tmp_path: Path)
         residue_alphabet_sha256=sidecar_sha256,
         entrypoint="run.py",
         arguments=(
+            "--model_type",
+            "ligand_mpnn",
             "--checkpoint_ligand_mpnn",
             str(checkpoint),
             "--pdb_path",
@@ -299,6 +315,8 @@ def test_pinned_runtime_preserves_pdb_basename_for_upstream_score_output(tmp_pat
         residue_alphabet_sha256=None,
         entrypoint="score.py",
         arguments=(
+            "--model_type",
+            "ligand_mpnn",
             "--checkpoint_ligand_mpnn",
             str(checkpoint),
             "--pdb_path",
@@ -328,6 +346,8 @@ def test_pinned_runtime_rejects_preexisting_score_output(tmp_path: Path) -> None
             residue_alphabet_sha256=None,
             entrypoint="score.py",
             arguments=(
+                "--model_type",
+                "ligand_mpnn",
                 "--checkpoint_ligand_mpnn",
                 str(checkpoint),
                 "--pdb_path",
@@ -364,6 +384,8 @@ def test_pinned_runtime_rejects_attached_duplicate_file_flags(
             residue_alphabet_sha256=None,
             entrypoint="run.py",
             arguments=(
+                "--model_type",
+                "ligand_mpnn",
                 "--checkpoint_ligand_mpnn",
                 str(checkpoint),
                 "--pdb_path",
@@ -402,11 +424,57 @@ def test_pinned_runtime_rejects_unpinned_attached_optional_file_flags(
             residue_alphabet_sha256=None,
             entrypoint="run.py",
             arguments=(
+                "--model_type",
+                "ligand_mpnn",
                 "--checkpoint_ligand_mpnn",
                 str(checkpoint),
                 "--pdb_path",
                 str(pdb),
                 attached_argument,
+                "--output",
+                str(tmp_path / "output.txt"),
+            ),
+        )
+
+
+@pytest.mark.parametrize(
+    "extra_arguments",
+    [
+        ("--checkpoint_ligand_m=/unattested.pt",),
+        ("--checkpoint_protein_mpnn", "/unattested.pt"),
+        ("--pdb_path_multi", "/unattested.json"),
+        ("--fixed_residues_multi", "/unattested.json"),
+        ("--redesigned_residues_multi", "/unattested.json"),
+        ("--bias_AA_per_residue", "/unattested.json"),
+        ("--bias_AA_per_residue_multi", "/unattested.json"),
+        ("--omit_AA_per_residue_multi", "/unattested.json"),
+        ("--model_type", "protein_mpnn"),
+        ("--model_type=protein_mpnn",),
+    ],
+)
+def test_pinned_runtime_rejects_abbreviated_or_alternate_attestation_flags(
+    tmp_path: Path,
+    extra_arguments: tuple[str, ...],
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+
+    with pytest.raises(ValueError, match="unattested or ambiguous LigandMPNN runtime option"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                *extra_arguments,
                 "--output",
                 str(tmp_path / "output.txt"),
             ),

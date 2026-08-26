@@ -11,6 +11,9 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
+import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -23,6 +26,7 @@ from dnadesign.thread.adapters.ligandmpnn import (
     LigandMpnnUpstreamPin,
     build_ligandmpnn_commands,
     build_planned_receipt,
+    load_ligandmpnn_context_inventory,
 )
 from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import (
     create_pinned_context_checkout,
@@ -32,6 +36,14 @@ from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import (
 _DIGEST = "a" * 64
 _PACKING_DIGEST = "b" * 64
 _COMMIT = "26ec57ac976ade5379920dbd43c7f97a91cf82de"  # pragma: allowlist secret
+_CONTEXT_PDB_PAYLOAD = b"ATOM pinned context input\n"
+
+
+def _write_context_input(root: Path) -> str:
+    path = root / "inputs/target.pdb"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(_CONTEXT_PDB_PAYLOAD)
+    return hashlib.sha256(_CONTEXT_PDB_PAYLOAD).hexdigest()
 
 
 def _request(**overrides: object) -> LigandMpnnRequest:
@@ -188,15 +200,17 @@ def test_residue_identifier_rejects_non_pdb_chain_or_insertion_codes() -> None:
 
 def test_planned_receipt_is_normalized_and_records_no_execution_claim(tmp_path: Path) -> None:
     checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
+    pdb_sha256 = _write_context_input(tmp_path)
     context_inventory = write_context_inventory(
         tmp_path,
         input_path=Path("inputs/target.pdb"),
-        input_sha256=_DIGEST,
+        input_sha256=pdb_sha256,
         upstream_commit=commit,
         parse_all_atoms=True,
         parser_sha256=parser_sha256,
     )
     request = _request(
+        pdb_sha256=pdb_sha256,
         context_inventory=context_inventory,
         upstream=LigandMpnnUpstreamPin(
             commit=commit,
@@ -226,7 +240,7 @@ def test_planned_receipt_is_normalized_and_records_no_execution_claim(tmp_path: 
         "packing_checkpoint_sha256": f"sha256:{_PACKING_DIGEST}",
     }
     assert payload["commands"][0]["argv"][0] == "python"
-    assert payload["input"] == {"path": "inputs/target.pdb", "sha256": f"sha256:{_DIGEST}"}
+    assert payload["input"] == {"path": "inputs/target.pdb", "sha256": f"sha256:{pdb_sha256}"}
     assert payload["context_inventory"] == {
         "path": "evidence/context-inventory.json",
         "sha256": f"sha256:{context_inventory.sha256}",
@@ -235,15 +249,17 @@ def test_planned_receipt_is_normalized_and_records_no_execution_claim(tmp_path: 
 
 def test_planned_receipt_rejects_missing_or_partial_command_sets(tmp_path: Path) -> None:
     checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
+    pdb_sha256 = _write_context_input(tmp_path)
     context_inventory = write_context_inventory(
         tmp_path,
         input_path=Path("inputs/target.pdb"),
-        input_sha256=_DIGEST,
+        input_sha256=pdb_sha256,
         upstream_commit=commit,
         parse_all_atoms=True,
         parser_sha256=parser_sha256,
     )
     request = _request(
+        pdb_sha256=pdb_sha256,
         context_inventory=context_inventory,
         upstream=LigandMpnnUpstreamPin(
             commit=commit,
@@ -347,6 +363,56 @@ def test_planned_receipt_rejects_inventory_from_different_parser_blob(tmp_path: 
     commands = build_ligandmpnn_commands(request, checkout_root=checkout_root)
 
     with pytest.raises(ValueError, match="parser digest does not match pinned upstream commit"):
+        build_planned_receipt(
+            request,
+            commands,
+            execution_root=tmp_path,
+            checkout_root=checkout_root,
+        )
+
+
+def test_planned_receipt_rejects_self_asserted_context_atoms(tmp_path: Path) -> None:
+    checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
+    pdb_payload = b"ATOM pinned context input\n"
+    pdb_path = tmp_path / "inputs/target.pdb"
+    pdb_path.parent.mkdir(parents=True)
+    pdb_path.write_bytes(pdb_payload)
+    pdb_sha256 = hashlib.sha256(pdb_payload).hexdigest()
+    reference = write_context_inventory(
+        tmp_path,
+        input_path=Path("inputs/target.pdb"),
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=True,
+        parser_sha256=parser_sha256,
+    )
+    inventory = load_ligandmpnn_context_inventory(reference, execution_root=tmp_path)
+    forged_atom = replace(
+        inventory.atoms[0],
+        serial=2,
+        atom_name="O5'",
+        element="O",
+        upstream_element_type=8,
+    )
+    forged_inventory = replace(inventory, atoms=(*inventory.atoms, forged_atom))
+    forged_payload = (json.dumps(forged_inventory.to_dict(), indent=2, sort_keys=True) + "\n").encode()
+    (tmp_path / reference.path).write_bytes(forged_payload)
+    forged_reference = LigandMpnnContextInventoryReference(
+        path=reference.path,
+        sha256=hashlib.sha256(forged_payload).hexdigest(),
+    )
+    request = _request(
+        pdb_sha256=pdb_sha256,
+        context_inventory=forged_reference,
+        upstream=LigandMpnnUpstreamPin(
+            commit=commit,
+            checkpoint_sha256=_DIGEST,
+            packing_checkpoint_sha256=_PACKING_DIGEST,
+        ),
+    )
+    commands = build_ligandmpnn_commands(request, checkout_root=checkout_root)
+
+    with pytest.raises(ValueError, match="context inventory does not match pinned parser derivation"):
         build_planned_receipt(
             request,
             commands,

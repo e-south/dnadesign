@@ -48,7 +48,9 @@ run, the wrapper verifies the declared checkpoint digests, copies those exact
 bytes into the isolated runtime, and points the upstream entrypoint at the
 verified copies. The input PDB and optional residue-alphabet sidecar are
 verified and staged the same way, so execution cannot substitute changed input
-bytes after planning. Preflight remains an early diagnostic; execution repeats
+bytes after planning. The wrapper rejects abbreviated, duplicate, multi-input,
+or alternate-model options that could redirect upstream parsing around those
+staged files. Preflight remains an early diagnostic; execution repeats
 the source, input, and weight identity boundary rather than trusting an earlier
 check.
 
@@ -64,6 +66,11 @@ RNA atoms survive the upstream parser. Standard PDB DNA residue names
 forms) are classified; any other residue identity remains explicitly `other`.
 This classification labels the observed atoms—it does not decide which atoms
 upstream consumes.
+
+Context receipts are published by an atomic no-follow replacement. Admission
+replays the exact pinned parser over the digest-matched PDB and requires the
+loaded receipt to equal that derived inventory; a caller-authored JSON receipt
+cannot create observed context by assertion alone.
 
 Probability probes use the official `score.py` single-AA or autoregressive
 mode with explicit sequence, atom-context, and fixed-side-chain-context flags.

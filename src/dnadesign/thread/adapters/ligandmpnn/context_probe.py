@@ -14,9 +14,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
@@ -148,6 +150,27 @@ def materialize_ligandmpnn_context_inventory(
 ) -> LigandMpnnContextInventoryReference:
     """Run upstream ``parse_PDB`` and persist its effective context inventory."""
 
+    inventory = _derive_ligandmpnn_context_inventory(
+        request,
+        execution_root=execution_root,
+        checkout_root=checkout_root,
+    )
+    root = execution_root.expanduser().resolve()
+    output_path = _within_root(root, request.output_path, field_name="context probe output_path")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = (json.dumps(inventory.to_dict(), indent=2, sort_keys=True) + "\n").encode("utf-8")
+    _publish_context_inventory(output_path, payload)
+    return LigandMpnnContextInventoryReference(path=request.output_path, sha256=hashlib.sha256(payload).hexdigest())
+
+
+def _derive_ligandmpnn_context_inventory(
+    request: LigandMpnnContextProbeRequest,
+    *,
+    execution_root: Path,
+    checkout_root: Path,
+) -> LigandMpnnContextInventory:
+    """Derive one inventory from exact input bytes and the pinned parser without publishing it."""
+
     root = execution_root.expanduser().resolve()
     if not root.is_dir():
         raise ValueError("execution_root must be an existing directory")
@@ -173,7 +196,7 @@ def materialize_ligandmpnn_context_inventory(
         parse_atoms_with_zero_occupancy=request.parse_atoms_with_zero_occupancy,
     )
     atoms = _effective_context_atoms(parsed, other_atoms, element_dict_rev=element_dict_rev)
-    inventory = LigandMpnnContextInventory(
+    return LigandMpnnContextInventory(
         request_id=request.request_id,
         request_sha256=_probe_request_sha256(request),
         input_path=request.pdb_path,
@@ -189,13 +212,45 @@ def materialize_ligandmpnn_context_inventory(
         required_polymer_types=request.required_polymer_types,
         atoms=atoms,
     )
-    output_path = _within_root(root, request.output_path, field_name="context probe output_path")
-    if output_path.is_symlink():
-        raise ValueError("context probe output must not be a symlink")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    payload = (json.dumps(inventory.to_dict(), indent=2, sort_keys=True) + "\n").encode("utf-8")
-    output_path.write_bytes(payload)
-    return LigandMpnnContextInventoryReference(path=request.output_path, sha256=hashlib.sha256(payload).hexdigest())
+
+
+def _publish_context_inventory(output_path: Path, payload: bytes) -> None:
+    """Atomically replace one receipt without following a raced leaf symlink."""
+
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
+    temporary_name = f".{output_path.name}.{uuid.uuid4().hex}.tmp"
+    try:
+        directory_fd = os.open(output_path.parent, directory_flags)
+    except OSError as error:
+        raise ValueError("context probe output directory could not be opened safely") from error
+    try:
+        file_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
+        file_descriptor = os.open(temporary_name, file_flags, 0o600, dir_fd=directory_fd)
+        try:
+            handle = os.fdopen(file_descriptor, "wb")
+        except BaseException:
+            os.close(file_descriptor)
+            raise
+        with handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(
+            temporary_name,
+            output_path.name,
+            src_dir_fd=directory_fd,
+            dst_dir_fd=directory_fd,
+        )
+        os.fsync(directory_fd)
+    except OSError as error:
+        raise ValueError("context probe output could not be published atomically") from error
+    finally:
+        try:
+            os.unlink(temporary_name, dir_fd=directory_fd)
+        except FileNotFoundError:
+            pass
+        finally:
+            os.close(directory_fd)
 
 
 def _run_pinned_upstream_parser(
