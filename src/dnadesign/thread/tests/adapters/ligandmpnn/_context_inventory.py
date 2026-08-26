@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 from dnadesign.thread.adapters.ligandmpnn import (
@@ -30,6 +31,7 @@ def write_context_inventory(
     input_sha256: str,
     upstream_commit: str,
     parse_all_atoms: bool,
+    parser_sha256: str = "c" * 64,
 ) -> LigandMpnnContextInventoryReference:
     """Write one valid inventory and return its exact relative reference."""
 
@@ -40,7 +42,7 @@ def write_context_inventory(
         input_sha256=input_sha256,
         upstream_commit=upstream_commit,
         parser_path=Path("data_utils.py"),
-        parser_sha256="c" * 64,
+        parser_sha256=parser_sha256,
         parser_callable="parse_PDB",
         chains=(),
         parse_all_atoms=parse_all_atoms,
@@ -60,4 +62,35 @@ def write_context_inventory(
     )
 
 
-__all__ = ["write_context_inventory"]
+def create_pinned_context_checkout(root: Path) -> tuple[Path, str, str]:
+    """Create a minimal Git fixture and return its parser identity."""
+
+    checkout = root / "LigandMPNN"
+    checkout.mkdir()
+    parser_payload = b"def parse_PDB(*args, **kwargs):\n    return {}\n"
+    (checkout / "data_utils.py").write_bytes(parser_payload)
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    subprocess.run(["git", "-C", str(checkout), "add", "data_utils.py"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(checkout),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-qm",
+            "fixture",
+        ],
+        check=True,
+    )
+    commit = subprocess.check_output(
+        ["git", "-C", str(checkout), "rev-parse", "HEAD"],
+        text=True,
+    ).strip()
+    return checkout, commit, hashlib.sha256(parser_payload).hexdigest()
+
+
+__all__ = ["create_pinned_context_checkout", "write_context_inventory"]

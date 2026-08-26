@@ -27,7 +27,10 @@ from dnadesign.thread.adapters.ligandmpnn import (
     build_planned_receipt,
     materialize_residue_alphabet_sidecar,
 )
-from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import write_context_inventory
+from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import (
+    create_pinned_context_checkout,
+    write_context_inventory,
+)
 
 _DIGEST = "a" * 64
 _COMMIT = "26ec57ac976ade5379920dbd43c7f97a91cf82de"  # pragma: allowlist secret
@@ -138,21 +141,24 @@ def test_sidecar_can_stage_bytes_while_binding_final_execution_path(tmp_path: Pa
 
 
 def test_planned_receipt_binds_the_sidecar_digest(tmp_path: Path) -> None:
+    checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
     request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
     request = replace(
         request,
+        upstream=LigandMpnnUpstreamPin(commit=commit, checkpoint_sha256=_DIGEST),
         context_inventory=write_context_inventory(
             tmp_path,
             input_path=request.pdb_path,
             input_sha256=request.pdb_sha256,
-            upstream_commit=request.upstream.commit,
+            upstream_commit=commit,
             parse_all_atoms=request.use_side_chain_context,
+            parser_sha256=parser_sha256,
         ),
     )
     sidecar = materialize_residue_alphabet_sidecar(request, tmp_path / "omit.json")
     commands = build_ligandmpnn_commands(
         request,
-        checkout_root=Path("tool"),
+        checkout_root=checkout_root,
         residue_alphabet_sidecar=sidecar,
     )
 
@@ -160,7 +166,7 @@ def test_planned_receipt_binds_the_sidecar_digest(tmp_path: Path) -> None:
         request,
         commands,
         execution_root=tmp_path,
-        checkout_root=Path("tool"),
+        checkout_root=checkout_root,
         residue_alphabet_sidecar=sidecar,
     ).to_dict()
 
@@ -171,6 +177,6 @@ def test_planned_receipt_binds_the_sidecar_digest(tmp_path: Path) -> None:
             request,
             (),
             execution_root=tmp_path,
-            checkout_root=Path("tool"),
+            checkout_root=checkout_root,
             residue_alphabet_sidecar=sidecar,
         )

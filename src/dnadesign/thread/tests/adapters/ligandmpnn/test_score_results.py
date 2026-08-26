@@ -35,8 +35,8 @@ from dnadesign.thread.adapters.ligandmpnn import (
     parse_ligandmpnn_score_outputs,
     score_request_sha256,
 )
+from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import create_pinned_context_checkout
 
-_COMMIT = "26ec57ac976ade5379920dbd43c7f97a91cf82de"  # pragma: allowlist secret
 _CHECKPOINT_SHA256 = "a" * 64
 
 
@@ -45,17 +45,23 @@ def _sha256(payload: bytes) -> str:
 
 
 def _prepare_request(root: Path, *, seeds: tuple[int, ...] = (7, 11)) -> LigandMpnnScoreRequest:
+    _checkout, commit, parser_sha256 = create_pinned_context_checkout(root)
     pdb_payload = b"ATOM      1  N   ALA A   1      0.000   0.000   0.000\n"
     pdb_path = root / "inputs/target.pdb"
     pdb_path.parent.mkdir(parents=True)
     pdb_path.write_bytes(pdb_payload)
-    context_inventory = _write_context_inventory(root, pdb_sha256=_sha256(pdb_payload))
+    context_inventory = _write_context_inventory(
+        root,
+        pdb_sha256=_sha256(pdb_payload),
+        upstream_commit=commit,
+        parser_sha256=parser_sha256,
+    )
     return LigandMpnnScoreRequest(
         request_id="generic_context_probe",
         pdb_path=Path("inputs/target.pdb"),
         pdb_sha256=_sha256(pdb_payload),
         output_dir=Path("outputs/scores"),
-        upstream=LigandMpnnUpstreamPin(commit=_COMMIT, checkpoint_sha256=_CHECKPOINT_SHA256),
+        upstream=LigandMpnnUpstreamPin(commit=commit, checkpoint_sha256=_CHECKPOINT_SHA256),
         context_inventory=context_inventory,
         seeds=seeds,
         batch_size=2,
@@ -71,6 +77,8 @@ def _write_context_inventory(
     root: Path,
     *,
     pdb_sha256: str,
+    upstream_commit: str,
+    parser_sha256: str,
 ) -> LigandMpnnContextInventoryReference:
     atoms = (
         LigandMpnnContextAtom(1, "P", "P", 15, "D", "DC", 12, "", LigandMpnnContextPolymer.DNA),
@@ -81,9 +89,9 @@ def _write_context_inventory(
         request_sha256="b" * 64,
         input_path=Path("inputs/target.pdb"),
         input_sha256=pdb_sha256,
-        upstream_commit=_COMMIT,
+        upstream_commit=upstream_commit,
         parser_path=Path("data_utils.py"),
-        parser_sha256="c" * 64,
+        parser_sha256=parser_sha256,
         parser_callable="parse_PDB",
         chains=(),
         parse_all_atoms=False,
@@ -156,7 +164,7 @@ def _write_output(
 
 
 def _parse(root: Path, request: LigandMpnnScoreRequest):
-    commands = build_ligandmpnn_score_commands(request, checkout_root=Path("/opt/LigandMPNN"))
+    commands = build_ligandmpnn_score_commands(request, checkout_root=root / "LigandMPNN")
     return parse_ligandmpnn_score_outputs(
         request,
         commands,
@@ -174,7 +182,7 @@ def test_parser_binds_exact_request_commands_inputs_and_raw_probabilities(tmp_pa
 
     assert result.request_sha256 == score_request_sha256(request)
     assert result.input_sha256 == f"sha256:{request.pdb_sha256}"
-    assert result.provenance.upstream_commit == _COMMIT
+    assert result.provenance.upstream_commit == request.upstream.commit
     assert result.provenance.checkpoint_sha256 == f"sha256:{_CHECKPOINT_SHA256}"
     assert result.atom_context_requested is True
     assert result.atom_context_status == "enabled_with_observed_nucleotide_context"
@@ -295,7 +303,7 @@ def test_parser_rejects_input_or_context_command_drift(tmp_path: Path) -> None:
         _parse(tmp_path, request)
 
     corrected = replace(request, pdb_sha256=_sha256(b"tampered"))
-    commands = build_ligandmpnn_score_commands(corrected, checkout_root=Path("/opt/LigandMPNN"))
+    commands = build_ligandmpnn_score_commands(corrected, checkout_root=tmp_path / "LigandMPNN")
     argv = list(commands[0].argv)
     context_index = argv.index("--ligand_mpnn_use_atom_context") + 1
     argv[context_index] = "0"
@@ -324,7 +332,10 @@ def test_parser_rejects_missing_or_non_nucleotide_observed_context(tmp_path: Pat
         "request_id": "generic_context_inventory",
         "request_sha256": f"sha256:{'b' * 64}",
         "input": {"path": "inputs/target.pdb", "sha256": f"sha256:{request.pdb_sha256}"},
-        "upstream": {"repository": "https://github.com/dauparas/LigandMPNN", "commit": _COMMIT},
+        "upstream": {
+            "repository": "https://github.com/dauparas/LigandMPNN",
+            "commit": request.upstream.commit,
+        },
         "parser": {
             "path": "data_utils.py",
             "sha256": f"sha256:{'c' * 64}",
@@ -381,7 +392,7 @@ def test_parser_rejects_missing_or_non_nucleotide_observed_context(tmp_path: Pat
 
 def test_parser_requires_explicit_trust_and_still_uses_weights_only_loading(tmp_path: Path) -> None:
     request = _prepare_request(tmp_path, seeds=(7,))
-    commands = build_ligandmpnn_score_commands(request, checkout_root=Path("/opt/LigandMPNN"))
+    commands = build_ligandmpnn_score_commands(request, checkout_root=tmp_path / "LigandMPNN")
     _write_output(tmp_path, request, 7)
 
     with pytest.raises(ValueError, match="explicit pinned-local-execution trust"):

@@ -279,7 +279,7 @@ def parse_ligandmpnn_score_outputs(
     if observed_input_sha256 != expected_input_sha256:
         raise ValueError(f"input SHA256 mismatch: expected {expected_input_sha256}, observed {observed_input_sha256}")
 
-    _validate_commands(request, commands)
+    checkout_root = _validate_commands(request, commands)
     context_inventory = load_ligandmpnn_context_inventory(
         request.context_inventory,
         execution_root=root,
@@ -290,6 +290,7 @@ def parse_ligandmpnn_score_outputs(
         pdb_sha256=request.pdb_sha256,
         upstream=request.upstream,
         use_side_chain_context=request.use_side_chain_context,
+        checkout_root=checkout_root,
     )
 
     command_digests = tuple(_command_sha256(command) for command in commands)
@@ -367,7 +368,7 @@ def parse_ligandmpnn_score_outputs(
     )
 
 
-def _validate_commands(request: LigandMpnnScoreRequest, commands: tuple[LigandMpnnCommand, ...]) -> None:
+def _validate_commands(request: LigandMpnnScoreRequest, commands: tuple[LigandMpnnCommand, ...]) -> Path:
     if not isinstance(commands, tuple) or len(commands) != len(request.seeds):
         raise ValueError("commands do not exactly match score request seeds")
     if not commands:
@@ -392,6 +393,7 @@ def _validate_commands(request: LigandMpnnScoreRequest, commands: tuple[LigandMp
     )
     if commands != expected:
         raise ValueError("commands do not exactly match score request and context mode")
+    return checkout_root
 
 
 def _load_weights_only_payload(payload: bytes, *, artifact_path: Path) -> dict[str, Any]:

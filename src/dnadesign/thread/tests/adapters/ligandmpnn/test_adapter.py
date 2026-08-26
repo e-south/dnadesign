@@ -24,7 +24,10 @@ from dnadesign.thread.adapters.ligandmpnn import (
     build_ligandmpnn_commands,
     build_planned_receipt,
 )
-from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import write_context_inventory
+from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import (
+    create_pinned_context_checkout,
+    write_context_inventory,
+)
 
 _DIGEST = "a" * 64
 _PACKING_DIGEST = "b" * 64
@@ -174,21 +177,30 @@ def test_residue_identifier_rejects_non_pdb_chain_or_insertion_codes() -> None:
 
 
 def test_planned_receipt_is_normalized_and_records_no_execution_claim(tmp_path: Path) -> None:
+    checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
     context_inventory = write_context_inventory(
         tmp_path,
         input_path=Path("inputs/target.pdb"),
         input_sha256=_DIGEST,
-        upstream_commit=_COMMIT,
+        upstream_commit=commit,
         parse_all_atoms=True,
+        parser_sha256=parser_sha256,
     )
-    request = _request(context_inventory=context_inventory)
-    commands = build_ligandmpnn_commands(request, checkout_root=Path("tool"))
+    request = _request(
+        context_inventory=context_inventory,
+        upstream=LigandMpnnUpstreamPin(
+            commit=commit,
+            checkpoint_sha256=_DIGEST,
+            packing_checkpoint_sha256=_PACKING_DIGEST,
+        ),
+    )
+    commands = build_ligandmpnn_commands(request, checkout_root=checkout_root)
 
     receipt = build_planned_receipt(
         request,
         commands,
         execution_root=tmp_path,
-        checkout_root=Path("tool"),
+        checkout_root=checkout_root,
     )
 
     payload = receipt.to_dict()
@@ -199,7 +211,7 @@ def test_planned_receipt_is_normalized_and_records_no_execution_claim(tmp_path: 
     assert payload["expected_sequence_count"] == 12
     assert payload["provenance"] == {
         "upstream_repository": "https://github.com/dauparas/LigandMPNN",
-        "upstream_commit": _COMMIT,
+        "upstream_commit": commit,
         "checkpoint_sha256": f"sha256:{_DIGEST}",
         "packing_checkpoint_sha256": f"sha256:{_PACKING_DIGEST}",
     }
@@ -212,15 +224,24 @@ def test_planned_receipt_is_normalized_and_records_no_execution_claim(tmp_path: 
 
 
 def test_planned_receipt_rejects_missing_or_partial_command_sets(tmp_path: Path) -> None:
+    checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
     context_inventory = write_context_inventory(
         tmp_path,
         input_path=Path("inputs/target.pdb"),
         input_sha256=_DIGEST,
-        upstream_commit=_COMMIT,
+        upstream_commit=commit,
         parse_all_atoms=True,
+        parser_sha256=parser_sha256,
     )
-    request = _request(context_inventory=context_inventory)
-    commands = build_ligandmpnn_commands(request, checkout_root=Path("tool"))
+    request = _request(
+        context_inventory=context_inventory,
+        upstream=LigandMpnnUpstreamPin(
+            commit=commit,
+            checkpoint_sha256=_DIGEST,
+            packing_checkpoint_sha256=_PACKING_DIGEST,
+        ),
+    )
+    commands = build_ligandmpnn_commands(request, checkout_root=checkout_root)
 
     for supplied in ((), commands[:-1]):
         with pytest.raises(ValueError, match="commands do not match the deterministic request command set"):
@@ -228,7 +249,7 @@ def test_planned_receipt_rejects_missing_or_partial_command_sets(tmp_path: Path)
                 request,
                 supplied,
                 execution_root=tmp_path,
-                checkout_root=Path("tool"),
+                checkout_root=checkout_root,
             )
 
 
@@ -266,20 +287,59 @@ def test_planned_receipt_rejects_context_inventory_for_different_request(
     parse_all_atoms: bool,
     message: str,
 ) -> None:
+    checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
+    inventory_commit = commit if upstream_commit == _COMMIT else upstream_commit
     context_inventory = write_context_inventory(
         tmp_path,
         input_path=input_path,
         input_sha256=input_sha256,
-        upstream_commit=upstream_commit,
+        upstream_commit=inventory_commit,
         parse_all_atoms=parse_all_atoms,
+        parser_sha256=parser_sha256,
     )
-    request = _request(context_inventory=context_inventory)
-    commands = build_ligandmpnn_commands(request, checkout_root=Path("tool"))
+    request = _request(
+        context_inventory=context_inventory,
+        upstream=LigandMpnnUpstreamPin(
+            commit=commit,
+            checkpoint_sha256=_DIGEST,
+            packing_checkpoint_sha256=_PACKING_DIGEST,
+        ),
+    )
+    commands = build_ligandmpnn_commands(request, checkout_root=checkout_root)
 
     with pytest.raises(ValueError, match=message):
         build_planned_receipt(
             request,
             commands,
             execution_root=tmp_path,
-            checkout_root=Path("tool"),
+            checkout_root=checkout_root,
+        )
+
+
+def test_planned_receipt_rejects_inventory_from_different_parser_blob(tmp_path: Path) -> None:
+    checkout_root, commit, _parser_sha256 = create_pinned_context_checkout(tmp_path)
+    context_inventory = write_context_inventory(
+        tmp_path,
+        input_path=Path("inputs/target.pdb"),
+        input_sha256=_DIGEST,
+        upstream_commit=commit,
+        parse_all_atoms=True,
+        parser_sha256="d" * 64,
+    )
+    request = _request(
+        context_inventory=context_inventory,
+        upstream=LigandMpnnUpstreamPin(
+            commit=commit,
+            checkpoint_sha256=_DIGEST,
+            packing_checkpoint_sha256=_PACKING_DIGEST,
+        ),
+    )
+    commands = build_ligandmpnn_commands(request, checkout_root=checkout_root)
+
+    with pytest.raises(ValueError, match="parser digest does not match pinned upstream commit"):
+        build_planned_receipt(
+            request,
+            commands,
+            execution_root=tmp_path,
+            checkout_root=checkout_root,
         )

@@ -114,6 +114,7 @@ def build_planned_receipt(
         pdb_sha256=request.pdb_sha256,
         upstream=request.upstream,
         use_side_chain_context=request.use_side_chain_context,
+        checkout_root=checkout_root,
     )
     if request.residue_alphabets and residue_alphabet_sidecar is None:
         raise ValueError("residue alphabets require a typed residue alphabet sidecar")

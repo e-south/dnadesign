@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from enum import Enum
@@ -386,6 +387,7 @@ def validate_context_inventory_for_input(
     pdb_sha256: str,
     upstream: LigandMpnnUpstreamPin,
     use_side_chain_context: bool,
+    checkout_root: Path,
 ) -> None:
     """Require an inventory produced for the exact input and context settings."""
 
@@ -393,6 +395,13 @@ def validate_context_inventory_for_input(
         raise ValueError("context inventory input identity does not match request")
     if inventory.upstream_commit != upstream.commit:
         raise ValueError("context inventory upstream commit does not match request")
+    expected_parser_sha256 = _pinned_parser_sha256(
+        checkout_root,
+        upstream_commit=upstream.commit,
+        parser_path=inventory.parser_path,
+    )
+    if inventory.parser_sha256 != expected_parser_sha256:
+        raise ValueError("context inventory parser digest does not match pinned upstream commit")
     if inventory.chains:
         raise ValueError("score requests require a context inventory parsed with all input chains")
     if inventory.parse_all_atoms is not use_side_chain_context:
@@ -401,6 +410,27 @@ def validate_context_inventory_for_input(
         raise ValueError("score requests require the upstream positive-occupancy parser default")
     if inventory.effective_nucleotide_atom_count <= 0:
         raise ValueError("context inventory proves zero effective DNA/RNA context atoms")
+
+
+def _pinned_parser_sha256(checkout_root: Path, *, upstream_commit: str, parser_path: Path) -> str:
+    checkout = checkout_root.expanduser().resolve()
+    if not checkout.is_dir():
+        raise ValueError("LigandMPNN checkout_root must be an existing directory")
+    try:
+        payload = subprocess.check_output(
+            [
+                "git",
+                "--no-replace-objects",
+                "-C",
+                str(checkout),
+                "show",
+                f"{upstream_commit}:{parser_path.as_posix()}",
+            ],
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise ValueError("pinned LigandMPNN parser blob could not be read") from error
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _require_exact_keys(payload: dict[str, Any], expected: frozenset[str], *, label: str) -> None:
