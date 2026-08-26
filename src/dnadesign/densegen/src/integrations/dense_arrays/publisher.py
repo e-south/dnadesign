@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import shutil
 import tempfile
@@ -163,10 +164,47 @@ def _presentation_number(
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise TypeError(f"presentation.{field} must be numeric")
     number = float(value)
-    if (positive and number <= 0.0) or (not positive and number < 0.0):
+    if not math.isfinite(number) or (positive and number <= 0.0) or (not positive and number < 0.0):
         qualifier = "positive" if positive else "non-negative"
         raise ValueError(f"presentation.{field} must be {qualifier}")
     return number
+
+
+def _install_output_directory(
+    temp_path: Path,
+    output_path: Path,
+    *,
+    replace: bool,
+) -> None:
+    """Install a completed bundle while retaining the prior bundle for rollback."""
+
+    if output_path.is_symlink():
+        raise ValueError(f"output directory must not be a symlink: {output_path}")
+    if not output_path.exists():
+        temp_path.replace(output_path)
+        return
+    if not replace:
+        raise FileExistsError(f"output already exists: {output_path}; pass replace=True explicitly")
+    backup_path = Path(
+        tempfile.mkdtemp(
+            prefix=f".{output_path.name}.backup-",
+            dir=output_path.parent,
+        )
+    )
+    try:
+        output_path.replace(backup_path)
+    except Exception:
+        backup_path.rmdir()
+        raise
+    try:
+        temp_path.replace(output_path)
+    except Exception as install_error:
+        try:
+            backup_path.replace(output_path)
+        except Exception as rollback_error:
+            raise RuntimeError(f"replacement failed and prior output remains at {backup_path}") from rollback_error
+        raise install_error
+    shutil.rmtree(backup_path)
 
 
 def _repository_root(config_path: Path, repository: str) -> Path:
@@ -608,9 +646,7 @@ def publish_densegen_playback_endpoint(
             json.dumps(manifest, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        if output_path.exists():
-            shutil.rmtree(output_path)
-        temp_path.replace(output_path)
+        _install_output_directory(temp_path, output_path, replace=replace)
     except Exception:
         shutil.rmtree(temp_path, ignore_errors=True)
         raise

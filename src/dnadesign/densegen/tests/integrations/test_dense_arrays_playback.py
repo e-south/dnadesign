@@ -203,6 +203,58 @@ def test_publisher_confines_replace_to_dedicated_workspace_output(tmp_path: Path
         publisher.publish_densegen_playback_endpoint(config_path, replace=True)
 
 
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_publisher_rejects_nonfinite_timing_values(tmp_path: Path, value: float) -> None:
+    config_path = _write_endpoint(tmp_path)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    payload["presentation"]["hold_seconds"] = value
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="presentation.hold_seconds must be non-negative"):
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+
+def test_publisher_restores_prior_bundle_when_replacement_install_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = _write_endpoint(tmp_path)
+    output_path = publisher.publish_densegen_playback_endpoint(config_path)
+    marker = output_path / "prior-bundle.txt"
+    marker.write_text("prior\n", encoding="utf-8")
+    original_replace = Path.replace
+    replacement_calls = 0
+
+    def _replace(path: Path, target: Path) -> Path:
+        nonlocal replacement_calls
+        replacement_calls += 1
+        if replacement_calls == 2:
+            raise OSError("forced replacement failure")
+        return original_replace(path, target)
+
+    monkeypatch.setattr(Path, "replace", _replace)
+
+    with pytest.raises(OSError, match="forced replacement failure"):
+        publisher.publish_densegen_playback_endpoint(config_path, replace=True)
+
+    assert marker.read_text(encoding="utf-8") == "prior\n"
+    assert not tuple(output_path.parent.glob(f".{output_path.name}.backup-*"))
+
+
+def test_publisher_removes_prior_bundle_after_successful_replacement(tmp_path: Path) -> None:
+    config_path = _write_endpoint(tmp_path)
+    output_path = publisher.publish_densegen_playback_endpoint(config_path)
+    marker = output_path / "prior-bundle.txt"
+    marker.write_text("prior\n", encoding="utf-8")
+
+    replaced_path = publisher.publish_densegen_playback_endpoint(config_path, replace=True)
+
+    assert replaced_path == output_path
+    assert not marker.exists()
+    assert (output_path / "manifest.json").is_file()
+    assert not tuple(output_path.parent.glob(f".{output_path.name}.backup-*"))
+
+
 def test_publisher_validates_default_display_text(tmp_path: Path) -> None:
     config_path = _write_endpoint(tmp_path, scene="sigma_factor_example")
 
