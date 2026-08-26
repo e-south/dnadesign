@@ -464,6 +464,7 @@ def _plot_review_sections(
     output_root: Path,
     controls: dict[str, object],
     catalog_plots: list[dict[str, object]] | None = None,
+    catalog_deliverables: list[dict[str, object]] | None = None,
 ) -> BrowserPlotReview:
     plot_controls = controls.get("plot_controls", {})
     ordered_plot_ids = [str(item) for item in plot_controls.get("ordered_plot_ids", []) if isinstance(item, str)]
@@ -477,6 +478,11 @@ def _plot_review_sections(
         if isinstance(item, dict) and item.get("plot_id")
     }
     live_plot_rows = _live_plot_status_rows(catalog_plots)
+    live_deliverable_rows = {
+        str(row.get("deliverable_id")): row
+        for row in (catalog_deliverables or [])
+        if isinstance(row, dict) and row.get("deliverable_id")
+    }
     docs_cache: dict[str, dict[str, object]] = {}
     sections: list[dict[str, object]] = []
     current_section: dict[str, object] | None = None
@@ -485,11 +491,18 @@ def _plot_review_sections(
         entry = plot_entries.get(plot_id, {})
         live_entry = live_plot_rows.get(plot_id, {})
         deliverable_id = str(entry.get("deliverable_id") or "")
-        deliverable = context.config.deliverables.get(deliverable_id) if deliverable_id else None
-        deliverable_title = str(entry.get("deliverable_title") or "") or (
-            deliverable.title if deliverable is not None else _humanize_plot_id(deliverable_id)
+        deliverable = (
+            context.config.deliverables.get(deliverable_id) if context is not None and deliverable_id else None
         )
-        deliverable_summary = deliverable.summary if deliverable is not None else ""
+        live_deliverable = live_deliverable_rows.get(deliverable_id, {})
+        deliverable_title = str(entry.get("deliverable_title") or "") or (
+            deliverable.title
+            if deliverable is not None
+            else str(live_deliverable.get("title") or _humanize_plot_id(deliverable_id))
+        )
+        deliverable_summary = (
+            deliverable.summary if deliverable is not None else str(live_deliverable.get("summary") or "")
+        )
         if deliverable_id not in docs_cache:
             parsed: dict[str, object] | None = None
             if deliverable is not None and deliverable.docs_refs:
@@ -511,7 +524,11 @@ def _plot_review_sections(
         except Exception as exc:
             manifest = {"status": "error", "stale": False}
             manifest_warning = f"Plot manifest could not be read for `{plot_id}`: {exc}"
-        semantics = _resolved_plot_semantics_payload(context, plot_id=plot_id, manifest=manifest)
+        semantics = (
+            _resolved_plot_semantics_payload(context, plot_id=plot_id, manifest=manifest)
+            if context is not None
+            else live_entry
+        )
         output_paths = [
             plot_dir / str(output.get("path"))
             for output in manifest.get("outputs", [])
@@ -519,14 +536,24 @@ def _plot_review_sections(
         ]
         render_path = select_plot_render_path(output_paths)
         visibility_tier = str(
-            entry.get("visibility_tier") or getattr(context.require_plot(plot_id), "visibility_tier", "primary")
+            entry.get("visibility_tier")
+            or (
+                getattr(context.require_plot(plot_id), "visibility_tier", "primary")
+                if context is not None
+                else "primary"
+            )
         )
-        resolved_spec = _resolve_review_plot_spec(context, plot_id=plot_id)
-        plot_spec_payload = resolved_spec.model_dump(mode="json")
-        live_render, render_mode_note = _resolve_plot_review_render_mode(
-            output_root=output_root,
-            plot_spec=plot_spec_payload,
-        )
+        if context is not None:
+            resolved_spec = _resolve_review_plot_spec(context, plot_id=plot_id)
+            plot_spec_payload = resolved_spec.model_dump(mode="json")
+            live_render, render_mode_note = _resolve_plot_review_render_mode(
+                output_root=output_root,
+                plot_spec=plot_spec_payload,
+            )
+        else:
+            plot_spec_payload = {}
+            live_render = False
+            render_mode_note = "Persisted-artifact review; live rerender requires the workspace configuration."
 
         if current_section is None or str(current_section.get("deliverable_id")) != deliverable_id:
             current_section = {
@@ -600,7 +627,7 @@ def build_workspace_browser_runtime(
     health_path: Path,
     controls: dict[str, object],
 ) -> WorkspaceBrowserRuntime:
-    context = load_workspace_config(workspace_dir)
+    context = load_workspace_config(workspace_dir) if (workspace_dir / "config.yaml").is_file() else None
     catalog = load_json(catalog_path)
     health = load_json(health_path)
     deliverables = [
@@ -662,26 +689,37 @@ def build_workspace_browser_runtime(
         if isinstance(row, dict) and row.get("candidate_set_id")
     ]
 
-    source_labels = []
-    for source_id, source in context.config.sources.items():
-        if hasattr(source, "dataset"):
-            source_labels.append(f"{source_id}:{source.dataset}")
-        elif hasattr(source, "path"):
-            source_labels.append(f"{source_id}:{source.path}")
-        else:
-            source_labels.append(source_id)
-    vector_columns = sorted(
-        {
-            view.vector.name
+    if context is not None:
+        source_labels = []
+        for source_id, source in context.config.sources.items():
+            if hasattr(source, "dataset"):
+                source_labels.append(f"{source_id}:{source.dataset}")
+            elif hasattr(source, "path"):
+                source_labels.append(f"{source_id}:{source.path}")
+            else:
+                source_labels.append(source_id)
+        vector_columns = sorted(
+            {
+                view.vector.name
+                for view in context.config.views.values()
+                if hasattr(view, "vector") and getattr(view.vector, "kind", None) == "column"
+            }
+        )
+        visual_families = unique_in_order(
+            getattr(view, "tags", {}).get("family")
             for view in context.config.views.values()
-            if hasattr(view, "vector") and getattr(view.vector, "kind", None) == "column"
-        }
-    )
-    visual_families = unique_in_order(
-        getattr(view, "tags", {}).get("family")
-        for view in context.config.views.values()
-        if getattr(view, "tags", {}).get("family") is not None
-    )
+            if getattr(view, "tags", {}).get("family") is not None
+        )
+    else:
+        source_labels = unique_in_order(
+            f"{row.get('source_id')}:{row.get('dataset')}"
+            for row in candidate_inventory
+            if row.get("source_id") and row.get("dataset")
+        )
+        vector_columns = sorted(
+            str(row.get("view_id")) for row in geometry_rows if str(row.get("view_id") or "").strip()
+        )
+        visual_families = unique_in_order(row.get("family") for row in geometry_rows if row.get("family") is not None)
     matrix_shapes = _matrix_shapes_from_control_plane(
         candidate_inventory=candidate_inventory,
         geometry_rows=geometry_rows,
@@ -758,6 +796,7 @@ def build_workspace_browser_runtime(
         output_root=output_root,
         controls=controls,
         catalog_plots=plots,
+        catalog_deliverables=deliverables,
     )
 
     return WorkspaceBrowserRuntime(

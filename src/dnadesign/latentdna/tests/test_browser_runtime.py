@@ -418,6 +418,140 @@ def test_browser_runtime_uses_control_plane_shapes_without_loading_matrices(monk
     assert "sfxi_ref__effect_scaled" in runtime.geometry.reference_required_columns
 
 
+def test_browser_runtime_falls_back_to_persisted_controls_when_workspace_config_was_externalized(
+    tmp_path: Path,
+) -> None:
+    workspace_dir = tmp_path / "externalized_workspace"
+    output_root = workspace_dir / "outputs"
+    notebook_dir = output_root / "notebooks" / "latent_geometry_browser"
+    plot_dir = output_root / "plots" / "selected_umap"
+    notebook_dir.mkdir(parents=True)
+    plot_dir.mkdir(parents=True)
+    (plot_dir / "plot.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'/>", encoding="utf-8")
+    (plot_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "stale": False,
+                "outputs": [{"path": "plot.svg", "media_type": "image/svg+xml"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    catalog_path = output_root / "catalog.json"
+    health_path = notebook_dir / "health.json"
+    catalog_path.write_text(
+        json.dumps(
+            {
+                "deliverables": [
+                    {
+                        "deliverable_id": "representation_review",
+                        "title": "Representation review",
+                        "summary": "Persisted representation evidence.",
+                        "section": "Review",
+                    }
+                ],
+                "plots": [
+                    {
+                        "plot_id": "selected_umap",
+                        "deliverable_id": "representation_review",
+                        "status": "ok",
+                        "stale": False,
+                        "question": "Do designed families retain visible structure?",
+                        "decision_role": "orientation",
+                        "caption": "Selected-view UMAP.",
+                        "alt_text": "UMAP of the selected representation.",
+                    }
+                ],
+                "exports": [],
+                "notebooks": [],
+                "runs": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    health_path.write_text("{}", encoding="utf-8")
+    controls = {
+        "candidate_inventory": [
+            {
+                "view_id": "selected_view",
+                "source_id": "evo2_features",
+                "dataset": "promoter_context",
+                "n_rows": 160_460,
+                "n_dims": 8_192,
+                "materialization_status": "materialized",
+            }
+        ],
+        "plot_controls": {
+            "default_surface": "plots",
+            "ordered_plot_ids": ["selected_umap"],
+            "plots": [
+                {
+                    "plot_id": "selected_umap",
+                    "deliverable_id": "representation_review",
+                    "deliverable_title": "Representation review",
+                    "visibility_tier": "primary",
+                    "status": "ok",
+                    "stale": False,
+                }
+            ],
+        },
+        "geometry_controls": {
+            "default_model": "7b",
+            "default_family": "intermediate_embedding",
+            "default_context": "context_anchor_mean_bidir_concat",
+            "default_layout": "single_view",
+            "geometries": [
+                {
+                    "view_id": "selected_view",
+                    "model": "7b",
+                    "family": "intermediate_embedding",
+                    "context": "context_anchor_mean_bidir_concat",
+                    "role": "primary",
+                    "materialized": True,
+                    "projection_ids": ["selected_umap"],
+                    "rows": 160_460,
+                    "dims": 8_192,
+                }
+            ],
+            "preferred_hues": [],
+            "row_metadata_hues": [],
+            "hue_kinds": {},
+            "joinable_tables": [],
+            "layout_presets": [],
+            "comparison_bases": [],
+            "reference_labels": [],
+            "reference_sets": [],
+            "candidate_sets": [],
+            "compare_metrics": {},
+        },
+    }
+
+    runtime = build_workspace_browser_runtime(
+        title="Detached review",
+        description=None,
+        workspace_id="externalized_workspace",
+        notebook_id="latent_geometry_browser",
+        default_deliverable="representation_review",
+        workspace_dir=workspace_dir,
+        output_root=output_root,
+        catalog_path=catalog_path,
+        health_path=health_path,
+        controls=controls,
+    )
+
+    assert runtime.identity.source_labels == ["evo2_features:promoter_context"]
+    assert runtime.identity.vector_columns == ["selected_view"]
+    assert runtime.identity.visual_families == ["intermediate_embedding"]
+    assert runtime.plot_review.default_surface == "plots"
+    assert len(runtime.plot_review.sections) == 1
+    card = runtime.plot_review.sections[0]["cards"][0]
+    assert card["title"] == "Chosen UMAP"
+    assert card["question"] == "Do designed families retain visible structure?"
+    assert card["render_path"] == plot_dir / "plot.svg"
+    assert card["live_render"] is False
+
+
 def test_reference_annotation_options_keep_label_selection_separate_from_hues() -> None:
     reference_sets = [
         {
