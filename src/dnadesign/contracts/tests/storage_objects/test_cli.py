@@ -296,6 +296,28 @@ def test_refresh_preserves_existing_manifest_permissions(tmp_path: Path) -> None
     assert stat.S_IMODE(manifest_path.stat().st_mode) == 0o640
 
 
+def test_inventory_creates_group_writable_lock_for_shared_object(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(0o770)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+
+    assert stat.S_IMODE((root / LOCK_NAME).stat().st_mode) == 0o664
+
+
 def test_refresh_rejects_missing_root_without_traceback(tmp_path: Path) -> None:
     root = tmp_path / "missing"
 

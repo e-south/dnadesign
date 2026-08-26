@@ -109,13 +109,15 @@ def _write_manifest(
 def _manifest_lock(root: Path) -> Iterator[None]:
     lock_path = root / LOCK_NAME
     try:
+        root_mode = stat.S_IMODE(root.stat(follow_symlinks=False).st_mode)
         if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
             raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
         if lock_path.exists() and lock_path.stat(follow_symlinks=False).st_size != 0:
             raise StorageObjectError(f"storage object lock must be an empty coordination file: {lock_path}")
     except OSError as exc:
         raise StorageObjectError(f"cannot inspect storage object lock {lock_path}: {exc}") from exc
-    lock = FileLock(lock_path, timeout=30)
+    lock_mode = 0o664 if root_mode & stat.S_IWGRP else 0o644
+    lock = FileLock(lock_path, timeout=30, mode=lock_mode)
     try:
         lock.acquire()
     except Timeout as exc:
