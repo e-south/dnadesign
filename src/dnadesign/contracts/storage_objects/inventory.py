@@ -372,6 +372,11 @@ def refresh_storage_object(
             raise StorageObjectError(
                 "artifact reclassification requires an existing receipt resource: " + ", ".join(unknown_artifacts)
             )
+        missing_artifacts = sorted(normalized_artifacts - relative_files)
+        if missing_artifacts:
+            raise StorageObjectError(
+                "artifact reclassification target is missing from the storage object: " + ", ".join(missing_artifacts)
+            )
         invalid_artifact_roles = sorted(
             path
             for path in normalized_artifacts

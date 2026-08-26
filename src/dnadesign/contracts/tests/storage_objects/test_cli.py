@@ -947,6 +947,39 @@ def test_refresh_never_reclassifies_inputs_as_artifacts(tmp_path: Path) -> None:
     assert manifest_path.read_bytes() == prior_bytes
 
 
+def test_refresh_never_reclassifies_deleted_metadata_as_artifact(tmp_path: Path) -> None:
+    root = tmp_path / "store"
+    root.mkdir()
+    metadata = root / "metadata.txt"
+    metadata.write_text("original\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="store",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="authoritative",
+        retention_policy="retain",
+        metadata_paths=("metadata.txt",),
+    )
+    manifest_path = root / MANIFEST_NAME
+    prior_bytes = manifest_path.read_bytes()
+    metadata.unlink()
+
+    with pytest.raises(StorageObjectError, match="reclassification target is missing"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+            artifact_paths=("metadata.txt",),
+        )
+
+    assert manifest_path.read_bytes() == prior_bytes
+
+
 @pytest.mark.parametrize("protected_role", ["input", "metadata"])
 def test_refresh_rejects_changed_protected_bytes(tmp_path: Path, protected_role: str) -> None:
     root = tmp_path / "pilot"
