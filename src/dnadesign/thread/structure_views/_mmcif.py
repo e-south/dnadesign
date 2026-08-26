@@ -156,6 +156,7 @@ def _browser_cif_token(value: str, *, field: str) -> str:
     requires_quotes = (
         any(character.isspace() for character in value)
         or any(character in value for character in ("'", '"'))
+        or value in {".", "?"}
         or value.startswith(("_", "#", "$", "[", "]"))
         or lowered.startswith(("data_", "save_"))
         or lowered in {"loop_", "stop_", "global_"}

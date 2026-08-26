@@ -737,6 +737,8 @@ def test_py3dmol_backend_quotes_whitespace_bearing_mmcif_identifiers() -> None:
 @pytest.mark.parametrize(
     "identifier",
     (
+        ".",
+        "?",
         "#chain",
         "_chain",
         "$chain",
@@ -761,7 +763,7 @@ def test_py3dmol_backend_quotes_reserved_mmcif_identifiers(identifier: str) -> N
     assert f'"{identifier}"' in serialized
 
 
-@pytest.mark.parametrize("value", ("loop_", "LOOP_", "stop_", "global_"))
+@pytest.mark.parametrize("value", (".", "?", "loop_", "LOOP_", "stop_", "global_"))
 def test_mmcif_token_serializer_quotes_reserved_control_words(value: str) -> None:
     assert _browser_cif_token(value, field="_atom_site.auth_asym_id") == f'"{value}"'
 
