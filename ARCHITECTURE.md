@@ -2,14 +2,14 @@
 doc_id: architecture
 surface: system-of-record
 owner: dnadesign-maintainers
-last_verified: 2026-08-21
+last_verified: 2026-08-22
 ---
 
 # ARCHITECTURE
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-21
+**Last verified:** 2026-08-22
 
 ## At a glance
 `dnadesign` is a uv-managed monorepo of modular bioinformatics tools under `src/dnadesign/`, with shared CI/devtools and operator runbooks in `docs/`.
@@ -33,9 +33,8 @@ This file is the architecture map: it names system boundaries, major flows, and 
 
 ## System boundaries
 - Tool packages: each top-level tool under `src/dnadesign/<tool>/` owns its CLI behavior, configs, and tests.
-- Domain-qualified tools may own reusable biological operations. For example,
-  `dnadesign.msd` resolves and compiles Retron MSD designs while callers retain
-  ownership of registry contents, candidate choices, and study evidence.
+- Domain-qualified tools may own reusable biological operations while callers
+  retain study identity, candidate choices, and experimental evidence.
 - Shared artifact schemas live under `src/dnadesign/contracts/` when a producer and consumer need a neutral, versioned handoff model without importing either tool's internals.
 - Construct accepts producer-authored annotated sequence parts through the
   neutral `AnnotatedSequencePartV1` contract. It may place and offset that

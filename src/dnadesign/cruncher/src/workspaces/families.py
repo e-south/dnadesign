@@ -60,28 +60,6 @@ _WORKFLOW_FAMILIES: tuple[WorkflowFamilyDescriptor, ...] = (
         docs_section_id="yiu",
     ),
     WorkflowFamilyDescriptor(
-        id="snapback",
-        display_name="single-nick snapback workflow",
-        workspace_kind="runbook_family",
-        runbook_command_roots=("snapback",),
-        spec_globs=(
-            "configs/snapback/*.snapback.yaml",
-            "configs/snapback/*.snapback.solve.yaml",
-            "configs/snapback/*.released.snapback.yaml",
-        ),
-        default_output_root="outputs",
-        docs_section_id="snapback",
-    ),
-    WorkflowFamilyDescriptor(
-        id="scar_nick",
-        display_name="retained-scar terminal-nick workflow",
-        workspace_kind="runbook_family",
-        runbook_command_roots=("scar-nick",),
-        spec_globs=("configs/scar_nick/*.scar_nick.yaml",),
-        default_output_root="outputs/scar_nick",
-        docs_section_id="scar_nick",
-    ),
-    WorkflowFamilyDescriptor(
         id="study",
         display_name="Study orchestration",
         workspace_kind="hybrid",
