@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/contracts/workspace_storage/__main__.py
+src/dnadesign/contracts/storage_objects/__main__.py
 
-Provides the module entrypoint for workspace-storage verification.
+Provides the storage-object command-line module entrypoint.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

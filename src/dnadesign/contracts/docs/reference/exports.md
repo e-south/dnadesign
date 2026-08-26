@@ -37,12 +37,13 @@ Generic sequence and folding contracts:
   provider references, and declared CDS/protein lengths; it publishes no
   sequence bytes or provider-internal candidate ids
 
-Workspace storage contract:
+External storage contract:
 
-- `dnadesign.contracts.workspace_storage`: strict
-  `dnadesign.workspace-storage/v1` parsing and source-closed verification for an
-  explicit external workspace root; this envelope owns location, retention,
-  and digest identity without interpreting the tool-owned workspace schema
+- `dnadesign.contracts.storage_objects`: strict
+  `dnadesign.storage-object/v1` parsing, deterministic inventory, and exact
+  file-closure verification for an explicit external workspace, store, or tool
+  cache; this envelope owns location, retention, and digest identity without
+  interpreting the tool-owned content schema
 
 Visual contracts:
 

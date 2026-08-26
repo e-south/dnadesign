@@ -33,10 +33,10 @@ identity from a directory name.
   for study-owned OPAL evidence adapters.
 - Tool CLIs accept explicit workspace and configuration paths. Study packages
   should call those public surfaces rather than importing tool internals.
-- `dnadesign.contracts.workspace_storage` verifies the neutral storage envelope
-  for private or large workspace instances outside public Git checkouts. The
-  producing tool still owns the workspace schema; see
-  [external workspace storage](workspace-storage.md).
+- `dnadesign.contracts.storage_objects` verifies the neutral storage envelope
+  for private or large workspaces, durable stores, and rebuildable tool caches
+  outside public Git checkouts. The producing tool still owns the content
+  schema; see [external storage objects](storage-objects.md).
 
 Example status registration in a study package:
 

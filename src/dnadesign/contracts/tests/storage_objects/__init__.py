@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/contracts/tests/workspace_storage/__init__.py
+src/dnadesign/contracts/tests/storage_objects/__init__.py
 
-Defines the workspace-storage contract test package.
+Defines the storage-object contract test package.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

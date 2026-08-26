@@ -8,7 +8,7 @@ last_verified: 2026-08-26
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-22
+**Last verified:** 2026-08-26
 
 Find the next task, command, or reference doc from the routes below.
 
@@ -21,8 +21,8 @@ Start with:
 - [Tool docs](#tool-docs) when you already know the package.
 - [External study workspaces](integrations/study-workspaces.md) when a private
   study needs to call dnadesign without importing tool internals.
-- [External workspace storage](integrations/workspace-storage.md) when a private
-  or large tool workspace must live outside a public Git checkout.
+- [External storage objects](integrations/storage-objects.md) when a private or
+  large workspace, store, or tool cache must live outside a public Git checkout.
 - [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for repo contracts and operator docs.
 
 ### Inspect available work
@@ -67,7 +67,7 @@ Use these when data moves through more than one tool and the shared record lives
 | Assemble multiple producer datasets before construct and infer share one downstream dataset | [Multi-source shared dataset assembly](../src/dnadesign/usr/docs/operations/assembly/multi-source-shared-dataset.md) | Verify carried overlays, construct lineage, and infer write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
 | Hand one construct-backed dataset to infer and downstream watchers | [Construct -> USR -> Infer shared dataset runbook](../src/dnadesign/usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md) | Verify lineage plus downstream write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
 | Connect a private study workspace to dnadesign | [External study workspace contract](integrations/study-workspaces.md) | Pin dnadesign, pass explicit paths, and register only study-owned status or evidence adapters. |
-| Validate a private runtime workspace outside Git | [External workspace storage contract](integrations/workspace-storage.md) | Pass one exact workspace root and verify its schema, ownership, retention, paths, and digests before execution. |
+| Validate private runtime state outside Git | [External storage-object contract](integrations/storage-objects.md) | Inventory one exact workspace, store, or cache and verify its ownership, retention, file closure, and digests before execution. |
 | Build a promoter feature dataset from anchors, wildtype/manual promoters, optional construct contexts, and infer outputs | [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter/characterization-feature-matrix.md) | Verify one explicit `infer__...` column is chosen as `X` or export a flattened matrix before continuing to the exploratory [cluster workflow](../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) or the downstream [USR dataset with infer-derived X -> OPAL active learning](../src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md) workflow. |
 | Sync iterative HPC outputs to local analysis safely | [USR workflow map](../src/dnadesign/usr/docs/operations/routes/workflow-map.md) -> [USR HPC sync flow](../src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.md) | Verify transfer parity with [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync/audit-loop.md). |
 | Run cross-machine sync with stricter failure checks | [USR sync command contract](../src/dnadesign/usr/docs/operations/sync/README.md) | Verify sidecar and overlay fidelity with [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync/fidelity-drills.md). |
@@ -127,7 +127,7 @@ contract artifacts or bundle manifest.
 
 | Surface | CLI | Docs |
 | --- | --- | --- |
-| `contracts` | `uv run dnadesign-workspace-storage --help` | [contracts docs](../src/dnadesign/contracts/docs/README.md) |
+| `contracts` | `uv run dnadesign-storage --help` | [contracts docs](../src/dnadesign/contracts/docs/README.md) |
 | external studies | n/a | [study workspace integration contract](integrations/study-workspaces.md) |
 
 ### System records
@@ -159,8 +159,8 @@ contract artifacts or bundle manifest.
 - [Repo maintenance](repo-maintenance.md): compact route map for broad maintainer work.
 - [Execution plans index](exec-plans/README.md): active and completed execution-plan records.
 - [External study workspaces](integrations/study-workspaces.md): public contracts for private study packages.
-- [External workspace storage](integrations/workspace-storage.md): fail-fast
-  envelope for private runtime workspaces outside Git checkouts.
+- [External storage objects](integrations/storage-objects.md): fail-fast
+  envelopes for private workspaces, stores, and caches outside Git checkouts.
 - [Templates index](templates/README.md): reusable templates for runbooks, plans, and records.
 - [Architecture decisions index](architecture/decisions/README.md): ADR catalog and decision history.
 - [Quality docs index](quality/README.md): quality gates, audits, and measurement references.

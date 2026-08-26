@@ -1,0 +1,176 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/contracts/tests/storage_objects/test_cli.py
+
+Tests deterministic storage inventory and validation commands.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+from dnadesign.contracts.storage_objects import MANIFEST_NAME
+
+
+def _digest(path: Path) -> str:
+    return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+
+
+def test_inventory_creates_a_closed_manifest_then_refuses_overwrite(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    (root / "inputs").mkdir(parents=True)
+    (root / "outputs").mkdir()
+    (root / "inputs" / "payload.txt").write_text("payload\n", encoding="utf-8")
+    (root / "outputs" / "result.json").write_text('{"status":"ok"}\n', encoding="utf-8")
+    command = [
+        sys.executable,
+        "-m",
+        "dnadesign.contracts.storage_objects",
+        "inventory",
+        str(root),
+        "--storage-id",
+        "pilot",
+        "--owner-repository",
+        "dnadesign",
+        "--owner-tool",
+        "cruncher",
+        "--object-kind",
+        "workspace",
+        "--content-schema",
+        "cruncher.workspace",
+        "--content-schema-version",
+        "1",
+        "--producer-revision",
+        "test-revision-1",
+        "--storage-class",
+        "reproducible",
+        "--retention-policy",
+        "review-before-delete",
+        "--input",
+        "inputs/payload.txt",
+        "--metadata",
+        "outputs/result.json",
+        "--json",
+    ]
+
+    completed = subprocess.run(command, check=True, capture_output=True, text=True)
+    manifest_text = (root / MANIFEST_NAME).read_text(encoding="utf-8")
+
+    assert manifest_text.endswith("\n")
+    assert json.loads(completed.stdout)["status"] == "verified"
+    assert [row["path"] for row in json.loads(manifest_text)["resources"]] == [
+        "inputs/payload.txt",
+        "outputs/result.json",
+    ]
+    assert [row["role"] for row in json.loads(manifest_text)["resources"]] == [
+        "input",
+        "metadata",
+    ]
+    repeated = subprocess.run(command, check=False, capture_output=True, text=True)
+    assert repeated.returncode == 2
+    assert "already exists" in repeated.stderr
+
+
+def test_validate_root_emits_inventory_summary(tmp_path: Path) -> None:
+    storage_root = tmp_path / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "dnadesign.contracts.storage_objects",
+            "validate-root",
+            str(storage_root),
+            "--json",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(completed.stdout) == {
+        "object_count": 0,
+        "objects_by_kind": {},
+        "owner_count": 0,
+        "schema": "dnadesign.storage-root/v1",
+        "status": "verified",
+    }
+
+
+def test_refresh_requires_prior_receipt_and_preserves_protected_roles(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    (root / "inputs").mkdir(parents=True)
+    (root / "outputs").mkdir()
+    (root / "inputs" / "payload.txt").write_text("payload\n", encoding="utf-8")
+    (root / "outputs" / "result.json").write_text("first\n", encoding="utf-8")
+    inventory = [
+        sys.executable,
+        "-m",
+        "dnadesign.contracts.storage_objects",
+        "inventory",
+        str(root),
+        "--storage-id",
+        "pilot",
+        "--owner-repository",
+        "dnadesign",
+        "--owner-tool",
+        "cruncher",
+        "--object-kind",
+        "workspace",
+        "--content-schema",
+        "cruncher.workspace",
+        "--content-schema-version",
+        "1",
+        "--producer-revision",
+        "test-revision-1",
+        "--storage-class",
+        "reproducible",
+        "--retention-policy",
+        "review-before-delete",
+        "--input",
+        "inputs/payload.txt",
+    ]
+    subprocess.run(inventory, check=True, capture_output=True, text=True)
+    manifest_path = root / MANIFEST_NAME
+    expected_digest = _digest(manifest_path)
+    (root / "outputs" / "result.json").write_text("second\n", encoding="utf-8")
+    (root / "outputs" / "new.txt").write_text("new\n", encoding="utf-8")
+    refresh = [
+        sys.executable,
+        "-m",
+        "dnadesign.contracts.storage_objects",
+        "refresh",
+        str(root),
+        "--expected-manifest-digest",
+        expected_digest,
+        "--json",
+    ]
+
+    stale = subprocess.run(
+        [*refresh[:-2], "sha256:" + "0" * 64, "--json"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert stale.returncode == 2
+    assert "manifest changed before refresh" in stale.stderr
+
+    completed = subprocess.run(refresh, check=True, capture_output=True, text=True)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    roles = {row["path"]: row["role"] for row in manifest["resources"]}
+    assert json.loads(completed.stdout)["resource_count"] == 3
+    assert roles == {
+        "inputs/payload.txt": "input",
+        "outputs/new.txt": "artifact",
+        "outputs/result.json": "artifact",
+    }

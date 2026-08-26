@@ -1,9 +1,9 @@
 """
 --------------------------------------------------------------------------------
 dnadesign
-src/dnadesign/contracts/workspace_storage/loading.py
+src/dnadesign/contracts/storage_objects/loading.py
 
-Strict JSON loading for workspace-storage manifests.
+Strict JSON loading for storage-object manifests.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -18,29 +18,31 @@ from pathlib import Path, PurePosixPath
 
 from .models import (
     SCHEMA_ID,
+    ObjectKind,
+    ResourceRole,
     RetentionPolicy,
     StorageClass,
+    StorageObjectError,
+    StorageObjectManifest,
     StoredResource,
-    WorkspaceStorageError,
-    WorkspaceStorageManifest,
 )
 
 _MANIFEST_FIELDS = {
     "schema",
-    "workspace_id",
+    "storage_id",
     "owner_repository",
     "owner_tool",
-    "workspace_schema",
-    "workspace_schema_version",
+    "object_kind",
+    "content_schema",
+    "content_schema_version",
     "producer_revision",
     "storage_class",
     "retention_policy",
     "demo",
-    "inputs",
-    "artifacts",
+    "resources",
 }
 _OPTIONAL_MANIFEST_FIELDS = {"original_execution_path"}
-_RESOURCE_FIELDS = {"path", "digest"}
+_RESOURCE_FIELDS = {"path", "digest", "role"}
 _IDENTIFIER = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 _DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 _RETENTION_BY_STORAGE_CLASS = {
@@ -59,14 +61,14 @@ def _strict_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
     result: dict[str, object] = {}
     for key, value in pairs:
         if key in result:
-            raise WorkspaceStorageError(f"workspace storage JSON contains duplicate key {key!r}")
+            raise StorageObjectError(f"storage object JSON contains duplicate key {key!r}")
         result[key] = value
     return result
 
 
 def _mapping(value: object, *, label: str) -> Mapping[str, object]:
     if not isinstance(value, Mapping):
-        raise WorkspaceStorageError(f"{label} must be an object")
+        raise StorageObjectError(f"{label} must be an object")
     return value
 
 
@@ -80,113 +82,122 @@ def _exact_fields(
     optional = optional or set()
     missing = sorted(required - set(value))
     if missing:
-        raise WorkspaceStorageError(f"{label} is missing required fields: {', '.join(missing)}")
+        raise StorageObjectError(f"{label} is missing required fields: {', '.join(missing)}")
     unsupported = sorted(set(value) - required - optional)
     if unsupported:
-        raise WorkspaceStorageError(f"{label} has unsupported fields: {', '.join(unsupported)}")
+        raise StorageObjectError(f"{label} has unsupported fields: {', '.join(unsupported)}")
 
 
 def _text(value: object, *, label: str) -> str:
     if not isinstance(value, str) or not value.strip():
-        raise WorkspaceStorageError(f"{label} must be a non-empty string")
+        raise StorageObjectError(f"{label} must be a non-empty string")
     return value.strip()
 
 
 def _identifier(value: object, *, label: str) -> str:
     token = _text(value, label=label)
     if not _IDENTIFIER.fullmatch(token):
-        raise WorkspaceStorageError(f"{label} must be a lowercase identifier")
+        raise StorageObjectError(f"{label} must be a lowercase identifier")
     return token
+
+
+def normalize_relative_path(value: object, *, label: str) -> str:
+    """Return one confined portable file path."""
+
+    token = _text(value, label=label)
+    candidate = PurePosixPath(token)
+    unsafe_parts = any(part in {".", ".."} for part in candidate.parts)
+    if "\\" in token or candidate.is_absolute() or not candidate.parts or unsafe_parts:
+        raise StorageObjectError(f"{label} must be a confined relative path")
+    return candidate.as_posix()
 
 
 def _digest(value: object, *, label: str) -> str:
     token = _text(value, label=label)
     if not _DIGEST.fullmatch(token):
-        raise WorkspaceStorageError(f"{label} must be a lowercase sha256 digest")
+        raise StorageObjectError(f"{label} must be a lowercase sha256 digest")
     return token
 
 
-def _relative_path(value: object, *, label: str) -> str:
-    token = _text(value, label=label)
-    candidate = PurePosixPath(token)
-    unsafe_parts = any(part in {".", ".."} for part in candidate.parts)
-    if "\\" in token or candidate.is_absolute() or not candidate.parts or unsafe_parts:
-        raise WorkspaceStorageError(f"{label} must be a confined relative path")
-    return candidate.as_posix()
-
-
-def _resources(value: object, *, label: str) -> tuple[StoredResource, ...]:
+def _resources(value: object) -> tuple[StoredResource, ...]:
     if not isinstance(value, list):
-        raise WorkspaceStorageError(f"{label} must be an array")
+        raise StorageObjectError("resources must be an array")
     resources: list[StoredResource] = []
     for index, raw_item in enumerate(value):
-        item_label = f"{label}[{index}]"
-        item = _mapping(raw_item, label=item_label)
-        _exact_fields(item, required=_RESOURCE_FIELDS, label=item_label)
+        label = f"resources[{index}]"
+        item = _mapping(raw_item, label=label)
+        _exact_fields(item, required=_RESOURCE_FIELDS, label=label)
+        try:
+            role = ResourceRole(_text(item["role"], label=f"{label}.role"))
+        except ValueError as exc:
+            raise StorageObjectError(f"unsupported resource role {item['role']!r}") from exc
         resources.append(
             StoredResource(
-                relative_path=_relative_path(item["path"], label=f"{item_label}.path"),
-                digest=_digest(item["digest"], label=f"{item_label}.digest"),
+                relative_path=normalize_relative_path(item["path"], label=f"{label}.path"),
+                digest=_digest(item["digest"], label=f"{label}.digest"),
+                role=role,
             )
         )
     return tuple(resources)
 
 
-def load_workspace_storage_manifest(manifest_path: Path) -> WorkspaceStorageManifest:
-    """Parse one exact manifest without inferring paths or defaults."""
+def load_storage_object_manifest(manifest_path: Path) -> StorageObjectManifest:
+    """Parse one exact storage-object manifest without inferring defaults."""
 
     source = Path(manifest_path)
+    if source.is_symlink():
+        raise StorageObjectError(f"storage object manifest must not be a symlink: {source}")
     try:
         raw = json.loads(source.read_text(encoding="utf-8"), object_pairs_hook=_strict_object)
-    except WorkspaceStorageError:
+    except StorageObjectError:
         raise
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise WorkspaceStorageError(f"cannot read workspace storage manifest {source}: {exc}") from exc
+        raise StorageObjectError(f"cannot read storage object manifest {source}: {exc}") from exc
 
-    payload = _mapping(raw, label="workspace storage manifest")
+    payload = _mapping(raw, label="storage object manifest")
     _exact_fields(
         payload,
         required=_MANIFEST_FIELDS,
         optional=_OPTIONAL_MANIFEST_FIELDS,
-        label="workspace storage manifest",
+        label="storage object manifest",
     )
     if payload["schema"] != SCHEMA_ID:
-        raise WorkspaceStorageError(
-            f"unsupported workspace storage schema {payload['schema']!r}; expected {SCHEMA_ID!r}"
-        )
+        raise StorageObjectError(f"unsupported storage object schema {payload['schema']!r}; expected {SCHEMA_ID!r}")
     if type(payload["demo"]) is not bool:
-        raise WorkspaceStorageError("workspace storage manifest.demo must be a boolean")
-
+        raise StorageObjectError("storage object manifest.demo must be a boolean")
+    try:
+        object_kind = ObjectKind(_text(payload["object_kind"], label="object_kind"))
+    except ValueError as exc:
+        raise StorageObjectError(f"unsupported object_kind {payload['object_kind']!r}") from exc
     try:
         storage_class = StorageClass(_text(payload["storage_class"], label="storage_class"))
     except ValueError as exc:
-        raise WorkspaceStorageError(f"unsupported storage_class {payload['storage_class']!r}") from exc
+        raise StorageObjectError(f"unsupported storage_class {payload['storage_class']!r}") from exc
     try:
         retention_policy = RetentionPolicy(_text(payload["retention_policy"], label="retention_policy"))
     except ValueError as exc:
-        raise WorkspaceStorageError(f"unsupported retention_policy {payload['retention_policy']!r}") from exc
+        raise StorageObjectError(f"unsupported retention_policy {payload['retention_policy']!r}") from exc
     if retention_policy not in _RETENTION_BY_STORAGE_CLASS[storage_class]:
-        raise WorkspaceStorageError(
+        raise StorageObjectError(
             f"retention_policy {retention_policy.value!r} is incompatible with storage_class {storage_class.value!r}"
         )
+    if object_kind is ObjectKind.TOOL_CACHE and storage_class is not StorageClass.CACHE:
+        raise StorageObjectError("tool-cache objects require storage_class 'cache'")
 
-    original_execution_path_raw = payload.get("original_execution_path")
-    original_execution_path = (
-        None
-        if original_execution_path_raw is None
-        else _text(original_execution_path_raw, label="original_execution_path")
-    )
-    return WorkspaceStorageManifest(
-        workspace_id=_identifier(payload["workspace_id"], label="workspace_id"),
+    original_path = payload.get("original_execution_path")
+    return StorageObjectManifest(
+        storage_id=_identifier(payload["storage_id"], label="storage_id"),
         owner_repository=_identifier(payload["owner_repository"], label="owner_repository"),
         owner_tool=_identifier(payload["owner_tool"], label="owner_tool"),
-        workspace_schema=_identifier(payload["workspace_schema"], label="workspace_schema"),
-        workspace_schema_version=_text(payload["workspace_schema_version"], label="workspace_schema_version"),
+        object_kind=object_kind,
+        content_schema=_identifier(payload["content_schema"], label="content_schema"),
+        content_schema_version=_text(payload["content_schema_version"], label="content_schema_version"),
         producer_revision=_text(payload["producer_revision"], label="producer_revision"),
         storage_class=storage_class,
         retention_policy=retention_policy,
         demo=payload["demo"],
-        inputs=_resources(payload["inputs"], label="inputs"),
-        artifacts=_resources(payload["artifacts"], label="artifacts"),
-        original_execution_path=original_execution_path,
+        resources=_resources(payload["resources"]),
+        original_execution_path=(
+            None if original_path is None else _text(original_path, label="original_execution_path")
+        ),
     )

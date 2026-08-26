@@ -43,15 +43,16 @@ def ctx_args(ctx: typer.Context, **kwargs) -> NS:
 def build_root_callback(
     *,
     default_usr_root: Callable[[], Path],
+    resolve_usr_root_from_env: Callable[[], Path | None],
     normalize_usr_root: Callable[[Path], Path],
     assert_supported_root: Callable[[Path], None],
 ) -> Callable[..., None]:
     def _root(
         ctx: typer.Context,
-        root: Path = typer.Option(
-            default_usr_root(),
+        root: Path | None = typer.Option(
+            None,
             "--root",
-            help="Datasets root folder",
+            help="Datasets root folder; defaults to DNADESIGN_USR_ROOT, then packaged datasets",
             readable=True,
             exists=True,
             dir_okay=True,
@@ -71,7 +72,8 @@ def build_root_callback(
         if remotes_config is not None:
             os.environ["USR_REMOTES_PATH"] = str(remotes_config.expanduser())
         try:
-            normalized_root = normalize_usr_root(root)
+            selected_root = root or resolve_usr_root_from_env() or default_usr_root()
+            normalized_root = normalize_usr_root(selected_root)
             assert_supported_root(normalized_root)
         except SequencesError as exc:
             raise typer.BadParameter(str(exc), param_hint="--root") from exc
