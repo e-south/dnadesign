@@ -401,6 +401,16 @@ def test_publisher_validates_serialized_record_provenance(tmp_path: Path, field:
         publisher.publish_densegen_playback_endpoint(config_path)
 
 
+def test_publisher_validates_serialized_manifest_fields(tmp_path: Path) -> None:
+    config_path = _write_endpoint(tmp_path)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    payload["endpoint_id"] = "private sigma factor endpoint"
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="serialized manifest payload contains forbidden term: 'sigma factor'"):
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+
 def test_publisher_validates_record_derived_variant_annotations(tmp_path: Path) -> None:
     row = _publisher_row()
     row["densegen__used_tfbs_detail"] = [

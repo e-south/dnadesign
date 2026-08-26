@@ -734,10 +734,13 @@ def publish_densegen_playback_endpoint(
                 for path in artifact_paths
             ],
         }
-        (temp_path / "manifest.json").write_text(
-            json.dumps(manifest, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
+        manifest_payload = json.dumps(manifest, ensure_ascii=True, indent=2, sort_keys=True)
+        _validate_serialized_public_payload(
+            manifest_payload,
+            forbidden_terms,
+            payload_name="manifest",
         )
+        (temp_path / "manifest.json").write_text(manifest_payload + "\n", encoding="utf-8")
         _install_output_directory(temp_path, output_path, replace=replace)
     except Exception:
         shutil.rmtree(temp_path, ignore_errors=True)
