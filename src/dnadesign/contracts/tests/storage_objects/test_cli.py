@@ -400,6 +400,38 @@ def test_inventory_rejects_nonempty_shared_lock_without_changing_it(tmp_path: Pa
     assert lock_path.read_text(encoding="utf-8") == "user bytes\n"
 
 
+def test_inventory_wraps_resource_read_failures(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    payload_path = root / "payload.txt"
+    payload_path.write_text("payload\n", encoding="utf-8")
+    original_open = Path.open
+
+    def _open(path: Path, *args: object, **kwargs: object):
+        if path == payload_path:
+            raise PermissionError(13, "Permission denied", str(path))
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", _open)
+
+    with pytest.raises(StorageObjectError, match="cannot read storage resource"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+
 def test_inventory_does_not_delete_preexisting_manifest_temp(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     root.mkdir()
@@ -540,3 +572,31 @@ def test_failed_refresh_atomically_restores_readonly_manifest(
     assert manifest_path.read_bytes() == previous_bytes
     assert stat.S_IMODE(manifest_path.stat().st_mode) == 0o444
     assert not tuple(root.glob(f".{MANIFEST_NAME}.restore-*"))
+
+
+def test_refresh_rejects_duplicate_resource_paths_before_collapsing_roles(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    payload_path = root / "payload.txt"
+    payload_path.write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+        input_paths=("payload.txt",),
+    )
+    manifest_path = root / MANIFEST_NAME
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["resources"].append({**manifest["resources"][0], "role": "artifact"})
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    expected_digest = _digest(manifest_path)
+
+    with pytest.raises(StorageObjectError, match="resource path is declared more than once"):
+        refresh_storage_object(root, expected_manifest_digest=expected_digest)

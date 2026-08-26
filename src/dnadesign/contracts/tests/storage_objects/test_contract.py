@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+import dnadesign.contracts.storage_objects.validation as storage_validation
 from dnadesign.contracts.storage_objects import (
     MANIFEST_NAME,
     StorageObjectError,
@@ -99,6 +100,18 @@ def test_verify_storage_object_rejects_symlinks(tmp_path: Path) -> None:
         verify_storage_object(linked_root)
 
 
+def test_verify_storage_object_rejects_nul_in_resource_path(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    manifest_path = root / MANIFEST_NAME
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["resources"][0]["path"] = "inputs/payload\x00.txt"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="must not contain NUL bytes"):
+        verify_storage_object(root)
+
+
 def test_verify_storage_object_rejects_non_regular_entries(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     _write_object(root)
@@ -117,6 +130,38 @@ def test_storage_object_lock_is_shared_state_not_content(tmp_path: Path) -> None
     verified = verify_storage_object(root)
 
     assert verified.summary()["resource_count"] == 2
+
+
+def test_verify_storage_object_rejects_nonempty_shared_lock(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    lock_path = root / LOCK_NAME
+    lock_path.write_text("unexpected bytes\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="must be an empty coordination file"):
+        verify_storage_object(root)
+
+    assert lock_path.read_text(encoding="utf-8") == "unexpected bytes\n"
+
+
+def test_verify_storage_object_wraps_resource_read_failures(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    payload_path = root / "inputs" / "payload.txt"
+    original_open = Path.open
+
+    def _open(path: Path, *args: object, **kwargs: object):
+        if path == payload_path:
+            raise PermissionError(13, "Permission denied", str(path))
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", _open)
+
+    with pytest.raises(StorageObjectError, match="cannot read storage resource"):
+        storage_validation.verify_storage_object(root)
 
 
 def test_storage_file_closure_propagates_unreadable_subtree(

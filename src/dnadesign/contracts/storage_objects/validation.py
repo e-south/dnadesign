@@ -48,9 +48,12 @@ def _git_checkout_ancestor(root: Path, *, include_root: bool) -> Path | None:
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
+    try:
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as exc:
+        raise StorageObjectError(f"cannot read storage resource {path}: {exc}") from exc
     return f"sha256:{digest.hexdigest()}"
 
 
@@ -164,6 +167,11 @@ def verify_storage_object(
         raise StorageObjectError(f"storage object manifest must not be a symlink: {manifest_path}")
     if not manifest_path.is_file():
         raise StorageObjectError(f"storage object root is missing {MANIFEST_NAME}: {root}")
+    lock_path = root / LOCK_NAME
+    if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
+        raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
+    if lock_path.exists() and lock_path.stat(follow_symlinks=False).st_size != 0:
+        raise StorageObjectError(f"storage object lock must be an empty coordination file: {lock_path}")
     manifest = load_storage_object_manifest(manifest_path)
 
     declared_paths: set[str] = set()

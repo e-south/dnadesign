@@ -105,6 +105,8 @@ def normalize_relative_path(value: object, *, label: str) -> str:
     """Return one confined portable file path."""
 
     token = _text(value, label=label)
+    if "\x00" in token:
+        raise StorageObjectError(f"{label} must not contain NUL bytes")
     candidate = PurePosixPath(token)
     unsafe_parts = any(part in {".", ".."} for part in candidate.parts)
     if "\\" in token or candidate.is_absolute() or not candidate.parts or unsafe_parts:
@@ -123,6 +125,7 @@ def _resources(value: object) -> tuple[StoredResource, ...]:
     if not isinstance(value, list):
         raise StorageObjectError("resources must be an array")
     resources: list[StoredResource] = []
+    resource_paths: set[str] = set()
     for index, raw_item in enumerate(value):
         label = f"resources[{index}]"
         item = _mapping(raw_item, label=label)
@@ -131,9 +134,13 @@ def _resources(value: object) -> tuple[StoredResource, ...]:
             role = ResourceRole(_text(item["role"], label=f"{label}.role"))
         except ValueError as exc:
             raise StorageObjectError(f"unsupported resource role {item['role']!r}") from exc
+        relative_path = normalize_relative_path(item["path"], label=f"{label}.path")
+        if relative_path in resource_paths:
+            raise StorageObjectError(f"resource path is declared more than once: {relative_path}")
+        resource_paths.add(relative_path)
         resources.append(
             StoredResource(
-                relative_path=normalize_relative_path(item["path"], label=f"{label}.path"),
+                relative_path=relative_path,
                 digest=_digest(item["digest"], label=f"{label}.digest"),
                 role=role,
             )
