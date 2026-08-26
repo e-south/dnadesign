@@ -95,8 +95,11 @@ or changing them fails rather than silently authorizing a new input identity.
 If an initial receipt incorrectly classified a mutable operational ledger as
 metadata, an operator may name that existing path with `--artifact`. This
 one-way, compare-and-swap-protected correction permits only `metadata` to
-`artifact`; inputs and caches cannot be reclassified. For example, USR
-`.events.log` is an append-only artifact, not immutable metadata.
+`artifact`. Similarly, `--cache` may explicitly demote an existing artifact to
+rebuildable cache material while continuing to classify newly discovered cache
+files. Inputs remain immutable, and metadata cannot be reclassified as cache.
+For example, USR `.events.log` is an append-only artifact, not immutable
+metadata.
 Refresh uses the expected digest as a compare-and-swap guard against concurrent
 receipt changes. Writers lock
 `<object>/.storage-object.lock`, so processes and compute nodes that see the
@@ -107,7 +110,9 @@ fail-fast requirements let collaborators reach coordination files and ensure
 locks, staging files, and newly inventoried manifests inherit the shared
 directory group instead of the writer's primary group. They are created
 group-writable so collaborating accounts can participate in the same
-coordination boundary. Manifest staging occurs inside the object so
+coordination boundary. Declared resource files must inherit that group and be
+group-readable; their parent directories must inherit the group and be
+group-readable and traversable. Manifest staging occurs inside the object so
 the atomic replacement stays on the same filesystem. A pre-existing
 staging-shaped name fails closed for explicit operator inspection; the tool
 never guesses that such bytes are safe to delete. Independently synced replicas,

@@ -403,6 +403,30 @@ def test_inventory_rejects_shared_root_without_group_traversal(tmp_path: Path) -
     assert not (root / MANIFEST_NAME).exists()
 
 
+def test_inventory_rejects_shared_root_without_group_read(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(0o2730)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="must be group-readable"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert not (root / LOCK_NAME).exists()
+    assert not (root / MANIFEST_NAME).exists()
+
+
 def test_inventory_stages_manifest_on_object_filesystem(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1018,6 +1042,7 @@ def test_inventory_and_refresh_preserve_explicit_cache_roles(tmp_path: Path) -> 
     root = tmp_path / "pilot"
     root.mkdir()
     (root / "cache.bin").write_bytes(b"cache-v1")
+    (root / "artifact-cache.bin").write_bytes(b"artifact-cache-v1")
     inventory_storage_object(
         root,
         storage_id="pilot",
@@ -1038,14 +1063,52 @@ def test_inventory_and_refresh_preserve_explicit_cache_roles(tmp_path: Path) -> 
         root,
         expected_manifest_digest=_digest(manifest_path),
         producer_revision="test-revision-2",
-        cache_paths=("new-cache.bin",),
+        cache_paths=("artifact-cache.bin", "new-cache.bin"),
     )
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert {item["path"]: item["role"] for item in manifest["resources"]} == {
+        "artifact-cache.bin": "cache",
         "cache.bin": "cache",
         "new-cache.bin": "cache",
     }
+
+
+@pytest.mark.parametrize("protected_role", ["input", "metadata"])
+def test_refresh_never_reclassifies_protected_resources_as_cache(
+    tmp_path: Path,
+    protected_role: str,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    protected = root / "protected.txt"
+    protected.write_text("protected\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+        input_paths=("protected.txt",) if protected_role == "input" else (),
+        metadata_paths=("protected.txt",) if protected_role == "metadata" else (),
+    )
+    manifest_path = root / MANIFEST_NAME
+    prior_bytes = manifest_path.read_bytes()
+
+    with pytest.raises(StorageObjectError, match="input and metadata roles remain protected"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+            cache_paths=("protected.txt",),
+        )
+
+    assert manifest_path.read_bytes() == prior_bytes
 
 
 def test_failed_refresh_atomically_restores_readonly_manifest(

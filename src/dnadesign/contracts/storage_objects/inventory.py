@@ -140,6 +140,11 @@ def _manifest_lock(root: Path) -> Iterator[None]:
                 "group-writable storage object roots must be group-traversable "
                 "so collaborators can reach coordination files"
             )
+        if root_mode & stat.S_IWGRP and not root_mode & stat.S_IRGRP:
+            raise StorageObjectError(
+                "group-writable storage object roots must be group-readable "
+                "so collaborators can enumerate declared content"
+            )
         if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
             raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
         if lock_path.exists() and lock_path.stat(follow_symlinks=False).st_size != 0:
@@ -387,8 +392,22 @@ def refresh_storage_object(
                 "only metadata may be reclassified as artifact; input and cache roles remain protected: "
                 + ", ".join(invalid_artifact_roles)
             )
+        invalid_cache_roles = sorted(
+            path
+            for path in normalized_caches
+            if path in prior_roles and prior_roles[path] not in {ResourceRole.ARTIFACT, ResourceRole.CACHE}
+        )
+        if invalid_cache_roles:
+            raise StorageObjectError(
+                "only artifacts may be reclassified as cache; input and metadata roles remain protected: "
+                + ", ".join(invalid_cache_roles)
+            )
         effective_roles = {
-            path: (ResourceRole.ARTIFACT if path in normalized_artifacts else role)
+            path: (
+                ResourceRole.ARTIFACT
+                if path in normalized_artifacts
+                else (ResourceRole.CACHE if path in normalized_caches else role)
+            )
             for path, role in prior_roles.items()
         }
         protected_paths = {
@@ -409,11 +428,6 @@ def refresh_storage_object(
         missing_caches = sorted(normalized_caches - relative_files)
         if missing_caches:
             raise StorageObjectError(f"declared refresh cache paths are missing: {', '.join(missing_caches)}")
-        role_changes = sorted(
-            path for path in normalized_caches if path in prior_roles and prior_roles[path] is not ResourceRole.CACHE
-        )
-        if role_changes:
-            raise StorageObjectError(f"refresh cannot change existing resource roles: {', '.join(role_changes)}")
         resources = []
         for path in files:
             relative_path = path.relative_to(root).as_posix()

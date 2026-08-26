@@ -175,6 +175,41 @@ def test_verify_storage_object_rejects_shared_root_without_group_traversal(tmp_p
         verify_storage_object(root)
 
 
+def test_verify_storage_object_rejects_shared_root_without_group_read(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    root.chmod(0o2730)
+
+    with pytest.raises(StorageObjectError, match="must be group-readable"):
+        verify_storage_object(root)
+
+
+def test_verify_storage_object_rejects_inaccessible_shared_content(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    root.chmod(0o2770)
+    (root / "inputs").chmod(0o700)
+
+    with pytest.raises(StorageObjectError, match="directory must be group-readable and traversable"):
+        verify_storage_object(root)
+
+    (root / "inputs").chmod(0o750)
+    (root / "inputs" / "payload.txt").chmod(0o600)
+    with pytest.raises(StorageObjectError, match="shared resource must be group-readable"):
+        verify_storage_object(root)
+
+
+def test_verify_storage_object_rejects_inaccessible_empty_shared_directory(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    root.chmod(0o2770)
+    empty = root / "empty"
+    empty.mkdir(mode=0o700)
+
+    with pytest.raises(StorageObjectError, match="directory must be group-readable and traversable"):
+        verify_storage_object(root)
+
+
 def test_verify_storage_object_rejects_private_manifest_in_shared_root(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     _write_object(root)

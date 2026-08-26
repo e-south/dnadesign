@@ -77,8 +77,8 @@ def _sha256_bytes(content: bytes) -> str:
     return f"sha256:{hashlib.sha256(content).hexdigest()}"
 
 
-def storage_file_paths(root: Path) -> tuple[Path, ...]:
-    """Return every regular file while rejecting symlinks and special entries."""
+def _storage_tree_paths(root: Path) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
+    """Return regular files and directories while rejecting unsafe entries."""
 
     def _raise_walk_error(error: OSError) -> None:
         raise StorageObjectError(
@@ -86,6 +86,7 @@ def storage_file_paths(root: Path) -> tuple[Path, ...]:
         ) from error
 
     files: list[Path] = []
+    directories: list[Path] = []
     for current, directory_names, file_names in os.walk(
         root,
         followlinks=False,
@@ -99,6 +100,7 @@ def storage_file_paths(root: Path) -> tuple[Path, ...]:
             if directory.is_symlink():
                 relative = directory.relative_to(root).as_posix()
                 raise StorageObjectError(f"symlink is not allowed: {relative}")
+            directories.append(directory)
         for file_name in file_names:
             path = current_path / file_name
             relative = path.relative_to(root).as_posix()
@@ -111,7 +113,14 @@ def storage_file_paths(root: Path) -> tuple[Path, ...]:
             if not stat.S_ISREG(mode):
                 raise StorageObjectError(f"non-regular storage entry is not allowed: {relative}")
             files.append(path)
-    return tuple(files)
+    return tuple(files), tuple(directories)
+
+
+def storage_file_paths(root: Path) -> tuple[Path, ...]:
+    """Return every regular file while rejecting symlinks and special entries."""
+
+    files, _directories = _storage_tree_paths(root)
+    return files
 
 
 def _verify_resource(root: Path, resource: StoredResource) -> VerifiedStoredResource:
@@ -146,6 +155,39 @@ def _verify_resource(root: Path, resource: StoredResource) -> VerifiedStoredReso
         role=resource.role,
         size_bytes=size_bytes,
     )
+
+
+def _verify_shared_resource_access(
+    root: Path,
+    resources: tuple[VerifiedStoredResource, ...],
+    directories: tuple[Path, ...],
+    *,
+    shared_group: int,
+) -> None:
+    """Require shared-object readers to reach and hash every declared resource."""
+
+    for resource in resources:
+        try:
+            resource_stat = resource.path.stat(follow_symlinks=False)
+        except OSError as exc:
+            raise StorageObjectError(f"cannot inspect shared resource {resource.relative_path}: {exc}") from exc
+        if resource_stat.st_gid != shared_group:
+            raise StorageObjectError(
+                f"shared resource does not inherit the storage object group: {resource.relative_path}"
+            )
+        if not resource_stat.st_mode & stat.S_IRGRP:
+            raise StorageObjectError(f"shared resource must be group-readable: {resource.relative_path}")
+    for directory in sorted(directories):
+        relative = directory.relative_to(root).as_posix()
+        try:
+            directory_stat = directory.stat(follow_symlinks=False)
+        except OSError as exc:
+            raise StorageObjectError(f"cannot inspect shared resource directory {relative}: {exc}") from exc
+        if directory_stat.st_gid != shared_group:
+            raise StorageObjectError(f"shared resource directory does not inherit the storage object group: {relative}")
+        required = stat.S_IRGRP | stat.S_IXGRP
+        if directory_stat.st_mode & required != required:
+            raise StorageObjectError(f"shared resource directory must be group-readable and traversable: {relative}")
 
 
 def _verify_demo(
@@ -217,6 +259,11 @@ def verify_storage_object(
                 "group-writable storage object roots must be group-traversable "
                 "so collaborators can reach coordination files"
             )
+        if root_mode & stat.S_IWGRP and not root_mode & stat.S_IRGRP:
+            raise StorageObjectError(
+                "group-writable storage object roots must be group-readable "
+                "so collaborators can enumerate declared content"
+            )
         manifest_stat = manifest_path.stat(follow_symlinks=False)
         if root_mode & stat.S_IWGRP and manifest_stat.st_gid != root_stat.st_gid:
             raise StorageObjectError(
@@ -259,9 +306,17 @@ def verify_storage_object(
         declared_paths.add(resource.relative_path)
 
     resources = tuple(_verify_resource(root, resource) for resource in manifest.resources)
+    first_file_paths, first_directory_paths = _storage_tree_paths(root)
+    if root_mode & stat.S_IWGRP:
+        _verify_shared_resource_access(
+            root,
+            resources,
+            first_directory_paths,
+            shared_group=root_stat.st_gid,
+        )
     actual_paths = {
         path.relative_to(root).as_posix()
-        for path in storage_file_paths(root)
+        for path in first_file_paths
         if path.name not in {MANIFEST_NAME, LOCK_NAME} or path.parent != root
     }
     undeclared = sorted(actual_paths - declared_paths)
@@ -271,9 +326,10 @@ def verify_storage_object(
     if missing:
         raise StorageObjectError(f"declared files are missing: {', '.join(missing)}")
     second_resources = tuple(_verify_resource(root, resource) for resource in manifest.resources)
+    second_file_paths, second_directory_paths = _storage_tree_paths(root)
     second_actual_paths = {
         path.relative_to(root).as_posix()
-        for path in storage_file_paths(root)
+        for path in second_file_paths
         if path.name not in {MANIFEST_NAME, LOCK_NAME} or path.parent != root
     }
     first_state = tuple((item.relative_path, item.digest, item.size_bytes) for item in resources)
@@ -282,7 +338,14 @@ def verify_storage_object(
         second_manifest_bytes = manifest_path.read_bytes()
     except OSError as exc:
         raise StorageObjectError(f"cannot reread storage object manifest {manifest_path}: {exc}") from exc
-    if manifest_bytes != second_manifest_bytes or first_state != second_state or actual_paths != second_actual_paths:
+    first_directories = tuple(path.relative_to(root).as_posix() for path in first_directory_paths)
+    second_directories = tuple(path.relative_to(root).as_posix() for path in second_directory_paths)
+    if (
+        manifest_bytes != second_manifest_bytes
+        or first_state != second_state
+        or actual_paths != second_actual_paths
+        or first_directories != second_directories
+    ):
         raise StorageObjectError("storage object changed during validation; retry while the producer is quiescent")
 
     verified = VerifiedStorageObject(
