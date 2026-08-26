@@ -508,6 +508,17 @@ def test_publisher_rejects_false_yaml_label_containers(
         publisher.publish_densegen_playback_endpoint(config_path)
 
 
+@pytest.mark.parametrize("value", [False, 0, [], ""])
+def test_publisher_rejects_explicit_non_mapping_duplex(tmp_path: Path, value: object) -> None:
+    config_path = _write_endpoint(tmp_path)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    payload["duplex"] = value
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(TypeError, match="duplex must be a mapping"):
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+
 def test_publisher_rejects_nonpublic_audience(tmp_path: Path) -> None:
     config_path = _write_endpoint(tmp_path)
     payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))

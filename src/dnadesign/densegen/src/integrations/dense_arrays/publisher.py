@@ -532,7 +532,7 @@ def publish_densegen_playback_endpoint(
         show_authority_notice=show_authority_notice,
         show_distance_bracket=show_distance_bracket,
     )
-    duplex_spec = _required_mapping(endpoint.get("duplex") or {}, field_name="duplex")
+    duplex_spec = _required_mapping(endpoint.get("duplex", {}), field_name="duplex")
     _strict_fields(duplex_spec, _DUPLEX_FIELDS, field_name="duplex")
     fixed_element_annotations = _choice(
         duplex_spec.get("fixed_element_annotations", "none"),
