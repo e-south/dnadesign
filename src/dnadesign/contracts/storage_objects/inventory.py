@@ -236,6 +236,7 @@ def refresh_storage_object(
     storage_root: Path,
     *,
     expected_manifest_digest: str,
+    producer_revision: str,
 ) -> dict[str, object]:
     """Refresh a changed object while preserving identity and protected roles."""
 
@@ -300,7 +301,7 @@ def refresh_storage_object(
             "object_kind": manifest.object_kind.value,
             "owner_repository": manifest.owner_repository,
             "owner_tool": manifest.owner_tool,
-            "producer_revision": manifest.producer_revision,
+            "producer_revision": producer_revision,
             "resources": resources,
             "retention_policy": manifest.retention_policy.value,
             "schema": manifest.schema,

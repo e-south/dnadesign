@@ -190,6 +190,9 @@ def load_storage_object_manifest(manifest_path: Path) -> StorageObjectManifest:
         )
     if object_kind is ObjectKind.TOOL_CACHE and storage_class is not StorageClass.CACHE:
         raise StorageObjectError("tool-cache objects require storage_class 'cache'")
+    resources = _resources(payload["resources"])
+    if object_kind is ObjectKind.TOOL_CACHE and any(resource.role is not ResourceRole.CACHE for resource in resources):
+        raise StorageObjectError("tool-cache objects require every resource role to be 'cache'")
 
     original_path = payload.get("original_execution_path")
     return StorageObjectManifest(
@@ -203,7 +206,7 @@ def load_storage_object_manifest(manifest_path: Path) -> StorageObjectManifest:
         storage_class=storage_class,
         retention_policy=retention_policy,
         demo=payload["demo"],
-        resources=_resources(payload["resources"]),
+        resources=resources,
         original_execution_path=(
             None if original_path is None else _text(original_path, label="original_execution_path")
         ),

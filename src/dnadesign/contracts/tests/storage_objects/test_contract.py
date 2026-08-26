@@ -50,6 +50,7 @@ def _write_object(
     (root / "outputs").mkdir()
     (root / "inputs" / "payload.txt").write_bytes(payload)
     (root / "outputs" / "result.json").write_bytes(result)
+    resource_roles = ("cache", "cache") if object_kind == "tool-cache" else ("input", "artifact")
     manifest = {
         "schema": "dnadesign.storage-object/v1",
         "storage_id": storage_id,
@@ -63,8 +64,8 @@ def _write_object(
         "retention_policy": retention_policy,
         "demo": demo,
         "resources": [
-            {"path": "inputs/payload.txt", "digest": _digest(payload), "role": "input"},
-            {"path": "outputs/result.json", "digest": _digest(result), "role": "artifact"},
+            {"path": "inputs/payload.txt", "digest": _digest(payload), "role": resource_roles[0]},
+            {"path": "outputs/result.json", "digest": _digest(result), "role": resource_roles[1]},
         ],
     }
     (root / MANIFEST_NAME).write_text(json.dumps(manifest), encoding="utf-8")
@@ -248,6 +249,23 @@ def test_external_tool_cache_may_be_a_git_checkout(tmp_path: Path) -> None:
     manifest["retention_policy"] = "review-before-delete"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(StorageObjectError, match="non-demo storage object cannot live inside"):
+        verify_storage_object(root)
+
+
+def test_tool_cache_rejects_noncache_resource_roles(tmp_path: Path) -> None:
+    root = tmp_path / "proteinmpnn"
+    _write_object(
+        root,
+        storage_id="proteinmpnn",
+        owner_tool="proteinmpnn",
+        object_kind="tool-cache",
+    )
+    manifest_path = root / MANIFEST_NAME
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["resources"][0]["role"] = "artifact"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="every resource role to be 'cache'"):
         verify_storage_object(root)
 
 

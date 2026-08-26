@@ -53,6 +53,7 @@ def _parser() -> argparse.ArgumentParser:
     refresh = subparsers.add_parser("refresh", help="refresh one changed object using its prior receipt digest")
     refresh.add_argument("storage_root", type=Path)
     refresh.add_argument("--expected-manifest-digest", required=True)
+    refresh.add_argument("--producer-revision", required=True)
     _add_json(refresh)
 
     validate = subparsers.add_parser("validate", help="verify one explicit storage object")
@@ -96,6 +97,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             summary = refresh_storage_object(
                 args.storage_root,
                 expected_manifest_digest=args.expected_manifest_digest,
+                producer_revision=args.producer_revision,
             )
         elif args.command == "validate":
             summary = verify_storage_object(args.storage_root).summary()

@@ -79,12 +79,14 @@ run, refresh its receipt with the digest of the receipt that authorized the run:
 ```bash
 uv run dnadesign-storage refresh /absolute/path/to/object \
   --expected-manifest-digest sha256:<digest> \
+  --producer-revision <revision-that-produced-the-new-bytes> \
   --json
 ```
 
-Refresh preserves identity and existing input/metadata roles, inventories new
-artifacts, rejects missing input or metadata files, and uses the expected digest
-as a compare-and-swap guard against concurrent receipt changes. Writers lock
+Refresh preserves identity and existing input/metadata roles, records the
+revision that produced the refreshed bytes, inventories new artifacts, rejects
+missing input or metadata files, and uses the expected digest as a
+compare-and-swap guard against concurrent receipt changes. Writers lock
 `<object>/.storage-object.lock`, so processes and compute nodes that see the
 same POSIX filesystem serialize receipt updates. The lock is contract-owned
 coordination state and is excluded from the content manifest. Independently

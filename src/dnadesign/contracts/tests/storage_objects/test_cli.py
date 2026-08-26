@@ -238,11 +238,15 @@ def test_refresh_requires_prior_receipt_and_preserves_protected_roles(tmp_path: 
         str(root),
         "--expected-manifest-digest",
         expected_digest,
+        "--producer-revision",
+        "test-revision-2",
         "--json",
     ]
 
+    stale_refresh = [*refresh]
+    stale_refresh[6] = "sha256:" + "0" * 64
     stale = subprocess.run(
-        [*refresh[:-2], "sha256:" + "0" * 64, "--json"],
+        stale_refresh,
         check=False,
         capture_output=True,
         text=True,
@@ -254,6 +258,7 @@ def test_refresh_requires_prior_receipt_and_preserves_protected_roles(tmp_path: 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     roles = {row["path"]: row["role"] for row in manifest["resources"]}
     assert json.loads(completed.stdout)["resource_count"] == 3
+    assert manifest["producer_revision"] == "test-revision-2"
     assert roles == {
         "inputs/payload.txt": "input",
         "outputs/new.txt": "artifact",
@@ -282,7 +287,11 @@ def test_refresh_preserves_existing_manifest_permissions(tmp_path: Path) -> None
     expected_digest = _digest(manifest_path)
     (root / "result.txt").write_text("result\n", encoding="utf-8")
 
-    refresh_storage_object(root, expected_manifest_digest=expected_digest)
+    refresh_storage_object(
+        root,
+        expected_manifest_digest=expected_digest,
+        producer_revision="test-revision-2",
+    )
 
     assert stat.S_IMODE(manifest_path.stat().st_mode) == 0o640
 
@@ -299,6 +308,8 @@ def test_refresh_rejects_missing_root_without_traceback(tmp_path: Path) -> None:
             str(root),
             "--expected-manifest-digest",
             "sha256:" + "0" * 64,
+            "--producer-revision",
+            "test-revision-2",
         ],
         check=False,
         capture_output=True,
@@ -486,7 +497,11 @@ def test_refresh_wraps_lock_acquisition_failures(
     monkeypatch.setattr(storage_inventory.FileLock, "acquire", _deny_lock)
 
     with pytest.raises(StorageObjectError, match="cannot acquire storage object manifest lock"):
-        refresh_storage_object(root, expected_manifest_digest=expected_digest)
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=expected_digest,
+            producer_revision="test-revision-2",
+        )
 
 
 def test_inventory_does_not_delete_preexisting_manifest_temp(tmp_path: Path) -> None:
@@ -554,6 +569,7 @@ def test_concurrent_refresh_allows_exactly_one_compare_and_swap(tmp_path: Path) 
             refresh_storage_object(
                 root,
                 expected_manifest_digest=expected_digest,
+                producer_revision="test-revision-2",
             )
         except StorageObjectError as exc:
             return str(exc)
@@ -588,7 +604,11 @@ def test_refresh_rejects_nonworkspace_receipts(tmp_path: Path) -> None:
     (root / "payload.txt").write_text("changed\n", encoding="utf-8")
 
     with pytest.raises(StorageObjectError, match="limited to active workspaces"):
-        refresh_storage_object(root, expected_manifest_digest=expected_digest)
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=expected_digest,
+            producer_revision="test-revision-2",
+        )
 
     assert manifest_path.read_bytes() == previous_bytes
 
@@ -624,7 +644,11 @@ def test_failed_refresh_atomically_restores_readonly_manifest(
     monkeypatch.setattr(storage_inventory, "verify_storage_object", _reject_manifest)
 
     with pytest.raises(StorageObjectError, match="forced post-write validation failure"):
-        refresh_storage_object(root, expected_manifest_digest=expected_digest)
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=expected_digest,
+            producer_revision="test-revision-2",
+        )
 
     assert manifest_path.read_bytes() == previous_bytes
     assert stat.S_IMODE(manifest_path.stat().st_mode) == 0o444
@@ -656,4 +680,8 @@ def test_refresh_rejects_duplicate_resource_paths_before_collapsing_roles(tmp_pa
     expected_digest = _digest(manifest_path)
 
     with pytest.raises(StorageObjectError, match="resource path is declared more than once"):
-        refresh_storage_object(root, expected_manifest_digest=expected_digest)
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=expected_digest,
+            producer_revision="test-revision-2",
+        )
