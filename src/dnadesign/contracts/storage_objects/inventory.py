@@ -24,7 +24,7 @@ from pathlib import Path
 
 from filelock import FileLock, Timeout
 
-from .loading import load_storage_object_manifest, normalize_relative_path
+from .loading import load_storage_object_manifest_bytes, normalize_relative_path
 from .models import (
     LOCK_NAME,
     MANIFEST_NAME,
@@ -47,6 +47,10 @@ def _sha256(path: Path) -> str:
     except OSError as exc:
         raise StorageObjectError(f"cannot read storage resource {path}: {exc}") from exc
     return f"sha256:{digest.hexdigest()}"
+
+
+def _sha256_bytes(content: bytes) -> str:
+    return f"sha256:{hashlib.sha256(content).hexdigest()}"
 
 
 def _write_manifest(
@@ -99,7 +103,7 @@ def _write_manifest(
                 f"&& {python_executable} -m dnadesign.contracts.storage_objects validate {object_root}"
             )
         return summary
-    except Exception as validation_error:
+    except BaseException as validation_error:
         if previous_bytes is None:
             manifest_path.unlink(missing_ok=True)
         else:
@@ -360,17 +364,17 @@ def refresh_storage_object(
         manifest_path = root / MANIFEST_NAME
         if not manifest_path.is_file() or manifest_path.is_symlink():
             raise StorageObjectError(f"storage object root is missing a regular {MANIFEST_NAME}: {root}")
-        observed_manifest_digest = _sha256(manifest_path)
+        try:
+            previous_bytes = manifest_path.read_bytes()
+        except OSError as exc:
+            raise StorageObjectError(f"cannot read storage object manifest {manifest_path}: {exc}") from exc
+        observed_manifest_digest = _sha256_bytes(previous_bytes)
         if observed_manifest_digest != expected_manifest_digest:
             raise StorageObjectError(
                 "storage object manifest changed before refresh: "
                 f"expected {expected_manifest_digest}, observed {observed_manifest_digest}"
             )
-        try:
-            previous_bytes = manifest_path.read_bytes()
-        except OSError as exc:
-            raise StorageObjectError(f"cannot read storage object manifest {manifest_path}: {exc}") from exc
-        manifest = load_storage_object_manifest(manifest_path)
+        manifest = load_storage_object_manifest_bytes(previous_bytes, source_label=str(manifest_path))
         if manifest.object_kind not in {ObjectKind.WORKSPACE, ObjectKind.STORE}:
             raise StorageObjectError(
                 "storage receipt refresh is limited to active workspaces and stores; "

@@ -1234,6 +1234,122 @@ def test_failed_refresh_atomically_restores_readonly_manifest(
     assert not tuple(root.glob(f".{MANIFEST_NAME}.restore-*"))
 
 
+def test_refresh_hashes_and_parses_one_manifest_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    initial_bytes = manifest_path.read_bytes()
+    replacement = json.loads(initial_bytes)
+    replacement["owner_tool"] = "replacement-owner"
+    replacement_bytes = (json.dumps(replacement, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    expected_digest = _digest(manifest_path)
+    original_read_bytes = Path.read_bytes
+    swapped = False
+
+    def _read_bytes(path: Path) -> bytes:
+        nonlocal swapped
+        content = original_read_bytes(path)
+        if path == manifest_path and not swapped:
+            swapped = True
+            path.write_bytes(replacement_bytes)
+        return content
+
+    monkeypatch.setattr(Path, "read_bytes", _read_bytes)
+
+    refresh_storage_object(
+        root,
+        expected_manifest_digest=expected_digest,
+        producer_revision="test-revision-2",
+    )
+
+    refreshed = json.loads(original_read_bytes(manifest_path))
+    assert refreshed["owner_tool"] == "cruncher"
+    assert refreshed["producer_revision"] == "test-revision-2"
+
+
+def test_refresh_restores_manifest_when_verification_is_interrupted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    previous_bytes = manifest_path.read_bytes()
+
+    def _interrupt_verification(*_args: object, **_kwargs: object) -> object:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _interrupt_verification)
+
+    with pytest.raises(KeyboardInterrupt):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert manifest_path.read_bytes() == previous_bytes
+
+
+def test_inventory_removes_manifest_when_verification_is_interrupted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+
+    def _interrupt_verification(*_args: object, **_kwargs: object) -> object:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _interrupt_verification)
+
+    with pytest.raises(KeyboardInterrupt):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert not (root / MANIFEST_NAME).exists()
+
+
 def test_refresh_rejects_duplicate_resource_paths_before_collapsing_roles(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     root.mkdir()
