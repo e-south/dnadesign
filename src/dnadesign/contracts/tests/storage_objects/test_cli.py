@@ -93,7 +93,7 @@ def test_inventory_creates_a_closed_manifest_then_refuses_overwrite(tmp_path: Pa
 def test_inventory_bootstraps_demo_then_requires_manifest_to_be_tracked(
     tmp_path: Path,
 ) -> None:
-    checkout = tmp_path / "checkout"
+    checkout = tmp_path / "checkout with spaces"
     subprocess.run(["git", "init", "-q", str(checkout)], check=True)
     root = checkout / "examples" / "pilot"
     root.mkdir(parents=True)
@@ -140,9 +140,14 @@ def test_inventory_bootstraps_demo_then_requires_manifest_to_be_tracked(
         capture_output=True,
         text=True,
     )
-    subprocess.run(
-        ["git", "-C", str(checkout), "add", "examples/pilot/storage.object.json"],
+    summary = json.loads(completed.stdout)
+    next_step = subprocess.run(
+        summary["next_step"],
+        shell=True,
+        cwd=tmp_path,
         check=True,
+        capture_output=True,
+        text=True,
     )
     after_add = subprocess.run(
         [
@@ -157,10 +162,11 @@ def test_inventory_bootstraps_demo_then_requires_manifest_to_be_tracked(
         text=True,
     )
 
-    assert json.loads(completed.stdout)["status"] == "created-pending-git-add"
+    assert summary["status"] == "created-pending-git-add"
     assert (root / MANIFEST_NAME).is_file()
     assert before_add.returncode == 2
     assert "demo file is not tracked" in before_add.stderr
+    assert json.loads(next_step.stdout)["status"] == "verified"
     assert json.loads(after_add.stdout)["status"] == "verified"
 
 
@@ -319,6 +325,32 @@ def test_inventory_creates_group_writable_lock_for_shared_object(tmp_path: Path)
     assert stat.S_IMODE((root / MANIFEST_NAME).stat().st_mode) == 0o664
     assert (root / LOCK_NAME).stat().st_gid == root.stat().st_gid
     assert (root / MANIFEST_NAME).stat().st_gid == root.stat().st_gid
+
+
+def test_inventory_rejects_non_group_writable_lock_in_shared_object(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(0o2770)
+    lock_path = root / LOCK_NAME
+    lock_path.touch(mode=0o644)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="lock must be group-writable"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert stat.S_IMODE(lock_path.stat().st_mode) == 0o644
+    assert not (root / MANIFEST_NAME).exists()
 
 
 def test_inventory_rejects_group_writable_root_without_setgid(tmp_path: Path) -> None:

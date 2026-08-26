@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shlex
 import stat
 import tempfile
 from collections.abc import Iterator
@@ -90,7 +91,10 @@ def _write_manifest(
         ).summary()
         if allow_untracked_demo_manifest:
             summary["status"] = "created-pending-git-add"
-            summary["next_step"] = f"git add {MANIFEST_NAME} && dnadesign-storage validate {manifest_path.parent}"
+            object_root = shlex.quote(str(manifest_path.parent))
+            summary["next_step"] = (
+                f"git -C {object_root} add -- {MANIFEST_NAME} && dnadesign-storage validate {object_root}"
+            )
         return summary
     except Exception as validation_error:
         if previous_bytes is None:
@@ -138,6 +142,12 @@ def _manifest_lock(root: Path) -> Iterator[None]:
             and lock_path.stat(follow_symlinks=False).st_gid != root_stat.st_gid
         ):
             raise StorageObjectError(f"storage object lock does not inherit the shared object group: {lock_path}")
+        if (
+            root_mode & stat.S_IWGRP
+            and lock_path.exists()
+            and not lock_path.stat(follow_symlinks=False).st_mode & stat.S_IWGRP
+        ):
+            raise StorageObjectError(f"storage object lock must be group-writable in a shared object root: {lock_path}")
     except OSError as exc:
         raise StorageObjectError(f"cannot inspect storage object lock {lock_path}: {exc}") from exc
     lock_mode = 0o664 if root_mode & stat.S_IWGRP else 0o644
