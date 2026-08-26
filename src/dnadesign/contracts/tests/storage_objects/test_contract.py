@@ -333,3 +333,22 @@ def test_verify_storage_root_rejects_symlinked_agents_router(tmp_path: Path) -> 
 
     with pytest.raises(StorageObjectError, match="routing file must not be a symlink"):
         verify_storage_root(storage_root)
+
+
+def test_verify_storage_root_wraps_directory_enumeration_failures(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "storage"
+    storage_root.mkdir()
+    original_iterdir = Path.iterdir
+
+    def _iterdir(path: Path):
+        if path == storage_root:
+            raise PermissionError(13, "Permission denied", str(path))
+        return original_iterdir(path)
+
+    monkeypatch.setattr(Path, "iterdir", _iterdir)
+
+    with pytest.raises(StorageObjectError, match="cannot enumerate storage root"):
+        verify_storage_root(storage_root)

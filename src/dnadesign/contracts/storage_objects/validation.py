@@ -38,6 +38,13 @@ _SHELF_KINDS = {
 _ALLOWED_ROOT_FILES = {"AGENTS.md"}
 
 
+def _directory_entries(directory: Path, *, label: str) -> tuple[Path, ...]:
+    try:
+        return tuple(directory.iterdir())
+    except OSError as exc:
+        raise StorageObjectError(f"cannot enumerate {label} {directory}: {exc}") from exc
+
+
 def _git_checkout_ancestor(root: Path, *, include_root: bool) -> Path | None:
     candidates = (root, *root.parents) if include_root else root.parents
     for candidate in candidates:
@@ -114,12 +121,16 @@ def _verify_resource(root: Path, resource: StoredResource) -> VerifiedStoredReso
             f"declared resource digest mismatch for {resource.relative_path}: "
             f"expected {resource.digest}, observed {observed_digest}"
         )
+    try:
+        size_bytes = resolved.stat().st_size
+    except OSError as exc:
+        raise StorageObjectError(f"cannot inspect storage resource {resource.relative_path}: {exc}") from exc
     return VerifiedStoredResource(
         relative_path=resource.relative_path,
         path=resolved,
         digest=observed_digest,
         role=resource.role,
-        size_bytes=resolved.stat().st_size,
+        size_bytes=size_bytes,
     )
 
 
@@ -168,10 +179,13 @@ def verify_storage_object(
     if not manifest_path.is_file():
         raise StorageObjectError(f"storage object root is missing {MANIFEST_NAME}: {root}")
     lock_path = root / LOCK_NAME
-    if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
-        raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
-    if lock_path.exists() and lock_path.stat(follow_symlinks=False).st_size != 0:
-        raise StorageObjectError(f"storage object lock must be an empty coordination file: {lock_path}")
+    try:
+        if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
+            raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
+        if lock_path.exists() and lock_path.stat(follow_symlinks=False).st_size != 0:
+            raise StorageObjectError(f"storage object lock must be an empty coordination file: {lock_path}")
+    except OSError as exc:
+        raise StorageObjectError(f"cannot inspect storage object lock {lock_path}: {exc}") from exc
     manifest = load_storage_object_manifest(manifest_path)
 
     declared_paths: set[str] = set()
@@ -230,7 +244,8 @@ def verify_storage_root(storage_root: Path) -> VerifiedStorageRoot:
     if not root.is_dir():
         raise StorageObjectError(f"storage root is not a directory: {root}")
     allowed_shelves = set(_SHELF_KINDS) | _ALLOWED_ROOT_FILES
-    unexpected_root_paths = sorted(path.name for path in root.iterdir() if path.name not in allowed_shelves)
+    root_entries = _directory_entries(root, label="storage root")
+    unexpected_root_paths = sorted(path.name for path in root_entries if path.name not in allowed_shelves)
     if unexpected_root_paths:
         raise StorageObjectError(f"unexpected path in storage root: {', '.join(unexpected_root_paths)}")
     routing_file = root / "AGENTS.md"
@@ -246,21 +261,23 @@ def verify_storage_root(storage_root: Path) -> VerifiedStorageRoot:
             raise StorageObjectError(f"storage shelf must not be a symlink: {shelf}")
         if not shelf.is_dir():
             raise StorageObjectError(f"storage root is missing shelf {shelf_name!r}")
-        unexpected_shelf_paths = sorted(path.name for path in shelf.iterdir() if not path.is_dir())
+        shelf_entries = _directory_entries(shelf, label="storage shelf")
+        unexpected_shelf_paths = sorted(path.name for path in shelf_entries if not path.is_dir())
         if unexpected_shelf_paths:
             raise StorageObjectError(
                 f"unexpected path in storage shelf {shelf_name!r}: {', '.join(unexpected_shelf_paths)}"
             )
-        for owner_directory in sorted(path for path in shelf.iterdir() if path.is_dir()):
+        for owner_directory in sorted(path for path in shelf_entries if path.is_dir()):
             if owner_directory.is_symlink():
                 raise StorageObjectError(f"storage shelf owner must not be a symlink: {owner_directory}")
-            unexpected_owner_paths = sorted(path.name for path in owner_directory.iterdir() if not path.is_dir())
+            owner_entries = _directory_entries(owner_directory, label="storage owner directory")
+            unexpected_owner_paths = sorted(path.name for path in owner_entries if not path.is_dir())
             if unexpected_owner_paths:
                 raise StorageObjectError(
                     f"unexpected path in storage owner directory {owner_directory.name!r}: "
                     f"{', '.join(unexpected_owner_paths)}"
                 )
-            for object_directory in sorted(path for path in owner_directory.iterdir() if path.is_dir()):
+            for object_directory in sorted(path for path in owner_entries if path.is_dir()):
                 if object_directory.is_symlink():
                     raise StorageObjectError(f"storage object directory must not be a symlink: {object_directory}")
                 verified = verify_storage_object(object_directory)

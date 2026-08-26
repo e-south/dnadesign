@@ -432,6 +432,63 @@ def test_inventory_wraps_resource_read_failures(
         )
 
 
+def test_inventory_wraps_lock_acquisition_failures(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+
+    def _deny_lock(*_args: object, **_kwargs: object) -> object:
+        raise PermissionError(13, "Permission denied", str(root / LOCK_NAME))
+
+    monkeypatch.setattr(storage_inventory.FileLock, "acquire", _deny_lock)
+
+    with pytest.raises(StorageObjectError, match="cannot acquire storage object manifest lock"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+
+def test_refresh_wraps_lock_acquisition_failures(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    expected_digest = _digest(root / MANIFEST_NAME)
+
+    def _deny_lock(*_args: object, **_kwargs: object) -> object:
+        raise PermissionError(13, "Permission denied", str(root / LOCK_NAME))
+
+    monkeypatch.setattr(storage_inventory.FileLock, "acquire", _deny_lock)
+
+    with pytest.raises(StorageObjectError, match="cannot acquire storage object manifest lock"):
+        refresh_storage_object(root, expected_manifest_digest=expected_digest)
+
+
 def test_inventory_does_not_delete_preexisting_manifest_temp(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     root.mkdir()

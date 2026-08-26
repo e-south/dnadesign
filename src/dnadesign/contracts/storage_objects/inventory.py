@@ -16,6 +16,8 @@ import json
 import os
 import stat
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from filelock import FileLock, Timeout
@@ -103,13 +105,38 @@ def _write_manifest(
         raise
 
 
-def _manifest_lock(root: Path) -> FileLock:
+@contextmanager
+def _manifest_lock(root: Path) -> Iterator[None]:
     lock_path = root / LOCK_NAME
-    if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
-        raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
-    if lock_path.exists() and lock_path.stat(follow_symlinks=False).st_size != 0:
-        raise StorageObjectError(f"storage object lock must be an empty coordination file: {lock_path}")
-    return FileLock(lock_path, timeout=30)
+    try:
+        if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
+            raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
+        if lock_path.exists() and lock_path.stat(follow_symlinks=False).st_size != 0:
+            raise StorageObjectError(f"storage object lock must be an empty coordination file: {lock_path}")
+    except OSError as exc:
+        raise StorageObjectError(f"cannot inspect storage object lock {lock_path}: {exc}") from exc
+    lock = FileLock(lock_path, timeout=30)
+    try:
+        lock.acquire()
+    except Timeout as exc:
+        raise StorageObjectError(f"timed out waiting for storage object manifest lock: {root}") from exc
+    except OSError as exc:
+        raise StorageObjectError(f"cannot acquire storage object manifest lock {lock_path}: {exc}") from exc
+    try:
+        yield
+    except BaseException as body_error:
+        try:
+            lock.release()
+        except OSError as release_error:
+            raise StorageObjectError(
+                f"storage operation failed and manifest lock {lock_path} could not be released: {release_error}"
+            ) from body_error
+        raise
+    else:
+        try:
+            lock.release()
+        except OSError as exc:
+            raise StorageObjectError(f"cannot release storage object manifest lock {lock_path}: {exc}") from exc
 
 
 def inventory_storage_object(
@@ -149,63 +176,60 @@ def inventory_storage_object(
     duplicate_roles = sorted(normalized_inputs & normalized_metadata)
     if duplicate_roles:
         raise StorageObjectError(f"inventory paths have multiple roles: {', '.join(duplicate_roles)}")
-    try:
-        with _manifest_lock(root):
-            manifest_path = root / MANIFEST_NAME
-            if manifest_path.exists() or manifest_path.is_symlink():
-                raise StorageObjectError(f"storage object manifest already exists: {manifest_path}")
-            files = tuple(
-                path
-                for path in storage_file_paths(root)
-                if path.name not in {MANIFEST_NAME, LOCK_NAME} or path.parent != root
-            )
-            relative_files = {path.relative_to(root).as_posix() for path in files}
-            missing_declared = sorted((normalized_inputs | normalized_metadata) - relative_files)
-            if missing_declared:
-                raise StorageObjectError(f"declared inventory paths are missing: {', '.join(missing_declared)}")
-            resources = [
-                {
-                    "digest": _sha256(path),
-                    "path": path.relative_to(root).as_posix(),
-                    "role": (
-                        ResourceRole.INPUT.value
-                        if path.relative_to(root).as_posix() in normalized_inputs
+    with _manifest_lock(root):
+        manifest_path = root / MANIFEST_NAME
+        if manifest_path.exists() or manifest_path.is_symlink():
+            raise StorageObjectError(f"storage object manifest already exists: {manifest_path}")
+        files = tuple(
+            path
+            for path in storage_file_paths(root)
+            if path.name not in {MANIFEST_NAME, LOCK_NAME} or path.parent != root
+        )
+        relative_files = {path.relative_to(root).as_posix() for path in files}
+        missing_declared = sorted((normalized_inputs | normalized_metadata) - relative_files)
+        if missing_declared:
+            raise StorageObjectError(f"declared inventory paths are missing: {', '.join(missing_declared)}")
+        resources = [
+            {
+                "digest": _sha256(path),
+                "path": path.relative_to(root).as_posix(),
+                "role": (
+                    ResourceRole.INPUT.value
+                    if path.relative_to(root).as_posix() in normalized_inputs
+                    else (
+                        ResourceRole.METADATA.value
+                        if path.relative_to(root).as_posix() in normalized_metadata
                         else (
-                            ResourceRole.METADATA.value
-                            if path.relative_to(root).as_posix() in normalized_metadata
-                            else (
-                                ResourceRole.CACHE.value
-                                if parsed_kind is ObjectKind.TOOL_CACHE
-                                else ResourceRole.ARTIFACT.value
-                            )
+                            ResourceRole.CACHE.value
+                            if parsed_kind is ObjectKind.TOOL_CACHE
+                            else ResourceRole.ARTIFACT.value
                         )
-                    ),
-                }
-                for path in files
-            ]
-            payload: dict[str, object] = {
-                "content_schema": content_schema,
-                "content_schema_version": content_schema_version,
-                "demo": demo,
-                "object_kind": parsed_kind.value,
-                "owner_repository": owner_repository,
-                "owner_tool": owner_tool,
-                "producer_revision": producer_revision,
-                "resources": resources,
-                "retention_policy": parsed_retention.value,
-                "schema": SCHEMA_ID,
-                "storage_class": parsed_class.value,
-                "storage_id": storage_id,
+                    )
+                ),
             }
-            if original_execution_path is not None:
-                payload["original_execution_path"] = original_execution_path
-            return _write_manifest(
-                manifest_path,
-                payload,
-                allow_untracked_demo_manifest=demo,
-            )
-    except Timeout as exc:
-        raise StorageObjectError(f"timed out waiting for storage object manifest lock: {root}") from exc
+            for path in files
+        ]
+        payload: dict[str, object] = {
+            "content_schema": content_schema,
+            "content_schema_version": content_schema_version,
+            "demo": demo,
+            "object_kind": parsed_kind.value,
+            "owner_repository": owner_repository,
+            "owner_tool": owner_tool,
+            "producer_revision": producer_revision,
+            "resources": resources,
+            "retention_policy": parsed_retention.value,
+            "schema": SCHEMA_ID,
+            "storage_class": parsed_class.value,
+            "storage_id": storage_id,
+        }
+        if original_execution_path is not None:
+            payload["original_execution_path"] = original_execution_path
+        return _write_manifest(
+            manifest_path,
+            payload,
+            allow_untracked_demo_manifest=demo,
+        )
 
 
 def refresh_storage_object(
@@ -221,70 +245,68 @@ def refresh_storage_object(
     root = requested_root.resolve()
     if not root.is_dir():
         raise StorageObjectError(f"storage object root is not a directory: {root}")
-    try:
-        with _manifest_lock(root):
-            manifest_path = root / MANIFEST_NAME
-            if not manifest_path.is_file() or manifest_path.is_symlink():
-                raise StorageObjectError(f"storage object root is missing a regular {MANIFEST_NAME}: {root}")
-            observed_manifest_digest = _sha256(manifest_path)
-            if observed_manifest_digest != expected_manifest_digest:
-                raise StorageObjectError(
-                    "storage object manifest changed before refresh: "
-                    f"expected {expected_manifest_digest}, observed {observed_manifest_digest}"
-                )
-            previous_bytes = manifest_path.read_bytes()
-            manifest = load_storage_object_manifest(manifest_path)
-            if manifest.object_kind is not ObjectKind.WORKSPACE:
-                raise StorageObjectError(
-                    "storage receipt refresh is limited to active workspaces; "
-                    f"found object_kind={manifest.object_kind.value}"
-                )
-            prior_roles = {resource.relative_path: resource.role for resource in manifest.resources}
-            files = tuple(
-                path
-                for path in storage_file_paths(root)
-                if path.name not in {MANIFEST_NAME, LOCK_NAME} or path.parent != root
+    with _manifest_lock(root):
+        manifest_path = root / MANIFEST_NAME
+        if not manifest_path.is_file() or manifest_path.is_symlink():
+            raise StorageObjectError(f"storage object root is missing a regular {MANIFEST_NAME}: {root}")
+        observed_manifest_digest = _sha256(manifest_path)
+        if observed_manifest_digest != expected_manifest_digest:
+            raise StorageObjectError(
+                "storage object manifest changed before refresh: "
+                f"expected {expected_manifest_digest}, observed {observed_manifest_digest}"
             )
-            relative_files = {path.relative_to(root).as_posix() for path in files}
-            protected_paths = {
-                path for path, role in prior_roles.items() if role in {ResourceRole.INPUT, ResourceRole.METADATA}
-            }
-            missing_protected = sorted(protected_paths - relative_files)
-            if missing_protected:
-                raise StorageObjectError(
-                    f"cannot refresh after removing input or metadata files: {', '.join(missing_protected)}"
-                )
-            resources = []
-            for path in files:
-                relative_path = path.relative_to(root).as_posix()
-                role = prior_roles.get(relative_path)
-                if role is None:
-                    role = (
-                        ResourceRole.CACHE if manifest.object_kind is ObjectKind.TOOL_CACHE else ResourceRole.ARTIFACT
-                    )
-                resources.append(
-                    {
-                        "digest": _sha256(path),
-                        "path": relative_path,
-                        "role": role.value,
-                    }
-                )
-            payload: dict[str, object] = {
-                "content_schema": manifest.content_schema,
-                "content_schema_version": manifest.content_schema_version,
-                "demo": manifest.demo,
-                "object_kind": manifest.object_kind.value,
-                "owner_repository": manifest.owner_repository,
-                "owner_tool": manifest.owner_tool,
-                "producer_revision": manifest.producer_revision,
-                "resources": resources,
-                "retention_policy": manifest.retention_policy.value,
-                "schema": manifest.schema,
-                "storage_class": manifest.storage_class.value,
-                "storage_id": manifest.storage_id,
-            }
-            if manifest.original_execution_path is not None:
-                payload["original_execution_path"] = manifest.original_execution_path
-            return _write_manifest(manifest_path, payload, previous_bytes=previous_bytes)
-    except Timeout as exc:
-        raise StorageObjectError(f"timed out waiting for storage object manifest lock: {root}") from exc
+        try:
+            previous_bytes = manifest_path.read_bytes()
+        except OSError as exc:
+            raise StorageObjectError(f"cannot read storage object manifest {manifest_path}: {exc}") from exc
+        manifest = load_storage_object_manifest(manifest_path)
+        if manifest.object_kind is not ObjectKind.WORKSPACE:
+            raise StorageObjectError(
+                "storage receipt refresh is limited to active workspaces; "
+                f"found object_kind={manifest.object_kind.value}"
+            )
+        prior_roles = {resource.relative_path: resource.role for resource in manifest.resources}
+        files = tuple(
+            path
+            for path in storage_file_paths(root)
+            if path.name not in {MANIFEST_NAME, LOCK_NAME} or path.parent != root
+        )
+        relative_files = {path.relative_to(root).as_posix() for path in files}
+        protected_paths = {
+            path for path, role in prior_roles.items() if role in {ResourceRole.INPUT, ResourceRole.METADATA}
+        }
+        missing_protected = sorted(protected_paths - relative_files)
+        if missing_protected:
+            raise StorageObjectError(
+                f"cannot refresh after removing input or metadata files: {', '.join(missing_protected)}"
+            )
+        resources = []
+        for path in files:
+            relative_path = path.relative_to(root).as_posix()
+            role = prior_roles.get(relative_path)
+            if role is None:
+                role = ResourceRole.CACHE if manifest.object_kind is ObjectKind.TOOL_CACHE else ResourceRole.ARTIFACT
+            resources.append(
+                {
+                    "digest": _sha256(path),
+                    "path": relative_path,
+                    "role": role.value,
+                }
+            )
+        payload: dict[str, object] = {
+            "content_schema": manifest.content_schema,
+            "content_schema_version": manifest.content_schema_version,
+            "demo": manifest.demo,
+            "object_kind": manifest.object_kind.value,
+            "owner_repository": manifest.owner_repository,
+            "owner_tool": manifest.owner_tool,
+            "producer_revision": manifest.producer_revision,
+            "resources": resources,
+            "retention_policy": manifest.retention_policy.value,
+            "schema": manifest.schema,
+            "storage_class": manifest.storage_class.value,
+            "storage_id": manifest.storage_id,
+        }
+        if manifest.original_execution_path is not None:
+            payload["original_execution_path"] = manifest.original_execution_path
+        return _write_manifest(manifest_path, payload, previous_bytes=previous_bytes)
