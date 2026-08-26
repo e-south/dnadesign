@@ -357,6 +357,16 @@ def test_publisher_validates_default_display_text(tmp_path: Path) -> None:
         publisher.publish_densegen_playback_endpoint(config_path)
 
 
+def test_publisher_rejects_unknown_label_fields(tmp_path: Path) -> None:
+    config_path = _write_endpoint(tmp_path)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    payload["labels"] = {"forbidden_term": ["sigma factor"], "overrides": {}}
+    config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"labels contains unsupported fields: \['forbidden_term'\]"):
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+
 def test_publisher_validates_record_derived_placement_labels(tmp_path: Path) -> None:
     config_path = _write_endpoint(tmp_path, placement_label="Sigma factor RpoD")
 

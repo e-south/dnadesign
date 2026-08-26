@@ -71,6 +71,7 @@ _PLAYBACK_FIELDS = {
     "graph_relation",
     "show_authority_notice",
 }
+_LABEL_FIELDS = {"forbidden_terms", "overrides"}
 _PRESENTATION_FIELDS = {
     "layout",
     "color_profile",
@@ -425,6 +426,7 @@ def publish_densegen_playback_endpoint(
         field_name="playback.show_authority_notice",
     )
     labels = _required_mapping(endpoint.get("labels") or {}, field_name="labels")
+    _strict_fields(labels, _LABEL_FIELDS, field_name="labels")
     overrides_raw = _required_mapping(labels.get("overrides") or {}, field_name="labels.overrides")
     label_overrides = {str(key): str(value) for key, value in overrides_raw.items()}
     presentation_spec = _required_mapping(
