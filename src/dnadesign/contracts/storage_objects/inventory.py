@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import tempfile
 from pathlib import Path
 
 from filelock import FileLock, Timeout
@@ -65,7 +66,9 @@ def _write_manifest(
 
 
 def _manifest_lock(root: Path) -> FileLock:
-    return FileLock(root.parent / f".{root.name}.{MANIFEST_NAME}.lock", timeout=30)
+    root_identity = hashlib.sha256(str(root.resolve()).encode("utf-8")).hexdigest()
+    lock_path = Path(tempfile.gettempdir()) / f"dnadesign-storage-{root_identity}.lock"
+    return FileLock(lock_path, timeout=30)
 
 
 def inventory_storage_object(
