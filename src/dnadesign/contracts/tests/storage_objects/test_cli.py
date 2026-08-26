@@ -1119,6 +1119,57 @@ def test_refresh_rejects_changed_protected_bytes(tmp_path: Path, protected_role:
     assert manifest_path.read_bytes() == previous_bytes
 
 
+@pytest.mark.parametrize("protected_role", ["input", "metadata"])
+def test_refresh_rejects_protected_bytes_changed_between_digest_passes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    protected_role: str,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    protected = root / "protected.txt"
+    protected.write_text("original\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+        input_paths=("protected.txt",) if protected_role == "input" else (),
+        metadata_paths=("protected.txt",) if protected_role == "metadata" else (),
+    )
+    manifest_path = root / MANIFEST_NAME
+    previous_bytes = manifest_path.read_bytes()
+    original_sha256 = storage_inventory._sha256
+    protected_hashes = 0
+
+    def _mutate_after_first_protected_hash(path: Path) -> str:
+        nonlocal protected_hashes
+        digest = original_sha256(path)
+        if path == protected:
+            protected_hashes += 1
+            if protected_hashes == 1:
+                protected.write_text("changed\n", encoding="utf-8")
+        return digest
+
+    monkeypatch.setattr(storage_inventory, "_sha256", _mutate_after_first_protected_hash)
+
+    with pytest.raises(StorageObjectError, match="protected resource changed during refresh"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert protected_hashes == 2
+    assert manifest_path.read_bytes() == previous_bytes
+
+
 def test_inventory_and_refresh_preserve_explicit_cache_roles(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     root.mkdir()

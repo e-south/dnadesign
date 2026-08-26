@@ -483,8 +483,9 @@ def refresh_storage_object(
             raise StorageObjectError(
                 f"cannot refresh after removing input or metadata files: {', '.join(missing_protected)}"
             )
+        protected_digests = {path: _sha256(root / path) for path in protected_paths}
         changed_protected = sorted(
-            path for path in protected_paths if _sha256(root / path) != prior_resources[path].digest
+            path for path, digest in protected_digests.items() if digest != prior_resources[path].digest
         )
         if changed_protected:
             raise StorageObjectError(
@@ -499,9 +500,12 @@ def refresh_storage_object(
             role = effective_roles.get(relative_path)
             if role is None:
                 role = ResourceRole.CACHE if relative_path in normalized_caches else ResourceRole.ARTIFACT
+            digest = _sha256(path)
+            if relative_path in protected_digests and digest != protected_digests[relative_path]:
+                raise StorageObjectError(f"protected resource changed during refresh: {relative_path}")
             resources.append(
                 {
-                    "digest": _sha256(path),
+                    "digest": digest,
                     "path": relative_path,
                     "role": role.value,
                 }
