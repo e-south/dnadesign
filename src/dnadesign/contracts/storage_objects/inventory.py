@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import stat
+import tempfile
 from pathlib import Path
 
 from filelock import FileLock, Timeout
@@ -74,13 +75,28 @@ def _write_manifest(
             summary["status"] = "created-pending-git-add"
             summary["next_step"] = f"git add {MANIFEST_NAME} && dnadesign-storage validate {manifest_path.parent}"
         return summary
-    except Exception:
+    except Exception as validation_error:
         if previous_bytes is None:
             manifest_path.unlink(missing_ok=True)
         else:
-            manifest_path.write_bytes(previous_bytes)
-            if previous_mode is not None:
-                manifest_path.chmod(previous_mode, follow_symlinks=False)
+            restore_path: Path | None = None
+            try:
+                descriptor, restore_name = tempfile.mkstemp(
+                    dir=manifest_path.parent,
+                    prefix=f".{MANIFEST_NAME}.restore-",
+                )
+                restore_path = Path(restore_name)
+                with os.fdopen(descriptor, "wb") as handle:
+                    handle.write(previous_bytes)
+                if previous_mode is not None:
+                    restore_path.chmod(previous_mode, follow_symlinks=False)
+                os.replace(restore_path, manifest_path)
+            except OSError as restore_error:
+                if restore_path is not None:
+                    restore_path.unlink(missing_ok=True)
+                raise StorageObjectError(
+                    f"storage object validation failed and the prior manifest could not be restored: {restore_error}"
+                ) from validation_error
         raise
 
 
@@ -88,6 +104,8 @@ def _manifest_lock(root: Path) -> FileLock:
     lock_path = root / LOCK_NAME
     if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
         raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
+    if lock_path.exists() and lock_path.stat(follow_symlinks=False).st_size != 0:
+        raise StorageObjectError(f"storage object lock must be an empty coordination file: {lock_path}")
     return FileLock(lock_path, timeout=30)
 
 
@@ -213,6 +231,11 @@ def refresh_storage_object(
                 )
             previous_bytes = manifest_path.read_bytes()
             manifest = load_storage_object_manifest(manifest_path)
+            if manifest.object_kind is not ObjectKind.WORKSPACE:
+                raise StorageObjectError(
+                    "storage receipt refresh is limited to active workspaces; "
+                    f"found object_kind={manifest.object_kind.value}"
+                )
             prior_roles = {resource.relative_path: resource.role for resource in manifest.resources}
             files = tuple(
                 path

@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+import dnadesign.contracts.storage_objects.inventory as storage_inventory
 from dnadesign.contracts.storage_objects import (
     MANIFEST_NAME,
     StorageObjectError,
@@ -376,6 +377,29 @@ def test_inventory_rejects_symlinked_shared_lock(tmp_path: Path) -> None:
     assert external.read_text(encoding="utf-8") == "do not touch\n"
 
 
+def test_inventory_rejects_nonempty_shared_lock_without_changing_it(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    lock_path = root / LOCK_NAME
+    lock_path.write_text("user bytes\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="must be an empty coordination file"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert lock_path.read_text(encoding="utf-8") == "user bytes\n"
+
+
 def test_inventory_does_not_delete_preexisting_manifest_temp(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     root.mkdir()
@@ -451,3 +475,68 @@ def test_concurrent_refresh_allows_exactly_one_compare_and_swap(tmp_path: Path) 
 
     assert outcomes.count("verified") == 1
     assert sum("manifest changed before refresh" in outcome for outcome in outcomes) == 1
+
+
+def test_refresh_rejects_nonworkspace_receipts(tmp_path: Path) -> None:
+    root = tmp_path / "store"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="store",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="authoritative",
+        retention_policy="retain",
+    )
+    manifest_path = root / MANIFEST_NAME
+    expected_digest = _digest(manifest_path)
+    previous_bytes = manifest_path.read_bytes()
+    (root / "payload.txt").write_text("changed\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="limited to active workspaces"):
+        refresh_storage_object(root, expected_manifest_digest=expected_digest)
+
+    assert manifest_path.read_bytes() == previous_bytes
+
+
+def test_failed_refresh_atomically_restores_readonly_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    previous_bytes = manifest_path.read_bytes()
+    manifest_path.chmod(0o444)
+    expected_digest = _digest(manifest_path)
+    (root / "result.txt").write_text("result\n", encoding="utf-8")
+
+    def _reject_manifest(*_args: object, **_kwargs: object) -> object:
+        raise StorageObjectError("forced post-write validation failure")
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _reject_manifest)
+
+    with pytest.raises(StorageObjectError, match="forced post-write validation failure"):
+        refresh_storage_object(root, expected_manifest_digest=expected_digest)
+
+    assert manifest_path.read_bytes() == previous_bytes
+    assert stat.S_IMODE(manifest_path.stat().st_mode) == 0o444
+    assert not tuple(root.glob(f".{MANIFEST_NAME}.restore-*"))
