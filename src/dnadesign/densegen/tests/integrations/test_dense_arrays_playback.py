@@ -21,7 +21,7 @@ import pytest
 import yaml
 from dense_arrays.playback import PlaybackDocument, reconstruct_playback
 from dense_arrays.playback.theme import PlaybackPresentation
-from dense_arrays.realized import Orientation
+from dense_arrays.realized import Orientation, PlacementKind
 
 from dnadesign.densegen.src.integrations.dense_arrays import publisher
 from dnadesign.densegen.src.integrations.dense_arrays.baserender_projection import (
@@ -148,6 +148,15 @@ def test_reverse_placement_uses_realized_reverse_complement() -> None:
     assert realized.placements[0].sequence == "CCGT"
     assert realized.placements[0].metadata["library_sequence"] == "ACGG"
     assert reconstruct_playback(realized).steps[0].placement_sequence == "CCGT"
+
+
+def test_missing_legacy_part_kind_defaults_to_tfbs() -> None:
+    record = _publisher_row()
+    del record["densegen__used_tfbs_detail"][0]["part_kind"]
+
+    realized = realized_array_from_densegen_record(record, source_ref="fixture.parquet")
+
+    assert realized.placements[0].kind is PlacementKind.TFBS
 
 
 def test_fixed_element_recovers_sequence_consistent_raw_coordinate() -> None:

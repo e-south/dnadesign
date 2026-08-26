@@ -55,7 +55,7 @@ def _details(record: Mapping[str, object]) -> list[Mapping[str, object]]:
 
 
 def _placement_kind(value: object) -> PlacementKind:
-    text = str(value or "").strip()
+    text = str(value or PlacementKind.TFBS.value).strip()
     if text == PlacementKind.TFBS.value:
         return PlacementKind.TFBS
     if text == PlacementKind.FIXED_ELEMENT.value:
