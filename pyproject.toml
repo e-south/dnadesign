@@ -138,6 +138,9 @@ exclude = [
 
 [tool.setuptools.package-data]
 "dnadesign.baserender" = [
+  "assets/overlays/*.json",
+  "assets/overlays/*.png",
+  "assets/overlays/*.svg",
   "styles/*/*.yaml",
 ]
 "dnadesign.cruncher" = [
