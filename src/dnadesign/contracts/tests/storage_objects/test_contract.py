@@ -25,6 +25,7 @@ from dnadesign.contracts.storage_objects import (
     verify_storage_object,
     verify_storage_root,
 )
+from dnadesign.contracts.storage_objects.models import LOCK_NAME
 from dnadesign.contracts.storage_objects.validation import storage_file_paths
 
 
@@ -96,6 +97,26 @@ def test_verify_storage_object_rejects_symlinks(tmp_path: Path) -> None:
     linked_root.symlink_to(root, target_is_directory=True)
     with pytest.raises(StorageObjectError, match="storage object root must not be a symlink"):
         verify_storage_object(linked_root)
+
+
+def test_verify_storage_object_rejects_non_regular_entries(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    fifo = root / "runtime.fifo"
+    os.mkfifo(fifo)
+
+    with pytest.raises(StorageObjectError, match="non-regular storage entry is not allowed: runtime.fifo"):
+        verify_storage_object(root)
+
+
+def test_storage_object_lock_is_shared_state_not_content(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    (root / LOCK_NAME).touch()
+
+    verified = verify_storage_object(root)
+
+    assert verified.summary()["resource_count"] == 2
 
 
 def test_storage_file_closure_propagates_unreadable_subtree(

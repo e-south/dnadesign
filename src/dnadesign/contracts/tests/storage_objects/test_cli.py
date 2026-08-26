@@ -18,11 +18,15 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import pytest
+
 from dnadesign.contracts.storage_objects import (
     MANIFEST_NAME,
     StorageObjectError,
+    inventory_storage_object,
     refresh_storage_object,
 )
+from dnadesign.contracts.storage_objects.models import LOCK_NAME
 
 
 def _digest(path: Path) -> str:
@@ -297,6 +301,30 @@ def test_inventory_and_refresh_reject_symlinked_object_root(tmp_path: Path) -> N
     assert "root must not be a symlink" in inventory.stderr
 
 
+def test_inventory_rejects_symlinked_shared_lock(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    external = tmp_path / "external.lock"
+    external.write_text("do not touch\n", encoding="utf-8")
+    (root / LOCK_NAME).symlink_to(external)
+
+    with pytest.raises(StorageObjectError, match="storage object lock must be a regular file"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert external.read_text(encoding="utf-8") == "do not touch\n"
+
+
 def test_concurrent_refresh_allows_exactly_one_compare_and_swap(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     (root / "inputs").mkdir(parents=True)
@@ -329,6 +357,7 @@ def test_concurrent_refresh_allows_exactly_one_compare_and_swap(tmp_path: Path) 
         "inputs/payload.txt",
     ]
     subprocess.run(inventory, check=True, capture_output=True, text=True)
+    assert (root / LOCK_NAME).is_file()
     expected_digest = _digest(root / MANIFEST_NAME)
     (root / "result.txt").write_text("result\n", encoding="utf-8")
 

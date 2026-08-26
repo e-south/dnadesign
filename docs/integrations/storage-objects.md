@@ -84,7 +84,13 @@ uv run dnadesign-storage refresh /absolute/path/to/object \
 
 Refresh preserves identity and existing input/metadata roles, inventories new
 artifacts, rejects missing input or metadata files, and uses the expected digest
-as a compare-and-swap guard against concurrent receipt changes.
+as a compare-and-swap guard against concurrent receipt changes. Writers lock
+`<object>/.storage-object.lock`, so processes and compute nodes that see the
+same POSIX filesystem serialize receipt updates. The lock is contract-owned
+coordination state and is excluded from the content manifest. Independently
+synced replicas, including separate Dropbox clients, are not one shared
+filesystem; keep one writer or provide an external coordination service for
+those replicas.
 
 Verify one object before a tool consumes it:
 

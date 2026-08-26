@@ -13,11 +13,13 @@ from __future__ import annotations
 
 import hashlib
 import os
+import stat
 import subprocess
 from pathlib import Path
 
 from .loading import load_storage_object_manifest
 from .models import (
+    LOCK_NAME,
     MANIFEST_NAME,
     MAX_DEMO_BYTES,
     ObjectKind,
@@ -53,7 +55,7 @@ def _sha256(path: Path) -> str:
 
 
 def storage_file_paths(root: Path) -> tuple[Path, ...]:
-    """Return every regular file while rejecting symlinks anywhere below root."""
+    """Return every regular file while rejecting symlinks and special entries."""
 
     def _raise_walk_error(error: OSError) -> None:
         raise StorageObjectError(
@@ -79,8 +81,13 @@ def storage_file_paths(root: Path) -> tuple[Path, ...]:
             relative = path.relative_to(root).as_posix()
             if path.is_symlink():
                 raise StorageObjectError(f"symlink is not allowed: {relative}")
-            if path.is_file():
-                files.append(path)
+            try:
+                mode = path.lstat().st_mode
+            except OSError as exc:
+                raise StorageObjectError(f"cannot inspect storage entry: {relative}: {exc}") from exc
+            if not stat.S_ISREG(mode):
+                raise StorageObjectError(f"non-regular storage entry is not allowed: {relative}")
+            files.append(path)
     return tuple(files)
 
 
@@ -171,7 +178,7 @@ def verify_storage_object(
     actual_paths = {
         path.relative_to(root).as_posix()
         for path in storage_file_paths(root)
-        if path.name != MANIFEST_NAME or path.parent != root
+        if path.name not in {MANIFEST_NAME, LOCK_NAME} or path.parent != root
     }
     undeclared = sorted(actual_paths - declared_paths)
     if undeclared:

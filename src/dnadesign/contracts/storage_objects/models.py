@@ -18,6 +18,7 @@ from pathlib import Path
 SCHEMA_ID = "dnadesign.storage-object/v1"
 ROOT_SCHEMA_ID = "dnadesign.storage-root/v1"
 MANIFEST_NAME = "storage.object.json"
+LOCK_NAME = ".storage-object.lock"
 MAX_DEMO_BYTES = 2_000_000
 
 

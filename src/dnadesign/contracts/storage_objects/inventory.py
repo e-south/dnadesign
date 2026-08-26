@@ -14,13 +14,13 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import tempfile
 from pathlib import Path
 
 from filelock import FileLock, Timeout
 
 from .loading import load_storage_object_manifest, normalize_relative_path
 from .models import (
+    LOCK_NAME,
     MANIFEST_NAME,
     SCHEMA_ID,
     ObjectKind,
@@ -74,8 +74,9 @@ def _write_manifest(
 
 
 def _manifest_lock(root: Path) -> FileLock:
-    root_identity = hashlib.sha256(str(root.resolve()).encode("utf-8")).hexdigest()
-    lock_path = Path(tempfile.gettempdir()) / f"dnadesign-storage-{root_identity}.lock"
+    lock_path = root / LOCK_NAME
+    if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
+        raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
     return FileLock(lock_path, timeout=30)
 
 
@@ -121,7 +122,11 @@ def inventory_storage_object(
             manifest_path = root / MANIFEST_NAME
             if manifest_path.exists() or manifest_path.is_symlink():
                 raise StorageObjectError(f"storage object manifest already exists: {manifest_path}")
-            files = tuple(path for path in storage_file_paths(root) if path != manifest_path)
+            files = tuple(
+                path
+                for path in storage_file_paths(root)
+                if path.name not in {MANIFEST_NAME, LOCK_NAME} or path.parent != root
+            )
             relative_files = {path.relative_to(root).as_posix() for path in files}
             missing_declared = sorted((normalized_inputs | normalized_metadata) - relative_files)
             if missing_declared:
@@ -196,7 +201,11 @@ def refresh_storage_object(
             previous_bytes = manifest_path.read_bytes()
             manifest = load_storage_object_manifest(manifest_path)
             prior_roles = {resource.relative_path: resource.role for resource in manifest.resources}
-            files = tuple(path for path in storage_file_paths(root) if path != manifest_path)
+            files = tuple(
+                path
+                for path in storage_file_paths(root)
+                if path.name not in {MANIFEST_NAME, LOCK_NAME} or path.parent != root
+            )
             relative_files = {path.relative_to(root).as_posix() for path in files}
             protected_paths = {
                 path for path, role in prior_roles.items() if role in {ResourceRole.INPUT, ResourceRole.METADATA}
