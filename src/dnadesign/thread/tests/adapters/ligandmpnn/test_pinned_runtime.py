@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import os
 import py_compile
@@ -23,15 +24,22 @@ import pytest
 from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import execute_pinned_entrypoint
 
 
-def _checkout(tmp_path: Path) -> tuple[Path, str]:
+def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str]:
     root = tmp_path / "LigandMPNN"
     root.mkdir()
     (root / "data_utils.py").write_text("VALUE = 'attested'\n", encoding="utf-8")
+    (root / "model_utils.py").write_text("HELPER = 'helper-attested'\n", encoding="utf-8")
     (root / "run.py").write_text(
+        "import argparse\n"
         "from pathlib import Path\n"
-        "import sys\n"
         "from data_utils import VALUE\n"
-        "Path(sys.argv[1]).write_text(VALUE, encoding='utf-8')\n",
+        "from model_utils import HELPER\n"
+        "parser = argparse.ArgumentParser()\n"
+        "parser.add_argument('--checkpoint_ligand_mpnn', required=True)\n"
+        "parser.add_argument('--output', required=True)\n"
+        "args = parser.parse_args()\n"
+        "checkpoint = Path(args.checkpoint_ligand_mpnn).read_text(encoding='utf-8')\n"
+        "Path(args.output).write_text(f'{VALUE}:{HELPER}:{checkpoint}', encoding='utf-8')\n",
         encoding="utf-8",
     )
     (root / "score.py").write_text("from data_utils import VALUE\n", encoding="utf-8")
@@ -56,11 +64,14 @@ def _checkout(tmp_path: Path) -> tuple[Path, str]:
         ["git", "-C", str(root), "rev-parse", "HEAD"],
         text=True,
     ).strip()
-    return root, commit
+    checkpoint = root / "checkpoint.pt"
+    checkpoint.write_text("checkpoint-v1", encoding="utf-8")
+    checkpoint_sha256 = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+    return root, commit, checkpoint, checkpoint_sha256
 
 
 def test_pinned_runtime_ignores_timestamp_valid_poisoned_parser_bytecode(tmp_path: Path) -> None:
-    checkout, commit = _checkout(tmp_path)
+    checkout, commit, checkpoint, checkpoint_sha256 = _checkout(tmp_path)
     parser_path = checkout / "data_utils.py"
     malicious_source = tmp_path / "data_utils.py"
     malicious_source.write_text("VALUE = 'poisoned'\n", encoding="utf-8")
@@ -77,28 +88,75 @@ def test_pinned_runtime_ignores_timestamp_valid_poisoned_parser_bytecode(tmp_pat
     )
 
     poisoned_output = tmp_path / "poisoned.txt"
-    subprocess.run([sys.executable, str(checkout / "run.py"), str(poisoned_output)], check=True)
-    assert poisoned_output.read_text(encoding="utf-8") == "poisoned"
+    subprocess.run(
+        [
+            sys.executable,
+            str(checkout / "run.py"),
+            "--checkpoint_ligand_mpnn",
+            str(checkpoint),
+            "--output",
+            str(poisoned_output),
+        ],
+        check=True,
+    )
+    assert poisoned_output.read_text(encoding="utf-8") == "poisoned:helper-attested:checkpoint-v1"
 
     attested_output = tmp_path / "attested.txt"
     execute_pinned_entrypoint(
         checkout_root=checkout,
         upstream_commit=commit,
+        checkpoint_sha256=checkpoint_sha256,
+        packing_checkpoint_sha256=None,
         entrypoint="run.py",
-        arguments=(str(attested_output),),
+        arguments=(
+            "--checkpoint_ligand_mpnn",
+            str(checkpoint),
+            "--output",
+            str(attested_output),
+        ),
     )
 
-    assert attested_output.read_text(encoding="utf-8") == "attested"
+    assert attested_output.read_text(encoding="utf-8") == "attested:helper-attested:checkpoint-v1"
 
 
-def test_pinned_runtime_rejects_dirty_parser_bytes(tmp_path: Path) -> None:
-    checkout, commit = _checkout(tmp_path)
+def test_pinned_runtime_executes_pinned_tree_when_checkout_sources_are_dirty(tmp_path: Path) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256 = _checkout(tmp_path)
     (checkout / "data_utils.py").write_text("VALUE = 'modified'\n", encoding="utf-8")
+    (checkout / "model_utils.py").write_text("HELPER = 'helper-modified'\n", encoding="utf-8")
+    output = tmp_path / "output.txt"
 
-    with pytest.raises(ValueError, match="data_utils.py must match the pinned commit"):
+    execute_pinned_entrypoint(
+        checkout_root=checkout,
+        upstream_commit=commit,
+        checkpoint_sha256=checkpoint_sha256,
+        packing_checkpoint_sha256=None,
+        entrypoint="run.py",
+        arguments=(
+            "--checkpoint_ligand_mpnn",
+            str(checkpoint),
+            "--output",
+            str(output),
+        ),
+    )
+
+    assert output.read_text(encoding="utf-8") == "attested:helper-attested:checkpoint-v1"
+
+
+def test_pinned_runtime_rejects_checkpoint_changed_after_planning(tmp_path: Path) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256 = _checkout(tmp_path)
+    checkpoint.write_text("checkpoint-v2", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="checkpoint_ligand_mpnn SHA256 mismatch"):
         execute_pinned_entrypoint(
             checkout_root=checkout,
             upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            packing_checkpoint_sha256=None,
             entrypoint="run.py",
-            arguments=(str(tmp_path / "output.txt"),),
+            arguments=(
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--output",
+                str(tmp_path / "output.txt"),
+            ),
         )

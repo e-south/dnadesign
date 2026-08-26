@@ -62,6 +62,8 @@ def test_single_aa_probability_command_is_explicit() -> None:
         "/opt/LigandMPNN",
         "--upstream-commit",
         _COMMIT,
+        "--checkpoint-sha256",
+        _DIGEST,
         "--entrypoint",
         "score.py",
         "--",

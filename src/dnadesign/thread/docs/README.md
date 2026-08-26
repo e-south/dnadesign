@@ -41,6 +41,14 @@ always omitted. Atomic planners may write the bytes to a staging path while
 binding a distinct final execution path; only the final path is serialized,
 and the promoted file has an explicit digest-validation method.
 
+Generated design and score commands execute from a temporary source tree
+materialized directly from the pinned Git commit. They do not import helper
+modules or bytecode caches from the mutable checkout. Immediately before each
+run, the wrapper verifies the declared checkpoint digests, copies those exact
+bytes into the isolated runtime, and points the upstream entrypoint at the
+verified copies. Preflight remains an early diagnostic; execution repeats the
+source and weight identity boundary rather than trusting an earlier check.
+
 An atom-context request is not evidence that context was parsed. Before a
 design or probability request is admitted, the context probe imports
 `data_utils.parse_PDB` from the exact clean upstream commit and records the

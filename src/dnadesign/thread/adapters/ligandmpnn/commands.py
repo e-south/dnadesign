@@ -35,6 +35,10 @@ def build_ligandmpnn_commands(
             *pinned_runtime_prefix(
                 checkout_root=checkout_root,
                 upstream_commit=request.upstream.commit,
+                checkpoint_sha256=request.upstream.checkpoint_sha256,
+                packing_checkpoint_sha256=(
+                    request.upstream.packing_checkpoint_sha256 if request.packing.enabled else None
+                ),
                 entrypoint="run.py",
                 python_executable=python_executable,
             ),
