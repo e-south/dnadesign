@@ -467,22 +467,20 @@ def test_prime_labels_have_symmetric_left_right_offsets_per_row() -> None:
     seq_left = layout.x_left
     seq_right = layout.x_left + len(sequence) * layout.cw
 
-    for row_y, left_token, right_token in (
-        (layout.y_forward, "5'", "3'"),
-        (layout.y_reverse, "3'", "5'"),
-    ):
-        left = next(
-            t
-            for t in ax.texts
-            if t.get_text() == left_token and t.get_ha() == "right" and abs(t.get_position()[1] - row_y) < 1e-6
-        )
-        right = next(
-            t
-            for t in ax.texts
-            if t.get_text() == right_token and t.get_ha() == "left" and abs(t.get_position()[1] - row_y) < 1e-6
-        )
-        left_gap = seq_left - left.get_position()[0]
-        right_gap = right.get_position()[0] - seq_right
+    renderer = fig.canvas.get_renderer()
+    inverse = ax.transData.inverted()
+
+    def terminal_extent(prefix: str) -> tuple[float, float]:
+        patches = [patch for patch in ax.patches if (patch.get_gid() or "").startswith(prefix)]
+        assert patches
+        boxes = [inverse.transform_bbox(patch.get_window_extent(renderer=renderer)) for patch in patches]
+        return min(box.x0 for box in boxes), max(box.x1 for box in boxes)
+
+    for row_id in ("fwd", "rev"):
+        _left_edge, left_right = terminal_extent(f"terminal:{row_id}:right:")
+        right_left, _right_edge = terminal_extent(f"terminal:{row_id}:left:")
+        left_gap = seq_left - left_right
+        right_gap = right_left - seq_right
         assert left_gap == pytest.approx(right_gap)
 
     plt.close(fig)

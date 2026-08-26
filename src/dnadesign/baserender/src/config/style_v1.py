@@ -145,6 +145,8 @@ class Style:
     span_link_inner_margin_bp: float = 0.25
     span_link_line_width: float = 1.1
     span_link_tick_line_width: float = 1.1
+    span_link_color: str = "#9CA3AF"
+    span_link_label_color: str | None = None
 
     kmer: GlyphStyle = field(default_factory=GlyphStyle)
     motif_logo: MotifLogoStyle = field(default_factory=MotifLogoStyle)
@@ -210,6 +212,13 @@ class Style:
             ensure(self.font_size_annotation_label >= 6, "style.font_size_annotation_label must be >= 6", SchemaError)
         if self.font_size_span_link_label is not None:
             ensure(self.font_size_span_link_label >= 6, "style.font_size_span_link_label must be >= 6", SchemaError)
+        ensure(str(self.span_link_color).strip() != "", "style.span_link_color must be non-empty", SchemaError)
+        if self.span_link_label_color is not None:
+            ensure(
+                str(self.span_link_label_color).strip() != "",
+                "style.span_link_label_color must be non-empty when set",
+                SchemaError,
+            )
         ensure(self.padding_x >= 0, "style.padding_x must be >= 0", SchemaError)
         ensure(self.padding_y >= 0, "style.padding_y must be >= 0", SchemaError)
         ensure(self.layout.outer_pad_cells >= 0, "style.layout.outer_pad_cells must be >= 0", SchemaError)

@@ -1,0 +1,89 @@
+schema: densegen.solution_path_playback_endpoint.v1
+endpoint_id: dense_array_packing_showcase
+title: Dense-array packing showcase
+audience: public
+
+source:
+  kind: densegen_records
+  table: ../demo_tfbs_baseline/outputs/tables/records.parquet
+  selected_records_sha256: ef114dcb2dd7a0fc660663351e75412c227af4171e3132907cef2ade4d4b8340  # pragma: allowlist secret
+  records:
+    - id: de0a47de9c0d6d9b5ba40a31372a09b1a24a4c36
+      scene: unconstrained_packing_a
+      title: Dense packing A
+      subtitle: Unpadded overlap-dense binding-site realization
+    - id: 861d51785bd5df37cea5d26c99a00c4f21cc7f2d
+      scene: unconstrained_packing_b
+      title: Dense packing B
+      subtitle: Unpadded overlap-dense binding-site realization
+    - id: e60b5c0f129c121351aa5dd3f91bc842eb15725d
+      scene: unconstrained_packing_c
+      title: Dense packing C
+      subtitle: Unpadded overlap-dense binding-site realization
+    - id: 2fd7617a7b4abda2acc254e1076bb36db690a794
+      scene: unconstrained_packing_d
+      title: Dense packing D
+      subtitle: Unpadded overlap-dense binding-site realization
+    - id: 05feb24302bf0968641d1edd9c45d59a2be3a685
+      scene: unconstrained_packing_e
+      title: Dense packing E
+      subtitle: Unpadded overlap-dense binding-site realization
+
+adapter:
+  kind: densegen_realized_array_v1
+  display_coordinate: offset
+  solver_coordinate_provenance: offset_raw
+
+playback:
+  authority: placement_reconstructed
+  ordering_policy:
+    - start
+    - shorter_first
+    - placement_id
+  graph_relation: coordinate_precedence
+  show_authority_notice: false
+
+labels:
+  forbidden_terms:
+    - sigma factor
+    - -35 element
+    - -10 element
+  overrides:
+    TF_A: TF A
+    TF_B: TF B
+    TF_C: TF C
+    TF_D: TF D
+    TF_E: TF E
+    TF_F: TF F
+    TF_G: TF G
+    TF_H: TF H
+    upstream: fixed upstream element
+    downstream: fixed downstream element
+    alpha_anchor: fixed pair A
+    beta_anchor: fixed pair B
+
+presentation:
+  layout: graph_left_duplex_right
+  color_profile: uniform
+  show_legend: false
+  graph_detail: full
+  graph_fraction: 0.35
+  show_edge_costs: false
+  seconds_per_step: 0.22
+  hold_seconds: 1.80
+  lead_seconds: 0.10
+  scene_transition_seconds: 0.24
+  show_distance_bracket: never
+  collection_order:
+    - unconstrained_packing_a
+    - unconstrained_packing_b
+    - unconstrained_packing_c
+    - unconstrained_packing_d
+    - unconstrained_packing_e
+
+outputs:
+  directory: outputs/publication/playback/dense_array_packing_showcase
+  formats:
+    - manifest.json
+    - playback.mp4
+    - poster.png

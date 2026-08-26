@@ -394,8 +394,8 @@ wheels = [
 
 [[package]]
 name = "dense-arrays"
-version = "0.1.0"
-source = { git = "https://github.com/e-south/dense-arrays#2ce9401dc0deea82c05c6c92385c5f57a44a646a" }
+version = "0.2.0"
+source = { git = "https://github.com/e-south/dense-arrays#adaff39282d5c5389569aecdb5f303f42cbe6b35" }
 dependencies = [
     { name = "numpy" },
     { name = "ortools" },
