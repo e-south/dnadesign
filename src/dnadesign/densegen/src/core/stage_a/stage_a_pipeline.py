@@ -486,7 +486,7 @@ def run_stage_a_pipeline(
     )
     collapsed_by_core_identity = 0
     if uniqueness_key == "core":
-        collapsed, collapsed_by_core_identity = _collapse_by_core_identity(candidates)
+        collapsed, collapsed_by_core_identity = _collapse_by_core_identity(candidates, rng=rng)
         ranked = _rank_candidates(
             collapsed,
             rank_by=selection_rank_by,
