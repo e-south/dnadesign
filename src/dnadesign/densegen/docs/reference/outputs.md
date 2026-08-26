@@ -1,7 +1,7 @@
 ## DenseGen outputs reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-08-26
 This page defines what DenseGen writes, where it writes it, and which event stream each
 consumer should read.
 
@@ -355,20 +355,30 @@ DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solve
 `dense stage-a build-pool` appends new unique TFBS to existing pools by default; pass `--fresh`
 to rebuild pools from scratch.
 `pool_manifest.json` includes the input config hash plus file fingerprints; append requires they match.
+The config hash includes `runtime.random_seed`, so changing the seed makes an existing Stage-A pool stale.
 For FIMO-backed PWM inputs, it records Stage-A sampling metadata, including:
 - tier fractions + source + scheme label
 - eligibility/retention rules, FIMO threshold, background source/bgfile
 - consensus and max-score stats (`pwm_consensus`, `pwm_consensus_iupac`, `pwm_consensus_score`,
   `pwm_theoretical_max_score`, `max_observed_score`)
 - selection pool diagnostics (`selection_pool_*`, `selection_score_norm_*`)
+- core representative provenance (`core_representative_policy`, `runtime_random_seed`)
 - trimming metadata (`motif_width`, `trimmed_width`, `trim_window_length`,
   `trim_window_strategy`, `trim_window_start`, `trim_window_score`, `trim_window_applied`)
 - diversity summaries (k‑NN unweighted/weighted, pairwise weighted, overlap, score quantiles)
 - mining and padding audits
 
 See the sampling guide for interpretation; the manifest is the source of truth for field names.
-Stage‑A pool rows include `best_hit_score`, `tier`, `rank_within_regulator` (1‑based rank among
-eligible_unique TFBS per regulator), and `tfbs_core` for core‑level uniqueness checks.
+Stage-A pool rows include `best_hit_score`, `tier`, `rank_within_regulator` (1-based rank among
+eligible_unique TFBS per regulator), and `tfbs_core` for core-level uniqueness checks.
+
+When `sampling.uniqueness.key=core`, DenseGen preserves the maximum-scoring candidate for each
+FIMO-matched core. If multiple complete motif sequences share that maximum score, it selects one with
+the Stage-A seeded random process after placing candidates and cores in stable order. The fixed seed is
+reproducible, candidate enumeration does not change membership, and nucleotide lexical order is not a
+selection criterion. Pool-manifest schema 1.7 identifies this membership contract; manifests from
+earlier schemas require an explicit `--fresh` rebuild and remain evidence of the behavior that created
+them.
 
 Stage‑B expects Stage‑A pools (default `outputs/pools`). `dense run` reuses these pools by default
 and rebuilds them if they are missing or stale; rebuild explicitly with `dense stage-a build-pool --fresh`

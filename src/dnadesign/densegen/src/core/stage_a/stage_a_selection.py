@@ -22,6 +22,8 @@ from .stage_a_encoding import CoreEncodingStore, encode_cores
 from .stage_a_sampling_utils import normalize_background
 from .stage_a_types import SelectionMeta
 
+CORE_REPRESENTATIVE_POLICY = "seeded_random_max_score_v1"
+
 
 class _CandidateLike(Protocol):
     seq: str
@@ -110,15 +112,29 @@ def _core_sequence(candidate: _CandidateLike) -> str:
     raise ValueError("FIMO matched_sequence is required to derive the TFBS core.")
 
 
-def _collapse_by_core_identity(ranked: Sequence[_CandidateLike]) -> tuple[list[_CandidateLike], int]:
-    best_by_core: dict[str, _CandidateLike] = {}
+def _collapse_by_core_identity(
+    ranked: Sequence[_CandidateLike],
+    *,
+    rng: np.random.Generator,
+) -> tuple[list[_CandidateLike], int]:
+    candidates_by_core: dict[str, list[_CandidateLike]] = {}
     for cand in ranked:
         core = _core_sequence(cand)
-        prev = best_by_core.get(core)
-        if prev is None or cand.score > prev.score or (cand.score == prev.score and cand.seq < prev.seq):
-            best_by_core[core] = cand
-    collapsed = max(0, len(ranked) - len(best_by_core))
-    return sorted(best_by_core.values(), key=lambda cand: (-cand.score, cand.seq)), int(collapsed)
+        candidates_by_core.setdefault(core, []).append(cand)
+
+    representatives: list[_CandidateLike] = []
+    for core in sorted(candidates_by_core):
+        candidates = candidates_by_core[core]
+        max_score = max(float(candidate.score) for candidate in candidates)
+        highest_scoring = sorted(
+            (candidate for candidate in candidates if float(candidate.score) == max_score),
+            key=lambda candidate: candidate.seq,
+        )
+        selected_index = int(rng.integers(0, len(highest_scoring))) if len(highest_scoring) > 1 else 0
+        representatives.append(highest_scoring[selected_index])
+
+    collapsed = max(0, len(ranked) - len(representatives))
+    return sorted(representatives, key=lambda cand: (-cand.score, cand.seq)), int(collapsed)
 
 
 def _pwm_tolerant_weights(

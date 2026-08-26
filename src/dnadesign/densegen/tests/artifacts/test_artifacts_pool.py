@@ -205,7 +205,7 @@ def test_load_pool_data_rejects_manifest_path_traversal(tmp_path: Path) -> None:
         outside, index=False
     )
     manifest = {
-        "schema_version": "1.6",
+        "schema_version": "1.7",
         "run_id": "demo",
         "run_root": ".",
         "config_path": "config.yaml",

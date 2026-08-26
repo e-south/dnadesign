@@ -380,7 +380,7 @@ def _pool_manifest(tmp_path: Path, *, include_diversity: bool = False) -> TFBSPo
     pools_dir = tmp_path / "pools"
     pools_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "schema_version": "1.6",
+        "schema_version": "1.7",
         "run_id": "demo",
         "run_root": ".",
         "config_path": "config.yaml",
@@ -521,7 +521,7 @@ def _pool_manifest_two_inputs(tmp_path: Path) -> TFBSPoolArtifact:
         },
     }
     manifest = {
-        "schema_version": "1.6",
+        "schema_version": "1.7",
         "run_id": "demo",
         "run_root": ".",
         "config_path": "config.yaml",
@@ -552,7 +552,7 @@ def _background_pool_manifest(tmp_path: Path) -> TFBSPoolArtifact:
     pools_dir = tmp_path / "pools"
     pools_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "schema_version": "1.6",
+        "schema_version": "1.7",
         "run_id": "demo",
         "run_root": ".",
         "config_path": "config.yaml",
@@ -3049,7 +3049,7 @@ def test_plot_stage_a_summary_background_logo_filename_avoids_double_background(
     pools_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = pools_dir / "pool_manifest.json"
     manifest_payload = {
-        "schema_version": "1.6",
+        "schema_version": "1.7",
         "run_id": "demo",
         "run_root": ".",
         "config_path": "config.yaml",
@@ -3105,7 +3105,7 @@ def test_plot_stage_a_summary_background_logo_uses_compact_size_and_nonredundant
     pools_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = pools_dir / "pool_manifest.json"
     manifest_payload = {
-        "schema_version": "1.6",
+        "schema_version": "1.7",
         "run_id": "demo",
         "run_root": ".",
         "config_path": "config.yaml",
