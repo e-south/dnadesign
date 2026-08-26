@@ -52,7 +52,19 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
         ")\n",
         encoding="utf-8",
     )
-    (root / "score.py").write_text("from data_utils import VALUE\n", encoding="utf-8")
+    (root / "score.py").write_text(
+        "import argparse\n"
+        "from pathlib import Path\n"
+        "parser = argparse.ArgumentParser()\n"
+        "parser.add_argument('--checkpoint_ligand_mpnn', required=True)\n"
+        "parser.add_argument('--pdb_path', required=True)\n"
+        "parser.add_argument('--out_folder', required=True)\n"
+        "args = parser.parse_args()\n"
+        "output = Path(args.out_folder) / f'{Path(args.pdb_path).stem}.pt'\n"
+        "output.parent.mkdir(parents=True, exist_ok=True)\n"
+        "output.write_text('score', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
     subprocess.run(["git", "init", "-q", str(root)], check=True)
     subprocess.run(["git", "-C", str(root), "add", "."], check=True)
     subprocess.run(
@@ -270,6 +282,33 @@ def test_pinned_runtime_stages_verified_sidecar_before_execution(tmp_path: Path)
     )
 
     assert output.read_text(encoding="utf-8") == "attested:helper-attested:checkpoint-v1:input-v1:sidecar-v1"
+
+
+def test_pinned_runtime_preserves_pdb_basename_for_upstream_score_output(tmp_path: Path) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    named_pdb = pdb.with_name("target-complex.pdb")
+    pdb.rename(named_pdb)
+    output_root = tmp_path / "scores"
+
+    execute_pinned_entrypoint(
+        checkout_root=checkout,
+        upstream_commit=commit,
+        checkpoint_sha256=checkpoint_sha256,
+        pdb_sha256=pdb_sha256,
+        packing_checkpoint_sha256=None,
+        residue_alphabet_sha256=None,
+        entrypoint="score.py",
+        arguments=(
+            "--checkpoint_ligand_mpnn",
+            str(checkpoint),
+            "--pdb_path",
+            str(named_pdb),
+            "--out_folder",
+            str(output_root),
+        ),
+    )
+
+    assert (output_root / "target-complex.pt").read_text(encoding="utf-8") == "score"
 
 
 @pytest.mark.parametrize(

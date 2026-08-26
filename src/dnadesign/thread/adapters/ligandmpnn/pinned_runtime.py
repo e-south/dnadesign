@@ -152,7 +152,8 @@ def execute_pinned_entrypoint(
             runtime_arguments,
             flag=_PDB_FLAG,
             expected_sha256=pdb_sha256,
-            destination=inputs_root / "input.pdb",
+            destination=inputs_root / "pdb",
+            preserve_source_name=True,
         )
         if residue_alphabet_sha256 is None:
             if _has_flag(runtime_arguments, _RESIDUE_ALPHABET_FLAG):
@@ -176,6 +177,7 @@ def _replace_verified_file(
     flag: str,
     expected_sha256: str,
     destination: Path,
+    preserve_source_name: bool = False,
 ) -> None:
     if len(expected_sha256) != 64 or any(character not in "0123456789abcdef" for character in expected_sha256):
         raise ValueError(f"{flag} expected digest must be a lowercase SHA256")
@@ -198,9 +200,11 @@ def _replace_verified_file(
         raise ValueError(
             f"{flag} SHA256 mismatch: expected sha256:{expected_sha256}, observed sha256:{observed_sha256}"
         )
-    destination.write_bytes(payload)
-    destination.chmod(0o400)
-    arguments[value_index] = str(destination)
+    staged_path = destination / source_path.name if preserve_source_name else destination
+    staged_path.parent.mkdir(parents=True, exist_ok=True)
+    staged_path.write_bytes(payload)
+    staged_path.chmod(0o400)
+    arguments[value_index] = str(staged_path)
 
 
 def _has_flag(arguments: list[str], flag: str) -> bool:
