@@ -77,6 +77,26 @@ def _sha256_bytes(content: bytes) -> str:
     return f"sha256:{hashlib.sha256(content).hexdigest()}"
 
 
+def _recheck_verified_manifest(verified: VerifiedStorageObject) -> None:
+    """Reject a root snapshot whose verified receipt has since changed."""
+
+    manifest_path = verified.root / MANIFEST_NAME
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise StorageObjectError(
+            "storage object manifest changed during root validation; retry while producers are quiescent"
+        )
+    try:
+        manifest_bytes = manifest_path.read_bytes()
+    except OSError as exc:
+        raise StorageObjectError(
+            "storage object manifest changed during root validation; retry while producers are quiescent"
+        ) from exc
+    if _sha256_bytes(manifest_bytes) != verified.manifest_digest:
+        raise StorageObjectError(
+            "storage object manifest changed during root validation; retry while producers are quiescent"
+        )
+
+
 def _storage_tree_paths(root: Path) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
     """Return regular files and directories while rejecting unsafe entries."""
 
@@ -484,6 +504,8 @@ def verify_storage_root(storage_root: Path) -> VerifiedStorageRoot:
             raise StorageObjectError(f"storage identity is duplicated: {identity}")
         identities.add(identity)
         objects.append(verified)
+    for verified in objects:
+        _recheck_verified_manifest(verified)
     if routes != _routed_object_directories(root):
         raise StorageObjectError("storage root changed during validation; retry while object routing is quiescent")
     return VerifiedStorageRoot(root=root, objects=tuple(objects))

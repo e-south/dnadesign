@@ -662,3 +662,36 @@ def test_verify_storage_root_rejects_object_created_during_validation(
 
     with pytest.raises(StorageObjectError, match="storage root changed during validation"):
         verify_storage_root(storage_root)
+
+
+def test_verify_storage_root_rejects_earlier_manifest_refreshed_during_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+    earlier = storage_root / "workspaces" / "cruncher" / "earlier"
+    later = storage_root / "workspaces" / "cruncher" / "later"
+    _write_object(earlier, storage_id="earlier")
+    _write_object(later, storage_id="later")
+    original_verify = storage_validation.verify_storage_object
+    refreshed = False
+
+    def _verify(object_root: Path):
+        nonlocal refreshed
+        verified = original_verify(object_root)
+        if object_root == later and not refreshed:
+            manifest_path = earlier / MANIFEST_NAME
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["producer_revision"] = "test-revision-2"
+            staged_manifest = manifest_path.with_name(f".{MANIFEST_NAME}.refresh")
+            staged_manifest.write_text(json.dumps(manifest), encoding="utf-8")
+            os.replace(staged_manifest, manifest_path)
+            refreshed = True
+        return verified
+
+    monkeypatch.setattr(storage_validation, "verify_storage_object", _verify)
+
+    with pytest.raises(StorageObjectError, match="storage object manifest changed during root validation"):
+        verify_storage_root(storage_root)
