@@ -158,12 +158,15 @@ def _verify_demo(
         *(resource.path for resource in verified.resources),
     ):
         relative = path.relative_to(checkout).as_posix()
-        completed = subprocess.run(
-            ["git", "-C", str(checkout), "ls-files", "--error-unmatch", "--", relative],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        try:
+            completed = subprocess.run(
+                ["git", "-C", str(checkout), "ls-files", "--error-unmatch", "--", relative],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError as exc:
+            raise StorageObjectError(f"cannot verify demo Git tracking for {relative}: {exc}") from exc
         if completed.returncode != 0:
             if allow_untracked_manifest and path == verified.manifest_path:
                 continue
@@ -218,12 +221,22 @@ def verify_storage_object(
     missing = sorted(declared_paths - actual_paths)
     if missing:
         raise StorageObjectError(f"declared files are missing: {', '.join(missing)}")
+    second_resources = tuple(_verify_resource(root, resource) for resource in manifest.resources)
+    second_actual_paths = {
+        path.relative_to(root).as_posix()
+        for path in storage_file_paths(root)
+        if path.name not in {MANIFEST_NAME, LOCK_NAME} or path.parent != root
+    }
+    first_state = tuple((item.relative_path, item.digest, item.size_bytes) for item in resources)
+    second_state = tuple((item.relative_path, item.digest, item.size_bytes) for item in second_resources)
+    if first_state != second_state or actual_paths != second_actual_paths:
+        raise StorageObjectError("storage object changed during validation; retry while the producer is quiescent")
 
     verified = VerifiedStorageObject(
         root=root,
         manifest_path=resolve_storage_path(manifest_path, label="storage object manifest", strict=True),
         manifest=manifest,
-        resources=resources,
+        resources=second_resources,
     )
     checkout = _git_checkout_ancestor(
         root,

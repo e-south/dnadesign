@@ -55,20 +55,29 @@ def _write_manifest(
     allow_untracked_demo_manifest: bool = False,
 ) -> dict[str, object]:
     manifest_text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
-    temporary = manifest_path.parent / f".{MANIFEST_NAME}.tmp"
+    descriptor = -1
+    temporary: Path | None = None
     temporary_created = False
     previous_mode: int | None = None
     try:
         if previous_bytes is not None:
             previous_mode = stat.S_IMODE(manifest_path.stat(follow_symlinks=False).st_mode)
-        with temporary.open("x", encoding="utf-8") as handle:
-            temporary_created = True
+        descriptor, temporary_name = tempfile.mkstemp(
+            dir=manifest_path.parent,
+            prefix=f".{MANIFEST_NAME}.tmp-",
+        )
+        temporary = Path(temporary_name)
+        temporary_created = True
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            descriptor = -1
             handle.write(manifest_text)
         if previous_mode is not None:
             temporary.chmod(previous_mode, follow_symlinks=False)
         os.replace(temporary, manifest_path)
     except OSError as exc:
-        if temporary_created:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if temporary_created and temporary is not None:
             temporary.unlink(missing_ok=True)
         raise StorageObjectError(f"cannot write storage object manifest: {exc}") from exc
     try:
@@ -141,6 +150,22 @@ def _manifest_lock(root: Path) -> Iterator[None]:
             raise StorageObjectError(f"cannot release storage object manifest lock {lock_path}: {exc}") from exc
 
 
+def _remove_stale_manifest_staging(root: Path) -> None:
+    """Remove contract-owned staging files left by an interrupted writer."""
+
+    candidates = {root / f".{MANIFEST_NAME}.tmp"}
+    candidates.update(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    for candidate in sorted(candidates):
+        if not candidate.exists() and not candidate.is_symlink():
+            continue
+        if candidate.is_symlink() or not candidate.is_file():
+            raise StorageObjectError(f"manifest staging path must be a regular file: {candidate}")
+        try:
+            candidate.unlink()
+        except OSError as exc:
+            raise StorageObjectError(f"cannot remove stale manifest staging file {candidate}: {exc}") from exc
+
+
 def inventory_storage_object(
     storage_root: Path,
     *,
@@ -155,6 +180,7 @@ def inventory_storage_object(
     retention_policy: str,
     input_paths: tuple[str, ...] = (),
     metadata_paths: tuple[str, ...] = (),
+    cache_paths: tuple[str, ...] = (),
     original_execution_path: str | None = None,
     demo: bool = False,
 ) -> dict[str, object]:
@@ -175,10 +201,16 @@ def inventory_storage_object(
 
     normalized_inputs = {normalize_relative_path(path, label="input path") for path in input_paths}
     normalized_metadata = {normalize_relative_path(path, label="metadata path") for path in metadata_paths}
-    duplicate_roles = sorted(normalized_inputs & normalized_metadata)
+    normalized_caches = {normalize_relative_path(path, label="cache path") for path in cache_paths}
+    duplicate_roles = sorted(
+        (normalized_inputs & normalized_metadata)
+        | (normalized_inputs & normalized_caches)
+        | (normalized_metadata & normalized_caches)
+    )
     if duplicate_roles:
         raise StorageObjectError(f"inventory paths have multiple roles: {', '.join(duplicate_roles)}")
     with _manifest_lock(root):
+        _remove_stale_manifest_staging(root)
         manifest_path = root / MANIFEST_NAME
         if manifest_path.exists() or manifest_path.is_symlink():
             raise StorageObjectError(f"storage object manifest already exists: {manifest_path}")
@@ -188,7 +220,7 @@ def inventory_storage_object(
             if path.name not in {MANIFEST_NAME, LOCK_NAME} or path.parent != root
         )
         relative_files = {path.relative_to(root).as_posix() for path in files}
-        missing_declared = sorted((normalized_inputs | normalized_metadata) - relative_files)
+        missing_declared = sorted((normalized_inputs | normalized_metadata | normalized_caches) - relative_files)
         if missing_declared:
             raise StorageObjectError(f"declared inventory paths are missing: {', '.join(missing_declared)}")
         resources = [
@@ -204,6 +236,7 @@ def inventory_storage_object(
                         else (
                             ResourceRole.CACHE.value
                             if parsed_kind is ObjectKind.TOOL_CACHE
+                            or path.relative_to(root).as_posix() in normalized_caches
                             else ResourceRole.ARTIFACT.value
                         )
                     )
@@ -239,6 +272,7 @@ def refresh_storage_object(
     *,
     expected_manifest_digest: str,
     producer_revision: str,
+    cache_paths: tuple[str, ...] = (),
 ) -> dict[str, object]:
     """Refresh a changed object while preserving identity and protected roles."""
 
@@ -249,6 +283,7 @@ def refresh_storage_object(
     if not root.is_dir():
         raise StorageObjectError(f"storage object root is not a directory: {root}")
     with _manifest_lock(root):
+        _remove_stale_manifest_staging(root)
         manifest_path = root / MANIFEST_NAME
         if not manifest_path.is_file() or manifest_path.is_symlink():
             raise StorageObjectError(f"storage object root is missing a regular {MANIFEST_NAME}: {root}")
@@ -263,12 +298,14 @@ def refresh_storage_object(
         except OSError as exc:
             raise StorageObjectError(f"cannot read storage object manifest {manifest_path}: {exc}") from exc
         manifest = load_storage_object_manifest(manifest_path)
-        if manifest.object_kind is not ObjectKind.WORKSPACE:
+        if manifest.object_kind not in {ObjectKind.WORKSPACE, ObjectKind.STORE}:
             raise StorageObjectError(
-                "storage receipt refresh is limited to active workspaces; "
+                "storage receipt refresh is limited to active workspaces and stores; "
                 f"found object_kind={manifest.object_kind.value}"
             )
-        prior_roles = {resource.relative_path: resource.role for resource in manifest.resources}
+        prior_resources = {resource.relative_path: resource for resource in manifest.resources}
+        prior_roles = {path: resource.role for path, resource in prior_resources.items()}
+        normalized_caches = {normalize_relative_path(path, label="cache path") for path in cache_paths}
         files = tuple(
             path
             for path in storage_file_paths(root)
@@ -283,12 +320,27 @@ def refresh_storage_object(
             raise StorageObjectError(
                 f"cannot refresh after removing input or metadata files: {', '.join(missing_protected)}"
             )
+        changed_protected = sorted(
+            path for path in protected_paths if _sha256(root / path) != prior_resources[path].digest
+        )
+        if changed_protected:
+            raise StorageObjectError(
+                f"cannot refresh after changing input or metadata files: {', '.join(changed_protected)}"
+            )
+        missing_caches = sorted(normalized_caches - relative_files)
+        if missing_caches:
+            raise StorageObjectError(f"declared refresh cache paths are missing: {', '.join(missing_caches)}")
+        role_changes = sorted(
+            path for path in normalized_caches if path in prior_roles and prior_roles[path] is not ResourceRole.CACHE
+        )
+        if role_changes:
+            raise StorageObjectError(f"refresh cannot change existing resource roles: {', '.join(role_changes)}")
         resources = []
         for path in files:
             relative_path = path.relative_to(root).as_posix()
             role = prior_roles.get(relative_path)
             if role is None:
-                role = ResourceRole.CACHE if manifest.object_kind is ObjectKind.TOOL_CACHE else ResourceRole.ARTIFACT
+                role = ResourceRole.CACHE if relative_path in normalized_caches else ResourceRole.ARTIFACT
             resources.append(
                 {
                     "digest": _sha256(path),

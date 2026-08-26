@@ -165,6 +165,29 @@ def test_verify_storage_object_wraps_resource_read_failures(
         storage_validation.verify_storage_object(root)
 
 
+def test_verify_storage_object_rejects_bytes_changed_during_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    original_verify = storage_validation._verify_resource
+    calls = 0
+
+    def _verify(root_path, resource):
+        nonlocal calls
+        verified = original_verify(root_path, resource)
+        calls += 1
+        if calls == 2:
+            (root / "inputs" / "payload.txt").write_text("changed\n", encoding="utf-8")
+        return verified
+
+    monkeypatch.setattr(storage_validation, "_verify_resource", _verify)
+
+    with pytest.raises(StorageObjectError, match="declared resource digest mismatch"):
+        verify_storage_object(root)
+
+
 def test_storage_file_closure_propagates_unreadable_subtree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -223,6 +246,24 @@ def test_git_resident_demo_must_be_small_and_tracked(tmp_path: Path) -> None:
     subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot"], check=True)
 
     with pytest.raises(StorageObjectError, match="demo exceeds 2000000 bytes"):
+        verify_storage_object(root)
+
+
+def test_git_resident_demo_normalizes_missing_git_executable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout = tmp_path / "checkout"
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    root = checkout / "examples" / "pilot"
+    _write_object(root, demo=True)
+
+    def _missing_git(*_args, **_kwargs):
+        raise FileNotFoundError("git")
+
+    monkeypatch.setattr(storage_validation.subprocess, "run", _missing_git)
+
+    with pytest.raises(StorageObjectError, match="cannot verify demo Git tracking"):
         verify_storage_object(root)
 
 

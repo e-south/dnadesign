@@ -548,28 +548,27 @@ def test_refresh_wraps_lock_acquisition_failures(
         )
 
 
-def test_inventory_does_not_delete_preexisting_manifest_temp(tmp_path: Path) -> None:
+def test_inventory_recovers_preexisting_manifest_temp(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     root.mkdir()
     temporary = root / f".{MANIFEST_NAME}.tmp"
     temporary.write_text("pre-existing bytes\n", encoding="utf-8")
 
-    with pytest.raises(StorageObjectError, match="cannot write storage object manifest"):
-        inventory_storage_object(
-            root,
-            storage_id="pilot",
-            owner_repository="dnadesign",
-            owner_tool="cruncher",
-            object_kind="workspace",
-            content_schema="cruncher.workspace",
-            content_schema_version="1",
-            producer_revision="test-revision-1",
-            storage_class="reproducible",
-            retention_policy="review-before-delete",
-        )
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
 
-    assert temporary.read_text(encoding="utf-8") == "pre-existing bytes\n"
-    assert not (root / MANIFEST_NAME).exists()
+    assert not temporary.exists()
+    assert (root / MANIFEST_NAME).is_file()
 
 
 def test_concurrent_refresh_allows_exactly_one_compare_and_swap(tmp_path: Path) -> None:
@@ -626,7 +625,7 @@ def test_concurrent_refresh_allows_exactly_one_compare_and_swap(tmp_path: Path) 
     assert sum("manifest changed before refresh" in outcome for outcome in outcomes) == 1
 
 
-def test_refresh_rejects_nonworkspace_receipts(tmp_path: Path) -> None:
+def test_refresh_advances_authoritative_store_receipt(tmp_path: Path) -> None:
     root = tmp_path / "store"
     root.mkdir()
     (root / "payload.txt").write_text("payload\n", encoding="utf-8")
@@ -644,17 +643,111 @@ def test_refresh_rejects_nonworkspace_receipts(tmp_path: Path) -> None:
     )
     manifest_path = root / MANIFEST_NAME
     expected_digest = _digest(manifest_path)
-    previous_bytes = manifest_path.read_bytes()
     (root / "payload.txt").write_text("changed\n", encoding="utf-8")
 
-    with pytest.raises(StorageObjectError, match="limited to active workspaces"):
+    summary = refresh_storage_object(
+        root,
+        expected_manifest_digest=expected_digest,
+        producer_revision="test-revision-2",
+    )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert summary["status"] == "verified"
+    assert manifest["producer_revision"] == "test-revision-2"
+    assert manifest["resources"][0]["digest"] == _digest(root / "payload.txt")
+
+
+def test_refresh_rejects_tool_cache_receipts(tmp_path: Path) -> None:
+    root = tmp_path / "cache"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="cache",
+        owner_repository="dnadesign",
+        owner_tool="proteinmpnn",
+        object_kind="tool-cache",
+        content_schema="proteinmpnn.checkout",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="cache",
+        retention_policy="rebuildable",
+    )
+
+    with pytest.raises(StorageObjectError, match="limited to active workspaces and stores"):
         refresh_storage_object(
             root,
-            expected_manifest_digest=expected_digest,
+            expected_manifest_digest=_digest(root / MANIFEST_NAME),
+            producer_revision="test-revision-2",
+        )
+
+
+@pytest.mark.parametrize("protected_role", ["input", "metadata"])
+def test_refresh_rejects_changed_protected_bytes(tmp_path: Path, protected_role: str) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    protected = root / "protected.txt"
+    protected.write_text("original\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+        input_paths=("protected.txt",) if protected_role == "input" else (),
+        metadata_paths=("protected.txt",) if protected_role == "metadata" else (),
+    )
+    manifest_path = root / MANIFEST_NAME
+    previous_bytes = manifest_path.read_bytes()
+    protected.write_text("changed\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="cannot refresh after changing input or metadata files"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
             producer_revision="test-revision-2",
         )
 
     assert manifest_path.read_bytes() == previous_bytes
+
+
+def test_inventory_and_refresh_preserve_explicit_cache_roles(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "cache.bin").write_bytes(b"cache-v1")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+        cache_paths=("cache.bin",),
+    )
+    manifest_path = root / MANIFEST_NAME
+    (root / "new-cache.bin").write_bytes(b"cache-v2")
+
+    refresh_storage_object(
+        root,
+        expected_manifest_digest=_digest(manifest_path),
+        producer_revision="test-revision-2",
+        cache_paths=("new-cache.bin",),
+    )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert {item["path"]: item["role"] for item in manifest["resources"]} == {
+        "cache.bin": "cache",
+        "new-cache.bin": "cache",
+    }
 
 
 def test_failed_refresh_atomically_restores_readonly_manifest(

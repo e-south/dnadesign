@@ -41,6 +41,9 @@ files, and digest mismatches fail validation.
 `demo: true` is a narrow exception for small tracked examples inside Git. A
 demo is capped at 2 MB, and its manifest and every resource must be tracked.
 Operational objects must set `demo: false` and live outside a Git checkout.
+Place the external root beneath an account-private filesystem boundary. The v1
+manifest verifies routing and bytes; operating-system ACLs remain an explicit
+operator responsibility.
 
 ### Inventory and validation
 
@@ -59,22 +62,24 @@ uv run dnadesign-storage inventory /absolute/path/to/object \
   --storage-class reproducible \
   --retention-policy review-before-delete \
   --input configs/config.yaml \
-  --metadata README.md
+  --metadata README.md \
+  --cache runtime/fontconfig/cache.bin
 ```
 
 The command is create-only. It inventories every regular file, writes one
 deterministic manifest, verifies exact closure, and refuses to overwrite an
-existing manifest. Paths passed with `--input` or `--metadata` receive those
-roles; remaining workspace/store files are artifacts, while all tool-cache
-files are cache material.
+existing manifest. Paths passed with `--input`, `--metadata`, or `--cache`
+receive those roles; remaining workspace/store files are artifacts, while all
+tool-cache files are cache material.
 
 For `--demo`, existing resources must already be small and tracked. Inventory
 creates the new manifest with status `created-pending-git-add`; add that
 manifest to Git, then run `dnadesign-storage validate` to reach `verified`.
 Operational objects never use this two-step exception.
 
-An active workspace may change only through its owning tool. After a successful
-run, refresh its receipt with the digest of the receipt that authorized the run:
+An active workspace or durable store may change only through its owning tool.
+After a successful run or store transaction, refresh its receipt with the
+digest of the receipt that authorized the write:
 
 ```bash
 uv run dnadesign-storage refresh /absolute/path/to/object \
@@ -83,10 +88,12 @@ uv run dnadesign-storage refresh /absolute/path/to/object \
   --json
 ```
 
-Refresh preserves identity and existing input/metadata roles, records the
-revision that produced the refreshed bytes, inventories new artifacts, rejects
-missing input or metadata files, and uses the expected digest as a
-compare-and-swap guard against concurrent receipt changes. Writers lock
+Refresh preserves identity and existing roles, records the revision that
+produced the refreshed bytes, inventories new artifacts, and accepts `--cache`
+for newly created cache files. Input and metadata bytes are protected: removing
+or changing them fails rather than silently authorizing a new input identity.
+Refresh uses the expected digest as a compare-and-swap guard against concurrent
+receipt changes. Writers lock
 `<object>/.storage-object.lock`, so processes and compute nodes that see the
 same POSIX filesystem serialize receipt updates. The lock is contract-owned
 coordination state and is excluded from the content manifest. Group-writable
@@ -110,7 +117,10 @@ uv run dnadesign-storage validate-root /absolute/path/to/storage --json
 
 Storage validation establishes byte identity and retention posture. The owning
 tool must still load its own config or store schema and perform its normal
-semantic preflight before execution.
+semantic preflight before execution. Validation makes two complete digest and
+closure passes and rejects observed drift, but producers must still be
+quiescent or participate in their own transaction or locking contract while a
+receipt is verified.
 
 ### Adoption order
 

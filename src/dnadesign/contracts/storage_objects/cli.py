@@ -46,6 +46,7 @@ def _parser() -> argparse.ArgumentParser:
     inventory.add_argument("--retention-policy", choices=[value.value for value in RetentionPolicy], required=True)
     inventory.add_argument("--input", action="append", default=[])
     inventory.add_argument("--metadata", action="append", default=[])
+    inventory.add_argument("--cache", action="append", default=[])
     inventory.add_argument("--original-execution-path")
     inventory.add_argument("--demo", action="store_true")
     _add_json(inventory)
@@ -54,6 +55,7 @@ def _parser() -> argparse.ArgumentParser:
     refresh.add_argument("storage_root", type=Path)
     refresh.add_argument("--expected-manifest-digest", required=True)
     refresh.add_argument("--producer-revision", required=True)
+    refresh.add_argument("--cache", action="append", default=[])
     _add_json(refresh)
 
     validate = subparsers.add_parser("validate", help="verify one explicit storage object")
@@ -90,6 +92,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 retention_policy=args.retention_policy,
                 input_paths=tuple(args.input),
                 metadata_paths=tuple(args.metadata),
+                cache_paths=tuple(args.cache),
                 original_execution_path=args.original_execution_path,
                 demo=args.demo,
             )
@@ -98,6 +101,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.storage_root,
                 expected_manifest_digest=args.expected_manifest_digest,
                 producer_revision=args.producer_revision,
+                cache_paths=tuple(args.cache),
             )
         elif args.command == "validate":
             summary = verify_storage_object(args.storage_root).summary()
