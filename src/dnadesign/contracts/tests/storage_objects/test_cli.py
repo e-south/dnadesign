@@ -733,6 +733,33 @@ def test_inventory_wraps_lock_acquisition_failures(
         )
 
 
+def test_inventory_wraps_unsupported_filesystem_locking(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+
+    def _unsupported_lock(*_args: object, **_kwargs: object) -> object:
+        raise NotImplementedError("flock unsupported")
+
+    monkeypatch.setattr(storage_inventory.FileLock, "acquire", _unsupported_lock)
+
+    with pytest.raises(StorageObjectError, match="cannot acquire storage object manifest lock"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+
 def test_manifest_lock_releases_after_post_acquisition_inspection_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -180,7 +180,7 @@ def _manifest_lock(root: Path) -> Iterator[None]:
         lock.acquire()
     except Timeout as exc:
         raise StorageObjectError(f"timed out waiting for storage object manifest lock: {root}") from exc
-    except OSError as exc:
+    except (OSError, NotImplementedError) as exc:
         raise StorageObjectError(f"cannot acquire storage object manifest lock {lock_path}: {exc}") from exc
     try:
         lock_stat = lock_path.stat(follow_symlinks=False)
