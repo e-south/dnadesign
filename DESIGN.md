@@ -2,14 +2,14 @@
 doc_id: design
 surface: system-of-record
 owner: dnadesign-maintainers
-last_verified: 2026-08-01
+last_verified: 2026-08-26
 ---
 
 # DESIGN
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-01
+**Last verified:** 2026-08-26
 
 ## At a glance
 This document defines repo-wide engineering principles, invariants, and boundary rules.
@@ -59,6 +59,9 @@ Use it when adding or changing behavior so tools remain decoupled, assertive, an
 - Shared data-plane behaviors such as overlay compaction and part-management are expressed with USR semantics (`usr-overlay-*`) instead of tool-specific command names.
 - Cross-dataset overlay carry must stay explicit and narrow: no implicit merge-side overlay copying, no non-`id` carry keys, and no reserved-namespace transfer hidden behind convenience defaults.
 - No hidden path fallback is allowed for orchestration accumulation; when required paths are missing or invalid, commands fail with actionable errors.
+- A non-demo private workspace must not resolve inside a Git checkout. External
+  workspace paths are explicit and must pass the shared storage-envelope
+  contract before a caller relies on their declared inputs or artifacts.
 - Transient operational working directories and generated artifact roots are never root-level repo paths; disposable working state uses `/scratch`, while durable orchestration state remains workspace-scoped.
 
 ## Tool/package boundaries

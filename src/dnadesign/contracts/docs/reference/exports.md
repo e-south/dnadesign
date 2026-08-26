@@ -1,7 +1,7 @@
 # Contract Exports
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-22
+**Last verified:** 2026-08-26
 
 `contracts` publishes shared cross-tool artifact schemas for `dnadesign`.
 
@@ -36,6 +36,13 @@ Generic sequence and folding contracts:
   for opaque, digest-closed RT parts, with explicit producer ownership,
   provider references, and declared CDS/protein lengths; it publishes no
   sequence bytes or provider-internal candidate ids
+
+Workspace storage contract:
+
+- `dnadesign.contracts.workspace_storage`: strict
+  `dnadesign.workspace-storage/v1` parsing and source-closed verification for an
+  explicit external workspace root; this envelope owns location, retention,
+  and digest identity without interpreting the tool-owned workspace schema
 
 Visual contracts:
 

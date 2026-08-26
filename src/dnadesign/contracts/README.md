@@ -9,4 +9,6 @@ neutral handoff without importing each other's internals.
   boundary rules.
 - [Contract exports](docs/reference/exports.md): public model names and
   domain-qualified handoff policy.
+- [External workspace storage](../../../docs/integrations/workspace-storage.md):
+  strict storage envelope and validator for private runtime workspaces.
 - [Repository docs index](../../../docs/README.md): cross-tool workflow routing.

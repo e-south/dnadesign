@@ -2,7 +2,7 @@
 doc_id: study-workspace-integration
 surface: integration-contract
 owner: dnadesign-maintainers
-last_verified: 2026-08-08
+last_verified: 2026-08-26
 ---
 
 ## External study workspaces
@@ -33,6 +33,10 @@ identity from a directory name.
   for study-owned OPAL evidence adapters.
 - Tool CLIs accept explicit workspace and configuration paths. Study packages
   should call those public surfaces rather than importing tool internals.
+- `dnadesign.contracts.workspace_storage` verifies the neutral storage envelope
+  for private or large workspace instances outside public Git checkouts. The
+  producing tool still owns the workspace schema; see
+  [external workspace storage](workspace-storage.md).
 
 Example status registration in a study package:
 

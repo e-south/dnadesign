@@ -2,14 +2,14 @@
 doc_id: architecture
 surface: system-of-record
 owner: dnadesign-maintainers
-last_verified: 2026-08-22
+last_verified: 2026-08-26
 ---
 
 # ARCHITECTURE
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-22
+**Last verified:** 2026-08-26
 
 ## At a glance
 `dnadesign` is a uv-managed monorepo of modular bioinformatics tools under `src/dnadesign/`, with shared CI/devtools and operator runbooks in `docs/`.
@@ -83,6 +83,10 @@ This file is the architecture map: it names system boundaries, major flows, and 
   through explicit workspace paths. Dnadesign does not select a global active
   study or infer one from its repository layout.
 - Tool packages own their workload configs, runtime outputs, and package-local workspace templates.
+- Private or large workspace instances may live outside public Git checkouts
+  under the neutral `dnadesign.workspace-storage/v1` envelope. The envelope
+  closes identity, ownership, retention, paths, and digests; the producing tool
+  continues to own the internal workspace schema and behavior.
 - USR owns durable dataset records and the integration event stream (`.events.log`) that downstream tooling consumes.
 - Active shared USR dataset ids are flat owner-first contracts, for example
   `densegen_prom_eth_cip_source`; provenance belongs in `root_kind`,
