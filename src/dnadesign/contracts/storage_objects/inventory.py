@@ -11,6 +11,8 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import ctypes
+import errno
 import hashlib
 import json
 import os
@@ -34,8 +36,12 @@ from .models import (
     RetentionPolicy,
     StorageClass,
     StorageObjectError,
+    StorageObjectPublicationUncertain,
+    StorageObjectPublicationUnsupported,
 )
 from .validation import resolve_storage_path, storage_file_paths, verify_storage_object
+
+_RENAME_EXCHANGE = 0x00000002
 
 
 def _sha256(path: Path) -> str:
@@ -98,26 +104,200 @@ def _rollback_manifest(
         ) from operation_error
 
 
-def _assert_manifest_commit_precondition(manifest_path: Path, *, previous_bytes: bytes | None) -> None:
-    """Require the destination to still match the state that authorized publication."""
+def _entry_identity(path: Path) -> tuple[int, int]:
+    entry_stat = path.lstat()
+    return entry_stat.st_dev, entry_stat.st_ino
 
-    if previous_bytes is None:
-        try:
-            manifest_path.lstat()
-        except FileNotFoundError:
-            return
-        except OSError as exc:
-            raise StorageObjectError(f"cannot inspect storage object manifest before publication: {exc}") from exc
-        raise StorageObjectError("storage object manifest appeared before publication; refusing to overwrite it")
 
-    if manifest_path.is_symlink():
-        raise StorageObjectError("storage object manifest changed before publication; refusing to overwrite it")
+def _fsync_directory(directory: Path) -> None:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    descriptor = os.open(directory, flags)
     try:
-        current_bytes = manifest_path.read_bytes()
-    except OSError as exc:
-        raise StorageObjectError(f"cannot read storage object manifest before publication: {exc}") from exc
-    if current_bytes != previous_bytes:
-        raise StorageObjectError("storage object manifest changed before publication; refusing to overwrite it")
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _atomic_exchange(source: Path, destination: Path) -> None:
+    """Atomically exchange two same-directory entries on supported POSIX kernels."""
+
+    if source.parent != destination.parent:
+        raise StorageObjectError("atomic manifest exchange requires same-directory entries")
+    parent_descriptor = os.open(source.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        source_bytes = os.fsencode(source.name)
+        destination_bytes = os.fsencode(destination.name)
+        if sys.platform == "darwin" and hasattr(libc, "renameatx_np"):
+            rename = libc.renameatx_np
+        elif sys.platform.startswith("linux") and hasattr(libc, "renameat2"):
+            rename = libc.renameat2
+        else:
+            raise StorageObjectPublicationUnsupported("this platform does not support atomic storage manifest exchange")
+        rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+        rename.restype = ctypes.c_int
+        result = rename(
+            parent_descriptor,
+            source_bytes,
+            parent_descriptor,
+            destination_bytes,
+            _RENAME_EXCHANGE,
+        )
+        if result == 0:
+            return
+        error = ctypes.get_errno()
+        if error in {errno.ENOSYS, errno.EOPNOTSUPP, errno.ENOTSUP, errno.EINVAL}:
+            raise StorageObjectPublicationUnsupported(
+                "this filesystem does not support atomic storage manifest exchange"
+            )
+        raise OSError(error, os.strerror(error), destination)
+    finally:
+        os.close(parent_descriptor)
+
+
+def _publish_create_only_manifest(
+    temporary: Path,
+    manifest_path: Path,
+    *,
+    manifest_bytes: bytes,
+    manifest_mode: int,
+) -> None:
+    """Publish one staged regular file without any replacement window."""
+
+    try:
+        os.link(temporary, manifest_path, follow_symlinks=False)
+    except FileExistsError as exc:
+        raise StorageObjectError(
+            "storage object manifest appeared before publication; refusing to overwrite it"
+        ) from exc
+    except NotImplementedError as publication_error:
+        _rollback_manifest(
+            manifest_path,
+            published_bytes=manifest_bytes,
+            previous_bytes=None,
+            previous_mode=manifest_mode,
+            operation_error=publication_error,
+        )
+        raise StorageObjectPublicationUnsupported(
+            "this platform does not support atomic create-only manifest publication"
+        ) from publication_error
+    except OSError as publication_error:
+        _rollback_manifest(
+            manifest_path,
+            published_bytes=manifest_bytes,
+            previous_bytes=None,
+            previous_mode=manifest_mode,
+            operation_error=publication_error,
+        )
+        if publication_error.errno in {errno.ENOSYS, errno.EOPNOTSUPP, errno.ENOTSUP, errno.EPERM}:
+            raise StorageObjectPublicationUnsupported(
+                "this filesystem does not support atomic create-only manifest publication"
+            ) from publication_error
+        raise
+    except BaseException as publication_error:
+        _rollback_manifest(
+            manifest_path,
+            published_bytes=manifest_bytes,
+            previous_bytes=None,
+            previous_mode=manifest_mode,
+            operation_error=publication_error,
+        )
+        raise
+    try:
+        _fsync_directory(manifest_path.parent)
+        temporary.unlink()
+        _fsync_directory(manifest_path.parent)
+    except BaseException as publication_error:
+        _rollback_manifest(
+            manifest_path,
+            published_bytes=manifest_bytes,
+            previous_bytes=None,
+            previous_mode=manifest_mode,
+            operation_error=publication_error,
+        )
+        raise
+
+
+def _publish_refresh_manifest(
+    temporary: Path,
+    manifest_path: Path,
+    *,
+    previous_bytes: bytes,
+) -> None:
+    """Exchange the staged receipt, validate the displaced receipt, and commit or swap back."""
+
+    staged_identity = _entry_identity(temporary)
+    exchange_error: BaseException | None = None
+    try:
+        _atomic_exchange(temporary, manifest_path)
+    except BaseException as exc:
+        exchange_error = exc
+        try:
+            exchanged = _entry_identity(manifest_path) == staged_identity
+        except OSError as identity_error:
+            raise StorageObjectPublicationUncertain(
+                "atomic storage manifest exchange failed with an uncertain publication outcome"
+            ) from identity_error
+        if not exchanged:
+            raise
+
+    try:
+        displaced_stat = temporary.lstat()
+        if not stat.S_ISREG(displaced_stat.st_mode):
+            raise StorageObjectError("storage object manifest changed before publication; refusing to overwrite it")
+        displaced_bytes = temporary.read_bytes()
+        if displaced_bytes != previous_bytes:
+            raise StorageObjectError("storage object manifest changed before publication; refusing to overwrite it")
+        if exchange_error is not None:
+            raise exchange_error
+        if _entry_identity(manifest_path) != staged_identity:
+            raise StorageObjectPublicationUncertain(
+                "storage object manifest changed after atomic exchange; publication outcome is uncertain"
+            )
+        _fsync_directory(manifest_path.parent)
+        temporary.unlink()
+        _fsync_directory(manifest_path.parent)
+        return
+    except BaseException as publication_error:
+        displaced_identity: tuple[int, int] | None
+        try:
+            displaced_identity = _entry_identity(temporary)
+        except OSError:
+            displaced_identity = None
+        try:
+            _atomic_exchange(temporary, manifest_path)
+        except BaseException as rollback_error:
+            try:
+                rollback_succeeded = (
+                    displaced_identity is not None
+                    and _entry_identity(manifest_path) == displaced_identity
+                    and _entry_identity(temporary) == staged_identity
+                )
+            except OSError:
+                rollback_succeeded = False
+            if not rollback_succeeded:
+                raise StorageObjectPublicationUncertain(
+                    "atomic storage manifest rollback failed; publication outcome is uncertain"
+                ) from rollback_error
+        try:
+            if displaced_identity is None or _entry_identity(manifest_path) != displaced_identity:
+                raise StorageObjectPublicationUncertain(
+                    "atomic storage manifest rollback restored an unexpected receipt; outcome is uncertain"
+                )
+            if _entry_identity(temporary) != staged_identity:
+                raise StorageObjectPublicationUncertain(
+                    "atomic storage manifest rollback displaced unrelated receipt bytes; outcome is uncertain"
+                )
+            _fsync_directory(manifest_path.parent)
+            temporary.unlink()
+            _fsync_directory(manifest_path.parent)
+        except StorageObjectPublicationUncertain:
+            raise
+        except BaseException as cleanup_error:
+            raise StorageObjectPublicationUncertain(
+                "atomic storage manifest rollback completed but cleanup outcome is uncertain"
+            ) from cleanup_error
+        raise publication_error
 
 
 def _write_manifest(
@@ -132,8 +312,8 @@ def _write_manifest(
     descriptor = -1
     temporary: Path | None = None
     temporary_created = False
+    preserve_temporary = False
     previous_mode: int
-    replace_started = False
     try:
         if previous_bytes is not None:
             previous_mode = stat.S_IMODE(manifest_path.stat(follow_symlinks=False).st_mode)
@@ -149,24 +329,32 @@ def _write_manifest(
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             descriptor = -1
             handle.write(manifest_text)
+            handle.flush()
+            os.fsync(handle.fileno())
         if previous_mode is not None:
             temporary.chmod(previous_mode, follow_symlinks=False)
-        _assert_manifest_commit_precondition(manifest_path, previous_bytes=previous_bytes)
-        replace_started = True
-        os.replace(temporary, manifest_path)
+        if previous_bytes is None:
+            _publish_create_only_manifest(
+                temporary,
+                manifest_path,
+                manifest_bytes=manifest_bytes,
+                manifest_mode=previous_mode,
+            )
+        else:
+            try:
+                _publish_refresh_manifest(
+                    temporary,
+                    manifest_path,
+                    previous_bytes=previous_bytes,
+                )
+            except StorageObjectPublicationUncertain:
+                preserve_temporary = True
+                raise
     except BaseException as write_error:
         if descriptor >= 0:
             os.close(descriptor)
-        if temporary_created and temporary is not None:
+        if temporary_created and temporary is not None and not preserve_temporary:
             temporary.unlink(missing_ok=True)
-        if replace_started:
-            _rollback_manifest(
-                manifest_path,
-                published_bytes=manifest_bytes,
-                previous_bytes=previous_bytes,
-                previous_mode=previous_mode,
-                operation_error=write_error,
-            )
         if isinstance(write_error, OSError):
             raise StorageObjectError(f"cannot write storage object manifest: {write_error}") from write_error
         raise

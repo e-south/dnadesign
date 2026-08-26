@@ -26,6 +26,14 @@ class StorageObjectError(ValueError):
     """Raised when a storage object or root violates its explicit contract."""
 
 
+class StorageObjectPublicationUnsupported(StorageObjectError):
+    """Raised when the filesystem lacks a required atomic publication primitive."""
+
+
+class StorageObjectPublicationUncertain(StorageObjectError):
+    """Raised when an interrupted atomic operation cannot prove the winning receipt."""
+
+
 class ObjectKind(StrEnum):
     """Physical storage shelf without importing tool-owned content meaning."""
 

@@ -113,7 +113,15 @@ group-writable so collaborating accounts can participate in the same
 coordination boundary. Declared resource files must inherit that group and be
 group-readable; their parent directories must inherit the group and be
 group-readable and traversable. Manifest staging occurs inside the object so
-the atomic replacement stays on the same filesystem. A pre-existing
+publication stays on the same filesystem. Create-only inventory commits with
+an atomic hard-link-if-absent operation. Refresh commits with a native atomic
+file exchange on Darwin or Linux, validates the displaced receipt against the
+exact bytes that authorized the refresh, and swaps it back on mismatch. A
+platform or filesystem without the required primitive fails closed as
+`StorageObjectPublicationUnsupported`. If an exchange cannot prove that its
+swap-back completed, it raises `StorageObjectPublicationUncertain` and retains
+both named files for explicit recovery rather than guessing which receipt may
+be deleted. A pre-existing
 staging-shaped name fails closed for explicit operator inspection; the tool
 never guesses that such bytes are safe to delete. Independently synced replicas,
 including separate Dropbox clients, are not one shared

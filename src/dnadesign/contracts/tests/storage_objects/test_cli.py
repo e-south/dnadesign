@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import stat
@@ -25,6 +26,8 @@ import dnadesign.contracts.storage_objects.inventory as storage_inventory
 from dnadesign.contracts.storage_objects import (
     MANIFEST_NAME,
     StorageObjectError,
+    StorageObjectPublicationUncertain,
+    StorageObjectPublicationUnsupported,
     inventory_storage_object,
     refresh_storage_object,
 )
@@ -1294,17 +1297,22 @@ def test_inventory_refuses_manifest_created_before_publication(
     (root / "payload.txt").write_text("payload\n", encoding="utf-8")
     manifest_path = root / MANIFEST_NAME
     external_bytes = b'{"external":"receipt"}\n'
-    original_chmod = Path.chmod
+    original_link = storage_inventory.os.link
     injected = False
 
-    def _create_external_receipt(path: Path, mode: int, *, follow_symlinks: bool = True) -> None:
+    def _link_after_competing_receipt(
+        source: Path,
+        destination: Path,
+        *,
+        follow_symlinks: bool = True,
+    ) -> None:
         nonlocal injected
-        original_chmod(path, mode, follow_symlinks=follow_symlinks)
-        if path.name.startswith(f".{MANIFEST_NAME}.tmp-") and not injected:
+        if Path(destination) == manifest_path and not injected:
             injected = True
             manifest_path.write_bytes(external_bytes)
+        original_link(source, destination, follow_symlinks=follow_symlinks)
 
-    monkeypatch.setattr(Path, "chmod", _create_external_receipt)
+    monkeypatch.setattr(storage_inventory.os, "link", _link_after_competing_receipt)
 
     with pytest.raises(StorageObjectError, match="manifest appeared before publication"):
         inventory_storage_object(
@@ -1350,24 +1358,23 @@ def test_refresh_hashes_and_parses_one_snapshot_then_rejects_manifest_replaced_b
     replacement["owner_tool"] = "replacement-owner"
     replacement_bytes = (json.dumps(replacement, indent=2, sort_keys=True) + "\n").encode("utf-8")
     expected_digest = _digest(manifest_path)
-    original_read_bytes = Path.read_bytes
+    original_exchange = storage_inventory._atomic_exchange
     original_load = storage_inventory.load_storage_object_manifest_bytes
     parsed_snapshots: list[bytes] = []
-    swapped = False
+    injected = False
 
-    def _read_bytes(path: Path) -> bytes:
-        nonlocal swapped
-        content = original_read_bytes(path)
-        if path == manifest_path and not swapped:
-            swapped = True
-            path.write_bytes(replacement_bytes)
-        return content
+    def _exchange_after_competing_receipt(source: Path, destination: Path) -> None:
+        nonlocal injected
+        if destination == manifest_path and not injected:
+            injected = True
+            manifest_path.write_bytes(replacement_bytes)
+        original_exchange(source, destination)
 
     def _record_parsed_snapshot(content: bytes, *, source_label: str) -> object:
         parsed_snapshots.append(content)
         return original_load(content, source_label=source_label)
 
-    monkeypatch.setattr(Path, "read_bytes", _read_bytes)
+    monkeypatch.setattr(storage_inventory, "_atomic_exchange", _exchange_after_competing_receipt)
     monkeypatch.setattr(storage_inventory, "load_storage_object_manifest_bytes", _record_parsed_snapshot)
 
     with pytest.raises(StorageObjectError, match="manifest changed before publication"):
@@ -1378,8 +1385,136 @@ def test_refresh_hashes_and_parses_one_snapshot_then_rejects_manifest_replaced_b
         )
 
     assert parsed_snapshots == [initial_bytes]
-    assert original_read_bytes(manifest_path) == replacement_bytes
+    assert injected
+    assert manifest_path.read_bytes() == replacement_bytes
     assert not tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+
+
+def test_refresh_reports_typed_unsupported_platform_without_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    previous_bytes = manifest_path.read_bytes()
+    monkeypatch.setattr(storage_inventory.sys, "platform", "unsupported")
+
+    with pytest.raises(
+        StorageObjectPublicationUnsupported,
+        match="does not support atomic storage manifest exchange",
+    ):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert manifest_path.read_bytes() == previous_bytes
+    assert not tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+
+
+def test_inventory_reports_typed_unsupported_hard_link_without_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+
+    def _unsupported_link(*_args: object, **_kwargs: object) -> None:
+        raise OSError(errno.EOPNOTSUPP, "injected unsupported hard link")
+
+    monkeypatch.setattr(storage_inventory.os, "link", _unsupported_link)
+
+    with pytest.raises(
+        StorageObjectPublicationUnsupported,
+        match="does not support atomic create-only manifest publication",
+    ):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert not (root / MANIFEST_NAME).exists()
+    assert not tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+
+
+def test_refresh_preserves_both_receipts_when_atomic_swap_back_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    replacement = json.loads(manifest_path.read_bytes())
+    replacement["owner_tool"] = "replacement-owner"
+    replacement_bytes = (json.dumps(replacement, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    expected_digest = _digest(manifest_path)
+    original_exchange = storage_inventory._atomic_exchange
+    exchange_calls = 0
+
+    def _fail_swap_back(source: Path, destination: Path) -> None:
+        nonlocal exchange_calls
+        exchange_calls += 1
+        if exchange_calls == 1:
+            destination.write_bytes(replacement_bytes)
+            original_exchange(source, destination)
+            return
+        raise OSError("injected atomic swap-back failure")
+
+    monkeypatch.setattr(storage_inventory, "_atomic_exchange", _fail_swap_back)
+
+    with pytest.raises(
+        StorageObjectPublicationUncertain,
+        match="rollback failed.*outcome is uncertain",
+    ):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=expected_digest,
+            producer_revision="test-revision-2",
+        )
+
+    assert exchange_calls == 2
+    published = json.loads(manifest_path.read_bytes())
+    assert published["producer_revision"] == "test-revision-2"
+    staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert len(staging) == 1
+    assert staging[0].read_bytes() == replacement_bytes
 
 
 def test_refresh_restores_manifest_when_verification_is_interrupted(
@@ -1449,20 +1584,25 @@ def test_inventory_removes_manifest_when_verification_is_interrupted(
     assert not (root / MANIFEST_NAME).exists()
 
 
-def test_inventory_rolls_back_when_atomic_replace_is_interrupted(
+def test_inventory_rolls_back_when_atomic_link_publication_is_interrupted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = tmp_path / "pilot"
     root.mkdir()
     (root / "payload.txt").write_text("payload\n", encoding="utf-8")
-    original_replace = storage_inventory.os.replace
+    original_link = storage_inventory.os.link
 
-    def _interrupt_after_replace(source: Path, destination: Path) -> None:
-        original_replace(source, destination)
+    def _interrupt_after_link(
+        source: Path,
+        destination: Path,
+        *,
+        follow_symlinks: bool = True,
+    ) -> None:
+        original_link(source, destination, follow_symlinks=follow_symlinks)
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(storage_inventory.os, "replace", _interrupt_after_replace)
+    monkeypatch.setattr(storage_inventory.os, "link", _interrupt_after_link)
 
     with pytest.raises(KeyboardInterrupt):
         inventory_storage_object(
@@ -1481,7 +1621,7 @@ def test_inventory_rolls_back_when_atomic_replace_is_interrupted(
     assert not (root / MANIFEST_NAME).exists()
 
 
-def test_refresh_rolls_back_when_atomic_replace_is_interrupted(
+def test_refresh_swaps_back_when_atomic_exchange_is_interrupted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1502,14 +1642,17 @@ def test_refresh_rolls_back_when_atomic_replace_is_interrupted(
     )
     manifest_path = root / MANIFEST_NAME
     previous_bytes = manifest_path.read_bytes()
-    original_replace = storage_inventory.os.replace
+    original_exchange = storage_inventory._atomic_exchange
+    exchange_calls = 0
 
-    def _interrupt_after_replace(source: Path, destination: Path) -> None:
-        original_replace(source, destination)
-        if Path(source).name.startswith(f".{MANIFEST_NAME}.tmp-"):
+    def _interrupt_after_exchange(source: Path, destination: Path) -> None:
+        nonlocal exchange_calls
+        exchange_calls += 1
+        original_exchange(source, destination)
+        if exchange_calls == 1:
             raise KeyboardInterrupt
 
-    monkeypatch.setattr(storage_inventory.os, "replace", _interrupt_after_replace)
+    monkeypatch.setattr(storage_inventory, "_atomic_exchange", _interrupt_after_exchange)
 
     with pytest.raises(KeyboardInterrupt):
         refresh_storage_object(
@@ -1519,6 +1662,7 @@ def test_refresh_rolls_back_when_atomic_replace_is_interrupted(
         )
 
     assert manifest_path.read_bytes() == previous_bytes
+    assert exchange_calls == 2
 
 
 def test_refresh_rejects_duplicate_resource_paths_before_collapsing_roles(tmp_path: Path) -> None:
