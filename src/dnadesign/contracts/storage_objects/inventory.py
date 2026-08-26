@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import stat
 from pathlib import Path
 
 from filelock import FileLock, Timeout
@@ -49,9 +50,14 @@ def _write_manifest(
 ) -> dict[str, object]:
     manifest_text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     temporary = manifest_path.parent / f".{MANIFEST_NAME}.tmp"
+    previous_mode: int | None = None
     try:
+        if previous_bytes is not None:
+            previous_mode = stat.S_IMODE(manifest_path.stat(follow_symlinks=False).st_mode)
         with temporary.open("x", encoding="utf-8") as handle:
             handle.write(manifest_text)
+        if previous_mode is not None:
+            temporary.chmod(previous_mode, follow_symlinks=False)
         os.replace(temporary, manifest_path)
     except OSError as exc:
         temporary.unlink(missing_ok=True)
@@ -70,6 +76,8 @@ def _write_manifest(
             manifest_path.unlink(missing_ok=True)
         else:
             manifest_path.write_bytes(previous_bytes)
+            if previous_mode is not None:
+                manifest_path.chmod(previous_mode, follow_symlinks=False)
         raise
 
 
@@ -187,6 +195,8 @@ def refresh_storage_object(
     if requested_root.is_symlink():
         raise StorageObjectError(f"storage object root must not be a symlink: {requested_root}")
     root = requested_root.resolve()
+    if not root.is_dir():
+        raise StorageObjectError(f"storage object root is not a directory: {root}")
     try:
         with _manifest_lock(root):
             manifest_path = root / MANIFEST_NAME

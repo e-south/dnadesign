@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import stat
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -257,6 +258,56 @@ def test_refresh_requires_prior_receipt_and_preserves_protected_roles(tmp_path: 
         "outputs/new.txt": "artifact",
         "outputs/result.json": "artifact",
     }
+
+
+def test_refresh_preserves_existing_manifest_permissions(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    manifest_path.chmod(0o640)
+    expected_digest = _digest(manifest_path)
+    (root / "result.txt").write_text("result\n", encoding="utf-8")
+
+    refresh_storage_object(root, expected_manifest_digest=expected_digest)
+
+    assert stat.S_IMODE(manifest_path.stat().st_mode) == 0o640
+
+
+def test_refresh_rejects_missing_root_without_traceback(tmp_path: Path) -> None:
+    root = tmp_path / "missing"
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "dnadesign.contracts.storage_objects",
+            "refresh",
+            str(root),
+            "--expected-manifest-digest",
+            "sha256:" + "0" * 64,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 2
+    assert "storage object root is not a directory" in completed.stderr
+    assert "Traceback" not in completed.stderr
+    assert not (root / LOCK_NAME).exists()
 
 
 def test_inventory_and_refresh_reject_symlinked_object_root(tmp_path: Path) -> None:
