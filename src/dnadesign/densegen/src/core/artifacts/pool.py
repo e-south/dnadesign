@@ -26,10 +26,11 @@ from ...config import resolve_relative_path
 from ...core.stage_a_constants import FIMO_REPORT_THRESH
 from ...utils.logging_utils import install_native_stderr_filters
 from ..input_types import PWM_INPUT_TYPES
+from ..stage_a.stage_a_selection import CORE_REPRESENTATIVE_POLICY
 from ..stage_a.stage_a_summary import PWMSamplingSummary
 from .ids import hash_tfbs_id
 
-POOL_SCHEMA_VERSION = "1.6"
+POOL_SCHEMA_VERSION = "1.7"
 POOL_MODE_TFBS = "tfbs"
 POOL_MODE_SEQUENCE = "sequence"
 _SAFE_FILENAME_RE = re.compile(r"[^A-Za-z0-9_.-]+")
@@ -41,7 +42,10 @@ def _sanitize_filename(name: str) -> str:
 
 
 def _hash_pool_config(cfg) -> str:
-    payload = [inp.model_dump(mode="json") for inp in sorted(cfg.inputs, key=lambda item: item.name)]
+    payload = {
+        "inputs": [inp.model_dump(mode="json") for inp in sorted(cfg.inputs, key=lambda item: item.name)],
+        "runtime_random_seed": int(cfg.runtime.random_seed),
+    }
     blob = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(blob).hexdigest()
 
@@ -251,6 +255,7 @@ def pool_status_by_input(cfg, cfg_path: Path, run_root: Path) -> dict[str, PoolI
 def _build_stage_a_sampling_manifest(
     summaries: list[object] | None,
     *,
+    runtime_random_seed: int,
     bgfile: str | None = None,
     bgfile_by_regulator: dict[str, str] | None = None,
 ) -> dict | None:
@@ -411,6 +416,8 @@ def _build_stage_a_sampling_manifest(
         "retention_rule": "top_n_sites_by_best_hit_score",
         "fimo_thresh": FIMO_REPORT_THRESH,
         "uniqueness_key": uniqueness_key,
+        "core_representative_policy": CORE_REPRESENTATIVE_POLICY if uniqueness_key == "core" else None,
+        "runtime_random_seed": int(runtime_random_seed),
         "selection_policy": selection_policy,
         "selection_alpha": selection_alpha_value,
         "selection_similarity": selection_similarity_value,
@@ -698,6 +705,7 @@ def build_pool_artifact(
                 bgfile_by_regulator[str(motif_id)] = str(override_bgfile)
         stage_a_sampling = _build_stage_a_sampling_manifest(
             summaries,
+            runtime_random_seed=int(cfg.runtime.random_seed),
             bgfile=str(base_bgfile) if base_bgfile is not None else None,
             bgfile_by_regulator=bgfile_by_regulator or None,
         )

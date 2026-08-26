@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -20,7 +21,7 @@ import yaml
 
 from dnadesign.densegen.src.adapters.sources.base import BaseDataSource
 from dnadesign.densegen.src.config import load_config
-from dnadesign.densegen.src.core.artifacts.pool import build_pool_artifact
+from dnadesign.densegen.src.core.artifacts.pool import _hash_pool_config, build_pool_artifact
 from dnadesign.densegen.src.core.pipeline import PipelineDeps, default_deps
 from dnadesign.densegen.src.core.stage_a.stage_a_metrics import (
     CoreHammingSummary,
@@ -232,6 +233,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
                     },
                     "solver": {"backend": "CBC", "strategy": "iterate"},
                     "runtime": {
+                        "random_seed": 17,
                         "round_robin": False,
                         "max_accepted_per_library": 10,
                         "min_count_per_tf": 0,
@@ -272,6 +274,7 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     )
 
     manifest = json.loads((out_dir / "pool_manifest.json").read_text())
+    assert manifest["schema_version"] == "1.7"
     entry = manifest["inputs"][0]
     stage_a_sampling = entry.get("stage_a_sampling")
     assert stage_a_sampling is not None
@@ -283,6 +286,8 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     assert stage_a_sampling["retention_rule"] == "top_n_sites_by_best_hit_score"
     assert stage_a_sampling["fimo_thresh"] == 1.0
     assert stage_a_sampling["uniqueness_key"] == "core"
+    assert stage_a_sampling["core_representative_policy"] == "seeded_random_max_score_v1"
+    assert stage_a_sampling["runtime_random_seed"] == 17
     assert stage_a_sampling["bgfile"] == "inputs/bg.txt"
     assert stage_a_sampling["background_source"] == "bgfile"
     hist = stage_a_sampling["eligible_score_hist"]
@@ -315,3 +320,19 @@ def test_pool_manifest_includes_stage_a_sampling(tmp_path: Path) -> None:
     assert hist[0]["trim_window_score"] == 1.23
     assert hist[0]["trimmed_width"] == 16
     assert hist[0]["trim_window_applied"] is True
+
+
+class _InputConfig:
+    name = "demo_pwm"
+
+    def model_dump(self, *, mode: str) -> dict[str, str]:
+        assert mode == "json"
+        return {"name": self.name, "type": "pwm_meme"}
+
+
+def test_pool_config_hash_includes_runtime_random_seed() -> None:
+    inputs = [_InputConfig()]
+    first = SimpleNamespace(inputs=inputs, runtime=SimpleNamespace(random_seed=17))
+    second = SimpleNamespace(inputs=inputs, runtime=SimpleNamespace(random_seed=29))
+
+    assert _hash_pool_config(first) != _hash_pool_config(second)
