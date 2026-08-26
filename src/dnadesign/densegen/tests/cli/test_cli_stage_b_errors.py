@@ -103,7 +103,7 @@ def _write_pool_manifest(tmp_path: Path) -> Path:
     pool_path = pools_dir / "demo_input__pool.parquet"
     df.to_parquet(pool_path, index=False)
     manifest = {
-        "schema_version": "1.6",
+        "schema_version": "1.7",
         "run_id": "demo",
         "run_root": ".",
         "config_path": "config.yaml",
