@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+import dnadesign.thread.adapters.ligandmpnn.context_probe as context_probe_module
 from dnadesign.thread.adapters.ligandmpnn import (
     LigandMpnnContextInventoryReference,
     LigandMpnnContextPolymer,
@@ -314,6 +315,42 @@ def test_probe_command_is_explicit_and_portable(tmp_path: Path) -> None:
     assert command.argv[command.argv.index("--upstream-commit") + 1] == commit
     assert command.argv[command.argv.index("--minimum-nucleotide-atoms") + 1] == "1"
     assert command.argv[command.argv.index("--required-polymer-types") + 1] == "dna,rna"
+
+
+def test_probe_command_preserves_blank_chain_selection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit = _fake_upstream_checkout(tmp_path)
+    request = _request(tmp_path, checkout, commit)
+    request = LigandMpnnContextProbeRequest(
+        request_id=request.request_id,
+        pdb_path=request.pdb_path,
+        pdb_sha256=request.pdb_sha256,
+        output_path=request.output_path,
+        upstream=request.upstream,
+        minimum_nucleotide_atoms=request.minimum_nucleotide_atoms,
+        required_polymer_types=request.required_polymer_types,
+        chains=("",),
+        parse_all_atoms=request.parse_all_atoms,
+        parse_atoms_with_zero_occupancy=request.parse_atoms_with_zero_occupancy,
+    )
+
+    command = build_ligandmpnn_context_probe_command(request, checkout_root=checkout)
+    observed: list[LigandMpnnContextProbeRequest] = []
+
+    def _capture(
+        parsed_request: LigandMpnnContextProbeRequest,
+        **_kwargs: object,
+    ) -> LigandMpnnContextInventoryReference:
+        observed.append(parsed_request)
+        return LigandMpnnContextInventoryReference(path=parsed_request.output_path, sha256=_DIGEST)
+
+    monkeypatch.setattr(context_probe_module, "materialize_ligandmpnn_context_inventory", _capture)
+
+    assert command.argv[command.argv.index("--chain") + 1] == ""
+    assert context_probe_module._main(list(command.argv[3:])) == 0
+    assert observed[0].chains == ("",)
 
 
 def test_reference_rejects_unsafe_paths_and_non_digests() -> None:

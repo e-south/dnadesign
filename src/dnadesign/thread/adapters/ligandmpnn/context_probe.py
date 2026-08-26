@@ -130,13 +130,13 @@ def build_ligandmpnn_context_probe_command(
         str(request.minimum_nucleotide_atoms),
         "--required-polymer-types",
         ",".join(item.value for item in request.required_polymer_types),
-        "--chains",
-        ",".join(request.chains),
         "--parse-all-atoms",
         _flag(request.parse_all_atoms),
         "--parse-atoms-with-zero-occupancy",
         _flag(request.parse_atoms_with_zero_occupancy),
     ]
+    for chain in request.chains:
+        argv.extend(["--chain", chain])
     return LigandMpnnContextProbeCommand(output_path=request.output_path, argv=tuple(argv))
 
 
@@ -459,7 +459,7 @@ def _main(argv: list[str] | None = None) -> int:
     materialize.add_argument("--output-path", type=Path, required=True)
     materialize.add_argument("--minimum-nucleotide-atoms", type=int, required=True)
     materialize.add_argument("--required-polymer-types", default="")
-    materialize.add_argument("--chains", default="")
+    materialize.add_argument("--chain", action="append", dest="chains")
     materialize.add_argument("--parse-all-atoms", type=_parse_bool_flag, required=True)
     materialize.add_argument("--parse-atoms-with-zero-occupancy", type=_parse_bool_flag, required=True)
     args = parser.parse_args(argv)
@@ -472,7 +472,7 @@ def _main(argv: list[str] | None = None) -> int:
         upstream=LigandMpnnUpstreamPin(commit=args.upstream_commit, checkpoint_sha256="0" * 64),
         minimum_nucleotide_atoms=args.minimum_nucleotide_atoms,
         required_polymer_types=required,
-        chains=tuple(item for item in args.chains.split(",") if item),
+        chains=tuple(args.chains or ()),
         parse_all_atoms=args.parse_all_atoms,
         parse_atoms_with_zero_occupancy=args.parse_atoms_with_zero_occupancy,
     )

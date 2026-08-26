@@ -148,6 +148,14 @@ def test_redesigned_residues_use_the_distinct_official_flag() -> None:
     assert argv[argv.index("--pack_side_chains") + 1] == "0"
 
 
+def test_command_preserves_requested_temperature_precision() -> None:
+    request = _request(temperature=0.123456789)
+
+    argv = build_ligandmpnn_commands(request, checkout_root=Path("tool"))[0].argv
+
+    assert argv[argv.index("--temperature") + 1] == "0.123456789"
+
+
 @pytest.mark.parametrize(
     ("overrides", "message"),
     [
@@ -172,8 +180,10 @@ def test_request_rejects_ambiguous_or_nondeterministic_inputs(overrides: dict[st
 def test_residue_identifier_rejects_non_pdb_chain_or_insertion_codes() -> None:
     with pytest.raises(ValueError, match="chain_id must be one alphanumeric character"):
         LigandMpnnResidue(chain_id="AA", residue_number=1)
-    with pytest.raises(ValueError, match="insertion_code must be one alphanumeric character"):
+    with pytest.raises(ValueError, match="insertion_code must be one ASCII letter"):
         LigandMpnnResidue(chain_id="A", residue_number=1, insertion_code="BC")
+    with pytest.raises(ValueError, match="insertion_code must be one ASCII letter"):
+        LigandMpnnResidue(chain_id="A", residue_number=1, insertion_code="2")
 
 
 def test_planned_receipt_is_normalized_and_records_no_execution_claim(tmp_path: Path) -> None:

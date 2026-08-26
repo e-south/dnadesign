@@ -36,8 +36,8 @@ class LigandMpnnResidue:
     def __post_init__(self) -> None:
         if len(self.chain_id) != 1 or not self.chain_id.isalnum():
             raise ValueError("chain_id must be one alphanumeric character")
-        if self.insertion_code and (len(self.insertion_code) != 1 or not self.insertion_code.isalnum()):
-            raise ValueError("insertion_code must be one alphanumeric character")
+        if self.insertion_code and re.fullmatch(r"[A-Za-z]", self.insertion_code) is None:
+            raise ValueError("insertion_code must be one ASCII letter")
         if isinstance(self.residue_number, bool) or not isinstance(self.residue_number, int):
             raise ValueError("residue_number must be an integer")
 

@@ -59,7 +59,7 @@ def build_ligandmpnn_commands(
             "--seed",
             str(seed),
             "--temperature",
-            f"{request.temperature:g}",
+            str(request.temperature),
             "--batch_size",
             str(request.batch_size),
             "--number_of_batches",
