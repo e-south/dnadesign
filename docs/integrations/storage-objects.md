@@ -170,9 +170,9 @@ tool must still load its own config or store schema and perform its normal
 semantic preflight before execution. Validation makes two complete digest and
 closure passes and rejects observed drift, but producers must still be
 quiescent or participate in their own transaction or locking contract while a
-receipt is verified. Root validation also rechecks each verified receipt digest
-before returning, so a refresh observed while later objects are checked fails
-closed instead of returning a stale root snapshot.
+receipt is verified. Root validation also fully revalidates each object before
+returning, so receipt or resource drift observed while later objects are
+checked fails closed instead of returning a stale root snapshot.
 
 ### Adoption order
 

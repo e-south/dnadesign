@@ -554,8 +554,15 @@ def verify_storage_root(storage_root: Path) -> VerifiedStorageRoot:
             raise StorageObjectError(f"storage identity is duplicated: {identity}")
         identities.add(identity)
         objects.append(verified)
+    revalidated_objects: list[VerifiedStorageObject] = []
     for verified in objects:
         _recheck_verified_manifest(verified)
+        revalidated = verify_storage_object(verified.root)
+        if revalidated.manifest_digest != verified.manifest_digest:
+            raise StorageObjectError(
+                "storage object manifest changed during root validation; retry while producers are quiescent"
+            )
+        revalidated_objects.append(revalidated)
     if routes != _routed_object_directories(root):
         raise StorageObjectError("storage root changed during validation; retry while object routing is quiescent")
-    return VerifiedStorageRoot(root=root, objects=tuple(objects))
+    return VerifiedStorageRoot(root=root, objects=tuple(revalidated_objects))

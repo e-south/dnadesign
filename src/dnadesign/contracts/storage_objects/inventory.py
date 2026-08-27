@@ -235,12 +235,26 @@ def _rollback_create_only_manifest(
     os.close(descriptor)
     quarantine = Path(quarantine_name)
     quarantine.unlink()
+    published_identity = _entry_identity(manifest_path)
     try:
         _atomic_move_no_replace(manifest_path, quarantine)
     except FileNotFoundError:
         return
     except BaseException:
-        quarantine.unlink(missing_ok=True)
+        try:
+            _entry_identity(manifest_path)
+        except FileNotFoundError:
+            try:
+                owns_quarantine = (
+                    _entry_identity(quarantine) == published_identity and quarantine.read_bytes() == published_bytes
+                )
+            except BaseException:
+                owns_quarantine = False
+        else:
+            owns_quarantine = False
+        if owns_quarantine:
+            quarantine.unlink()
+            _fsync_directory(manifest_path.parent)
         raise
 
     try:

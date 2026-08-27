@@ -2304,6 +2304,50 @@ def test_inventory_rollback_preserves_receipt_replaced_at_commit_boundary(
     assert not tuple(root.glob(f".{MANIFEST_NAME}.rollback-*"))
 
 
+def test_inventory_rollback_preserves_quarantine_name_collision(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    collision_bytes = b"competing recovery bytes\n"
+    collision_path: Path | None = None
+    original_move = storage_inventory._atomic_move_no_replace
+
+    def _move_after_collision(source: Path, destination: Path) -> None:
+        nonlocal collision_path
+        if source == manifest_path and destination.name.startswith(f".{MANIFEST_NAME}.rollback-"):
+            destination.write_bytes(collision_bytes)
+            collision_path = destination
+        original_move(source, destination)
+
+    def _fail_verification(*_args: object, **_kwargs: object) -> None:
+        raise StorageObjectError("injected validation failure")
+
+    monkeypatch.setattr(storage_inventory, "_atomic_move_no_replace", _move_after_collision)
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _fail_verification)
+
+    with pytest.raises(StorageObjectError, match="manifest rollback failed"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert collision_path is not None
+    assert collision_path.read_bytes() == collision_bytes
+    assert manifest_path.is_file()
+
+
 def test_refresh_swaps_back_when_atomic_exchange_is_interrupted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
