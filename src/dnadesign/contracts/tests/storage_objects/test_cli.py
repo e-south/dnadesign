@@ -1754,8 +1754,9 @@ def test_inventory_rejects_reserved_staging_snapshot_despite_guard_aba(
     guard_calls = 0
 
     def _storage_file_paths(storage_root: Path) -> tuple[Path, ...]:
+        files = original_storage_file_paths(storage_root)
         recovery.write_text("recoverable receipt\n", encoding="utf-8")
-        return original_storage_file_paths(storage_root)
+        return (*files, recovery)
 
     def _staging_guard(storage_root: Path) -> None:
         nonlocal guard_calls
@@ -1890,6 +1891,77 @@ def test_refresh_rejects_reserved_staging_created_during_resource_enumeration(
     assert injected
     assert manifest_path.read_bytes() == original_manifest
     assert recovery.read_text(encoding="utf-8") == "recoverable receipt\n"
+
+
+@pytest.mark.parametrize("operation", ["inventory", "refresh"])
+@pytest.mark.parametrize("namespace", ["tmp", "restore", "rollback"])
+def test_writers_reject_empty_reserved_directory_created_after_staging_guard(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+    namespace: str,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    if operation == "refresh":
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+        prior_manifest = manifest_path.read_bytes()
+    else:
+        prior_manifest = None
+    recovery = root / f".{MANIFEST_NAME}.{namespace}-raced-directory"
+    original_resource_guard = storage_inventory._assert_no_ambiguous_manifest_resources
+    injected = False
+
+    def _resource_guard(storage_root: Path, files: tuple[Path, ...]) -> None:
+        nonlocal injected
+        if not injected:
+            recovery.mkdir()
+            injected = True
+        original_resource_guard(storage_root, files)
+
+    monkeypatch.setattr(storage_inventory, "_assert_no_ambiguous_manifest_resources", _resource_guard)
+
+    with pytest.raises(StorageObjectError, match=r"ambiguous manifest staging state.*raced-directory"):
+        if operation == "inventory":
+            inventory_storage_object(
+                root,
+                storage_id="pilot",
+                owner_repository="dnadesign",
+                owner_tool="cruncher",
+                object_kind="workspace",
+                content_schema="cruncher.workspace",
+                content_schema_version="1",
+                producer_revision="test-revision-1",
+                storage_class="reproducible",
+                retention_policy="review-before-delete",
+            )
+        else:
+            refresh_storage_object(
+                root,
+                expected_manifest_digest=_digest(manifest_path),
+                producer_revision="test-revision-2",
+            )
+
+    assert injected
+    assert recovery.is_dir()
+    assert not tuple(recovery.iterdir())
+    if prior_manifest is None:
+        assert not manifest_path.exists()
+    else:
+        assert manifest_path.read_bytes() == prior_manifest
 
 
 def test_refresh_rejects_missing_root_without_traceback(tmp_path: Path) -> None:
@@ -2949,7 +3021,10 @@ def test_validation_rejects_transient_refresh_candidate_until_cas_finishes(
         )
         assert exchange_paused.wait(timeout=5)
         try:
-            with pytest.raises(StorageObjectError, match=r"undeclared files: \.storage\.object\.json\.tmp-"):
+            with pytest.raises(
+                StorageObjectError,
+                match=r"ambiguous manifest staging state.*\.storage\.object\.json\.tmp-",
+            ):
                 verify_storage_object(root)
         finally:
             allow_refresh_to_finish.set()

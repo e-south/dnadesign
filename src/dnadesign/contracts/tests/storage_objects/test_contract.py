@@ -132,6 +132,49 @@ def test_verify_storage_object_rejects_non_regular_entries(tmp_path: Path) -> No
         verify_storage_object(root)
 
 
+@pytest.mark.parametrize(
+    "reserved_name",
+    [
+        f".{MANIFEST_NAME}.tmp-user-declared",
+        f".{MANIFEST_NAME}.restore-user-declared",
+        f".{MANIFEST_NAME}.rollback-user-declared",
+        f".{MANIFEST_NAME}.cleanup-user-declared",
+        f".{MANIFEST_NAME}.cleanup-owner-{os.geteuid()}",
+    ],
+)
+def test_verify_storage_object_rejects_declared_reserved_recovery_file(
+    tmp_path: Path,
+    reserved_name: str,
+) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    content = b"user-declared recovery bytes\n"
+    reserved = root / reserved_name
+    reserved.write_bytes(content)
+    manifest_path = root / MANIFEST_NAME
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["resources"].append({"path": reserved_name, "digest": _digest(content), "role": "artifact"})
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(
+        StorageObjectError,
+        match=r"ambiguous manifest staging state.*(?:user-declared|cleanup-owner)",
+    ):
+        verify_storage_object(root)
+
+
+def test_verify_storage_object_allows_empty_top_level_cleanup_owner_directory(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    cleanup_directory = root / f".{MANIFEST_NAME}.cleanup-owner-{os.geteuid()}"
+    cleanup_directory.mkdir()
+
+    verified = verify_storage_object(root)
+
+    assert verified.summary()["status"] == "verified"
+    assert not tuple(cleanup_directory.iterdir())
+
+
 def test_storage_object_lock_is_shared_state_not_content(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     _write_object(root)
@@ -337,6 +380,62 @@ def test_verify_storage_object_rejects_bytes_changed_during_validation(
 
     with pytest.raises(StorageObjectError, match="declared resource digest mismatch"):
         verify_storage_object(root)
+
+
+def test_verify_storage_object_binds_digest_to_post_read_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    payload_path = root / "inputs" / "payload.txt"
+    original_sha256 = storage_validation._sha256
+    payload_reads = 0
+
+    def _sha256(path: Path) -> str:
+        nonlocal payload_reads
+        digest = original_sha256(path)
+        if path == payload_path:
+            payload_reads += 1
+            if payload_reads == 2:
+                path.write_bytes(b"changed\n")
+        return digest
+
+    monkeypatch.setattr(storage_validation, "_sha256", _sha256)
+
+    with pytest.raises(StorageObjectError, match="declared resource changed during validation"):
+        verify_storage_object(root)
+
+    assert payload_reads == 2
+    assert payload_path.read_bytes() == b"changed\n"
+
+
+def test_verify_storage_object_rechecks_tree_after_final_resource_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    payload_path = root / "inputs" / "payload.txt"
+    original_verify_resource = storage_validation._verify_resource
+    payload_reads = 0
+
+    def _verify_resource(root_path, resource):
+        nonlocal payload_reads
+        verified = original_verify_resource(root_path, resource)
+        if resource.relative_path == "inputs/payload.txt":
+            payload_reads += 1
+            if payload_reads == 2:
+                payload_path.write_bytes(b"changed\n")
+        return verified
+
+    monkeypatch.setattr(storage_validation, "_verify_resource", _verify_resource)
+
+    with pytest.raises(StorageObjectError, match="storage object changed during validation"):
+        verify_storage_object(root)
+
+    assert payload_reads == 2
+    assert payload_path.read_bytes() == b"changed\n"
 
 
 def test_verify_storage_object_rejects_manifest_changed_during_validation(

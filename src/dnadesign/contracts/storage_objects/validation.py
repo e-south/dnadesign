@@ -165,13 +165,24 @@ def _storage_tree_paths(root: Path) -> tuple[tuple[Path, ...], tuple[Path, ...]]
         file_names.sort()
         for directory_name in directory_names:
             directory = current_path / directory_name
+            relative = directory.relative_to(root)
+            if _is_ambiguous_manifest_recovery_path(relative, is_directory=True):
+                raise StorageObjectError(
+                    "storage object contains ambiguous manifest staging state; inspect and remove it explicitly: "
+                    + relative.as_posix()
+                )
             if directory.is_symlink():
-                relative = directory.relative_to(root).as_posix()
-                raise StorageObjectError(f"symlink is not allowed: {relative}")
+                raise StorageObjectError(f"symlink is not allowed: {relative.as_posix()}")
             directories.append(directory)
         for file_name in file_names:
             path = current_path / file_name
-            relative = path.relative_to(root).as_posix()
+            relative_path = path.relative_to(root)
+            relative = relative_path.as_posix()
+            if _is_ambiguous_manifest_recovery_path(relative_path, is_directory=False):
+                raise StorageObjectError(
+                    "storage object contains ambiguous manifest staging state; inspect and remove it explicitly: "
+                    + relative
+                )
             if path.is_symlink():
                 raise StorageObjectError(f"symlink is not allowed: {relative}")
             try:
@@ -182,6 +193,26 @@ def _storage_tree_paths(root: Path) -> tuple[tuple[Path, ...], tuple[Path, ...]]
                 raise StorageObjectError(f"non-regular storage entry is not allowed: {relative}")
             files.append(path)
     return tuple(files), tuple(directories)
+
+
+def _is_ambiguous_manifest_recovery_path(relative: Path, *, is_directory: bool) -> bool:
+    """Return whether one tree entry belongs to a reserved recovery namespace."""
+
+    top_level_name = relative.parts[0]
+    cleanup_owner_prefix = f".{MANIFEST_NAME}.cleanup-owner-"
+    if top_level_name.startswith(cleanup_owner_prefix):
+        return not (is_directory and len(relative.parts) == 1)
+    if top_level_name == f".{MANIFEST_NAME}.tmp":
+        return True
+    if top_level_name.startswith(
+        (
+            f".{MANIFEST_NAME}.tmp-",
+            f".{MANIFEST_NAME}.restore-",
+            f".{MANIFEST_NAME}.rollback-",
+        )
+    ):
+        return True
+    return top_level_name.startswith(".") and MANIFEST_NAME in top_level_name and ".cleanup-" in top_level_name
 
 
 def storage_file_paths(root: Path) -> tuple[Path, ...]:
@@ -257,12 +288,16 @@ def _verify_resource(root: Path, resource: StoredResource) -> VerifiedStoredReso
         initial_stat.st_ino,
         initial_stat.st_size,
         initial_stat.st_mode,
+        initial_stat.st_mtime_ns,
+        initial_stat.st_ctime_ns,
     )
     final_identity = (
         final_stat.st_dev,
         final_stat.st_ino,
         final_stat.st_size,
         final_stat.st_mode,
+        final_stat.st_mtime_ns,
+        final_stat.st_ctime_ns,
     )
     if initial_identity != final_identity:
         raise StorageObjectError(
@@ -836,6 +871,7 @@ def verify_storage_object(
 
     resources = tuple(_verify_resource(root, resource) for resource in manifest.resources)
     first_file_paths, first_directory_paths = _storage_tree_paths(root)
+    first_tree_state = _storage_tree_state(root, first_file_paths, first_directory_paths)
     if root_mode & stat.S_IWGRP:
         _verify_shared_resource_access(
             root,
@@ -886,6 +922,7 @@ def verify_storage_object(
         manifest_bytes != second_manifest_bytes
         or coordination_state != second_coordination_state
         or first_state != second_state
+        or first_tree_state != second_tree_state
         or actual_paths != second_actual_paths
         or first_directories != second_directories
     ):
