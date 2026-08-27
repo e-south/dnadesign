@@ -364,7 +364,13 @@ def _verify_demo(
     allow_pending_manifest: bool,
     allow_pending_lock: bool,
 ) -> None:
-    total_bytes = verified.manifest_path.stat().st_size + sum(resource.size_bytes for resource in verified.resources)
+    try:
+        manifest_size = verified.manifest_path.stat(follow_symlinks=False).st_size
+    except OSError as exc:
+        raise StorageObjectError(
+            f"cannot inspect demo manifest after validation {verified.manifest_path}: {exc}"
+        ) from exc
+    total_bytes = manifest_size + sum(resource.size_bytes for resource in verified.resources)
     if total_bytes > MAX_DEMO_BYTES:
         raise StorageObjectError(f"demo exceeds {MAX_DEMO_BYTES} bytes: {total_bytes}")
     for path, expected_digest in (

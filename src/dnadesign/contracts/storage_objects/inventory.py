@@ -1204,6 +1204,15 @@ def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]
             )
         except StorageObjectError as inspection_error:
             completion_error = inspection_error
+        committed_manifest_digest = "unavailable"
+        if completion_error is None:
+            try:
+                committed_manifest_digest = _sha256_bytes((root / MANIFEST_NAME).read_bytes())
+            except OSError:
+                pass
+        revalidation_command = (
+            f"{shlex.quote(sys.executable)} -m dnadesign.contracts.storage_objects validate {shlex.quote(str(root))}"
+        )
         try:
             lock.release()
         except OSError as release_error:
@@ -1212,8 +1221,10 @@ def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]
                     "storage operation committed but its coordination lock changed before completion "
                     f"and the held lock could not be released: {lock_path}: {release_error}"
                 ) from completion_error
-            raise StorageObjectError(
-                f"cannot release storage object manifest lock {lock_path}: {release_error}"
+            raise StorageObjectPublicationUncertain(
+                "storage operation committed and verified, but its manifest lock release failed; "
+                f"winning_manifest_digest={committed_manifest_digest}; do not retry with the prior CAS digest; "
+                f"revalidate with `{revalidation_command}`; release_error={release_error}"
             ) from release_error
         if completion_error is not None:
             raise StorageObjectPublicationUncertain(

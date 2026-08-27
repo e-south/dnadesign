@@ -25,6 +25,7 @@ from threading import Event
 import pytest
 
 import dnadesign.contracts.storage_objects.inventory as storage_inventory
+import dnadesign.contracts.storage_objects.validation as storage_validation
 from dnadesign.contracts.storage_objects import (
     MANIFEST_NAME,
     StorageObjectError,
@@ -65,6 +66,55 @@ def _set_git_index_mode(checkout: Path, path: Path, mode: str) -> None:
         ["git", "-C", str(checkout), "update-index", "--add", "--cacheinfo", f"{mode},{object_id},{relative}"],
         check=True,
     )
+
+
+def _seed_tracked_demo(tmp_path: Path) -> tuple[Path, Path]:
+    checkout = tmp_path / "checkout"
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    root = checkout / "examples" / "pilot"
+    root.mkdir(parents=True)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot/payload.txt"], check=True)
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+        demo=True,
+    )
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot"], check=True)
+    return root, root / MANIFEST_NAME
+
+
+def _fail_late_demo_manifest_stat(
+    monkeypatch: pytest.MonkeyPatch,
+    manifest_path: Path,
+) -> None:
+    original_verify_demo = storage_validation._verify_demo
+    original_stat = Path.stat
+    armed = False
+
+    def _verify_demo_with_stat_failure(*args: object, **kwargs: object) -> None:
+        nonlocal armed
+        armed = True
+        try:
+            original_verify_demo(*args, **kwargs)
+        finally:
+            armed = False
+
+    def _stat(path: Path, *args: object, **kwargs: object):
+        if armed and path == manifest_path:
+            raise OSError("injected late demo manifest stat failure")
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(storage_validation, "_verify_demo", _verify_demo_with_stat_failure)
+    monkeypatch.setattr(Path, "stat", _stat)
 
 
 def test_inventory_creates_a_closed_manifest_then_refuses_overwrite(tmp_path: Path) -> None:
@@ -247,6 +297,72 @@ def test_demo_validation_requires_empty_lock_to_match_git_index(tmp_path: Path) 
         check=True,
     )
     assert verify_storage_object(root).summary()["status"] == "verified"
+
+
+def test_demo_validation_normalizes_late_manifest_stat_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, manifest_path = _seed_tracked_demo(tmp_path)
+    _fail_late_demo_manifest_stat(monkeypatch, manifest_path)
+
+    with pytest.raises(StorageObjectError, match="cannot inspect demo manifest after validation"):
+        verify_storage_object(root)
+
+    assert manifest_path.exists()
+
+
+def test_inventory_demo_normalizes_late_manifest_stat_failure_and_rolls_back(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout = tmp_path / "checkout"
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    root = checkout / "examples" / "pilot"
+    root.mkdir(parents=True)
+    payload = root / "payload.txt"
+    payload.write_text("payload\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot/payload.txt"], check=True)
+    manifest_path = root / MANIFEST_NAME
+    _fail_late_demo_manifest_stat(monkeypatch, manifest_path)
+
+    with pytest.raises(StorageObjectError, match="cannot inspect demo manifest after validation"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+            demo=True,
+        )
+
+    assert not manifest_path.exists()
+    assert payload.read_text(encoding="utf-8") == "payload\n"
+
+
+def test_refresh_demo_normalizes_late_manifest_stat_failure_and_restores_prior_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, manifest_path = _seed_tracked_demo(tmp_path)
+    previous_bytes = manifest_path.read_bytes()
+    previous_digest = _digest(manifest_path)
+    _fail_late_demo_manifest_stat(monkeypatch, manifest_path)
+
+    with pytest.raises(StorageObjectError, match="cannot inspect demo manifest after validation"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=previous_digest,
+            producer_revision="test-revision-2",
+        )
+
+    assert manifest_path.read_bytes() == previous_bytes
+    assert json.loads(previous_bytes)["producer_revision"] == "test-revision-1"
 
 
 @pytest.mark.parametrize(
@@ -1637,6 +1753,103 @@ def test_refresh_reports_uncertain_when_lock_is_replaced_after_commit(
             second_lock.release()
 
     assert _digest(manifest_path) != prior_digest
+    assert verify_storage_object(root).manifest.producer_revision == "test-revision-2"
+
+
+def test_inventory_release_error_reports_committed_manifest_digest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    original_release = storage_inventory.FileLock.release
+    injected = False
+
+    def _release_then_fail(lock, *args: object, **kwargs: object) -> None:
+        nonlocal injected
+        original_release(lock, *args, **kwargs)
+        if manifest_path.exists() and not injected:
+            injected = True
+            raise OSError("injected post-commit lock release failure")
+
+    monkeypatch.setattr(storage_inventory.FileLock, "release", _release_then_fail)
+
+    with pytest.raises(
+        StorageObjectPublicationUncertain,
+        match="operation committed and verified.*lock release failed.*winning_manifest_digest",
+    ) as caught:
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert injected
+    assert _digest(manifest_path) in str(caught.value)
+    assert "dnadesign.contracts.storage_objects validate" in str(caught.value)
+    assert verify_storage_object(root).manifest.producer_revision == "test-revision-1"
+
+
+def test_refresh_release_error_reports_new_committed_manifest_digest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    prior_digest = _digest(manifest_path)
+    original_release = storage_inventory.FileLock.release
+    injected = False
+
+    def _release_then_fail(lock, *args: object, **kwargs: object) -> None:
+        nonlocal injected
+        original_release(lock, *args, **kwargs)
+        if (
+            json.loads(manifest_path.read_text(encoding="utf-8"))["producer_revision"] == "test-revision-2"
+            and not injected
+        ):
+            injected = True
+            raise OSError("injected post-commit lock release failure")
+
+    monkeypatch.setattr(storage_inventory.FileLock, "release", _release_then_fail)
+
+    with pytest.raises(
+        StorageObjectPublicationUncertain,
+        match="operation committed and verified.*lock release failed.*winning_manifest_digest",
+    ) as caught:
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=prior_digest,
+            producer_revision="test-revision-2",
+        )
+
+    committed_digest = _digest(manifest_path)
+    assert injected
+    assert committed_digest != prior_digest
+    assert committed_digest in str(caught.value)
+    assert "do not retry with the prior CAS digest" in str(caught.value)
     assert verify_storage_object(root).manifest.producer_revision == "test-revision-2"
 
 

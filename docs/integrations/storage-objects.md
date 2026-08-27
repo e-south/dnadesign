@@ -2,7 +2,7 @@
 doc_id: external-storage-objects
 surface: integration-contract
 owner: dnadesign-maintainers
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 ---
 
 ## External storage objects
@@ -121,6 +121,9 @@ posture against the inode held by its open lock descriptor. If that binding
 changes after a receipt commits, the call raises
 `StorageObjectPublicationUncertain` and requires explicit revalidation of the
 committed object instead of returning a false verified result.
+If lock release itself fails after a verified commit, the same typed uncertainty
+reports the winning manifest digest and an exact validation command; callers
+must not retry with the prior compare-and-swap digest.
 Group-writable
 object roots must also be group-traversable, set the POSIX setgid bit, and not
 set the sticky bit. Other-writable object roots are rejected because unrelated
