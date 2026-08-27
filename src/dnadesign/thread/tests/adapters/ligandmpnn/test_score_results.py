@@ -147,7 +147,11 @@ def _write_output(
     torch.save(payload, path)
     command = next(
         command
-        for command in build_ligandmpnn_score_commands(request, checkout_root=root / "LigandMPNN")
+        for command in build_ligandmpnn_score_commands(
+            request,
+            checkout_root=root / "LigandMPNN",
+            execution_root=root,
+        )
         if command.seed == expected_seed
     )
     completion_path, completion = pinned_runtime_completion_contract(
@@ -155,6 +159,9 @@ def _write_output(
         upstream_commit=request.upstream.commit,
         checkpoint_sha256=request.upstream.checkpoint_sha256,
         pdb_sha256=request.pdb_sha256,
+        context_inventory_path=request.context_inventory.path,
+        context_inventory_sha256=request.context_inventory.sha256,
+        execution_root=root,
         packing_checkpoint_sha256=None,
         residue_alphabet_sha256=None,
         entrypoint="score.py",
@@ -166,13 +173,70 @@ def _write_output(
 
 
 def _parse(root: Path, request: LigandMpnnScoreRequest):
-    commands = build_ligandmpnn_score_commands(request, checkout_root=root / "LigandMPNN")
+    commands = build_ligandmpnn_score_commands(
+        request,
+        checkout_root=root / "LigandMPNN",
+        execution_root=root,
+    )
     return parse_ligandmpnn_score_outputs(
         request,
         commands,
         execution_root=root,
         trust=LigandMpnnScoreOutputTrust.PINNED_LOCAL_EXECUTION,
     )
+
+
+@pytest.mark.parametrize("mutation", ["missing", "forged", "mismatched", "tampered"])
+def test_score_builder_rejects_invalid_context_before_command_emission(tmp_path: Path, mutation: str) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    inventory_path = tmp_path / request.context_inventory.path
+    if mutation == "missing":
+        inventory_path.unlink()
+    elif mutation == "forged":
+        request = replace(
+            request,
+            context_inventory=LigandMpnnContextInventoryReference(
+                path=request.context_inventory.path,
+                sha256="f" * 64,
+            ),
+        )
+    elif mutation == "mismatched":
+        request = replace(request, pdb_sha256="e" * 64)
+    else:
+        inventory_path.write_bytes(b"tampered")
+
+    with pytest.raises(ValueError, match="context inventory|input SHA256"):
+        build_ligandmpnn_score_commands(
+            request,
+            checkout_root=tmp_path / "LigandMPNN",
+            execution_root=tmp_path,
+        )
+
+
+def test_score_relative_checkout_is_anchored_for_foreign_cwd_admission(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    foreign_cwd = tmp_path / "foreign-cwd"
+    foreign_cwd.mkdir()
+    monkeypatch.chdir(foreign_cwd)
+    commands = build_ligandmpnn_score_commands(
+        request,
+        checkout_root=Path("LigandMPNN"),
+        execution_root=tmp_path,
+    )
+    _write_output(tmp_path, request, 7)
+
+    result = parse_ligandmpnn_score_outputs(
+        request,
+        commands,
+        execution_root=tmp_path,
+        trust=LigandMpnnScoreOutputTrust.PINNED_LOCAL_EXECUTION,
+    )
+
+    assert result.outputs[0].seed == 7
+    assert commands[0].argv[commands[0].argv.index("--checkout-root") + 1] == str(tmp_path / "LigandMPNN")
 
 
 def test_parser_binds_exact_request_commands_inputs_and_raw_probabilities(tmp_path: Path) -> None:
@@ -226,12 +290,19 @@ def test_parser_binds_exact_request_commands_inputs_and_raw_probabilities(tmp_pa
 def test_parser_requires_exact_actual_execution_completion(tmp_path: Path) -> None:
     request = _prepare_request(tmp_path, seeds=(7,))
     _write_output(tmp_path, request, 7)
-    command = build_ligandmpnn_score_commands(request, checkout_root=tmp_path / "LigandMPNN")[0]
+    command = build_ligandmpnn_score_commands(
+        request,
+        checkout_root=tmp_path / "LigandMPNN",
+        execution_root=tmp_path,
+    )[0]
     completion_path, completion = pinned_runtime_completion_contract(
         command.argv,
         upstream_commit=request.upstream.commit,
         checkpoint_sha256=request.upstream.checkpoint_sha256,
         pdb_sha256=request.pdb_sha256,
+        context_inventory_path=request.context_inventory.path,
+        context_inventory_sha256=request.context_inventory.sha256,
+        execution_root=tmp_path,
         packing_checkpoint_sha256=None,
         residue_alphabet_sha256=None,
         entrypoint="score.py",
@@ -269,12 +340,19 @@ def test_parser_rejects_valid_score_replaced_after_execution_completion(tmp_path
 def test_parser_rejects_symlinked_execution_completion_leaf(tmp_path: Path) -> None:
     request = _prepare_request(tmp_path, seeds=(7,))
     _write_output(tmp_path, request, 7)
-    command = build_ligandmpnn_score_commands(request, checkout_root=tmp_path / "LigandMPNN")[0]
+    command = build_ligandmpnn_score_commands(
+        request,
+        checkout_root=tmp_path / "LigandMPNN",
+        execution_root=tmp_path,
+    )[0]
     completion_path, _completion = pinned_runtime_completion_contract(
         command.argv,
         upstream_commit=request.upstream.commit,
         checkpoint_sha256=request.upstream.checkpoint_sha256,
         pdb_sha256=request.pdb_sha256,
+        context_inventory_path=request.context_inventory.path,
+        context_inventory_sha256=request.context_inventory.sha256,
+        execution_root=tmp_path,
         packing_checkpoint_sha256=None,
         residue_alphabet_sha256=None,
         entrypoint="score.py",
@@ -391,19 +469,32 @@ def test_parser_rejects_mismatched_payloads(
 def test_parser_rejects_input_or_context_command_drift(tmp_path: Path) -> None:
     request = _prepare_request(tmp_path, seeds=(7,))
     _write_output(tmp_path, request, 7)
+    original_input = (tmp_path / request.pdb_path).read_bytes()
     (tmp_path / request.pdb_path).write_bytes(b"tampered")
     with pytest.raises(ValueError, match="input SHA256"):
         _parse(tmp_path, request)
 
     corrected = replace(request, pdb_sha256=_sha256(b"tampered"))
-    commands = build_ligandmpnn_score_commands(corrected, checkout_root=tmp_path / "LigandMPNN")
+    with pytest.raises(ValueError, match="context inventory input identity"):
+        build_ligandmpnn_score_commands(
+            corrected,
+            checkout_root=tmp_path / "LigandMPNN",
+            execution_root=tmp_path,
+        )
+
+    (tmp_path / request.pdb_path).write_bytes(original_input)
+    commands = build_ligandmpnn_score_commands(
+        request,
+        checkout_root=tmp_path / "LigandMPNN",
+        execution_root=tmp_path,
+    )
     argv = list(commands[0].argv)
     context_index = argv.index("--ligand_mpnn_use_atom_context") + 1
     argv[context_index] = "0"
     drifted = (replace(commands[0], argv=tuple(argv)),)
     with pytest.raises(ValueError, match="commands do not exactly match"):
         parse_ligandmpnn_score_outputs(
-            corrected,
+            request,
             drifted,
             execution_root=tmp_path,
             trust=LigandMpnnScoreOutputTrust.PINNED_LOCAL_EXECUTION,
@@ -485,7 +576,11 @@ def test_parser_rejects_missing_or_non_nucleotide_observed_context(tmp_path: Pat
 
 def test_parser_requires_explicit_trust_and_still_uses_weights_only_loading(tmp_path: Path) -> None:
     request = _prepare_request(tmp_path, seeds=(7,))
-    commands = build_ligandmpnn_score_commands(request, checkout_root=tmp_path / "LigandMPNN")
+    commands = build_ligandmpnn_score_commands(
+        request,
+        checkout_root=tmp_path / "LigandMPNN",
+        execution_root=tmp_path,
+    )
     _write_output(tmp_path, request, 7)
 
     with pytest.raises(ValueError, match="explicit pinned-local-execution trust"):
@@ -500,6 +595,9 @@ def test_parser_requires_explicit_trust_and_still_uses_weights_only_loading(tmp_
         upstream_commit=request.upstream.commit,
         checkpoint_sha256=request.upstream.checkpoint_sha256,
         pdb_sha256=request.pdb_sha256,
+        context_inventory_path=request.context_inventory.path,
+        context_inventory_sha256=request.context_inventory.sha256,
+        execution_root=tmp_path,
         packing_checkpoint_sha256=None,
         residue_alphabet_sha256=None,
         entrypoint="score.py",

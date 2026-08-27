@@ -285,7 +285,7 @@ def parse_ligandmpnn_score_outputs(
     if observed_input_sha256 != expected_input_sha256:
         raise ValueError(f"input SHA256 mismatch: expected {expected_input_sha256}, observed {observed_input_sha256}")
 
-    checkout_root = _validate_commands(request, commands)
+    checkout_root = _validate_commands(request, commands, execution_root=root)
     context_inventory = load_ligandmpnn_context_inventory(
         request.context_inventory,
         execution_root=root,
@@ -404,7 +404,12 @@ def _is_private_score_attempt(path: Path, *, output_root: Path) -> bool:
     return any(part.startswith(".dnadesign-score-") for part in relative.parts[:-1])
 
 
-def _validate_commands(request: LigandMpnnScoreRequest, commands: tuple[LigandMpnnCommand, ...]) -> Path:
+def _validate_commands(
+    request: LigandMpnnScoreRequest,
+    commands: tuple[LigandMpnnCommand, ...],
+    *,
+    execution_root: Path,
+) -> Path:
     if not isinstance(commands, tuple) or len(commands) != len(request.seeds):
         raise ValueError("commands do not exactly match score request seeds")
     if not commands:
@@ -416,6 +421,9 @@ def _validate_commands(request: LigandMpnnScoreRequest, commands: tuple[LigandMp
             upstream_commit=request.upstream.commit,
             checkpoint_sha256=request.upstream.checkpoint_sha256,
             pdb_sha256=request.pdb_sha256,
+            context_inventory_path=request.context_inventory.path,
+            context_inventory_sha256=request.context_inventory.sha256,
+            execution_root=execution_root,
             packing_checkpoint_sha256=None,
             residue_alphabet_sha256=None,
             entrypoint="score.py",
@@ -425,6 +433,7 @@ def _validate_commands(request: LigandMpnnScoreRequest, commands: tuple[LigandMp
     expected = build_ligandmpnn_score_commands(
         request,
         checkout_root=checkout_root,
+        execution_root=execution_root,
         python_executable=python_executable,
     )
     if commands != expected:
@@ -446,6 +455,9 @@ def _validate_execution_completions(
             upstream_commit=request.upstream.commit,
             checkpoint_sha256=request.upstream.checkpoint_sha256,
             pdb_sha256=request.pdb_sha256,
+            context_inventory_path=request.context_inventory.path,
+            context_inventory_sha256=request.context_inventory.sha256,
+            execution_root=root,
             packing_checkpoint_sha256=None,
             residue_alphabet_sha256=None,
             entrypoint="score.py",

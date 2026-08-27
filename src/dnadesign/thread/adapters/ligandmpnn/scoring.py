@@ -16,6 +16,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
+from dnadesign.thread.adapters.ligandmpnn.commands import resolve_checkout_root_for_execution
+from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
+    load_ligandmpnn_context_inventory,
+    validate_context_inventory_for_input,
+)
 from dnadesign.thread.adapters.ligandmpnn.models import (
     LigandMpnnCommand,
     LigandMpnnContextInventoryReference,
@@ -107,10 +112,25 @@ def build_ligandmpnn_score_commands(
     request: LigandMpnnScoreRequest,
     *,
     checkout_root: Path,
+    execution_root: Path,
     python_executable: str = "python",
 ) -> tuple[LigandMpnnCommand, ...]:
     """Build one explicit official ``score.py`` invocation per seed."""
 
+    checkout_root = resolve_checkout_root_for_execution(checkout_root, execution_root=execution_root)
+    context_inventory = load_ligandmpnn_context_inventory(
+        request.context_inventory,
+        execution_root=execution_root,
+    )
+    validate_context_inventory_for_input(
+        context_inventory,
+        pdb_path=request.pdb_path,
+        pdb_sha256=request.pdb_sha256,
+        upstream=request.upstream,
+        use_side_chain_context=request.use_side_chain_context,
+        checkout_root=checkout_root,
+        execution_root=execution_root,
+    )
     commands: list[LigandMpnnCommand] = []
     for seed in request.seeds:
         output_dir = request.output_dir / f"seed_{seed}"
@@ -146,6 +166,9 @@ def build_ligandmpnn_score_commands(
             upstream_commit=request.upstream.commit,
             checkpoint_sha256=request.upstream.checkpoint_sha256,
             pdb_sha256=request.pdb_sha256,
+            context_inventory_path=request.context_inventory.path,
+            context_inventory_sha256=request.context_inventory.sha256,
+            execution_root=execution_root,
             packing_checkpoint_sha256=None,
             residue_alphabet_sha256=None,
             entrypoint="score.py",

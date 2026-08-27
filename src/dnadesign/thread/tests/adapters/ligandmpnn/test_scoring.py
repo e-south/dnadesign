@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,10 @@ from dnadesign.thread.adapters.ligandmpnn import (
     LigandMpnnScoreRequest,
     LigandMpnnUpstreamPin,
     build_ligandmpnn_score_commands,
+)
+from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import (
+    create_pinned_context_checkout,
+    write_context_inventory,
 )
 
 _DIGEST = "a" * 64
@@ -49,6 +54,31 @@ def _request(**overrides: object) -> LigandMpnnScoreRequest:
     return LigandMpnnScoreRequest(**values)  # type: ignore[arg-type]
 
 
+def _validated_request(tmp_path: Path, **overrides: object) -> tuple[LigandMpnnScoreRequest, Path]:
+    checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
+    pdb_payload = b"ATOM pinned score input\n"
+    pdb_path = tmp_path / "inputs/target.pdb"
+    pdb_path.parent.mkdir(parents=True)
+    pdb_path.write_bytes(pdb_payload)
+    pdb_sha256 = hashlib.sha256(pdb_payload).hexdigest()
+    use_side_chain_context = bool(overrides.get("use_side_chain_context", True))
+    context_inventory = write_context_inventory(
+        tmp_path,
+        input_path=Path("inputs/target.pdb"),
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=use_side_chain_context,
+        parser_sha256=parser_sha256,
+    )
+    values: dict[str, object] = {
+        "pdb_sha256": pdb_sha256,
+        "upstream": LigandMpnnUpstreamPin(commit=commit, checkpoint_sha256=_DIGEST),
+        "context_inventory": context_inventory,
+    }
+    values.update(overrides)
+    return _request(**values), checkout_root
+
+
 @pytest.mark.parametrize(
     ("field_name", "value", "message"),
     [
@@ -70,27 +100,39 @@ def test_score_request_rejects_paths_that_cannot_round_trip_through_runtime_argv
         _request(**{field_name: value})
 
 
-def test_score_request_preserves_valid_nested_relative_output_directory() -> None:
-    request = _request(output_dir=Path("results/nested/scores"))
+def test_score_request_preserves_valid_nested_relative_output_directory(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path, output_dir=Path("results/nested/scores"))
 
-    command = build_ligandmpnn_score_commands(request, checkout_root=Path("LigandMPNN"))[0]
+    command = build_ligandmpnn_score_commands(
+        request,
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
+    )[0]
 
     assert command.output_dir == Path("results/nested/scores/seed_7")
     assert command.argv[command.argv.index("--out_folder") + 1] == "results/nested/scores/seed_7"
 
 
-def test_score_request_preserves_dot_output_as_an_execution_root_seed_directory() -> None:
-    request = _request(output_dir=Path("."))
+def test_score_request_preserves_dot_output_as_an_execution_root_seed_directory(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path, output_dir=Path("."))
 
-    command = build_ligandmpnn_score_commands(request, checkout_root=Path("LigandMPNN"))[0]
+    command = build_ligandmpnn_score_commands(
+        request,
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
+    )[0]
 
     assert command.output_dir == Path("seed_7")
     assert command.argv[command.argv.index("--out_folder") + 1] == "seed_7"
 
 
-def test_single_aa_probability_command_is_explicit() -> None:
+def test_single_aa_probability_command_is_explicit(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path)
     command = build_ligandmpnn_score_commands(
-        _request(), checkout_root=Path("/opt/LigandMPNN"), python_executable="python3"
+        request,
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
+        python_executable="python3",
     )[0]
 
     planned_execution_sha256 = command.argv[command.argv.index("--planned-execution-sha256") + 1]
@@ -100,13 +142,19 @@ def test_single_aa_probability_command_is_explicit() -> None:
         "-m",
         "dnadesign.thread.adapters.ligandmpnn.pinned_runtime",
         "--checkout-root",
-        "/opt/LigandMPNN",
+        str(checkout_root),
         "--upstream-commit",
-        _COMMIT,
+        request.upstream.commit,
         "--checkpoint-sha256",
         _DIGEST,
         "--pdb-sha256",
-        _DIGEST,
+        request.pdb_sha256,
+        "--execution-root",
+        str(tmp_path),
+        "--context-inventory-path",
+        request.context_inventory.path.as_posix(),
+        "--context-inventory-sha256",
+        request.context_inventory.sha256,
         "--planned-execution-sha256",
         planned_execution_sha256,
         "--completion-record",
@@ -117,7 +165,7 @@ def test_single_aa_probability_command_is_explicit() -> None:
         "--model_type",
         "ligand_mpnn",
         "--checkpoint_ligand_mpnn",
-        "/opt/LigandMPNN/model_params/ligandmpnn_v_32_010_25.pt",
+        str(checkout_root / "model_params/ligandmpnn_v_32_010_25.pt"),
         "--pdb_path",
         "inputs/target.pdb",
         "--out_folder",
@@ -141,9 +189,12 @@ def test_single_aa_probability_command_is_explicit() -> None:
     )
 
 
-def test_autoregressive_probability_mode_sets_exclusive_official_flags() -> None:
+def test_autoregressive_probability_mode_sets_exclusive_official_flags(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path, mode=LigandMpnnScoreMode.AUTOREGRESSIVE)
     argv = build_ligandmpnn_score_commands(
-        _request(mode=LigandMpnnScoreMode.AUTOREGRESSIVE), checkout_root=Path("tool")
+        request,
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
     )[0].argv
     assert argv[argv.index("--autoregressive_score") + 1] == "1"
     assert argv[argv.index("--single_aa_score") + 1] == "0"
@@ -172,10 +223,12 @@ def test_score_request_requires_nonempty_seed_tuple(seeds: object) -> None:
         _request(seeds=seeds)
 
 
-def test_score_request_emits_numpy_seed_boundaries() -> None:
+def test_score_request_emits_numpy_seed_boundaries(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path, seeds=(0, 2**32 - 1))
     commands = build_ligandmpnn_score_commands(
-        _request(seeds=(0, 2**32 - 1)),
-        checkout_root=Path("/opt/LigandMPNN"),
+        request,
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
     )
 
     assert [command.seed for command in commands] == [0, 4294967295]

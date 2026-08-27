@@ -468,7 +468,7 @@ def execute_pinned_entrypoint(
             destination=inputs_root / "pdb",
             preserve_source_name=True,
         )
-        if entrypoint == "run.py":
+        if entrypoint in _ENTRYPOINTS:
             assert context_inventory_path is not None
             assert context_inventory_sha256 is not None
             assert execution_root is not None
@@ -667,8 +667,8 @@ def _validate_context_binding_fields(
     )
     if entrypoint == "run.py" and not all(bound):
         raise ValueError("design runtime requires a complete context inventory binding")
-    if entrypoint == "score.py" and any(bound):
-        raise ValueError("score runtime does not accept a design context inventory binding")
+    if entrypoint == "score.py" and not all(bound):
+        raise ValueError("score runtime requires a complete context inventory binding")
 
 
 def _validate_runtime_context_inventory(
@@ -683,7 +683,7 @@ def _validate_runtime_context_inventory(
     requested_pdb_sha256: str,
     use_side_chain_context: bool,
 ) -> None:
-    """Revalidate bound design evidence immediately before execution."""
+    """Revalidate bound context evidence immediately before execution."""
 
     root = execution_root.expanduser().resolve()
     if requested_pdb_path.is_absolute():

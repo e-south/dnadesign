@@ -38,8 +38,13 @@ def _execute_design(
     batch_size: int = 1,
     number_of_batches: int = 1,
     seeds: tuple[int, ...] = (7,),
+    pdb_name: str = "input.pdb",
 ) -> tuple[LigandMpnnRequest, tuple[LigandMpnnCommand, ...], Path]:
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    if pdb.name != pdb_name:
+        renamed_pdb = pdb.with_name(pdb_name)
+        pdb.rename(renamed_pdb)
+        pdb = renamed_pdb
     reference = write_context_inventory(
         tmp_path,
         input_path=pdb.relative_to(tmp_path),
@@ -98,6 +103,14 @@ def test_design_admission_binds_exact_published_tree(tmp_path: Path) -> None:
     assert result.to_dict()["expected_sequence_count"] == 1
     assert result.to_dict()["sequence_count"] == 1
     assert any(entry["path"] == "seqs/input.fa" for entry in result.outputs[0].manifest["entries"])
+
+
+def test_design_admission_preserves_uppercase_pdb_extension_in_official_fasta_name(tmp_path: Path) -> None:
+    request, commands, _output_root = _execute_design(tmp_path, pdb_name="input.PDB")
+
+    result = parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
+
+    assert result.sequence_count == request.expected_sequence_count == 1
 
 
 def test_design_admission_rejects_completed_tree_without_official_fasta(tmp_path: Path) -> None:
