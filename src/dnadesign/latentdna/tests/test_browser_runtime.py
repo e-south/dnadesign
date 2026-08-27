@@ -419,6 +419,7 @@ def test_browser_runtime_uses_control_plane_shapes_without_loading_matrices(monk
 
 
 def test_browser_runtime_falls_back_to_persisted_controls_when_workspace_config_was_externalized(
+    monkeypatch,
     tmp_path: Path,
 ) -> None:
     workspace_dir = tmp_path / "externalized_workspace"
@@ -446,6 +447,7 @@ def test_browser_runtime_falls_back_to_persisted_controls_when_workspace_config_
                     "preprocessing_md": "Rows were selected before projection.",
                     "math_md": "UMAP is descriptive here.",
                     "rationale_md": "Inspect retained structure.",
+                    "plot_details_md": "Persisted manifest plot details.",
                     "limitations_md": "Projection geometry is not causal evidence.",
                     "failure_modes_md": "Missing rows can distort the view.",
                 },
@@ -539,6 +541,15 @@ def test_browser_runtime_falls_back_to_persisted_controls_when_workspace_config_
             "compare_metrics": {},
         },
     }
+    monkeypatch.setattr(
+        "dnadesign.latentdna.src.notebooks.browser_runtime.resolve_plot_doc_block",
+        lambda **_: {
+            "title": "Chosen UMAP",
+            "markdown": "Documentation context.",
+            "plot_details_md": "Documentation fallback plot details.",
+            "warning": None,
+        },
+    )
 
     runtime = build_workspace_browser_runtime(
         title="Detached review",
@@ -567,6 +578,7 @@ def test_browser_runtime_falls_back_to_persisted_controls_when_workspace_config_
     assert card["guardrails"] == ["Do not infer biological function from projection distance."]
     assert card["caption_md"] == "Selected-view UMAP."
     assert card["alt_text"] == "UMAP of the selected representation."
+    assert card["plot_details_md"] == "Persisted manifest plot details."
     assert card["render_path"] == plot_dir / "plot.svg"
     assert card["live_render"] is False
 

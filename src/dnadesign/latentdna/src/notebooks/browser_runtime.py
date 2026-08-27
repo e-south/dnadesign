@@ -616,7 +616,9 @@ def _plot_review_sections(
                 "caption_md": str(semantics.get("caption") or "").strip(),
                 "alt_text": str(semantics.get("alt_text") or doc_block.get("title") or plot_id).strip(),
                 "study_doc_md": str(doc_block.get("markdown") or "").strip(),
-                "plot_details_md": str(doc_block.get("plot_details_md") or "").strip(),
+                "plot_details_md": str(
+                    semantics.get("plot_details_md") or doc_block.get("plot_details_md") or ""
+                ).strip(),
                 "preprocessing_md": str(semantics.get("preprocessing_md") or "").strip(),
                 "math_md": str(semantics.get("math_md") or "").strip(),
                 "rationale_md": str(semantics.get("rationale_md") or "").strip(),
