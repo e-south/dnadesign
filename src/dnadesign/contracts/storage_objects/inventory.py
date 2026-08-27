@@ -134,6 +134,38 @@ def _sha256_bytes(content: bytes) -> str:
     return f"sha256:{hashlib.sha256(content).hexdigest()}"
 
 
+def _stable_regular_file_snapshot(path: Path) -> tuple[bytes, tuple[int, int]] | None:
+    """Return bytes and identity only when regular-file metadata is stable across the read."""
+
+    try:
+        before = path.lstat()
+        if not stat.S_ISREG(before.st_mode):
+            return None
+        content = path.read_bytes()
+        after = path.lstat()
+    except OSError:
+        return None
+    before_state = (
+        before.st_dev,
+        before.st_ino,
+        before.st_size,
+        before.st_mode,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+    )
+    after_state = (
+        after.st_dev,
+        after.st_ino,
+        after.st_size,
+        after.st_mode,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    )
+    if not stat.S_ISREG(after.st_mode) or after_state != before_state:
+        return None
+    return content, (after.st_dev, after.st_ino)
+
+
 def _rollback_manifest(
     manifest_path: Path,
     *,
@@ -154,7 +186,12 @@ def _rollback_manifest(
             if previous_bytes is None:
                 return
             raise StorageObjectError("storage object manifest disappeared before the prior receipt could be restored")
-        current_bytes = manifest_path.read_bytes()
+        current_snapshot = _stable_regular_file_snapshot(manifest_path)
+        if current_snapshot is None:
+            raise StorageObjectPublicationUncertain(
+                "storage object manifest changed during rollback classification; outcome is uncertain"
+            )
+        current_bytes, _current_identity = current_snapshot
         if previous_bytes is not None and current_bytes == previous_bytes:
             return
         if current_bytes != published_bytes:
@@ -435,19 +472,10 @@ def _entry_matches_regular_bytes(
     expected_identity: tuple[int, int],
     expected_bytes: bytes,
 ) -> bool:
-    """Match one pathname to an exact regular-file inode and byte snapshot."""
+    """Match one pathname to one stable regular-file metadata and byte snapshot."""
 
-    try:
-        before = path.lstat()
-        if not stat.S_ISREG(before.st_mode) or (before.st_dev, before.st_ino) != expected_identity:
-            return False
-        content = path.read_bytes()
-        after = path.lstat()
-    except OSError:
-        return False
-    return (
-        stat.S_ISREG(after.st_mode) and (after.st_dev, after.st_ino) == expected_identity and content == expected_bytes
-    )
+    snapshot = _stable_regular_file_snapshot(path)
+    return snapshot is not None and snapshot == (expected_bytes, expected_identity)
 
 
 def _entry_has_identity(path: Path, expected_identity: tuple[int, int]) -> bool:
@@ -586,12 +614,11 @@ def _rollback_create_only_manifest(
         try:
             _entry_identity(manifest_path)
         except FileNotFoundError:
-            try:
-                owns_quarantine = (
-                    _entry_identity(quarantine) == published_identity and quarantine.read_bytes() == published_bytes
-                )
-            except BaseException:
-                owns_quarantine = False
+            owns_quarantine = _entry_matches_regular_bytes(
+                quarantine,
+                expected_identity=published_identity,
+                expected_bytes=published_bytes,
+            )
         else:
             owns_quarantine = False
         if owns_quarantine:
@@ -609,7 +636,11 @@ def _rollback_create_only_manifest(
             raise StorageObjectPublicationUncertain(
                 f"cannot identify the receipt moved during create-only rollback; retained at {quarantine}"
             )
-        owns_receipt = stat.S_ISREG(quarantine_stat.st_mode) and quarantine.read_bytes() == published_bytes
+        owns_receipt = _entry_matches_regular_bytes(
+            quarantine,
+            expected_identity=published_identity,
+            expected_bytes=published_bytes,
+        )
     except StorageObjectPublicationUncertain:
         raise
     except BaseException as inspection_error:

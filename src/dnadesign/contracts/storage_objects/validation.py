@@ -45,7 +45,7 @@ _DemoGitAuthority = tuple[Path, tuple[Path, ...], dict[str, str], bytes]
 _StorageTreeEntryState = tuple[str, int, int, int, int, int, int, int, int, int]
 _CoordinationState = tuple[
     tuple[int, int, int, int, int, int],
-    tuple[int, int, int, int],
+    tuple[int, int, int, int, int, int, int],
     tuple[int, int, int, int, int],
 ]
 _RoutedObject = tuple[Path, ObjectKind, str, tuple[_StorageTreeEntryState, ...]]
@@ -90,6 +90,45 @@ def _sha256_bytes(content: bytes) -> str:
     return f"sha256:{hashlib.sha256(content).hexdigest()}"
 
 
+def _read_stable_regular_bytes(
+    path: Path,
+    *,
+    label: str,
+    change_message: str,
+) -> bytes:
+    """Read one regular file while binding bytes to stable metadata."""
+
+    try:
+        before = path.stat(follow_symlinks=False)
+        if not stat.S_ISREG(before.st_mode):
+            raise StorageObjectError(f"{label} must remain a regular file: {path}")
+        content = path.read_bytes()
+        after = path.stat(follow_symlinks=False)
+    except StorageObjectError:
+        raise
+    except OSError as exc:
+        raise StorageObjectError(f"cannot read {label} {path}: {exc}") from exc
+    before_state = (
+        before.st_dev,
+        before.st_ino,
+        before.st_size,
+        before.st_mode,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+    )
+    after_state = (
+        after.st_dev,
+        after.st_ino,
+        after.st_size,
+        after.st_mode,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    )
+    if not stat.S_ISREG(after.st_mode) or after_state != before_state:
+        raise StorageObjectError(change_message)
+    return content
+
+
 def _recheck_verified_manifest(verified: VerifiedStorageObject) -> None:
     """Reject a root snapshot whose verified receipt has since changed."""
 
@@ -98,12 +137,11 @@ def _recheck_verified_manifest(verified: VerifiedStorageObject) -> None:
         raise StorageObjectError(
             "storage object manifest changed during root validation; retry while producers are quiescent"
         )
-    try:
-        manifest_bytes = manifest_path.read_bytes()
-    except OSError as exc:
-        raise StorageObjectError(
-            "storage object manifest changed during root validation; retry while producers are quiescent"
-        ) from exc
+    manifest_bytes = _read_stable_regular_bytes(
+        manifest_path,
+        label="storage object manifest",
+        change_message="storage object manifest changed during root validation; retry while producers are quiescent",
+    )
     if _sha256_bytes(manifest_bytes) != verified.manifest_digest:
         raise StorageObjectError(
             "storage object manifest changed during root validation; retry while producers are quiescent"
@@ -437,7 +475,15 @@ def _verify_coordination_posture(
             root_stat.st_dev,
             root_stat.st_ino,
         ),
-        (manifest_mode, manifest_stat.st_gid, manifest_stat.st_dev, manifest_stat.st_ino),
+        (
+            manifest_mode,
+            manifest_stat.st_gid,
+            manifest_stat.st_dev,
+            manifest_stat.st_ino,
+            manifest_stat.st_size,
+            manifest_stat.st_mtime_ns,
+            manifest_stat.st_ctime_ns,
+        ),
         lock_state,
     )
 
@@ -785,12 +831,11 @@ def _recheck_verified_demo_snapshot(
 ) -> None:
     """Rebind verified demo bytes and coordination after Git authority reads."""
 
-    try:
-        manifest_bytes = verified.manifest_path.read_bytes()
-    except OSError as exc:
-        raise StorageObjectError(
-            f"cannot reread demo manifest after Git index validation {verified.manifest_path}: {exc}"
-        ) from exc
+    manifest_bytes = _read_stable_regular_bytes(
+        verified.manifest_path,
+        label="demo manifest after Git index validation",
+        change_message="demo manifest changed during Git index validation; retry while the producer is quiescent",
+    )
     if _sha256_bytes(manifest_bytes) != verified.manifest_digest:
         raise StorageObjectError(
             "demo manifest changed during Git index validation; retry while the producer is quiescent"
@@ -857,10 +902,11 @@ def verify_storage_object(
     (_root_type, root_mode, _root_owner, shared_group, _root_device, _root_inode), _manifest_state, _lock_state = (
         coordination_state
     )
-    try:
-        manifest_bytes = manifest_path.read_bytes()
-    except OSError as exc:
-        raise StorageObjectError(f"cannot read storage object manifest {manifest_path}: {exc}") from exc
+    manifest_bytes = _read_stable_regular_bytes(
+        manifest_path,
+        label="storage object manifest",
+        change_message="storage object manifest changed during validation; retry while the producer is quiescent",
+    )
     manifest = load_storage_object_manifest_bytes(manifest_bytes, source_label=str(manifest_path))
 
     declared_paths: set[str] = set()
@@ -906,10 +952,11 @@ def verify_storage_object(
     second_state = tuple(
         (item.relative_path, item.digest, item.size_bytes, item.device_id, item.inode) for item in second_resources
     )
-    try:
-        second_manifest_bytes = manifest_path.read_bytes()
-    except OSError as exc:
-        raise StorageObjectError(f"cannot reread storage object manifest {manifest_path}: {exc}") from exc
+    second_manifest_bytes = _read_stable_regular_bytes(
+        manifest_path,
+        label="storage object manifest",
+        change_message="storage object manifest changed during validation; retry while the producer is quiescent",
+    )
     second_coordination_state = _verify_coordination_posture(root, manifest_path, lock_path)
     if root_mode & stat.S_IWGRP:
         _verify_shared_resource_access(

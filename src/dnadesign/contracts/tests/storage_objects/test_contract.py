@@ -481,6 +481,44 @@ def test_verify_storage_object_rejects_manifest_changed_during_validation(
         verify_storage_object(root)
 
 
+def test_verify_storage_object_rejects_same_inode_manifest_rewrite_during_final_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    manifest_path = root / MANIFEST_NAME
+    original_read_bytes = Path.read_bytes
+    initial_bytes = original_read_bytes(manifest_path)
+    replacement_bytes = b"!" + initial_bytes[1:]
+    reads = 0
+
+    def _read_then_rewrite_same_inode(path: Path) -> bytes:
+        nonlocal reads
+        content = original_read_bytes(path)
+        if path == manifest_path:
+            reads += 1
+            if reads == 2:
+                before = path.stat(follow_symlinks=False)
+                with path.open("r+b") as handle:
+                    handle.write(replacement_bytes)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.utime(
+                    path,
+                    ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000),
+                )
+        return content
+
+    monkeypatch.setattr(Path, "read_bytes", _read_then_rewrite_same_inode)
+
+    with pytest.raises(StorageObjectError, match="manifest changed during validation"):
+        verify_storage_object(root)
+
+    assert reads == 2
+    assert original_read_bytes(manifest_path) == replacement_bytes
+
+
 def test_verify_storage_object_rechecks_shared_resource_access_on_second_pass(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

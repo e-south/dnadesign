@@ -4763,6 +4763,50 @@ def test_inventory_rollback_retains_quarantine_replaced_after_move(
     assert not manifest_path.exists()
 
 
+def test_create_rollback_preserves_same_inode_quarantine_rewritten_after_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path = tmp_path / MANIFEST_NAME
+    published_bytes = b"published receipt\n"
+    replacement_bytes = b"modified! receipt\n"
+    manifest_path.write_bytes(published_bytes)
+    manifest_stat = manifest_path.stat(follow_symlinks=False)
+    published_identity = (manifest_stat.st_dev, manifest_stat.st_ino)
+    original_read_bytes = Path.read_bytes
+    injected = False
+
+    def _read_then_rewrite_quarantine(path: Path) -> bytes:
+        nonlocal injected
+        content = original_read_bytes(path)
+        if path.name.startswith(f".{MANIFEST_NAME}.rollback-") and not injected:
+            before = path.stat(follow_symlinks=False)
+            with path.open("r+b") as handle:
+                handle.write(replacement_bytes)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.utime(
+                path,
+                ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000),
+            )
+            injected = True
+        return content
+
+    monkeypatch.setattr(Path, "read_bytes", _read_then_rewrite_quarantine)
+
+    with pytest.raises(StorageObjectError, match="refusing to remove unrelated receipt bytes"):
+        storage_inventory._rollback_create_only_manifest(
+            manifest_path,
+            published_bytes=published_bytes,
+            published_identity=published_identity,
+            operation_error=StorageObjectError("injected validation failure"),
+        )
+
+    assert injected
+    assert original_read_bytes(manifest_path) == replacement_bytes
+    assert not tuple(tmp_path.glob(f".{MANIFEST_NAME}.rollback-*"))
+
+
 @pytest.mark.parametrize(
     ("cleanup_context", "manifest_remains"),
     [
@@ -4915,6 +4959,127 @@ def test_refresh_swaps_back_when_atomic_exchange_is_interrupted(
 
     assert manifest_path.read_bytes() == previous_bytes
     assert exchange_calls == 2
+
+
+def test_manifest_byte_match_rejects_same_inode_rewrite_after_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path = tmp_path / MANIFEST_NAME
+    expected_bytes = b"verified bytes\n"
+    replacement_bytes = b"modified bytes\n"
+    manifest_path.write_bytes(expected_bytes)
+    manifest_stat = manifest_path.stat(follow_symlinks=False)
+    expected_identity = (manifest_stat.st_dev, manifest_stat.st_ino)
+    original_read_bytes = Path.read_bytes
+    injected = False
+
+    def _read_then_rewrite_same_inode(path: Path) -> bytes:
+        nonlocal injected
+        content = original_read_bytes(path)
+        if path == manifest_path and not injected:
+            before = path.stat(follow_symlinks=False)
+            with path.open("r+b") as handle:
+                handle.write(replacement_bytes)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.utime(
+                path,
+                ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000),
+            )
+            injected = True
+        return content
+
+    monkeypatch.setattr(Path, "read_bytes", _read_then_rewrite_same_inode)
+
+    assert not storage_inventory._entry_matches_regular_bytes(
+        manifest_path,
+        expected_identity=expected_identity,
+        expected_bytes=expected_bytes,
+    )
+    assert injected
+    assert original_read_bytes(manifest_path) == replacement_bytes
+
+
+def test_refresh_swap_back_retains_candidate_after_same_inode_receipt_rewrite(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    expected_digest = _digest(manifest_path)
+    previous_bytes = manifest_path.read_bytes()
+    replacement_bytes = b"!" + previous_bytes[1:]
+    original_exchange = storage_inventory._atomic_exchange
+    original_fsync_directory = storage_inventory._fsync_directory
+    original_read_bytes = Path.read_bytes
+    exchange_calls = 0
+    durability_failure_injected = False
+    rewrite_injected = False
+
+    def _record_exchange(source: Path, destination: Path) -> None:
+        nonlocal exchange_calls
+        original_exchange(source, destination)
+        exchange_calls += 1
+
+    def _fail_first_publication_fsync(directory: Path) -> None:
+        nonlocal durability_failure_injected
+        if exchange_calls == 1 and not durability_failure_injected:
+            durability_failure_injected = True
+            raise OSError("injected publication durability failure")
+        original_fsync_directory(directory)
+
+    def _read_then_rewrite_swapped_back_receipt(path: Path) -> bytes:
+        nonlocal rewrite_injected
+        content = original_read_bytes(path)
+        if path == manifest_path and exchange_calls == 2 and not rewrite_injected:
+            before = path.stat(follow_symlinks=False)
+            with path.open("r+b") as handle:
+                handle.write(replacement_bytes)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.utime(
+                path,
+                ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000),
+            )
+            rewrite_injected = True
+        return content
+
+    monkeypatch.setattr(storage_inventory, "_atomic_exchange", _record_exchange)
+    monkeypatch.setattr(storage_inventory, "_fsync_directory", _fail_first_publication_fsync)
+    monkeypatch.setattr(Path, "read_bytes", _read_then_rewrite_swapped_back_receipt)
+
+    with pytest.raises(
+        StorageObjectPublicationUncertain,
+        match="displaced receipt changed.*retained candidate and recovery entries",
+    ):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=expected_digest,
+            producer_revision="test-revision-2",
+        )
+
+    assert durability_failure_injected
+    assert rewrite_injected
+    assert exchange_calls == 3
+    assert json.loads(original_read_bytes(manifest_path))["producer_revision"] == "test-revision-2"
+    recovery = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert len(recovery) == 1
+    assert original_read_bytes(recovery[0]) == replacement_bytes
 
 
 def test_refresh_retains_candidate_when_initial_exchange_changes_canonical_then_fails(
@@ -5390,6 +5555,52 @@ def test_refresh_rollback_retains_both_receipts_when_displaced_receipt_changes(
     recovery_paths = tuple(tmp_path.glob(f".{MANIFEST_NAME}.restore-*"))
     assert len(recovery_paths) == 1
     assert recovery_paths[0].read_bytes() == competitor_bytes
+
+
+def test_refresh_rollback_rejects_same_inode_previous_receipt_rewrite_after_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path = tmp_path / MANIFEST_NAME
+    previous_bytes = b"previous receipt\n"
+    foreign_bytes = b"foreign! receipt\n"
+    manifest_path.write_bytes(previous_bytes)
+    manifest_stat = manifest_path.stat(follow_symlinks=False)
+    published_identity = (manifest_stat.st_dev, manifest_stat.st_ino)
+    original_read_bytes = Path.read_bytes
+    injected = False
+
+    def _read_then_rewrite_same_inode(path: Path) -> bytes:
+        nonlocal injected
+        content = original_read_bytes(path)
+        if path == manifest_path and not injected:
+            before = path.stat(follow_symlinks=False)
+            with path.open("r+b") as handle:
+                handle.write(foreign_bytes)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.utime(
+                path,
+                ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000),
+            )
+            injected = True
+        return content
+
+    monkeypatch.setattr(Path, "read_bytes", _read_then_rewrite_same_inode)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="rollback classification.*uncertain"):
+        storage_inventory._rollback_manifest(
+            manifest_path,
+            published_bytes=b"published receipt\n",
+            previous_bytes=previous_bytes,
+            previous_mode=0o644,
+            operation_error=StorageObjectError("injected validation failure"),
+            published_identity=published_identity,
+        )
+
+    assert injected
+    assert original_read_bytes(manifest_path) == foreign_bytes
+    assert not tuple(tmp_path.glob(f".{MANIFEST_NAME}.restore-*"))
 
 
 def test_refresh_rollback_fails_typed_unsupported_without_mutation(
