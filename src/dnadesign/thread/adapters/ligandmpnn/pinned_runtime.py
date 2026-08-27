@@ -768,7 +768,7 @@ def _lexical_absolute_path(path: Path) -> Path:
 def _sync_regular_directory_tree(root: Path) -> None:
     """Make one private output tree durable before its directory publication."""
 
-    file_flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+    file_flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
     directory_flags = file_flags | os.O_DIRECTORY
     for directory, child_directories, filenames in os.walk(root, topdown=False, followlinks=False):
         directory_path = Path(directory)

@@ -16,9 +16,11 @@ import importlib.util
 import json
 import os
 import py_compile
+import socket
 import stat
 import subprocess
 import sys
+import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -778,6 +780,48 @@ def test_pinned_design_runtime_reports_uncertainty_when_directory_rollback_fsync
 
     assert not output_root.exists()
     assert not tuple(output_root.parent.glob(".seed_7.attempt-*"))
+
+
+@pytest.mark.parametrize("leaf_kind", ["fifo", "socket"])
+def test_design_output_tree_rejects_nonregular_leaf_without_blocking(leaf_kind: str) -> None:
+    with tempfile.TemporaryDirectory(prefix="ligandmpnn-nonregular-", dir="/tmp") as raw_root:
+        root = Path(raw_root)
+        leaf = root / "upstream-output"
+        listener: socket.socket | None = None
+        if leaf_kind == "fifo":
+            os.mkfifo(leaf)
+        else:
+            listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            listener.bind(str(leaf))
+        try:
+            probe = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    (
+                        "import sys\n"
+                        "from pathlib import Path\n"
+                        "from dnadesign.thread.adapters.ligandmpnn.pinned_runtime "
+                        "import _sync_regular_directory_tree\n"
+                        "try:\n"
+                        "    _sync_regular_directory_tree(Path(sys.argv[1]))\n"
+                        "except ValueError as error:\n"
+                        "    print(error)\n"
+                        "else:\n"
+                        "    raise SystemExit('nonregular output was accepted')\n"
+                    ),
+                    str(root),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            )
+        finally:
+            if listener is not None:
+                listener.close()
+
+    assert "design output could not be synced safely" in probe.stdout
 
 
 def test_pinned_score_runtime_rolls_back_link_when_score_directory_fsync_fails_once(
