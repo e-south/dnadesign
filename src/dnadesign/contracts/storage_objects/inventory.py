@@ -1240,6 +1240,12 @@ def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]
         try:
             lock.release()
         except OSError as release_error:
+            if isinstance(body_error, StorageObjectPublicationUncertain):
+                raise StorageObjectPublicationUncertain(
+                    "storage operation publication outcome is uncertain and manifest lock "
+                    f"{lock_path} release also failed; original_uncertainty={body_error}; "
+                    f"release_error={release_error}"
+                ) from body_error
             raise StorageObjectError(
                 f"storage operation failed and manifest lock {lock_path} could not be released: {release_error}"
             ) from body_error
@@ -1318,6 +1324,31 @@ def _assert_no_ambiguous_manifest_staging(root: Path) -> None:
         )
 
 
+def _assert_no_ambiguous_manifest_resources(root: Path, files: tuple[Path, ...]) -> None:
+    """Reject reserved recovery namespaces from an already captured resource snapshot."""
+
+    temporary_name = f".{MANIFEST_NAME}.tmp"
+    temporary_prefixes = (
+        f".{MANIFEST_NAME}.tmp-",
+        f".{MANIFEST_NAME}.restore-",
+        f".{MANIFEST_NAME}.rollback-",
+    )
+    ambiguous: list[str] = []
+    for path in files:
+        relative = path.relative_to(root)
+        top_level_name = relative.parts[0]
+        is_cleanup_recovery = (
+            top_level_name.startswith(".") and MANIFEST_NAME in top_level_name and ".cleanup-" in top_level_name
+        )
+        if top_level_name == temporary_name or top_level_name.startswith(temporary_prefixes) or is_cleanup_recovery:
+            ambiguous.append(relative.as_posix())
+    if ambiguous:
+        raise StorageObjectError(
+            "storage object contains ambiguous manifest staging state; inspect and remove it explicitly: "
+            + ", ".join(sorted(ambiguous))
+        )
+
+
 def inventory_storage_object(
     storage_root: Path,
     *,
@@ -1372,6 +1403,8 @@ def inventory_storage_object(
             for path in storage_file_paths(root)
             if path.name not in {MANIFEST_NAME, LOCK_NAME} or path.parent != root
         )
+        _assert_no_ambiguous_manifest_staging(root)
+        _assert_no_ambiguous_manifest_resources(root, files)
         relative_files = {path.relative_to(root).as_posix() for path in files}
         missing_declared = sorted((normalized_inputs | normalized_metadata | normalized_caches) - relative_files)
         if missing_declared:
@@ -1477,6 +1510,8 @@ def refresh_storage_object(
             for path in storage_file_paths(root)
             if path.name not in {MANIFEST_NAME, LOCK_NAME} or path.parent != root
         )
+        _assert_no_ambiguous_manifest_staging(root)
+        _assert_no_ambiguous_manifest_resources(root, files)
         relative_files = {path.relative_to(root).as_posix() for path in files}
         unknown_artifacts = sorted(normalized_artifacts - set(prior_roles))
         if unknown_artifacts:

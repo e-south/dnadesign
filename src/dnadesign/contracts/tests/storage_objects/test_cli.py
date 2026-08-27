@@ -1569,6 +1569,94 @@ def test_inventory_fails_closed_on_user_file_that_resembles_manifest_staging(tmp
     assert not (root / MANIFEST_NAME).exists()
 
 
+def test_inventory_rejects_reserved_staging_created_during_resource_enumeration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    recovery = root / f".{MANIFEST_NAME}.rollback-raced"
+    original_storage_file_paths = storage_inventory.storage_file_paths
+    injected = False
+
+    def _storage_file_paths(storage_root: Path) -> tuple[Path, ...]:
+        nonlocal injected
+        if not injected:
+            recovery.write_text("recoverable receipt\n", encoding="utf-8")
+            injected = True
+        return original_storage_file_paths(storage_root)
+
+    monkeypatch.setattr(storage_inventory, "storage_file_paths", _storage_file_paths)
+
+    with pytest.raises(StorageObjectError, match=r"ambiguous manifest staging state.*rollback-raced"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert injected
+    assert recovery.read_text(encoding="utf-8") == "recoverable receipt\n"
+    assert not (root / MANIFEST_NAME).exists()
+
+
+def test_inventory_rejects_reserved_staging_snapshot_despite_guard_aba(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    recovery = root / f".{MANIFEST_NAME}.rollback-aba"
+    original_storage_file_paths = storage_inventory.storage_file_paths
+    original_staging_guard = storage_inventory._assert_no_ambiguous_manifest_staging
+    guard_calls = 0
+
+    def _storage_file_paths(storage_root: Path) -> tuple[Path, ...]:
+        recovery.write_text("recoverable receipt\n", encoding="utf-8")
+        return original_storage_file_paths(storage_root)
+
+    def _staging_guard(storage_root: Path) -> None:
+        nonlocal guard_calls
+        guard_calls += 1
+        if guard_calls != 2:
+            original_staging_guard(storage_root)
+            return
+        recovery_bytes = recovery.read_bytes()
+        recovery.unlink()
+        original_staging_guard(storage_root)
+        recovery.write_bytes(recovery_bytes)
+
+    monkeypatch.setattr(storage_inventory, "storage_file_paths", _storage_file_paths)
+    monkeypatch.setattr(storage_inventory, "_assert_no_ambiguous_manifest_staging", _staging_guard)
+
+    with pytest.raises(StorageObjectError, match=r"ambiguous manifest staging state.*rollback-aba"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert guard_calls == 2
+    assert recovery.read_text(encoding="utf-8") == "recoverable receipt\n"
+    assert not (root / MANIFEST_NAME).exists()
+
+
 def test_inventory_fails_closed_on_create_rollback_recovery_state(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     root.mkdir()
@@ -1621,6 +1709,52 @@ def test_refresh_fails_closed_on_create_rollback_recovery_state(tmp_path: Path) 
             producer_revision="test-revision-2",
         )
 
+    assert manifest_path.read_bytes() == original_manifest
+    assert recovery.read_text(encoding="utf-8") == "recoverable receipt\n"
+
+
+def test_refresh_rejects_reserved_staging_created_during_resource_enumeration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    original_manifest = manifest_path.read_bytes()
+    recovery = root / f".{MANIFEST_NAME}.restore-raced"
+    original_storage_file_paths = storage_inventory.storage_file_paths
+    injected = False
+
+    def _storage_file_paths(storage_root: Path) -> tuple[Path, ...]:
+        nonlocal injected
+        if not injected:
+            recovery.write_text("recoverable receipt\n", encoding="utf-8")
+            injected = True
+        return original_storage_file_paths(storage_root)
+
+    monkeypatch.setattr(storage_inventory, "storage_file_paths", _storage_file_paths)
+
+    with pytest.raises(StorageObjectError, match=r"ambiguous manifest staging state.*restore-raced"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert injected
     assert manifest_path.read_bytes() == original_manifest
     assert recovery.read_text(encoding="utf-8") == "recoverable receipt\n"
 
@@ -2199,6 +2333,38 @@ def test_inventory_release_error_reports_committed_manifest_digest(
     assert _digest(manifest_path) in str(caught.value)
     assert "dnadesign.contracts.storage_objects validate" in str(caught.value)
     assert verify_storage_object(root).manifest.producer_revision == "test-revision-1"
+
+
+def test_manifest_lock_preserves_publication_uncertainty_when_release_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    lock_path = root / LOCK_NAME
+    lock_path.touch(mode=0o644)
+    original_release = storage_inventory.FileLock.release
+    injected = False
+
+    def _release_then_fail(lock, *args: object, **kwargs: object) -> None:
+        nonlocal injected
+        original_release(lock, *args, **kwargs)
+        if Path(lock.lock_file) == lock_path and not injected:
+            injected = True
+            raise OSError("injected uncertain-outcome lock release failure")
+
+    monkeypatch.setattr(storage_inventory.FileLock, "release", _release_then_fail)
+
+    with pytest.raises(
+        StorageObjectPublicationUncertain,
+        match="publication outcome is uncertain.*manifest lock.*release also failed",
+    ) as caught:
+        with storage_inventory._manifest_lock(root):
+            raise StorageObjectPublicationUncertain("candidate recovery state retained")
+
+    assert injected
+    assert isinstance(caught.value.__cause__, StorageObjectPublicationUncertain)
+    assert "candidate recovery state retained" in str(caught.value)
 
 
 def test_refresh_release_error_reports_new_committed_manifest_digest(
