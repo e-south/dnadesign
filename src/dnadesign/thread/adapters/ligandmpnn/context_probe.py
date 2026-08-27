@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 import os
@@ -244,7 +245,9 @@ def _publish_context_inventory(execution_root: Path, output_path: Path, payload:
         directory_fd = _open_output_directory(execution_root, output_path.parent)
     except OSError as error:
         raise ValueError("context probe output directory could not be opened safely") from error
+    lock_fd: int | None = None
     try:
+        lock_fd = _lock_context_receipt(directory_fd, output_path.name)
         prior_payload = _read_prior_receipt(directory_fd, output_path.name)
         published_identity = _write_temporary_receipt(directory_fd, temporary_name, payload)
         os.replace(
@@ -262,6 +265,7 @@ def _publish_context_inventory(execution_root: Path, output_path: Path, payload:
                     output_path.name,
                     prior_payload,
                     published_identity=published_identity,
+                    published_payload=payload,
                 )
             except OSError as restoration_error:
                 raise LigandMpnnContextPublicationUncertainError(
@@ -278,7 +282,25 @@ def _publish_context_inventory(execution_root: Path, output_path: Path, payload:
         except FileNotFoundError:
             pass
         finally:
+            if lock_fd is not None:
+                os.close(lock_fd)
             os.close(directory_fd)
+
+
+def _lock_context_receipt(directory_fd: int, output_name: str) -> int:
+    """Serialize cooperating publishers across snapshot, replacement, and recovery."""
+
+    lock_name = f".{output_name}.lock"
+    flags = os.O_RDWR | os.O_CREAT | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK
+    lock_fd = os.open(lock_name, flags, 0o600, dir_fd=directory_fd)
+    try:
+        if not stat.S_ISREG(os.fstat(lock_fd).st_mode):
+            raise OSError("context probe receipt lock must be a regular file")
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        return lock_fd
+    except BaseException:
+        os.close(lock_fd)
+        raise
 
 
 def _read_prior_receipt(directory_fd: int, output_name: str) -> bytes | None:
@@ -330,37 +352,179 @@ def _restore_prior_receipt(
     prior_payload: bytes | None,
     *,
     published_identity: tuple[int, int],
+    published_payload: bytes,
 ) -> None:
-    """Restore the descriptor-relative pre-publication state and sync it."""
+    """Quarantine the current leaf, then restore without overwriting a replacement."""
 
+    quarantine_name = f".{output_name}.{uuid.uuid4().hex}.recovery"
+    quarantine_leaf = "publication"
     try:
-        current_status = os.stat(output_name, dir_fd=directory_fd, follow_symlinks=False)
-    except FileNotFoundError as error:
+        os.mkdir(quarantine_name, mode=0o700, dir_fd=directory_fd)
+        quarantine_fd = os.open(
+            quarantine_name,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+            dir_fd=directory_fd,
+        )
+    except OSError as error:
         raise LigandMpnnContextPublicationUncertainError(
-            "context probe receipt changed before publication recovery"
+            "context probe receipt restoration could not be made durable after publication failure"
         ) from error
-    if (current_status.st_dev, current_status.st_ino) != published_identity:
-        raise LigandMpnnContextPublicationUncertainError("context probe receipt changed before publication recovery")
-    if prior_payload is None:
+    quarantined = False
+    restoration_name: str | None = None
+    try:
         try:
-            os.unlink(output_name, dir_fd=directory_fd)
-        except FileNotFoundError:
-            pass
-    else:
-        restoration_name = f".{output_name}.{uuid.uuid4().hex}.restore.tmp"
-        try:
-            _write_temporary_receipt(directory_fd, restoration_name, prior_payload)
-            os.replace(
-                restoration_name,
+            os.rename(
                 output_name,
+                quarantine_leaf,
                 src_dir_fd=directory_fd,
-                dst_dir_fd=directory_fd,
+                dst_dir_fd=quarantine_fd,
             )
-        finally:
+        except FileNotFoundError as error:
+            os.rmdir(quarantine_name, dir_fd=directory_fd)
+            os.fsync(directory_fd)
+            raise LigandMpnnContextPublicationUncertainError(
+                "context probe receipt changed before publication recovery"
+            ) from error
+        quarantined = True
+        observed_identity, observed_payload = _read_quarantined_receipt(quarantine_fd, quarantine_leaf)
+        if observed_identity != published_identity or observed_payload != published_payload:
+            _restore_quarantined_receipt_without_overwrite(
+                directory_fd,
+                output_name,
+                quarantine_fd,
+                quarantine_leaf,
+                quarantine_name=quarantine_name,
+            )
+            quarantined = False
+            raise LigandMpnnContextPublicationUncertainError(
+                "context probe receipt changed before publication recovery"
+            )
+
+        if prior_payload is not None:
+            restoration_name = f".{output_name}.{uuid.uuid4().hex}.restore.tmp"
+            _write_temporary_receipt(directory_fd, restoration_name, prior_payload)
+            try:
+                os.link(
+                    restoration_name,
+                    output_name,
+                    src_dir_fd=directory_fd,
+                    dst_dir_fd=directory_fd,
+                    follow_symlinks=False,
+                )
+            except FileExistsError as error:
+                os.unlink(restoration_name, dir_fd=directory_fd)
+                restoration_name = None
+                quarantined = False
+                _discard_quarantined_receipt(
+                    directory_fd,
+                    quarantine_fd,
+                    quarantine_name=quarantine_name,
+                    quarantine_leaf=quarantine_leaf,
+                )
+                raise LigandMpnnContextPublicationUncertainError(
+                    "context probe receipt changed before publication recovery"
+                ) from error
+            os.unlink(restoration_name, dir_fd=directory_fd)
+            restoration_name = None
+        os.unlink(quarantine_leaf, dir_fd=quarantine_fd)
+        quarantined = False
+        os.fsync(quarantine_fd)
+        os.rmdir(quarantine_name, dir_fd=directory_fd)
+        os.fsync(directory_fd)
+        if prior_payload is None:
+            try:
+                os.stat(output_name, dir_fd=directory_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                return
+            raise LigandMpnnContextPublicationUncertainError(
+                "context probe receipt changed before publication recovery"
+            )
+    except LigandMpnnContextPublicationUncertainError:
+        raise
+    except OSError as error:
+        recovery = f"; displaced receipt retained in {quarantine_name}/{quarantine_leaf}" if quarantined else ""
+        raise LigandMpnnContextPublicationUncertainError(
+            "context probe receipt restoration could not be made durable after publication failure" + recovery
+        ) from error
+    finally:
+        if restoration_name is not None:
             try:
                 os.unlink(restoration_name, dir_fd=directory_fd)
             except FileNotFoundError:
                 pass
+        os.close(quarantine_fd)
+
+
+def _read_quarantined_receipt(directory_fd: int, name: str) -> tuple[tuple[int, int], bytes]:
+    """Read identity and bytes from one no-follow regular recovery leaf."""
+
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK
+    descriptor = os.open(name, flags, dir_fd=directory_fd)
+    try:
+        status = os.fstat(descriptor)
+        if not stat.S_ISREG(status.st_mode):
+            raise OSError("context probe recovery leaf is not a regular file")
+        handle = os.fdopen(descriptor, "rb", closefd=False)
+        with handle:
+            payload = handle.read()
+        return (status.st_dev, status.st_ino), payload
+    finally:
+        os.close(descriptor)
+
+
+def _restore_quarantined_receipt_without_overwrite(
+    directory_fd: int,
+    output_name: str,
+    quarantine_fd: int,
+    quarantine_leaf: str,
+    *,
+    quarantine_name: str,
+) -> None:
+    """Restore a displaced foreign receipt only when its public name is absent."""
+
+    try:
+        os.link(
+            quarantine_leaf,
+            output_name,
+            src_dir_fd=quarantine_fd,
+            dst_dir_fd=directory_fd,
+            follow_symlinks=False,
+        )
+    except FileExistsError as error:
+        raise LigandMpnnContextPublicationUncertainError(
+            f"context probe receipt changed before publication recovery; displaced receipt retained in "
+            f"{quarantine_name}/{quarantine_leaf}"
+        ) from error
+    quarantined = True
+    try:
+        os.unlink(quarantine_leaf, dir_fd=quarantine_fd)
+        quarantined = False
+        os.fsync(quarantine_fd)
+        os.rmdir(quarantine_name, dir_fd=directory_fd)
+        os.fsync(directory_fd)
+    except OSError as error:
+        recovery = (
+            f"; displaced receipt retained in {quarantine_name}/{quarantine_leaf}"
+            if quarantined
+            else "; restored concurrent receipt durability is uncertain"
+        )
+        raise LigandMpnnContextPublicationUncertainError(
+            "context probe receipt restoration could not be made durable after publication failure" + recovery
+        ) from error
+
+
+def _discard_quarantined_receipt(
+    directory_fd: int,
+    quarantine_fd: int,
+    *,
+    quarantine_name: str,
+    quarantine_leaf: str,
+) -> None:
+    """Remove one known-owned recovery leaf and make its cleanup durable."""
+
+    os.unlink(quarantine_leaf, dir_fd=quarantine_fd)
+    os.fsync(quarantine_fd)
+    os.rmdir(quarantine_name, dir_fd=directory_fd)
     os.fsync(directory_fd)
 
 
