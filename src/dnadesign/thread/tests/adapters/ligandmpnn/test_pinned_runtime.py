@@ -29,8 +29,16 @@ from pathlib import Path
 import pytest
 
 import dnadesign.thread.adapters.ligandmpnn.pinned_runtime as pinned_runtime_module
+from dnadesign.thread.adapters.ligandmpnn.alphabets import materialize_residue_alphabet_sidecar
 from dnadesign.thread.adapters.ligandmpnn.commands import build_ligandmpnn_commands
-from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnRequest, LigandMpnnUpstreamPin
+from dnadesign.thread.adapters.ligandmpnn.design_results import parse_ligandmpnn_design_outputs
+from dnadesign.thread.adapters.ligandmpnn.models import (
+    LigandMpnnCommand,
+    LigandMpnnRequest,
+    LigandMpnnResidue,
+    LigandMpnnResidueAlphabet,
+    LigandMpnnUpstreamPin,
+)
 from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import (
     _validate_runtime_option_contract,
     build_pinned_runtime_command,
@@ -233,6 +241,150 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
     pdb.write_text("input-v1", encoding="utf-8")
     pdb_sha256 = hashlib.sha256(pdb.read_bytes()).hexdigest()
     return root, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256
+
+
+def _public_runtime_command(
+    tmp_path: Path,
+    *,
+    entrypoint: str,
+    with_residue_sidecar: bool = False,
+) -> tuple[LigandMpnnRequest | LigandMpnnScoreRequest, LigandMpnnCommand, Path]:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    reference = write_context_inventory(
+        tmp_path,
+        input_path=pdb.relative_to(tmp_path),
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=False,
+        parser_sha256=hashlib.sha256((checkout / "data_utils.py").read_bytes()).hexdigest(),
+    )
+    upstream = LigandMpnnUpstreamPin(
+        commit=commit,
+        checkpoint_sha256=checkpoint_sha256,
+        checkpoint_path=checkpoint.relative_to(checkout),
+    )
+    if entrypoint == "run.py":
+        residue = LigandMpnnResidue("A", 1)
+        request: LigandMpnnRequest | LigandMpnnScoreRequest = LigandMpnnRequest(
+            request_id="foreign_cwd_design",
+            pdb_path=pdb.relative_to(tmp_path),
+            pdb_sha256=pdb_sha256,
+            output_dir=Path("designs"),
+            upstream=upstream,
+            context_inventory=reference,
+            redesigned_residues=((residue,) if with_residue_sidecar else ()),
+            residue_alphabets=(
+                (LigandMpnnResidueAlphabet(residue=residue, allowed_amino_acids=("A", "C")),)
+                if with_residue_sidecar
+                else ()
+            ),
+            seeds=(7,),
+        )
+        sidecar = None
+        if with_residue_sidecar:
+            sidecar_path = Path("evidence/residue-alphabet.json")
+            sidecar = materialize_residue_alphabet_sidecar(
+                request,
+                sidecar_path,
+                write_path=tmp_path / sidecar_path,
+            )
+        command = build_ligandmpnn_commands(
+            request,
+            checkout_root=checkout,
+            execution_root=tmp_path,
+            python_executable=sys.executable,
+            residue_alphabet_sidecar=sidecar,
+        )[0]
+    else:
+        request = LigandMpnnScoreRequest(
+            request_id="foreign_cwd_score",
+            pdb_path=pdb.relative_to(tmp_path),
+            pdb_sha256=pdb_sha256,
+            output_dir=Path("scores"),
+            upstream=upstream,
+            context_inventory=reference,
+            seeds=(7,),
+            number_of_batches=10,
+            use_atom_context=False,
+        )
+        command = build_ligandmpnn_score_commands(
+            request,
+            checkout_root=checkout,
+            execution_root=tmp_path,
+            python_executable=sys.executable,
+        )[0]
+    return request, command, pdb
+
+
+@pytest.mark.parametrize("entrypoint", ["run.py", "score.py"])
+def test_public_runtime_anchors_relative_paths_to_execution_root_from_foreign_cwd(
+    tmp_path: Path,
+    entrypoint: str,
+) -> None:
+    request, command, pdb = _public_runtime_command(tmp_path, entrypoint=entrypoint)
+    foreign_cwd = tmp_path / "foreign-cwd"
+    foreign_pdb = foreign_cwd / request.pdb_path
+    foreign_pdb.parent.mkdir(parents=True)
+    foreign_pdb.write_bytes(pdb.read_bytes())
+
+    subprocess.run(command.argv, cwd=foreign_cwd, check=True)
+
+    output_root = tmp_path / command.output_dir
+    assert (output_root / ".dnadesign-ligandmpnn-execution.json").is_file()
+    assert not (foreign_cwd / command.output_dir).exists()
+    if isinstance(request, LigandMpnnRequest):
+        result = parse_ligandmpnn_design_outputs(request, (command,), execution_root=tmp_path)
+        assert result.sequence_count == request.expected_sequence_count
+    else:
+        assert (output_root / "input.pt").read_text(encoding="utf-8") == "input-v1"
+
+
+@pytest.mark.parametrize("entrypoint", ["run.py", "score.py"])
+@pytest.mark.parametrize("foreign_input", ["missing", "tampered"])
+def test_public_runtime_ignores_non_authoritative_foreign_relative_input(
+    tmp_path: Path,
+    entrypoint: str,
+    foreign_input: str,
+) -> None:
+    request, command, _pdb = _public_runtime_command(tmp_path, entrypoint=entrypoint)
+    foreign_cwd = tmp_path / "foreign-cwd"
+    foreign_cwd.mkdir()
+    if foreign_input == "tampered":
+        foreign_pdb = foreign_cwd / request.pdb_path
+        foreign_pdb.parent.mkdir(parents=True)
+        foreign_pdb.write_text("tampered-foreign-input", encoding="utf-8")
+
+    subprocess.run(command.argv, cwd=foreign_cwd, check=True)
+
+    output_root = tmp_path / command.output_dir
+    assert (output_root / ".dnadesign-ligandmpnn-execution.json").is_file()
+    assert not (foreign_cwd / command.output_dir).exists()
+
+
+@pytest.mark.parametrize("foreign_sidecar", ["missing", "tampered"])
+def test_public_design_runtime_ignores_non_authoritative_foreign_relative_sidecar(
+    tmp_path: Path,
+    foreign_sidecar: str,
+) -> None:
+    request, command, pdb = _public_runtime_command(
+        tmp_path,
+        entrypoint="run.py",
+        with_residue_sidecar=True,
+    )
+    foreign_cwd = tmp_path / "foreign-cwd"
+    foreign_pdb = foreign_cwd / request.pdb_path
+    foreign_pdb.parent.mkdir(parents=True)
+    foreign_pdb.write_bytes(pdb.read_bytes())
+    sidecar_value = command.argv[command.argv.index("--omit_AA_per_residue") + 1]
+    if foreign_sidecar == "tampered":
+        foreign_sidecar_path = foreign_cwd / sidecar_value
+        foreign_sidecar_path.parent.mkdir(parents=True)
+        foreign_sidecar_path.write_text("tampered-foreign-sidecar", encoding="utf-8")
+
+    subprocess.run(command.argv, cwd=foreign_cwd, check=True)
+
+    assert (tmp_path / command.output_dir / ".dnadesign-ligandmpnn-execution.json").is_file()
+    assert not (foreign_cwd / command.output_dir).exists()
 
 
 @pytest.mark.parametrize("entrypoint", ["run.py", "score.py"])
@@ -2752,8 +2904,13 @@ def test_pinned_score_runtime_publishes_only_one_concurrent_same_name_output(
     barrier = threading.Barrier(2)
     original_reject = pinned_runtime_module._reject_existing_score_output
 
-    def _synchronize(arguments: list[str], *, pdb_path: Path) -> tuple[int, Path, Path]:
-        publication = original_reject(arguments, pdb_path=pdb_path)
+    def _synchronize(
+        arguments: list[str],
+        *,
+        pdb_path: Path,
+        execution_root: Path,
+    ) -> tuple[int, Path, Path]:
+        publication = original_reject(arguments, pdb_path=pdb_path, execution_root=execution_root)
         barrier.wait(timeout=5)
         return publication
 

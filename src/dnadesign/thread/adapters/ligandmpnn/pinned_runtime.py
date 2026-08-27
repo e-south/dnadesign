@@ -49,6 +49,13 @@ _REDESIGNED_RESIDUES_FLAG = "--redesigned_residues"
 _MODEL_TYPE_FLAG = "--model_type"
 _OUTPUT_FOLDER_FLAG = "--out_folder"
 _COMPLETION_RECORD_NAME = ".dnadesign-ligandmpnn-execution.json"
+_RUNTIME_PATH_FLAGS = (
+    _CHECKPOINT_FLAG,
+    _PACKING_CHECKPOINT_FLAG,
+    _PDB_FLAG,
+    _RESIDUE_ALPHABET_FLAG,
+    _OUTPUT_FOLDER_FLAG,
+)
 _ALTERNATE_SOURCE_FLAGS = frozenset(
     {
         "--checkpoint_protein_mpnn",
@@ -432,6 +439,13 @@ def execute_pinned_entrypoint(
         context_inventory_sha256=context_inventory_sha256,
         execution_root=execution_root,
     )
+    assert execution_root is not None
+    runtime_execution_root = _canonical_runtime_execution_root(execution_root)
+    publication_completion_record_path = _lexical_absolute_path(
+        completion_record_path,
+        execution_root=runtime_execution_root,
+        label="completion record path",
+    )
     execution = _pinned_execution_payload(
         checkout_root=checkout_root,
         upstream_commit=upstream_commit,
@@ -452,14 +466,18 @@ def execute_pinned_entrypoint(
     ).hexdigest()
     if observed_execution_sha256 != planned_execution_sha256:
         raise ValueError("actual LigandMPNN execution does not match the complete planned arguments")
-    if os.path.lexists(completion_record_path):
-        raise ValueError(f"LigandMPNN completion record already exists: {completion_record_path}")
+    if os.path.lexists(publication_completion_record_path):
+        raise ValueError(f"LigandMPNN completion record already exists: {publication_completion_record_path}")
     _validate_runtime_option_contract(arguments)
     try:
         _resolve_rename_no_replace()
     except OSError as exc:
         raise ValueError("atomic no-replace publication is unavailable on this platform") from exc
-    checkout = checkout_root.expanduser().resolve()
+    checkout = _lexical_absolute_path(
+        checkout_root,
+        execution_root=runtime_execution_root,
+        label="checkout_root",
+    ).resolve()
     if not checkout.is_dir():
         raise ValueError("LigandMPNN checkout_root must be an existing directory")
     observed_commit = _git_head(checkout)
@@ -473,7 +491,8 @@ def execute_pinned_entrypoint(
         if not entrypoint_path.is_file():
             raise ValueError(f"pinned LigandMPNN commit does not contain {entrypoint}")
         runtime_arguments = list(arguments)
-        requested_pdb_path = Path(_runtime_option_value(runtime_arguments, _PDB_FLAG)).expanduser()
+        requested_pdb_path = Path(_runtime_option_value(runtime_arguments, _PDB_FLAG))
+        _anchor_runtime_path_options(runtime_arguments, execution_root=runtime_execution_root)
         weights_root = snapshot / ".dnadesign-weights"
         weights_root.mkdir()
         _replace_verified_file(
@@ -510,7 +529,7 @@ def execute_pinned_entrypoint(
                     path=context_inventory_path,
                     sha256=context_inventory_sha256,
                 ),
-                execution_root=execution_root,
+                execution_root=runtime_execution_root,
                 checkout_root=checkout,
                 upstream_commit=upstream_commit,
                 checkpoint_sha256=checkpoint_sha256,
@@ -542,8 +561,11 @@ def execute_pinned_entrypoint(
         design_attempt_identity: tuple[int, int] | None = None
         design_publication: tuple[Path, Path] | None = None
         if entrypoint == "run.py" and _has_flag(runtime_arguments, _OUTPUT_FOLDER_FLAG):
-            output_value_index, output_root = _runtime_output_root(runtime_arguments)
-            if _lexical_absolute_path(completion_record_path) != output_root / _COMPLETION_RECORD_NAME:
+            output_value_index, output_root = _runtime_output_root(
+                runtime_arguments,
+                execution_root=runtime_execution_root,
+            )
+            if publication_completion_record_path != output_root / _COMPLETION_RECORD_NAME:
                 raise ValueError("design completion record must be inside its per-seed output directory")
             if os.path.lexists(output_root):
                 raise ValueError(f"design output directory already exists: {output_root}")
@@ -564,6 +586,7 @@ def execute_pinned_entrypoint(
             output_value_index, output_root, expected_output = _reject_existing_score_output(
                 runtime_arguments,
                 pdb_path=staged_pdb,
+                execution_root=runtime_execution_root,
             )
             try:
                 output_directory_fd = _open_directory_path(output_root, create=True)
@@ -684,7 +707,7 @@ def execute_pinned_entrypoint(
                             raise
             return
     _write_completion_record(
-        completion_record_path,
+        publication_completion_record_path,
         _completion_record(
             execution,
             observed_execution_sha256,
@@ -1313,22 +1336,31 @@ def _validate_runtime_seed(arguments: tuple[str, ...]) -> None:
         )
 
 
-def _reject_existing_score_output(arguments: list[str], *, pdb_path: Path) -> tuple[int, Path, Path]:
-    output_value_index, output_root = _runtime_output_root(arguments)
+def _reject_existing_score_output(
+    arguments: list[str],
+    *,
+    pdb_path: Path,
+    execution_root: Path,
+) -> tuple[int, Path, Path]:
+    output_value_index, output_root = _runtime_output_root(arguments, execution_root=execution_root)
     expected_output = output_root / f"{pdb_path.stem}.pt"
     if expected_output.exists() or expected_output.is_symlink():
         raise ValueError(f"score output already exists; refuse stale or ambiguous result: {expected_output}")
     return output_value_index, output_root, expected_output
 
 
-def _runtime_output_root(arguments: list[str]) -> tuple[int, Path]:
+def _runtime_output_root(arguments: list[str], *, execution_root: Path) -> tuple[int, Path]:
     attached_prefix = f"{_OUTPUT_FOLDER_FLAG}="
     if any(value.startswith(attached_prefix) for value in arguments):
         raise ValueError(f"runtime arguments must use the split form of {_OUTPUT_FOLDER_FLAG} exactly once")
     positions = [index for index, value in enumerate(arguments) if value == _OUTPUT_FOLDER_FLAG]
     if len(positions) != 1 or positions[0] + 1 >= len(arguments):
         raise ValueError(f"runtime arguments must contain exactly one {_OUTPUT_FOLDER_FLAG}")
-    output_root = _lexical_absolute_path(Path(arguments[positions[0] + 1]).expanduser())
+    output_root = _lexical_absolute_path(
+        Path(arguments[positions[0] + 1]),
+        execution_root=execution_root,
+        label=_OUTPUT_FOLDER_FLAG,
+    )
     return positions[0] + 1, output_root
 
 
@@ -1351,10 +1383,44 @@ def _runtime_boolean_option(arguments: list[str], flag: str) -> bool:
     return value == "1"
 
 
-def _lexical_absolute_path(path: Path) -> Path:
-    """Anchor a relative path without resolving away symlink evidence."""
+def _canonical_runtime_execution_root(execution_root: Path) -> Path:
+    if not isinstance(execution_root, Path) or not execution_root.is_absolute():
+        raise ValueError("runtime execution_root must be an absolute directory")
+    root = execution_root.expanduser().resolve()
+    if not root.is_dir():
+        raise ValueError("runtime execution_root must be an existing directory")
+    return root
 
-    return path if path.is_absolute() else Path.cwd() / path
+
+def _anchor_runtime_path_options(arguments: list[str], *, execution_root: Path) -> None:
+    for flag in _RUNTIME_PATH_FLAGS:
+        if not _has_flag(arguments, flag):
+            continue
+        positions = [index for index, value in enumerate(arguments) if value == flag]
+        if not positions:
+            continue
+        if len(positions) != 1 or positions[0] + 1 >= len(arguments):
+            raise ValueError(f"runtime arguments must contain exactly one {flag}")
+        value_index = positions[0] + 1
+        arguments[value_index] = str(
+            _lexical_absolute_path(
+                Path(arguments[value_index]),
+                execution_root=execution_root,
+                label=flag,
+            )
+        )
+
+
+def _lexical_absolute_path(path: Path, *, execution_root: Path, label: str) -> Path:
+    """Anchor a safe relative path without resolving descendant symlink evidence."""
+
+    if str(path).startswith("~"):
+        raise ValueError(f"runtime {label} must not begin with '~'")
+    if path.is_absolute():
+        return path
+    if ".." in path.parts:
+        raise ValueError(f"runtime {label} must not contain traversal")
+    return execution_root / path
 
 
 def _sync_regular_directory_tree(root: Path) -> None:
