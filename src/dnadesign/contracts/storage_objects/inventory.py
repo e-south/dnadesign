@@ -267,6 +267,43 @@ def _rollback_create_only_manifest(
     ) from operation_error
 
 
+def _preflight_create_only_rollback(directory: Path) -> None:
+    """Prove no-replace rollback support before publishing a new receipt."""
+
+    descriptor, source_name = tempfile.mkstemp(
+        dir=directory,
+        prefix=f".{MANIFEST_NAME}.tmp-preflight-",
+    )
+    os.close(descriptor)
+    source = Path(source_name)
+    destination = source.with_name(f"{source.name}.destination")
+    source_identity = _entry_identity(source)
+    try:
+        _atomic_move_no_replace(source, destination)
+        if source.exists() or _entry_identity(destination) != source_identity:
+            raise StorageObjectPublicationUncertain(
+                "cannot prove atomic create-only manifest rollback support on this filesystem"
+            )
+    finally:
+        cleanup_errors: list[BaseException] = []
+        for candidate in (source, destination):
+            try:
+                if _entry_identity(candidate) != source_identity:
+                    cleanup_errors.append(
+                        StorageObjectError(f"create-only rollback preflight path changed unexpectedly: {candidate}")
+                    )
+                    continue
+                candidate.unlink()
+            except FileNotFoundError:
+                continue
+            except BaseException as exc:
+                cleanup_errors.append(exc)
+        if cleanup_errors:
+            raise StorageObjectPublicationUncertain(
+                "create-only rollback preflight cleanup is uncertain; inspect manifest staging state"
+            ) from cleanup_errors[0]
+
+
 def _publish_create_only_manifest(
     temporary: Path,
     manifest_path: Path,
@@ -276,6 +313,7 @@ def _publish_create_only_manifest(
 ) -> None:
     """Publish one staged regular file without any replacement window."""
 
+    _preflight_create_only_rollback(manifest_path.parent)
     try:
         os.link(temporary, manifest_path, follow_symlinks=False)
     except FileExistsError as exc:
@@ -417,7 +455,7 @@ def _write_manifest(
     payload: dict[str, object],
     *,
     previous_bytes: bytes | None = None,
-    allow_untracked_demo_manifest: bool = False,
+    allow_pending_demo_manifest: bool = False,
 ) -> dict[str, object]:
     manifest_text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     manifest_bytes = manifest_text.encode("utf-8")
@@ -473,10 +511,10 @@ def _write_manifest(
     try:
         summary = verify_storage_object(
             manifest_path.parent,
-            _allow_untracked_demo_manifest=allow_untracked_demo_manifest,
+            _allow_pending_demo_manifest=allow_pending_demo_manifest,
         ).summary()
-        if allow_untracked_demo_manifest:
-            summary["status"] = "created-pending-git-add"
+        if allow_pending_demo_manifest:
+            summary["status"] = "created-pending-git-add" if previous_bytes is None else "refreshed-pending-git-add"
             object_root = shlex.quote(str(manifest_path.parent))
             python_executable = shlex.quote(sys.executable)
             summary["next_step"] = (
@@ -717,7 +755,7 @@ def inventory_storage_object(
         return _write_manifest(
             manifest_path,
             payload,
-            allow_untracked_demo_manifest=demo,
+            allow_pending_demo_manifest=demo,
         )
 
 
@@ -860,4 +898,9 @@ def refresh_storage_object(
         }
         if manifest.original_execution_path is not None:
             payload["original_execution_path"] = manifest.original_execution_path
-        return _write_manifest(manifest_path, payload, previous_bytes=previous_bytes)
+        return _write_manifest(
+            manifest_path,
+            payload,
+            previous_bytes=previous_bytes,
+            allow_pending_demo_manifest=manifest.demo,
+        )

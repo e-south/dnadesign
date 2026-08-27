@@ -224,6 +224,65 @@ def test_inventory_demo_requires_resource_bytes_to_match_git_index(tmp_path: Pat
     )
 
 
+def test_refresh_demo_allows_only_manifest_to_enter_pending_git_state(tmp_path: Path) -> None:
+    checkout = tmp_path / "checkout"
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    root = checkout / "examples" / "pilot"
+    root.mkdir(parents=True)
+    payload = root / "payload.txt"
+    payload.write_text("first\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot/payload.txt"], check=True)
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+        demo=True,
+    )
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot/storage.object.json"], check=True)
+    manifest_path = root / MANIFEST_NAME
+    previous_bytes = manifest_path.read_bytes()
+    payload.write_text("second\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="demo file differs from Git index"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert manifest_path.read_bytes() == previous_bytes
+
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot/payload.txt"], check=True)
+    summary = refresh_storage_object(
+        root,
+        expected_manifest_digest=_digest(manifest_path),
+        producer_revision="test-revision-2",
+    )
+
+    assert summary["status"] == "refreshed-pending-git-add"
+    assert json.loads(manifest_path.read_text(encoding="utf-8"))["producer_revision"] == "test-revision-2"
+    with pytest.raises(StorageObjectError, match="demo file differs from Git index"):
+        verify_storage_object(root)
+    subprocess.run(summary["next_step"], shell=True, cwd=tmp_path, check=True, capture_output=True, text=True)
+    assert verify_storage_object(root).summary()["status"] == "verified"
+
+    revision_only = refresh_storage_object(
+        root,
+        expected_manifest_digest=_digest(manifest_path),
+        producer_revision="test-revision-3",
+    )
+    assert revision_only["status"] == "refreshed-pending-git-add"
+    subprocess.run(revision_only["next_step"], shell=True, cwd=tmp_path, check=True, capture_output=True, text=True)
+    assert verify_storage_object(root).manifest.producer_revision == "test-revision-3"
+
+
 def test_validate_root_emits_inventory_summary(tmp_path: Path) -> None:
     storage_root = tmp_path / "storage"
     for shelf in ("workspaces", "stores", "tool-cache"):
@@ -632,7 +691,7 @@ def test_inventory_stages_manifest_on_object_filesystem(
         retention_policy="review-before-delete",
     )
 
-    assert observed_directories == [root]
+    assert observed_directories == [root, root]
 
 
 def test_inventory_fails_closed_on_user_file_that_resembles_manifest_staging(tmp_path: Path) -> None:
@@ -1698,6 +1757,50 @@ def test_inventory_reports_typed_unsupported_hard_link_without_mutation(
             retention_policy="review-before-delete",
         )
 
+    assert not (root / MANIFEST_NAME).exists()
+    assert not tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+
+
+def test_inventory_preflights_create_rollback_support_before_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    link_calls = 0
+    original_link = storage_inventory.os.link
+
+    def _record_link(*args: object, **kwargs: object) -> None:
+        nonlocal link_calls
+        link_calls += 1
+        original_link(*args, **kwargs)
+
+    def _unsupported_move(*_args: object, **_kwargs: object) -> None:
+        raise StorageObjectPublicationUnsupported("injected unsupported no-replace move")
+
+    def _fail_verification(*_args: object, **_kwargs: object) -> None:
+        raise StorageObjectError("injected validation failure")
+
+    monkeypatch.setattr(storage_inventory.os, "link", _record_link)
+    monkeypatch.setattr(storage_inventory, "_atomic_move_no_replace", _unsupported_move)
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _fail_verification)
+
+    with pytest.raises(StorageObjectPublicationUnsupported, match="unsupported no-replace move"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert link_calls == 0
     assert not (root / MANIFEST_NAME).exists()
     assert not tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
 

@@ -94,6 +94,10 @@ Refresh preserves identity and existing roles, records the revision that
 produced the refreshed bytes, inventories new artifacts, and accepts `--cache`
 for newly created cache files. Input and metadata bytes are protected: removing
 or changing them fails rather than silently authorizing a new input identity.
+For a demo refresh, changed resources must already be staged and match their Git
+index entries. The refreshed manifest alone enters
+`refreshed-pending-git-add`; add it with the returned command to restore the
+fully `verified` state.
 If an initial receipt incorrectly classified a mutable operational ledger as
 metadata, an operator may name that existing path with `--artifact`. This
 one-way, compare-and-swap-protected correction permits only `metadata` to
@@ -120,7 +124,8 @@ coordination boundary. Declared resource files must inherit that group and be
 group-readable; their parent directories must inherit the group and be
 group-readable and traversable. Manifest staging occurs inside the object so
 publication stays on the same filesystem. Create-only inventory commits with
-an atomic hard-link-if-absent operation. Refresh commits with a native atomic
+an atomic hard-link-if-absent operation after preflighting the no-replace
+primitive required for conditional rollback. Refresh commits with a native atomic
 file exchange on Darwin or Linux, validates the displaced receipt against the
 exact bytes that authorized the refresh, and swaps it back on mismatch. A
 platform or filesystem without the required primitive fails closed as

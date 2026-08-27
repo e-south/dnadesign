@@ -292,7 +292,7 @@ def _verify_demo(
     checkout: Path,
     verified: VerifiedStorageObject,
     *,
-    allow_untracked_manifest: bool,
+    allow_pending_manifest: bool,
 ) -> None:
     total_bytes = verified.manifest_path.stat().st_size + sum(resource.size_bytes for resource in verified.resources)
     if total_bytes > MAX_DEMO_BYTES:
@@ -302,6 +302,8 @@ def _verify_demo(
         *((resource.path, resource.digest) for resource in verified.resources),
     ):
         relative = path.relative_to(checkout).as_posix()
+        if allow_pending_manifest and path == verified.manifest_path:
+            continue
         try:
             completed = subprocess.run(
                 [
@@ -320,8 +322,6 @@ def _verify_demo(
         except OSError as exc:
             raise StorageObjectError(f"cannot verify demo Git tracking for {relative}: {exc}") from exc
         if completed.returncode != 0:
-            if allow_untracked_manifest and path == verified.manifest_path:
-                continue
             raise StorageObjectError(f"demo file is not tracked: {relative}")
         try:
             indexed = subprocess.run(
@@ -343,7 +343,7 @@ def _verify_demo(
 def verify_storage_object(
     storage_root: Path,
     *,
-    _allow_untracked_demo_manifest: bool = False,
+    _allow_pending_demo_manifest: bool = False,
 ) -> VerifiedStorageObject:
     """Verify one explicit storage object and require exact file closure."""
 
@@ -444,7 +444,7 @@ def verify_storage_object(
         _verify_demo(
             checkout,
             verified,
-            allow_untracked_manifest=_allow_untracked_demo_manifest,
+            allow_pending_manifest=_allow_pending_demo_manifest,
         )
     elif checkout is not None:
         raise StorageObjectError(
