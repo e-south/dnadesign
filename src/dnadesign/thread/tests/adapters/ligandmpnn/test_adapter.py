@@ -313,6 +313,40 @@ def test_redesigned_residues_use_the_distinct_official_flag(tmp_path: Path) -> N
     assert argv[argv.index("--pack_side_chains") + 1] == "0"
 
 
+@pytest.mark.parametrize(
+    ("field_name", "residue"),
+    [
+        ("fixed_residues", LigandMpnnResidue("B", 12)),
+        ("fixed_residues", LigandMpnnResidue("A", 14)),
+        ("fixed_residues", LigandMpnnResidue("A", 13, "A")),
+        ("redesigned_residues", LigandMpnnResidue("B", 12)),
+        ("redesigned_residues", LigandMpnnResidue("A", 14)),
+        ("redesigned_residues", LigandMpnnResidue("A", 13, "A")),
+    ],
+)
+def test_build_commands_rejects_selectors_absent_from_pinned_parser_protein_identities(
+    tmp_path: Path,
+    field_name: str,
+    residue: LigandMpnnResidue,
+) -> None:
+    selection = {"fixed_residues": (), "redesigned_residues": ()}
+    selection[field_name] = (residue,)
+    request, checkout_root = _validated_request(tmp_path, **selection)
+
+    with pytest.raises(ValueError, match=rf"{field_name}.*{residue.upstream_id}.*not present"):
+        build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
+
+
+def test_build_commands_rejects_pdb_under_symlinked_ancestor_before_emission(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path)
+    original_inputs = tmp_path / "original-inputs"
+    (tmp_path / "inputs").rename(original_inputs)
+    (tmp_path / "inputs").symlink_to(original_inputs, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="context probe input could not be opened safely"):
+        build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
+
+
 def test_command_preserves_requested_temperature_precision(tmp_path: Path) -> None:
     request, checkout_root = _validated_request(tmp_path, temperature=0.123456789)
 

@@ -438,7 +438,7 @@ def validate_context_inventory_for_input(
     checkout_root: Path,
     execution_root: Path,
     require_clean_parser_checkout: bool = True,
-) -> None:
+) -> frozenset[str]:
     """Require an inventory produced for the exact input and context settings."""
 
     if inventory.input_path != pdb_path or inventory.input_sha256 != pdb_sha256:
@@ -462,10 +462,10 @@ def validate_context_inventory_for_input(
         raise ValueError("context inventory proves zero effective DNA/RNA context atoms")
     from dnadesign.thread.adapters.ligandmpnn.context_probe import (
         LigandMpnnContextProbeRequest,
-        _derive_ligandmpnn_context_inventory,
+        _derive_ligandmpnn_context_evidence,
     )
 
-    derived = _derive_ligandmpnn_context_inventory(
+    derived, protein_residue_ids = _derive_ligandmpnn_context_evidence(
         LigandMpnnContextProbeRequest(
             request_id=inventory.request_id,
             pdb_path=inventory.input_path,
@@ -484,6 +484,26 @@ def validate_context_inventory_for_input(
     )
     if inventory != derived:
         raise ValueError("context inventory does not match pinned parser derivation")
+    return protein_residue_ids
+
+
+def validate_ligandmpnn_residue_selection(
+    *,
+    fixed_residue_ids: tuple[str, ...],
+    redesigned_residue_ids: tuple[str, ...],
+    protein_residue_ids: frozenset[str],
+) -> None:
+    """Reject selectors that pinned upstream would silently ignore."""
+
+    for field_name, selected in (
+        ("fixed_residues", fixed_residue_ids),
+        ("redesigned_residues", redesigned_residue_ids),
+    ):
+        missing = tuple(item for item in selected if item not in protein_residue_ids)
+        if missing:
+            raise ValueError(
+                f"{field_name} selector(s) {', '.join(missing)} are not present in pinned parser protein residues"
+            )
 
 
 def _pinned_parser_sha256(checkout_root: Path, *, upstream_commit: str, parser_path: Path) -> str:

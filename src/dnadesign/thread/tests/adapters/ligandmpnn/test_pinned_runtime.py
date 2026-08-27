@@ -267,7 +267,7 @@ def _public_runtime_command(
         checkpoint_path=checkpoint.relative_to(checkout),
     )
     if entrypoint == "run.py":
-        residue = LigandMpnnResidue("A", 1)
+        residue = LigandMpnnResidue("A", 12)
         request: LigandMpnnRequest | LigandMpnnScoreRequest = LigandMpnnRequest(
             request_id="foreign_cwd_design",
             pdb_path=pdb.relative_to(tmp_path),
@@ -1049,6 +1049,42 @@ def test_pinned_runtime_rejects_simultaneous_singular_residue_selection_flags(tm
                 str(output),
             ),
         )
+
+
+@pytest.mark.parametrize("entrypoint", ["run.py", "score.py"])
+@pytest.mark.parametrize("selection_flag", ["--fixed_residues", "--redesigned_residues"])
+def test_pinned_runtime_rejects_selector_absent_from_attested_parser_input(
+    tmp_path: Path,
+    entrypoint: str,
+    selection_flag: str,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / f"{entrypoint}-output"
+
+    with pytest.raises(ValueError, match=rf"{selection_flag.removeprefix('--')}.*A13A.*not present"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint=entrypoint,
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+                selection_flag,
+                "A13A",
+            ),
+        )
+
+    assert not output_root.exists()
 
 
 def test_pinned_runtime_rejects_standalone_semantic_abbreviation() -> None:

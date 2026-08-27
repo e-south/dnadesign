@@ -28,6 +28,7 @@ from pathlib import Path
 from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
     load_ligandmpnn_context_inventory,
     validate_context_inventory_for_input,
+    validate_ligandmpnn_residue_selection,
 )
 from dnadesign.thread.adapters.ligandmpnn.design_manifest import build_design_output_manifest
 from dnadesign.thread.adapters.ligandmpnn.models import (
@@ -540,6 +541,11 @@ def execute_pinned_entrypoint(
                     runtime_arguments,
                     "--ligand_mpnn_use_side_chain_context",
                 ),
+                fixed_residue_ids=_runtime_residue_selector_ids(runtime_arguments, _FIXED_RESIDUES_FLAG),
+                redesigned_residue_ids=_runtime_residue_selector_ids(
+                    runtime_arguments,
+                    _REDESIGNED_RESIDUES_FLAG,
+                ),
             )
         if residue_alphabet_sha256 is None:
             if _has_flag(runtime_arguments, _RESIDUE_ALPHABET_FLAG):
@@ -794,6 +800,8 @@ def _validate_runtime_context_inventory(
     requested_pdb_path: Path,
     requested_pdb_sha256: str,
     use_side_chain_context: bool,
+    fixed_residue_ids: tuple[str, ...],
+    redesigned_residue_ids: tuple[str, ...],
 ) -> None:
     """Revalidate bound context evidence immediately before execution."""
 
@@ -808,7 +816,7 @@ def _validate_runtime_context_inventory(
     inventory = load_ligandmpnn_context_inventory(reference, execution_root=root)
     if inventory.input_path != relative_pdb_path:
         raise ValueError("context inventory input path does not match runtime PDB path")
-    validate_context_inventory_for_input(
+    protein_residue_ids = validate_context_inventory_for_input(
         inventory,
         pdb_path=relative_pdb_path,
         pdb_sha256=requested_pdb_sha256,
@@ -822,6 +830,17 @@ def _validate_runtime_context_inventory(
         execution_root=root,
         require_clean_parser_checkout=False,
     )
+    validate_ligandmpnn_residue_selection(
+        fixed_residue_ids=fixed_residue_ids,
+        redesigned_residue_ids=redesigned_residue_ids,
+        protein_residue_ids=protein_residue_ids,
+    )
+
+
+def _runtime_residue_selector_ids(arguments: list[str], flag: str) -> tuple[str, ...]:
+    if not _has_flag(arguments, flag):
+        return ()
+    return tuple(_runtime_option_value(arguments, flag).split())
 
 
 def _completion_record(

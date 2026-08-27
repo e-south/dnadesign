@@ -70,8 +70,10 @@ def parse_PDB(*args, **kwargs):
         "Y": _Tensor(((1.0, 0.0, 0.0), (2.0, 0.0, 0.0))),
         "Y_t": _Tensor((15, 7)),
         "Y_m": _Tensor((1, 1)),
+        "R_idx": _Tensor((12, 13, -2, 2)),
+        "chain_letters": np.asarray(("A", "A", "B", "B")),
     }
-    return parsed, None, _Selection(), [], None
+    return parsed, None, _Selection(), ("", "B", "A", ""), None
 """
 
 

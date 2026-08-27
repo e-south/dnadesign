@@ -23,6 +23,7 @@ from dnadesign.thread.adapters.ligandmpnn.commands import (
 from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
     load_ligandmpnn_context_inventory,
     validate_context_inventory_for_input,
+    validate_ligandmpnn_residue_selection,
 )
 from dnadesign.thread.adapters.ligandmpnn.models import (
     LigandMpnnCommand,
@@ -126,7 +127,7 @@ def build_ligandmpnn_score_commands(
         request.context_inventory,
         execution_root=execution_root,
     )
-    validate_context_inventory_for_input(
+    protein_residue_ids = validate_context_inventory_for_input(
         context_inventory,
         pdb_path=request.pdb_path,
         pdb_sha256=request.pdb_sha256,
@@ -134,6 +135,11 @@ def build_ligandmpnn_score_commands(
         use_side_chain_context=request.use_side_chain_context,
         checkout_root=checkout_root,
         execution_root=execution_root,
+    )
+    validate_ligandmpnn_residue_selection(
+        fixed_residue_ids=tuple(item.upstream_id for item in request.fixed_residues),
+        redesigned_residue_ids=tuple(item.upstream_id for item in request.redesigned_residues),
+        protein_residue_ids=protein_residue_ids,
     )
     commands: list[LigandMpnnCommand] = []
     for seed in request.seeds:

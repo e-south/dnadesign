@@ -34,6 +34,7 @@ from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
     LigandMpnnContextAtom,
     LigandMpnnContextInventory,
     LigandMpnnContextPolymer,
+    _read_descriptor_relative_regular_bytes,
 )
 from dnadesign.thread.adapters.ligandmpnn.models import (
     LigandMpnnContextInventoryReference,
@@ -207,23 +208,39 @@ def _derive_ligandmpnn_context_inventory(
 ) -> LigandMpnnContextInventory:
     """Derive one inventory from exact input bytes and the pinned parser without publishing it."""
 
+    inventory, _protein_residue_ids = _derive_ligandmpnn_context_evidence(
+        request,
+        execution_root=execution_root,
+        checkout_root=checkout_root,
+        require_clean_parser_checkout=require_clean_parser_checkout,
+    )
+    return inventory
+
+
+def _derive_ligandmpnn_context_evidence(
+    request: LigandMpnnContextProbeRequest,
+    *,
+    execution_root: Path,
+    checkout_root: Path,
+    require_clean_parser_checkout: bool = True,
+) -> tuple[LigandMpnnContextInventory, frozenset[str]]:
+    """Derive context and exact protein selector identities from one pinned parse."""
+
     root = execution_root.expanduser().resolve()
     if not root.is_dir():
         raise ValueError("execution_root must be an existing directory")
     checkout_root = _resolve_context_probe_checkout_root(checkout_root, execution_root=root)
-    input_path = _within_root(root, request.pdb_path, field_name="context probe pdb_path")
-    if input_path.is_symlink() or not input_path.is_file():
-        raise ValueError("context probe input must be an existing regular file, not a symlink")
-    try:
-        input_bytes = input_path.read_bytes()
-    except OSError as error:
-        raise ValueError("context probe input could not be read") from error
+    input_bytes = _read_descriptor_relative_regular_bytes(
+        root,
+        request.pdb_path,
+        label="context probe input",
+    )
     observed_input_sha256 = hashlib.sha256(input_bytes).hexdigest()
     if observed_input_sha256 != request.pdb_sha256:
         raise ValueError(
             f"context probe input SHA256 mismatch: expected {request.pdb_sha256}, observed {observed_input_sha256}"
         )
-    parsed, other_atoms, element_dict_rev, parser_sha256 = _run_pinned_upstream_parser(
+    parsed, other_atoms, element_dict_rev, parser_sha256, protein_residue_ids = _run_pinned_upstream_parser(
         checkout_root,
         expected_commit=request.upstream.commit,
         input_bytes=input_bytes,
@@ -234,7 +251,7 @@ def _derive_ligandmpnn_context_inventory(
         require_clean_checkout=require_clean_parser_checkout,
     )
     atoms = _effective_context_atoms(parsed, other_atoms, element_dict_rev=element_dict_rev)
-    return LigandMpnnContextInventory(
+    inventory = LigandMpnnContextInventory(
         request_id=request.request_id,
         request_sha256=_probe_request_sha256(request),
         input_path=request.pdb_path,
@@ -250,6 +267,7 @@ def _derive_ligandmpnn_context_inventory(
         required_polymer_types=request.required_polymer_types,
         atoms=atoms,
     )
+    return inventory, protein_residue_ids
 
 
 def _resolve_context_probe_checkout_root(checkout_root: Path, *, execution_root: Path) -> Path:
@@ -948,7 +966,7 @@ def _run_pinned_upstream_parser(
     parse_all_atoms: bool,
     parse_atoms_with_zero_occupancy: bool,
     require_clean_checkout: bool = True,
-) -> tuple[Any, Any, dict[int, str], str]:
+) -> tuple[Any, Any, dict[int, str], str, frozenset[str]]:
     checkout = checkout_root.expanduser().resolve()
     if not checkout.is_dir():
         raise ValueError("LigandMPNN checkout_root must be an existing directory")
@@ -1001,14 +1019,42 @@ def _run_pinned_upstream_parser(
             not isinstance(key, int) or not isinstance(value, str) for key, value in element_dict_rev.items()
         ):
             raise ValueError("pinned LigandMPNN data_utils.py does not expose element_dict_rev")
-        parsed, _, other_atoms, _, _ = parser(
+        parsed, _, other_atoms, insertion_codes, _ = parser(
             str(input_path),
             device="cpu",
             chains=list(chains),
             parse_all_atoms=parse_all_atoms,
             parse_atoms_with_zero_occupancy=parse_atoms_with_zero_occupancy,
         )
-    return parsed, other_atoms, element_dict_rev, hashlib.sha256(source_bytes).hexdigest()
+    protein_residue_ids = _pinned_parser_protein_residue_ids(parsed, insertion_codes)
+    return parsed, other_atoms, element_dict_rev, hashlib.sha256(source_bytes).hexdigest(), protein_residue_ids
+
+
+def _pinned_parser_protein_residue_ids(parsed: Any, insertion_codes: Any) -> frozenset[str]:
+    """Encode the exact residue identities consumed by pinned run.py/score.py."""
+
+    if not isinstance(parsed, dict) or not {"R_idx", "chain_letters"}.issubset(parsed):
+        raise ValueError("upstream parse_PDB did not return R_idx and chain_letters")
+    residue_numbers = _to_numpy(parsed["R_idx"]).reshape(-1)
+    chain_letters = _to_numpy(parsed["chain_letters"]).reshape(-1)
+    insertion_codes_array = _to_numpy(insertion_codes).reshape(-1)
+    if not (len(residue_numbers) == len(chain_letters) == len(insertion_codes_array)):
+        raise ValueError("upstream protein residue identity lengths differ")
+    identities: list[str] = []
+    for chain_id, residue_number, insertion_code in zip(
+        chain_letters,
+        residue_numbers,
+        insertion_codes_array,
+        strict=True,
+    ):
+        if not isinstance(chain_id, str) or not isinstance(insertion_code, str):
+            raise ValueError("upstream protein residue identities must use text chain and insertion codes")
+        if isinstance(residue_number, (bool, np.bool_)) or not np.issubdtype(type(residue_number), np.integer):
+            raise ValueError("upstream protein residue numbers must be integers")
+        identities.append(f"{chain_id}{int(residue_number)}{insertion_code}")
+    if len(set(identities)) != len(identities):
+        raise ValueError("upstream parse_PDB returned duplicate protein residue identities")
+    return frozenset(identities)
 
 
 def _import_upstream_module(

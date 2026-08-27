@@ -104,8 +104,14 @@ def parse_PDB(input_path, device="cpu", chains=[], parse_all_atoms=False,
         types = [15, 6, 15, 7, 30]
     retained = [atom for atom in atoms if atom.getElement() != "H"]
     xyz = [atom.getCoords() for atom in retained]
-    parsed = {"Y": _Tensor(xyz), "Y_t": _Tensor(types), "Y_m": _Tensor([1] * len(types))}
-    return parsed, None, _Selection(atoms), [], None
+    parsed = {
+        "Y": _Tensor(xyz),
+        "Y_t": _Tensor(types),
+        "Y_m": _Tensor([1] * len(types)),
+        "R_idx": _Tensor((12, 13, -2)),
+        "chain_letters": np.asarray(("A", "A", "B")),
+    }
+    return parsed, None, _Selection(atoms), ("", "B", "A"), None
 """.lstrip()
     (checkout / "data_utils.py").write_text(source, encoding="utf-8")
     subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)

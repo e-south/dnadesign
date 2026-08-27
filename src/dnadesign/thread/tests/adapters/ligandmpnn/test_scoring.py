@@ -18,6 +18,7 @@ import pytest
 
 from dnadesign.thread.adapters.ligandmpnn import (
     LigandMpnnContextInventoryReference,
+    LigandMpnnResidue,
     LigandMpnnScoreMode,
     LigandMpnnScoreRequest,
     LigandMpnnUpstreamPin,
@@ -200,6 +201,20 @@ def test_autoregressive_probability_mode_sets_exclusive_official_flags(tmp_path:
     )[0].argv
     assert argv[argv.index("--autoregressive_score") + 1] == "1"
     assert argv[argv.index("--single_aa_score") + 1] == "0"
+
+
+@pytest.mark.parametrize("field_name", ["fixed_residues", "redesigned_residues"])
+def test_score_commands_reject_selectors_absent_from_pinned_parser_protein_identities(
+    tmp_path: Path,
+    field_name: str,
+) -> None:
+    request, checkout_root = _validated_request(
+        tmp_path,
+        **{field_name: (LigandMpnnResidue("A", 13, "A"),)},
+    )
+
+    with pytest.raises(ValueError, match=rf"{field_name}.*A13A.*not present"):
+        build_ligandmpnn_score_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
 
 
 def test_score_request_enforces_upstream_minimum_batch_policy() -> None:
