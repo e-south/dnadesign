@@ -254,6 +254,14 @@ def test_inventory_bootstraps_demo_then_requires_manifest_to_be_tracked(
     assert "demo file is not tracked" in before_add.stderr
     assert json.loads(next_step.stdout)["status"] == "verified"
     assert json.loads(after_add.stdout)["status"] == "verified"
+    assert stat.S_IMODE((root / LOCK_NAME).stat().st_mode) == 0o600
+    indexed_lock = subprocess.run(
+        ["git", "-C", str(checkout), "ls-files", "--stage", "--", f"examples/pilot/{LOCK_NAME}"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert indexed_lock.startswith("100644 ")
 
 
 def test_demo_validation_requires_empty_lock_to_match_git_index(tmp_path: Path) -> None:
@@ -1206,10 +1214,72 @@ def test_inventory_creates_group_writable_lock_for_shared_object(tmp_path: Path)
         retention_policy="review-before-delete",
     )
 
-    assert stat.S_IMODE((root / LOCK_NAME).stat().st_mode) == 0o664
+    assert stat.S_IMODE((root / LOCK_NAME).stat().st_mode) == 0o660
     assert stat.S_IMODE((root / MANIFEST_NAME).stat().st_mode) == 0o664
     assert (root / LOCK_NAME).stat().st_gid == root.stat().st_gid
     assert (root / MANIFEST_NAME).stat().st_gid == root.stat().st_gid
+
+
+def test_inventory_creates_owner_only_lock_for_private_object(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+
+    assert stat.S_IMODE((root / LOCK_NAME).stat().st_mode) == 0o600
+
+
+def test_shared_lock_bootstrap_opens_owner_only_before_descriptor_chmod(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(0o2770)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    original_open = storage_locking.os.open
+    creation_modes: list[int] = []
+
+    def _open(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        if path == LOCK_NAME and flags & os.O_CREAT:
+            creation_modes.append(mode)
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(storage_locking.os, "open", _open)
+
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+
+    assert creation_modes == [0o600]
+    assert stat.S_IMODE((root / LOCK_NAME).stat().st_mode) == 0o660
 
 
 def test_inventory_normalizes_shared_cleanup_boundary_under_restrictive_umask(tmp_path: Path) -> None:

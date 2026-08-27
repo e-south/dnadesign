@@ -28,6 +28,11 @@ from typing import NoReturn
 
 from .loading import load_storage_object_manifest_bytes, normalize_relative_path
 from .locking import (
+    PRIVATE_LOCK_MODE,
+    SHARED_LOCK_MODE,
+    unavailable_locking_capabilities,
+)
+from .locking import (
     acquire_existing_lock as _acquire_existing_manifest_lock,
 )
 from .locking import (
@@ -35,9 +40,6 @@ from .locking import (
 )
 from .locking import (
     release_lock as _release_manifest_lock,
-)
-from .locking import (
-    unavailable_locking_capabilities,
 )
 from .models import (
     LOCK_NAME,
@@ -1200,7 +1202,7 @@ def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]
     except OSError as exc:
         raise StorageObjectError(f"cannot inspect storage object lock {lock_path}: {exc}") from exc
     if inspected_lock_identity is None:
-        lock_mode = 0o664 if root_mode & stat.S_IWGRP else 0o644
+        lock_mode = SHARED_LOCK_MODE if root_mode & stat.S_IWGRP else PRIVATE_LOCK_MODE
     else:
         lock_mode = stat.S_IMODE(inspected_lock_stat.st_mode)
     try:

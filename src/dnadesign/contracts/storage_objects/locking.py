@@ -24,6 +24,9 @@ except ImportError:  # pragma: no cover - exercised on non-POSIX platforms
 
 from .models import StorageObjectError, StorageObjectPublicationUncertain
 
+PRIVATE_LOCK_MODE = 0o600
+SHARED_LOCK_MODE = 0o660
+
 
 def unavailable_locking_capabilities() -> tuple[str, ...]:
     """Return capabilities required before a writer may mutate coordination state."""
@@ -141,6 +144,8 @@ def acquire_new_lock(
     """Exclusively create, durably bind, and lock one absent coordination file."""
 
     _require_locking_capabilities(lock_path)
+    if mode not in {PRIVATE_LOCK_MODE, SHARED_LOCK_MODE}:
+        raise StorageObjectError(f"new storage object lock mode must be 0600 or 0660: {lock_path}")
     parent_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
     try:
         parent_descriptor: int | None = os.open(lock_path.parent, parent_flags)
@@ -157,7 +162,7 @@ def acquire_new_lock(
             raise StorageObjectError(f"storage object root changed before lock bootstrap: {lock_path.parent}")
         flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC
         try:
-            descriptor = os.open(lock_path.name, flags, mode, dir_fd=parent_descriptor)
+            descriptor = os.open(lock_path.name, flags, PRIVATE_LOCK_MODE, dir_fd=parent_descriptor)
         except OSError as exc:
             raise StorageObjectError(f"cannot exclusively create storage object lock {lock_path}: {exc}") from exc
         try:
