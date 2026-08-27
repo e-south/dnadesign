@@ -226,12 +226,23 @@ def test_request_rejects_ambiguous_or_nondeterministic_inputs(overrides: dict[st
 
 
 def test_residue_identifier_rejects_non_pdb_chain_or_insertion_codes() -> None:
-    with pytest.raises(ValueError, match="chain_id must be one alphanumeric character"):
+    with pytest.raises(ValueError, match="chain_id must be one ASCII alphanumeric character"):
         LigandMpnnResidue(chain_id="AA", residue_number=1)
     with pytest.raises(ValueError, match="insertion_code must be one ASCII letter"):
         LigandMpnnResidue(chain_id="A", residue_number=1, insertion_code="BC")
     with pytest.raises(ValueError, match="insertion_code must be one ASCII letter"):
         LigandMpnnResidue(chain_id="A", residue_number=1, insertion_code="2")
+
+
+@pytest.mark.parametrize("chain_id", ["é", "１", "١"])
+def test_residue_identifier_rejects_non_ascii_alphanumeric_chain_ids(chain_id: str) -> None:
+    with pytest.raises(ValueError, match="chain_id must be one ASCII alphanumeric character"):
+        LigandMpnnResidue(chain_id=chain_id, residue_number=12)
+
+
+@pytest.mark.parametrize("chain_id", ["A", "z", "0"])
+def test_residue_identifier_preserves_ascii_alphanumeric_chain_ids(chain_id: str) -> None:
+    assert LigandMpnnResidue(chain_id=chain_id, residue_number=12).upstream_id == f"{chain_id}12"
 
 
 def test_planned_receipt_is_normalized_and_records_no_execution_claim(tmp_path: Path) -> None:
