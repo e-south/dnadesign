@@ -190,6 +190,55 @@ def test_design_admission_rejects_invalid_official_fasta_records(
         parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
 
 
+@pytest.mark.parametrize(
+    "designed_sequence",
+    [
+        "A",
+        "ACDEF",
+        "ACD:EF:G",
+        "EF:ACD",
+    ],
+)
+def test_design_admission_rejects_designs_that_change_ordered_native_chain_shape(
+    tmp_path: Path,
+    designed_sequence: str,
+) -> None:
+    request, commands, output_root = _execute_design(tmp_path)
+    (output_root / "seqs/input.fa").write_text(
+        "\n".join(
+            [
+                ">input, T=0.1, seed=7\nACD:EF",
+                f">input, id=1, T=0.1, seed=7\n{designed_sequence}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    _rebind_completion_to_current_tree(output_root)
+
+    with pytest.raises(ValueError, match="ordered chain-segment lengths"):
+        parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
+
+
+def test_design_admission_accepts_mutations_that_preserve_ordered_native_chain_shape(
+    tmp_path: Path,
+) -> None:
+    request, commands, output_root = _execute_design(tmp_path)
+    (output_root / "seqs/input.fa").write_text(
+        "\n".join(
+            [
+                ">input, T=0.1, seed=7\nACD:EF",
+                ">input, id=1, T=0.1, seed=7\nYYY:XX",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    _rebind_completion_to_current_tree(output_root)
+
+    result = parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
+
+    assert result.sequence_count == 1
+
+
 def test_design_admission_counts_only_the_official_input_fasta(tmp_path: Path) -> None:
     request, commands, output_root = _execute_design(tmp_path, batch_size=2)
     (output_root / "unrelated.fasta").write_text(">foreign\nAAAA\n", encoding="utf-8")
