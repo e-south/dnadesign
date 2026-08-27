@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -39,6 +41,7 @@ from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import (
 )
 
 _COMPLETION_RECORD_NAME = ".dnadesign-ligandmpnn-execution.json"
+_PACKED_PARSER_BATCH_SIZE = 8
 
 
 @dataclass(frozen=True)
@@ -225,6 +228,8 @@ def parse_ligandmpnn_design_outputs(
                 packed_paths=packed_paths,
                 checkout_root=checkout_root,
                 upstream_commit=request.upstream.commit,
+                input_path=request.pdb_path,
+                input_sha256=request.pdb_sha256,
                 input_evidence=protein_evidence,
                 fasta=parsed_fasta,
                 pack_count=request.packing.number_of_packs_per_design,
@@ -358,61 +363,176 @@ def _validate_packed_artifact_contents(
     packed_paths: tuple[Path, ...],
     checkout_root: Path,
     upstream_commit: str,
+    input_path: Path,
+    input_sha256: str,
     input_evidence: LigandMpnnProteinStructureEvidence,
     fasta: OfficialLigandMpnnDesignFasta,
     pack_count: int,
 ) -> None:
-    payloads: list[tuple[str, bytes]] = []
-    for packed_path in packed_paths:
-        execution_relative_path = output_dir / packed_path
-        try:
-            payload = _read_descriptor_relative_regular_bytes(
-                root,
-                execution_relative_path,
-                label="official LigandMPNN packed PDB",
-            )
-        except ValueError as error:
-            raise ValueError(f"official LigandMPNN packed PDB is invalid: {packed_path}") from error
-        _validate_manifest_file_binding(
-            manifest,
-            relative_path=packed_path,
-            payload=payload,
-            label="official LigandMPNN packed PDB",
-        )
-        payloads.append((packed_path.name, payload))
-
     from dnadesign.thread.adapters.ligandmpnn.context_probe import (
-        _derive_pinned_protein_evidence_for_payloads,
+        _derive_pinned_packing_structure_evidence_for_payloads,
     )
 
     try:
-        packed_evidence = _derive_pinned_protein_evidence_for_payloads(
+        input_payload = _read_descriptor_relative_regular_bytes(root, input_path, label="LigandMPNN input PDB")
+    except ValueError as error:
+        raise ValueError("LigandMPNN input PDB is missing or unreadable during packing admission") from error
+    if hashlib.sha256(input_payload).hexdigest() != input_sha256:
+        raise ValueError("LigandMPNN input PDB does not match its bound SHA256 during packing admission")
+    try:
+        input_contract = _derive_pinned_packing_structure_evidence_for_payloads(
             checkout_root,
             expected_commit=upstream_commit,
-            inputs=tuple(payloads),
-        )
+            inputs=((input_path.name, input_payload),),
+        )[0]
     except Exception as error:
-        raise ValueError("official LigandMPNN packed PDB is invalid") from error
+        raise ValueError("LigandMPNN input PDB could not establish pinned packing semantics") from error
+    if input_contract.protein_evidence != input_evidence:
+        raise ValueError("LigandMPNN input PDB packing evidence does not match bound context inventory")
 
-    expected_sequences = tuple(
-        input_evidence.parser_sequence_from_fasta_segments(design_segments)
-        for design_segments in fasta.designed_segments
-        for _pack_index in range(pack_count)
-    )
-    for packed_path, observed, expected_sequence in zip(
-        packed_paths,
-        packed_evidence,
-        expected_sequences,
-        strict=True,
-    ):
-        if not observed.residue_ids or any(value != 1 for value in observed.residue_validity_mask):
-            raise ValueError(f"official LigandMPNN packed PDB is invalid: {packed_path}")
-        if observed.residue_ids != input_evidence.residue_ids:
-            raise ValueError(
-                f"official LigandMPNN packed PDB structural identity does not match pinned input: {packed_path}"
+    for chunk_start in range(0, len(packed_paths), _PACKED_PARSER_BATCH_SIZE):
+        chunk_paths = packed_paths[chunk_start : chunk_start + _PACKED_PARSER_BATCH_SIZE]
+        payloads: list[tuple[str, bytes]] = []
+        for packed_path in chunk_paths:
+            execution_relative_path = output_dir / packed_path
+            try:
+                payload = _read_descriptor_relative_regular_bytes(
+                    root,
+                    execution_relative_path,
+                    label="official LigandMPNN packed PDB",
+                )
+            except ValueError as error:
+                raise ValueError(f"official LigandMPNN packed PDB is invalid: {packed_path}") from error
+            _validate_manifest_file_binding(
+                manifest,
+                relative_path=packed_path,
+                payload=payload,
+                label="official LigandMPNN packed PDB",
             )
-        if observed.native_sequence != expected_sequence:
-            raise ValueError(f"official LigandMPNN packed PDB does not match designed sequence identity: {packed_path}")
+            payloads.append((packed_path.name, payload))
+        try:
+            packed_contracts = _derive_pinned_packing_structure_evidence_for_payloads(
+                checkout_root,
+                expected_commit=upstream_commit,
+                inputs=tuple(payloads),
+            )
+        except Exception as error:
+            raise ValueError("official LigandMPNN packed PDB is invalid") from error
+        for chunk_index, (packed_path, payload_and_name, observed_contract) in enumerate(
+            zip(chunk_paths, payloads, packed_contracts, strict=True)
+        ):
+            absolute_index = chunk_start + chunk_index
+            design_index = absolute_index // pack_count
+            expected_sequence = input_evidence.parser_sequence_from_fasta_segments(
+                fasta.designed_segments[design_index]
+            )
+            observed = observed_contract.protein_evidence
+            if not observed.residue_ids or any(value != 1 for value in observed.residue_validity_mask):
+                raise ValueError(f"official LigandMPNN packed PDB is invalid: {packed_path}")
+            if observed.residue_ids != input_evidence.residue_ids:
+                raise ValueError(
+                    f"official LigandMPNN packed PDB structural identity does not match pinned input: {packed_path}"
+                )
+            if observed.native_sequence != expected_sequence:
+                raise ValueError(
+                    f"official LigandMPNN packed PDB does not match designed sequence identity: {packed_path}"
+                )
+            if observed_contract.preserved_nonprotein_atoms != input_contract.preserved_nonprotein_atoms:
+                raise ValueError(
+                    f"official LigandMPNN packed PDB nonprotein context differs from pinned input: {packed_path}"
+                )
+            if observed_contract.water_atom_count:
+                raise ValueError(f"official LigandMPNN packed PDB unexpectedly contains water: {packed_path}")
+            _validate_pinned_write_full_pdb_atom_inventory(
+                payload_and_name[1],
+                packed_path=packed_path,
+                residue_ids=input_evidence.residue_ids,
+                expected_sequence=expected_sequence,
+                canonical_heavy_atom_names=input_contract.canonical_heavy_atom_names,
+                preserved_nonprotein_atoms=input_contract.preserved_nonprotein_atoms,
+            )
+
+
+def _validate_pinned_write_full_pdb_atom_inventory(
+    payload: bytes,
+    *,
+    packed_path: Path,
+    residue_ids: tuple[str, ...],
+    expected_sequence: tuple[str, ...],
+    canonical_heavy_atom_names: tuple[tuple[str, str, tuple[str, ...]], ...],
+    preserved_nonprotein_atoms: tuple[tuple[object, ...], ...],
+) -> None:
+    try:
+        lines = payload.decode("ascii").splitlines()
+    except UnicodeDecodeError as error:
+        raise ValueError(f"official LigandMPNN packed PDB is not ASCII: {packed_path}") from error
+    canonical_by_amino_acid = {item[0]: item[1:] for item in canonical_heavy_atom_names}
+    expected_contract: dict[str, tuple[str, tuple[str, ...]]] = {}
+    for residue_id, amino_acid in zip(residue_ids, expected_sequence, strict=True):
+        canonical = canonical_by_amino_acid.get(amino_acid)
+        if canonical is None:
+            raise ValueError(f"pinned write_full_PDB has no atom contract for designed sequence: {packed_path}")
+        expected_contract[residue_id] = canonical
+    observed_order: list[str] = []
+    observed_atoms: dict[str, list[tuple[str, str, str]]] = {}
+    remaining_nonprotein_atoms = Counter(preserved_nonprotein_atoms)
+    serials: set[int] = set()
+    for line in lines:
+        if not line.startswith(("ATOM  ", "HETATM")):
+            continue
+        if len(line) < 78:
+            raise ValueError(f"official LigandMPNN packed PDB contains a truncated atom record: {packed_path}")
+        try:
+            serial = int(line[6:11])
+            residue_number = int(line[22:26])
+            coordinates = tuple(float(line[start : start + 8]) for start in (30, 38, 46))
+            occupancy = float(line[54:60])
+        except ValueError as error:
+            raise ValueError(
+                f"official LigandMPNN packed PDB contains an invalid atom record: {packed_path}"
+            ) from error
+        if serial in serials or not all(map(math.isfinite, (*coordinates, occupancy))):
+            raise ValueError(
+                f"official LigandMPNN packed PDB contains a duplicate or invalid atom record: {packed_path}"
+            )
+        serials.add(serial)
+        atom_name = line[12:16].strip()
+        element = line[76:78].strip().upper()
+        nonprotein_projection = (
+            atom_name,
+            element,
+            line[21:22].strip(),
+            line[17:20].strip().upper(),
+            residue_number,
+            tuple(round(value, 3) for value in coordinates),
+            round(occupancy, 2),
+        )
+        if remaining_nonprotein_atoms[nonprotein_projection]:
+            remaining_nonprotein_atoms[nonprotein_projection] -= 1
+            continue
+        residue_id = f"{line[21:22]}{residue_number}{line[26:27].strip()}"
+        if residue_id not in expected_contract:
+            continue
+        if not line.startswith("ATOM  ") or line[16:17].strip():
+            raise ValueError(f"official LigandMPNN packed PDB protein record is not canonical: {packed_path}")
+        if residue_id not in observed_atoms:
+            observed_order.append(residue_id)
+            observed_atoms[residue_id] = []
+        observed_atoms[residue_id].append((line[17:20].strip(), atom_name, element))
+    if any(remaining_nonprotein_atoms.values()):
+        raise ValueError(f"official LigandMPNN packed PDB omitted pinned nonprotein context: {packed_path}")
+    if tuple(observed_order) != residue_ids:
+        raise ValueError(f"official LigandMPNN packed PDB protein residue order is invalid: {packed_path}")
+    for residue_id in residue_ids:
+        residue_name, expected_names = expected_contract[residue_id]
+        expected_atoms = tuple(
+            (residue_name, atom_name, next(character for character in atom_name if character.isalpha()).upper())
+            for atom_name in expected_names
+        )
+        if tuple(observed_atoms[residue_id]) != expected_atoms:
+            raise ValueError(
+                f"official LigandMPNN packed PDB atom inventory does not match pinned write_full_PDB: {packed_path}"
+            )
 
 
 __all__ = [

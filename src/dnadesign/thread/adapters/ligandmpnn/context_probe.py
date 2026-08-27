@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import argparse
+import ast
 import ctypes
 import errno
 import fcntl
@@ -60,6 +61,9 @@ class _PinnedParserResult:
     other_atoms: Any
     insertion_codes: Any
     protein_evidence: LigandMpnnProteinStructureEvidence
+    preserved_nonprotein_atoms: tuple[tuple[object, ...], ...] = ()
+    water_atom_count: int = 0
+    canonical_heavy_atom_names: tuple[tuple[str, str, tuple[str, ...]], ...] = ()
 
 
 class LigandMpnnContextPublicationUncertainError(RuntimeError):
@@ -989,13 +993,13 @@ def _run_pinned_upstream_parser(
     return result.parsed, result.other_atoms, element_dict_rev, parser_sha256, result.protein_evidence
 
 
-def _derive_pinned_protein_evidence_for_payloads(
+def _derive_pinned_packing_structure_evidence_for_payloads(
     checkout_root: Path,
     *,
     expected_commit: str,
     inputs: tuple[tuple[str, bytes], ...],
-) -> tuple[LigandMpnnProteinStructureEvidence, ...]:
-    """Parse multiple bound PDB payloads through one attested pinned snapshot."""
+) -> tuple[_PinnedParserResult, ...]:
+    """Parse a bounded group of packed PDB payloads through one attested snapshot."""
 
     results, _element_dict_rev, _parser_sha256 = _run_pinned_upstream_parser_batch(
         checkout_root,
@@ -1005,8 +1009,9 @@ def _derive_pinned_protein_evidence_for_payloads(
         parse_all_atoms=False,
         parse_atoms_with_zero_occupancy=False,
         retain_parser_outputs=False,
+        capture_packing_contract=True,
     )
-    return tuple(result.protein_evidence for result in results)
+    return results
 
 
 def _run_pinned_upstream_parser_batch(
@@ -1019,6 +1024,7 @@ def _run_pinned_upstream_parser_batch(
     parse_atoms_with_zero_occupancy: bool,
     require_clean_checkout: bool = True,
     retain_parser_outputs: bool = True,
+    capture_packing_contract: bool = False,
 ) -> tuple[tuple[_PinnedParserResult, ...], dict[int, str], str]:
     if not inputs:
         raise ValueError("pinned parser inputs must not be empty")
@@ -1075,6 +1081,9 @@ def _run_pinned_upstream_parser_batch(
             not isinstance(key, int) or not isinstance(value, str) for key, value in restype_int_to_str.items()
         ):
             raise ValueError("pinned LigandMPNN data_utils.py does not expose restype_int_to_str")
+        canonical_heavy_atom_names = (
+            _pinned_write_full_pdb_atom_names(source_bytes, module) if capture_packing_contract else ()
+        )
         results: list[_PinnedParserResult] = []
         for input_index, (input_name, input_bytes) in enumerate(inputs):
             if not input_name or Path(input_name).name != input_name:
@@ -1083,7 +1092,7 @@ def _run_pinned_upstream_parser_batch(
             input_path.parent.mkdir(parents=True)
             input_path.write_bytes(input_bytes)
             input_path.chmod(0o400)
-            parsed, _, other_atoms, insertion_codes, _ = parser(
+            parsed, _, other_atoms, insertion_codes, water_atoms = parser(
                 str(input_path),
                 device="cpu",
                 chains=list(chains),
@@ -1100,6 +1109,11 @@ def _run_pinned_upstream_parser_batch(
                         insertion_codes,
                         restype_int_to_str=restype_int_to_str,
                     ),
+                    preserved_nonprotein_atoms=(
+                        _pinned_preserved_nonprotein_atoms(other_atoms) if capture_packing_contract else ()
+                    ),
+                    water_atom_count=(_pinned_atom_count(water_atoms) if capture_packing_contract else 0),
+                    canonical_heavy_atom_names=canonical_heavy_atom_names,
                 )
             )
     return tuple(results), element_dict_rev, hashlib.sha256(source_bytes).hexdigest()
@@ -1166,6 +1180,85 @@ def _pinned_parser_binary_mask(values: np.ndarray) -> tuple[int, ...]:
             raise ValueError("upstream protein residue validity mask must contain only zero or one")
         mask.append(integer)
     return tuple(mask)
+
+
+def _pinned_write_full_pdb_atom_names(
+    source_bytes: bytes,
+    module: ModuleType,
+) -> tuple[tuple[str, str, tuple[str, ...]], ...]:
+    """Extract the exact amino-acid atom14 table used by pinned ``write_full_PDB``."""
+
+    try:
+        tree = ast.parse(source_bytes)
+    except (SyntaxError, ValueError) as error:
+        raise ValueError("pinned LigandMPNN data_utils.py could not be parsed for packing semantics") from error
+    assignments: list[ast.AST] = []
+    for node in tree.body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) or node.name != "write_full_PDB":
+            continue
+        for child in ast.walk(node):
+            if not isinstance(child, ast.Assign) or len(child.targets) != 1:
+                continue
+            target = child.targets[0]
+            if isinstance(target, ast.Name) and target.id == "restype_name_to_atom14_names":
+                assignments.append(child.value)
+    if len(assignments) != 1:
+        raise ValueError("pinned write_full_PDB must define exactly one atom14 name table")
+    try:
+        by_three_letter = ast.literal_eval(assignments[0])
+    except (TypeError, ValueError, SyntaxError) as error:
+        raise ValueError("pinned write_full_PDB atom14 name table must be literal") from error
+    one_to_three = getattr(module, "restype_1to3", None)
+    if not isinstance(by_three_letter, dict) or not isinstance(one_to_three, dict):
+        raise ValueError("pinned write_full_PDB amino-acid atom tables are invalid")
+    observed: list[tuple[str, str, tuple[str, ...]]] = []
+    for amino_acid, residue_name in sorted(one_to_three.items()):
+        names = by_three_letter.get(residue_name)
+        if (
+            not isinstance(amino_acid, str)
+            or len(amino_acid) != 1
+            or not isinstance(residue_name, str)
+            or not isinstance(names, list)
+            or len(names) != 14
+            or any(not isinstance(name, str) for name in names)
+        ):
+            raise ValueError("pinned write_full_PDB atom14 name table is invalid")
+        nonempty = tuple(name for name in names if name)
+        if len(set(nonempty)) != len(nonempty):
+            raise ValueError("pinned write_full_PDB atom14 name table contains duplicate atoms")
+        observed.append((amino_acid, residue_name, nonempty))
+    return tuple(observed)
+
+
+def _pinned_preserved_nonprotein_atoms(other_atoms: Any) -> tuple[tuple[object, ...], ...]:
+    """Normalize fields that pinned ``write_full_PDB`` copies into packed output."""
+
+    if other_atoms is None:
+        return ()
+    observed: list[tuple[object, ...]] = []
+    for atom in other_atoms.iterAtoms():
+        coordinates = np.asarray(atom.getCoords(), dtype=np.float64).reshape(-1)
+        if coordinates.shape != (3,) or not np.isfinite(coordinates).all():
+            raise ValueError("pinned parser nonprotein atom coordinates are invalid")
+        occupancy = atom.getOccupancy()
+        if isinstance(occupancy, (bool, np.bool_)) or not isinstance(occupancy, (int, float, np.number)):
+            raise ValueError("pinned parser nonprotein atom occupancy is invalid")
+        observed.append(
+            (
+                str(atom.getName()).strip(),
+                str(atom.getElement() or "").strip().upper(),
+                str(atom.getChid()).strip(),
+                str(atom.getResname()).strip().upper(),
+                int(atom.getResnum()),
+                tuple(round(float(value), 3) for value in coordinates),
+                round(float(occupancy), 2),
+            )
+        )
+    return tuple(observed)
+
+
+def _pinned_atom_count(selection: Any) -> int:
+    return 0 if selection is None else sum(1 for _atom in selection.iterAtoms())
 
 
 def _import_upstream_module(

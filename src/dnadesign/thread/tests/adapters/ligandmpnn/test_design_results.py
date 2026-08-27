@@ -234,6 +234,86 @@ def test_design_admission_rejects_invalid_or_wrong_identity_packed_pdb(
         parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
 
 
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "missing-cb",
+        "missing-residue-specific-sidechain",
+        "duplicate-atom",
+        "incomplete-extra-protein-residue",
+        "missing-context-atom",
+        "altered-context-atom",
+        "extra-ligand",
+        "water",
+    ],
+)
+def test_design_admission_rejects_packed_pdb_not_emitted_by_pinned_write_full_pdb(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    request, commands, output_root, _sidecar = _execute_design(
+        tmp_path,
+        packing=LigandMpnnPackingConfig(enabled=True),
+    )
+    packed_path = output_root / "packed/input_packed_1_1.pdb"
+    lines = packed_path.read_text(encoding="utf-8").splitlines()
+    if mutation == "missing-cb":
+        lines.remove(next(line for line in lines if line[12:16].strip() == "CB" and line[21:27] == "A  12 "))
+    elif mutation == "missing-residue-specific-sidechain":
+        lines.remove(next(line for line in lines if line[12:16].strip() == "SG" and line[21:27] == "A  13B"))
+    elif mutation == "duplicate-atom":
+        duplicate = next(line for line in lines if line[12:16].strip() == "CB" and line[21:27] == "A  12 ")
+        lines.insert(-1, f"{duplicate[:6]}99999{duplicate[11:]}")
+    elif mutation == "incomplete-extra-protein-residue":
+        lines.insert(
+            -1,
+            "ATOM  99999  CA  ALA C  99       9.000   0.000   0.000  1.00  0.00           C",
+        )
+    elif mutation == "missing-context-atom":
+        lines.remove(next(line for line in lines if line.startswith("HETATM") and line[12:16].strip() == "P"))
+    elif mutation == "altered-context-atom":
+        original = next(line for line in lines if line.startswith("HETATM") and line[12:16].strip() == "P")
+        lines[lines.index(original)] = f"{original[:30]}{9.0:8.3f}{original[38:]}"
+    elif mutation == "extra-ligand":
+        lines.insert(
+            -1,
+            "HETATM99999  C1  LIG Z   1       9.000   0.000   0.000  1.00  0.00           C",
+        )
+    else:
+        lines.insert(
+            -1,
+            "HETATM99999  O   HOH W   1       9.000   0.000   0.000  1.00  0.00           O",
+        )
+    packed_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    _rebind_completion_to_current_tree(output_root)
+
+    with pytest.raises(ValueError, match="packed PDB"):
+        parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
+
+
+def test_design_admission_bounds_packed_parser_batches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import dnadesign.thread.adapters.ligandmpnn.context_probe as context_probe_module
+
+    request, commands, _output_root, _sidecar = _execute_design(
+        tmp_path,
+        batch_size=9,
+        packing=LigandMpnnPackingConfig(enabled=True, number_of_packs_per_design=1),
+    )
+    observed_batch_sizes: list[int] = []
+    original = context_probe_module._derive_pinned_packing_structure_evidence_for_payloads
+
+    def record_batch(*args: object, inputs: tuple[tuple[str, bytes], ...], **kwargs: object) -> object:
+        observed_batch_sizes.append(len(inputs))
+        return original(*args, inputs=inputs, **kwargs)
+
+    monkeypatch.setattr(context_probe_module, "_derive_pinned_packing_structure_evidence_for_payloads", record_batch)
+
+    result = parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
+
+    assert result.sequence_count == 9
+    assert observed_batch_sizes == [1, 8, 1]
+
+
 def test_design_admission_binds_each_packed_pdb_to_corresponding_design_record(tmp_path: Path) -> None:
     request, commands, output_root, _sidecar = _execute_design(
         tmp_path,

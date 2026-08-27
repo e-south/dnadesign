@@ -49,8 +49,8 @@ class _Tensor:
 
 
 class _Atom:
-    def __init__(self, serial, name, element, chain, residue, number, coordinates):
-        self._values = serial, name, element, chain, residue, number, coordinates
+    def __init__(self, serial, name, element, chain, residue, number, coordinates, occupancy=1.0):
+        self._values = serial, name, element, chain, residue, number, coordinates, occupancy
 
     def getSerial(self): return self._values[0]
     def getName(self): return self._values[1]
@@ -60,14 +60,29 @@ class _Atom:
     def getResnum(self): return self._values[5]
     def getIcode(self): return ""
     def getCoords(self): return np.asarray(self._values[6], dtype=np.float32)
+    def getOccupancy(self): return self._values[7]
 
 
 class _Selection:
-    def iterAtoms(self):
-        return iter((
+    def __init__(self, atoms=None):
+        self._atoms = tuple(atoms) if atoms is not None else (
             _Atom(1, "P", "P", "D", "DC", 12, (1.0, 0.0, 0.0)),
             _Atom(2, "N9", "N", "E", "G", 66, (2.0, 0.0, 0.0)),
-        ))
+        )
+
+    def iterAtoms(self):
+        return iter(self._atoms)
+
+
+def write_full_PDB():
+    restype_name_to_atom14_names = {
+        "ALA": ["N", "CA", "C", "O", "CB", "", "", "", "", "", "", "", "", ""],
+        "CYS": ["N", "CA", "C", "O", "CB", "SG", "", "", "", "", "", "", "", ""],
+        "ASP": ["N", "CA", "C", "O", "CB", "CG", "OD1", "OD2", "", "", "", "", "", ""],
+        "GLU": ["N", "CA", "C", "O", "CB", "CG", "CD", "OE1", "OE2", "", "", "", "", ""],
+        "TYR": ["N", "CA", "C", "O", "CB", "CG", "CD1", "CD2", "CE1", "CE2", "CZ", "OH", "", ""],
+    }
+    return restype_name_to_atom14_names
 
 
 def packed_pdb_payload(sequence):
@@ -78,13 +93,23 @@ def packed_pdb_payload(sequence):
     serial = 1
     for amino_acid, (chain, residue_number, insertion_code) in zip(sequence, identities):
         residue_name = restype_1to3[amino_acid]
-        for atom_name, element in (("N", "N"), ("CA", "C"), ("C", "C"), ("O", "O")):
+        for atom_name in (name for name in write_full_PDB()[residue_name] if name):
+            element = next(character for character in atom_name if character.isalpha())
             coordinate = float(serial)
             lines.append(
                 f"ATOM  {serial:5d} {atom_name:^4s} {residue_name:>3s} {chain}{residue_number:4d}{insertion_code:1s}"
                 f"   {coordinate:8.3f}{0.0:8.3f}{0.0:8.3f}{1.0:6.2f}{0.0:6.2f}          {element:>2s}"
             )
             serial += 1
+    for atom_name, element, residue_name, chain, residue_number, coordinate in (
+        ("P", "P", "DC", "D", 12, 1.0),
+        ("N9", "N", "G", "E", 66, 2.0),
+    ):
+        lines.append(
+            f"HETATM{serial:5d} {atom_name:^4s} {residue_name:>3s} {chain}{residue_number:4d} "
+            f"   {coordinate:8.3f}{0.0:8.3f}{0.0:8.3f}{1.0:6.2f}{0.0:6.2f}          {element:>2s}"
+        )
+        serial += 1
     lines.append("END")
     return "\\n".join(lines) + "\\n"
 
@@ -125,7 +150,29 @@ def _parse_packed_pdb(input_path):
         "S": _Tensor(tuple(native_sequence)),
         "mask": _Tensor(tuple(int({"N", "CA", "C", "O"}.issubset(residue_atoms[key])) for key in residue_order)),
     }
-    return parsed, None, _Selection(), tuple(key[2] for key in residue_order), None
+    other_atoms = []
+    water_atoms = []
+    for line in (line for line in lines if line.startswith("HETATM")):
+        if len(line) < 78:
+            raise ValueError("invalid packed PDB fixture")
+        atom = _Atom(
+            int(line[6:11]),
+            line[12:16].strip(),
+            line[76:78].strip(),
+            line[21:22],
+            line[17:20].strip(),
+            int(line[22:26]),
+            (float(line[30:38]), float(line[38:46]), float(line[46:54])),
+            float(line[54:60]),
+        )
+        (water_atoms if atom.getResname() in {"HOH", "WAT"} else other_atoms).append(atom)
+    return (
+        parsed,
+        None,
+        _Selection(other_atoms),
+        tuple(key[2] for key in residue_order),
+        _Selection(water_atoms),
+    )
 
 
 def parse_PDB(input_path, *args, **kwargs):
