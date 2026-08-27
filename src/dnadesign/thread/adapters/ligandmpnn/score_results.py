@@ -308,7 +308,13 @@ def parse_ligandmpnn_score_outputs(
         _within_root(root, command.output_dir / f"{request.pdb_path.stem}.pt", field_name="score output")
         for command in commands
     )
-    discovered_paths = tuple(output_root.rglob("*.pt")) if output_root.is_dir() else ()
+    discovered_paths = (
+        tuple(
+            path for path in output_root.rglob("*.pt") if not _is_private_score_attempt(path, output_root=output_root)
+        )
+        if output_root.is_dir()
+        else ()
+    )
     symlink_outputs = tuple(path for path in discovered_paths if path.is_symlink())
     if symlink_outputs:
         raise ValueError(
@@ -389,6 +395,13 @@ def parse_ligandmpnn_score_outputs(
         number_of_batches=request.number_of_batches,
         outputs=tuple(outputs),
     )
+
+
+def _is_private_score_attempt(path: Path, *, output_root: Path) -> bool:
+    """Exclude runtime-private attempt namespaces from public admission."""
+
+    relative = path.relative_to(output_root)
+    return any(part.startswith(".dnadesign-score-") for part in relative.parts[:-1])
 
 
 def _validate_commands(request: LigandMpnnScoreRequest, commands: tuple[LigandMpnnCommand, ...]) -> Path:

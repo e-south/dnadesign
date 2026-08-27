@@ -344,6 +344,19 @@ def test_parser_fails_closed_on_missing_and_extra_output_files(tmp_path: Path) -
         _parse(tmp_path, request)
 
 
+def test_parser_ignores_abandoned_private_score_attempts(tmp_path: Path) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    _write_output(tmp_path, request, 7)
+    abandoned = tmp_path / request.output_dir / "seed_7/.dnadesign-score-killed/partial.pt"
+    abandoned.parent.mkdir(parents=True)
+    abandoned.write_bytes(b"killed-attempt")
+
+    result = _parse(tmp_path, request)
+
+    assert [output.seed for output in result.outputs] == [7]
+    assert abandoned.read_bytes() == b"killed-attempt"
+
+
 def test_parser_rejects_symlinked_output_artifacts(tmp_path: Path) -> None:
     request = _prepare_request(tmp_path, seeds=(7,))
     source = _write_output(tmp_path, request, 7)

@@ -404,6 +404,7 @@ def execute_pinned_entrypoint(
         score_temporary: tempfile.TemporaryDirectory[str] | None = None
         score_publication: tuple[Path, Path] | None = None
         published_score_path: Path | None = None
+        published_score_identity: tuple[int, int] | None = None
         published_score_sha256: str | None = None
         design_temporary: tempfile.TemporaryDirectory[str] | None = None
         design_publication: tuple[Path, Path] | None = None
@@ -437,21 +438,49 @@ def execute_pinned_entrypoint(
                 raise ValueError(f"score output directory could not be opened safely: {output_root}") from exc
             else:
                 os.close(output_directory_fd)
-            score_temporary = tempfile.TemporaryDirectory(prefix=".dnadesign-score-", dir=output_root)
+            score_attempt_root = output_root.parent.parent
+            try:
+                score_attempt_root_fd = _open_directory_path(score_attempt_root, create=False)
+            except OSError as exc:
+                raise ValueError(f"score attempt directory could not be opened safely: {score_attempt_root}") from exc
+            else:
+                os.close(score_attempt_root_fd)
+            score_temporary = tempfile.TemporaryDirectory(
+                prefix=f".dnadesign-score-{output_root.parent.name}-{output_root.name}-",
+                dir=score_attempt_root,
+            )
             temporary_output_root = Path(score_temporary.name)
             runtime_arguments[output_value_index] = str(temporary_output_root)
             score_publication = (temporary_output_root / staged_pdb.with_suffix(".pt").name, expected_output)
+        execution_failure: BaseException | None = None
         try:
             subprocess.run(
                 [sys.executable, "-B", "-E", "-s", str(entrypoint_path), *runtime_arguments],
                 check=True,
             )
             if score_publication is not None:
-                published_score_sha256 = _publish_score_output(*score_publication)
+                published_score_sha256, published_score_identity = _publish_score_output(*score_publication)
                 published_score_path = score_publication[1]
+        except BaseException as error:
+            execution_failure = error
+            raise
         finally:
             if score_temporary is not None:
-                score_temporary.cleanup()
+                try:
+                    score_temporary.cleanup()
+                except BaseException as cleanup_error:
+                    if execution_failure is not None:
+                        execution_failure.add_note(f"private score attempt cleanup also failed: {cleanup_error}")
+                    elif published_score_path is not None and published_score_identity is not None:
+                        _rollback_score_after_cleanup_failure(
+                            published_score_path,
+                            published_identity=published_score_identity,
+                        )
+                        if not isinstance(cleanup_error, Exception):
+                            raise
+                        raise ValueError("score attempt cleanup failed after publication") from cleanup_error
+                    else:
+                        raise
         if design_publication is not None:
             temporary_output_root, output_root = design_publication
             try:
@@ -872,7 +901,7 @@ def _publish_design_output_directory(source_path: Path, destination_path: Path) 
         os.close(parent_fd)
 
 
-def _publish_score_output(source_path: Path, destination_path: Path) -> str:
+def _publish_score_output(source_path: Path, destination_path: Path) -> tuple[str, tuple[int, int]]:
     """Publish and durably commit one score without concurrent replacement."""
 
     if source_path.is_symlink() or not source_path.is_file():
@@ -881,8 +910,10 @@ def _publish_score_output(source_path: Path, destination_path: Path) -> str:
     try:
         source_fd = os.open(source_path, source_flags)
         try:
-            if not stat.S_ISREG(os.fstat(source_fd).st_mode):
+            source_status = os.fstat(source_fd)
+            if not stat.S_ISREG(source_status.st_mode):
                 raise OSError("score output is not regular")
+            source_identity = (source_status.st_dev, source_status.st_ino)
             digest = hashlib.sha256()
             while payload := os.read(source_fd, 1024 * 1024):
                 digest.update(payload)
@@ -923,7 +954,48 @@ def _publish_score_output(source_path: Path, destination_path: Path) -> str:
             raise ValueError(f"score output publication could not be made durable: {destination_path}") from (
                 publication_error
             )
-        return f"sha256:{digest.hexdigest()}"
+        return f"sha256:{digest.hexdigest()}", source_identity
+    finally:
+        os.close(directory_fd)
+
+
+def _rollback_score_after_cleanup_failure(
+    published_path: Path,
+    *,
+    published_identity: tuple[int, int],
+) -> None:
+    """Remove only this attempt's score after private cleanup fails."""
+
+    try:
+        directory_fd = _open_directory_path(published_path.parent, create=False)
+    except OSError as exc:
+        raise LigandMpnnScorePublicationUncertainError(
+            "LigandMPNN score cleanup rollback durability is uncertain"
+        ) from exc
+    try:
+        try:
+            published_status = os.stat(published_path.name, dir_fd=directory_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            published_status = None
+        except OSError as exc:
+            raise LigandMpnnScorePublicationUncertainError(
+                "LigandMPNN score cleanup rollback durability is uncertain"
+            ) from exc
+        if published_status is not None and (published_status.st_dev, published_status.st_ino) != published_identity:
+            raise LigandMpnnScorePublicationUncertainError("LigandMPNN score cleanup rollback target changed")
+        if published_status is not None:
+            try:
+                os.unlink(published_path.name, dir_fd=directory_fd)
+            except OSError as exc:
+                raise LigandMpnnScorePublicationUncertainError(
+                    "LigandMPNN score cleanup rollback durability is uncertain"
+                ) from exc
+        try:
+            os.fsync(directory_fd)
+        except OSError as exc:
+            raise LigandMpnnScorePublicationUncertainError(
+                "LigandMPNN score cleanup rollback durability is uncertain"
+            ) from exc
     finally:
         os.close(directory_fd)
 

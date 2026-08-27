@@ -551,6 +551,247 @@ def test_pinned_runtime_preserves_pdb_basename_for_upstream_score_output(tmp_pat
     assert completion["score_output_sha256"] == f"sha256:{hashlib.sha256(published_score.read_bytes()).hexdigest()}"
 
 
+def test_pinned_score_runtime_rolls_back_publication_when_private_cleanup_fails_then_retries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "scores"
+    completion_path = tmp_path / ".test-ligandmpnn-execution.json"
+    original_cleanup = tempfile.TemporaryDirectory.cleanup
+    failed = False
+    score_attempt_paths: list[Path] = []
+
+    def _fail_first_score_cleanup(directory: tempfile.TemporaryDirectory[str]) -> None:
+        nonlocal failed
+        path = Path(directory.name)
+        if path.name.startswith(".dnadesign-score-"):
+            score_attempt_paths.append(path)
+            if not failed:
+                failed = True
+                raise OSError("simulated private score cleanup failure")
+        original_cleanup(directory)
+
+    monkeypatch.setattr(tempfile.TemporaryDirectory, "cleanup", _fail_first_score_cleanup)
+    arguments = (
+        "--model_type",
+        "ligand_mpnn",
+        "--checkpoint_ligand_mpnn",
+        str(checkpoint),
+        "--pdb_path",
+        str(pdb),
+        "--out_folder",
+        str(output_root),
+    )
+
+    with pytest.raises(ValueError, match="score attempt cleanup failed after publication"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+            arguments=arguments,
+        )
+
+    assert failed
+    assert not (output_root / "input.pt").exists()
+    assert not completion_path.exists()
+    assert score_attempt_paths
+    assert all(path.parent == output_root.parent.parent for path in score_attempt_paths)
+
+    execute_pinned_entrypoint(
+        checkout_root=checkout,
+        upstream_commit=commit,
+        checkpoint_sha256=checkpoint_sha256,
+        pdb_sha256=pdb_sha256,
+        packing_checkpoint_sha256=None,
+        residue_alphabet_sha256=None,
+        entrypoint="score.py",
+        arguments=arguments,
+    )
+
+    assert (output_root / "input.pt").read_text(encoding="utf-8") == "input-v1"
+    assert completion_path.is_file()
+
+
+def test_pinned_score_runtime_reports_uncertainty_when_cleanup_rollback_sync_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "scores"
+    original_cleanup = tempfile.TemporaryDirectory.cleanup
+    original_fsync = os.fsync
+    cleanup_started = False
+
+    def _fail_score_cleanup(directory: tempfile.TemporaryDirectory[str]) -> None:
+        nonlocal cleanup_started
+        if Path(directory.name).name.startswith(".dnadesign-score-"):
+            cleanup_started = True
+            raise OSError("simulated private score cleanup failure")
+        original_cleanup(directory)
+
+    def _fail_cleanup_rollback_sync(descriptor: int) -> None:
+        if cleanup_started and stat.S_ISDIR(os.fstat(descriptor).st_mode):
+            raise OSError("simulated cleanup rollback sync failure")
+        original_fsync(descriptor)
+
+    monkeypatch.setattr(tempfile.TemporaryDirectory, "cleanup", _fail_score_cleanup)
+    monkeypatch.setattr(os, "fsync", _fail_cleanup_rollback_sync)
+
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnScorePublicationUncertainError,
+        match="cleanup rollback durability is uncertain",
+    ):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert not (output_root / "input.pt").exists()
+
+
+def test_pinned_score_cleanup_rollback_never_deletes_replacement_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "scores"
+    published_score = output_root / "input.pt"
+    original_cleanup = tempfile.TemporaryDirectory.cleanup
+
+    def _replace_score_then_fail_cleanup(directory: tempfile.TemporaryDirectory[str]) -> None:
+        if Path(directory.name).name.startswith(".dnadesign-score-"):
+            published_score.unlink()
+            published_score.write_text("unrelated replacement", encoding="utf-8")
+            raise OSError("simulated cleanup failure after replacement")
+        original_cleanup(directory)
+
+    monkeypatch.setattr(tempfile.TemporaryDirectory, "cleanup", _replace_score_then_fail_cleanup)
+
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnScorePublicationUncertainError,
+        match="cleanup rollback target changed",
+    ):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert published_score.read_text(encoding="utf-8") == "unrelated replacement"
+
+
+def test_pinned_score_cleanup_failure_does_not_mask_original_execution_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "scores"
+    original_cleanup = tempfile.TemporaryDirectory.cleanup
+    original_run = subprocess.run
+
+    def _fail_score_execution(command: object, *args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        if isinstance(command, list) and any(str(value).endswith("score.py") for value in command):
+            raise subprocess.CalledProcessError(23, command)
+        return original_run(command, *args, **kwargs)  # type: ignore[arg-type, return-value]
+
+    def _fail_score_cleanup(directory: tempfile.TemporaryDirectory[str]) -> None:
+        if Path(directory.name).name.startswith(".dnadesign-score-"):
+            raise OSError("simulated cleanup failure during execution failure")
+        original_cleanup(directory)
+
+    monkeypatch.setattr(subprocess, "run", _fail_score_execution)
+    monkeypatch.setattr(tempfile.TemporaryDirectory, "cleanup", _fail_score_cleanup)
+
+    with pytest.raises(subprocess.CalledProcessError) as captured:
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert any("private score attempt cleanup also failed" in note for note in captured.value.__notes__)
+    assert not (output_root / "input.pt").exists()
+
+
+def test_pinned_score_runtime_retries_with_abandoned_legacy_private_attempt(tmp_path: Path) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "scores"
+    abandoned = output_root / ".dnadesign-score-killed" / "partial.pt"
+    abandoned.parent.mkdir(parents=True)
+    abandoned.write_text("killed-attempt", encoding="utf-8")
+
+    execute_pinned_entrypoint(
+        checkout_root=checkout,
+        upstream_commit=commit,
+        checkpoint_sha256=checkpoint_sha256,
+        pdb_sha256=pdb_sha256,
+        packing_checkpoint_sha256=None,
+        residue_alphabet_sha256=None,
+        entrypoint="score.py",
+        arguments=(
+            "--model_type",
+            "ligand_mpnn",
+            "--checkpoint_ligand_mpnn",
+            str(checkpoint),
+            "--pdb_path",
+            str(pdb),
+            "--out_folder",
+            str(output_root),
+        ),
+    )
+
+    assert (output_root / "input.pt").read_text(encoding="utf-8") == "input-v1"
+    assert abandoned.read_text(encoding="utf-8") == "killed-attempt"
+
+
 def test_pinned_design_runtime_rejects_preexisting_seed_output_lifecycle(tmp_path: Path) -> None:
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     output_root = tmp_path / "designs" / "seed_7"
