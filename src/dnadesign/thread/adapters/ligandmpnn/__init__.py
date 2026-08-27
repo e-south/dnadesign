@@ -9,6 +9,8 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
+from importlib import import_module
+
 from dnadesign.thread.adapters.ligandmpnn.alphabets import (
     LigandMpnnResidueAlphabetSidecar,
     materialize_residue_alphabet_sidecar,
@@ -54,15 +56,6 @@ from dnadesign.thread.adapters.ligandmpnn.receipts import (
     LigandMpnnProvenance,
     LigandMpnnRunReceipt,
     build_planned_receipt,
-)
-from dnadesign.thread.adapters.ligandmpnn.score_results import (
-    EXPECTED_LIGANDMPNN_SCORE_ALPHABET,
-    LigandMpnnCanonical20Policy,
-    LigandMpnnScoreOutput,
-    LigandMpnnScoreOutputTrust,
-    LigandMpnnScoreResult,
-    parse_ligandmpnn_score_outputs,
-    score_request_sha256,
 )
 from dnadesign.thread.adapters.ligandmpnn.scoring import (
     LigandMpnnScoreMode,
@@ -114,3 +107,25 @@ __all__ = [
     "score_request_sha256",
     "load_ligandmpnn_context_inventory",
 ]
+
+_SCORE_RESULT_EXPORTS = frozenset(
+    {
+        "EXPECTED_LIGANDMPNN_SCORE_ALPHABET",
+        "LigandMpnnCanonical20Policy",
+        "LigandMpnnScoreOutput",
+        "LigandMpnnScoreOutputTrust",
+        "LigandMpnnScoreResult",
+        "parse_ligandmpnn_score_outputs",
+        "score_request_sha256",
+    }
+)
+
+
+def __getattr__(name: str) -> object:
+    """Load Torch-backed score-result APIs only when callers request them."""
+
+    if name not in _SCORE_RESULT_EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module("dnadesign.thread.adapters.ligandmpnn.score_results"), name)
+    globals()[name] = value
+    return value

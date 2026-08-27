@@ -779,6 +779,19 @@ def test_py3dmol_backend_preserves_quoted_literal_atom_site_null_tokens() -> Non
     assert 'ATOM 1 N "N" "." SER A 3 0.000 0.000 0.000 A 3 "?" 1.00 80.00 1' in serialized
 
 
+@pytest.mark.parametrize("value", [".", "?"])
+def test_py3dmol_backend_preserves_semicolon_text_null_like_literals(value: str) -> None:
+    structure = _SIDECHAIN_MMCIF.replace(
+        "ATOM 1 N N . SER",
+        f"ATOM 1 N N\n;{value}\n;\nSER",
+        1,
+    )
+
+    serialized = serialize_mmcif_atom_sites_for_3dmol(structure)
+
+    assert f'ATOM 1 N "N" "{value}" SER A 3 0.000 0.000 0.000 A 3 ? 1.00 80.00 1' in serialized
+
+
 def test_py3dmol_backend_uses_concrete_auth_atom_name_for_unquoted_label_null() -> None:
     serialized = serialize_mmcif_atom_sites_for_3dmol(_ATOM_NAME_FALLBACK_MMCIF)
 

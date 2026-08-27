@@ -14,7 +14,7 @@ from __future__ import annotations
 import shlex
 from dataclasses import dataclass
 from io import StringIO
-from typing import Iterator
+from typing import Iterator, TextIO
 
 from Bio.PDB.MMCIF2Dict import MMCIF2Dict
 
@@ -58,7 +58,7 @@ class _BrowserAtomSiteColumn:
 
 
 class _CifSourceToken(str):
-    """String token carrying whether its CIF source spelling used quotes."""
+    """String token carrying whether CIF syntax made it explicit literal text."""
 
     quoted: bool
 
@@ -69,7 +69,14 @@ class _CifSourceToken(str):
 
 
 class _SourceAwareMMCIF2Dict(MMCIF2Dict):
-    """Retain the quote bit discarded by Biopython's public dictionary values."""
+    """Retain literal-vs-null provenance discarded from public dictionary values."""
+
+    def _tokenize(self, handle: TextIO) -> Iterator[str]:
+        for token in super()._tokenize(handle):
+            if isinstance(token, _CifSourceToken):
+                yield token
+            else:
+                yield _CifSourceToken(token, quoted=True)
 
     def _splitline(self, line: str) -> Iterator[str]:
         in_token = False

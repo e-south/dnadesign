@@ -13,6 +13,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
+import sys
+import textwrap
 from dataclasses import replace
 from pathlib import Path
 
@@ -37,6 +40,47 @@ _DIGEST = "a" * 64
 _PACKING_DIGEST = "b" * 64
 _COMMIT = "26ec57ac976ade5379920dbd43c7f97a91cf82de"  # pragma: allowlist secret
 _CONTEXT_PDB_PAYLOAD = b"ATOM pinned context input\n"
+
+
+def test_torch_independent_public_surface_imports_without_torch() -> None:
+    script = textwrap.dedent(
+        """
+        import importlib.abc
+        import sys
+
+        class BlockTorch(importlib.abc.MetaPathFinder):
+            def find_spec(self, fullname, path=None, target=None):
+                if fullname == "torch" or fullname.startswith("torch."):
+                    raise ModuleNotFoundError("No module named 'torch'", name="torch")
+                return None
+
+        sys.meta_path.insert(0, BlockTorch())
+        from dnadesign.thread.adapters.ligandmpnn import (
+            LigandMpnnRequest,
+            LigandMpnnScoreRequest,
+            preflight_ligandmpnn,
+        )
+        assert LigandMpnnRequest is not None
+        assert LigandMpnnScoreRequest is not None
+        assert callable(preflight_ligandmpnn)
+        assert "torch" not in sys.modules
+
+        try:
+            from dnadesign.thread.adapters.ligandmpnn import LigandMpnnScoreOutput
+        except ModuleNotFoundError as error:
+            assert error.name == "torch"
+        else:
+            raise AssertionError("scoring output API unexpectedly imported without Torch")
+        """
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        text=True,
+        capture_output=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
 
 
 def _write_context_input(root: Path) -> str:
