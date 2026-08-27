@@ -25,6 +25,7 @@ from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
     load_ligandmpnn_context_inventory,
     validate_context_inventory_for_input,
 )
+from dnadesign.thread.adapters.ligandmpnn.design_manifest import build_design_output_manifest
 from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnContextInventoryReference, LigandMpnnUpstreamPin
 from dnadesign.thread.adapters.ligandmpnn.pinned_checkout import materialize_pinned_tree
 
@@ -338,6 +339,7 @@ def pinned_runtime_completion_contract(
     residue_alphabet_sha256: str | None,
     entrypoint: str,
     score_output_sha256: str | None = None,
+    design_output_manifest: dict[str, object] | None = None,
 ) -> tuple[Path, dict[str, object]]:
     """Return the exact completion record required for one planned command."""
 
@@ -372,6 +374,7 @@ def pinned_runtime_completion_contract(
         execution,
         execution_sha256,
         score_output_sha256=score_output_sha256,
+        design_output_manifest=design_output_manifest,
     )
 
 
@@ -579,16 +582,21 @@ def execute_pinned_entrypoint(
         if design_publication is not None:
             temporary_output_root, output_root = design_publication
             try:
+                _sync_regular_directory_tree(temporary_output_root)
+                design_output_manifest = build_design_output_manifest(temporary_output_root)
                 _write_completion_record(
                     temporary_output_root / _COMPLETION_RECORD_NAME,
                     _completion_record(
                         execution,
                         observed_execution_sha256,
                         score_output_sha256=None,
+                        design_output_manifest=design_output_manifest,
                     ),
                     rollback_output_path=None,
                 )
                 _sync_regular_directory_tree(temporary_output_root)
+                if build_design_output_manifest(temporary_output_root) != design_output_manifest:
+                    raise ValueError("design output tree changed before atomic publication")
                 _publish_design_output_directory(temporary_output_root, output_root)
             finally:
                 if design_temporary is not None:
@@ -600,6 +608,7 @@ def execute_pinned_entrypoint(
             execution,
             observed_execution_sha256,
             score_output_sha256=published_score_sha256,
+            design_output_manifest=None,
         ),
         rollback_output_path=published_score_path,
     )
@@ -706,15 +715,19 @@ def _completion_record(
     execution_sha256: str,
     *,
     score_output_sha256: str | None,
+    design_output_manifest: dict[str, object] | None,
 ) -> dict[str, object]:
-    return {
+    payload: dict[str, object] = {
         "schema_id": "thread.ligandmpnn.execution_completion",
-        "schema_version": 2,
+        "schema_version": 3 if design_output_manifest is not None else 2,
         "status": "completed",
         "execution_sha256": f"sha256:{execution_sha256}",
         "score_output_sha256": score_output_sha256,
         "execution": execution,
     }
+    if design_output_manifest is not None:
+        payload["design_output_manifest"] = design_output_manifest
+    return payload
 
 
 def _write_completion_record(

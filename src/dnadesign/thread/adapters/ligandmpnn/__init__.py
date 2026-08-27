@@ -30,6 +30,11 @@ from dnadesign.thread.adapters.ligandmpnn.context_probe import (
     build_ligandmpnn_context_probe_command,
     materialize_ligandmpnn_context_inventory,
 )
+from dnadesign.thread.adapters.ligandmpnn.design_results import (
+    LigandMpnnDesignOutput,
+    LigandMpnnDesignResult,
+    parse_ligandmpnn_design_outputs,
+)
 from dnadesign.thread.adapters.ligandmpnn.models import (
     CANONICAL_AA_ALPHABET,
     DEFAULT_CHECKPOINT_PATH,
@@ -73,6 +78,8 @@ __all__ = [
     "LigandMpnnCommand",
     "LigandMpnnCompletionPublicationUncertainError",
     "LigandMpnnDesignPublicationUncertainError",
+    "LigandMpnnDesignOutput",
+    "LigandMpnnDesignResult",
     "LigandMpnnContextAtom",
     "LigandMpnnContextInventory",
     "LigandMpnnContextInventoryReference",
@@ -106,6 +113,7 @@ __all__ = [
     "materialize_ligandmpnn_context_inventory",
     "preflight_ligandmpnn",
     "parse_ligandmpnn_score_outputs",
+    "parse_ligandmpnn_design_outputs",
     "score_request_sha256",
     "load_ligandmpnn_context_inventory",
 ]

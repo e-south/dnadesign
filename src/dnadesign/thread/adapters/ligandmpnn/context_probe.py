@@ -235,7 +235,7 @@ def _publish_context_inventory(execution_root: Path, output_path: Path, payload:
         raise ValueError("context probe output directory could not be opened safely") from error
     try:
         prior_payload = _read_prior_receipt(directory_fd, output_path.name)
-        _write_temporary_receipt(directory_fd, temporary_name, payload)
+        published_identity = _write_temporary_receipt(directory_fd, temporary_name, payload)
         os.replace(
             temporary_name,
             output_path.name,
@@ -246,7 +246,12 @@ def _publish_context_inventory(execution_root: Path, output_path: Path, payload:
             os.fsync(directory_fd)
         except OSError as durability_error:
             try:
-                _restore_prior_receipt(directory_fd, output_path.name, prior_payload)
+                _restore_prior_receipt(
+                    directory_fd,
+                    output_path.name,
+                    prior_payload,
+                    published_identity=published_identity,
+                )
             except OSError as restoration_error:
                 raise LigandMpnnContextPublicationUncertainError(
                     "context probe receipt restoration could not be made durable after publication failure"
@@ -290,7 +295,7 @@ def _read_prior_receipt(directory_fd: int, output_name: str) -> bytes | None:
         return handle.read()
 
 
-def _write_temporary_receipt(directory_fd: int, temporary_name: str, payload: bytes) -> None:
+def _write_temporary_receipt(directory_fd: int, temporary_name: str, payload: bytes) -> tuple[int, int]:
     """Write and sync one no-follow temporary receipt in an opened directory."""
 
     file_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
@@ -304,11 +309,27 @@ def _write_temporary_receipt(directory_fd: int, temporary_name: str, payload: by
         handle.write(payload)
         handle.flush()
         os.fsync(handle.fileno())
+        status = os.fstat(handle.fileno())
+        return status.st_dev, status.st_ino
 
 
-def _restore_prior_receipt(directory_fd: int, output_name: str, prior_payload: bytes | None) -> None:
+def _restore_prior_receipt(
+    directory_fd: int,
+    output_name: str,
+    prior_payload: bytes | None,
+    *,
+    published_identity: tuple[int, int],
+) -> None:
     """Restore the descriptor-relative pre-publication state and sync it."""
 
+    try:
+        current_status = os.stat(output_name, dir_fd=directory_fd, follow_symlinks=False)
+    except FileNotFoundError as error:
+        raise LigandMpnnContextPublicationUncertainError(
+            "context probe receipt changed before publication recovery"
+        ) from error
+    if (current_status.st_dev, current_status.st_ino) != published_identity:
+        raise LigandMpnnContextPublicationUncertainError("context probe receipt changed before publication recovery")
     if prior_payload is None:
         try:
             os.unlink(output_name, dir_fd=directory_fd)

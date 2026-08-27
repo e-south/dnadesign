@@ -441,6 +441,47 @@ def test_probe_restores_existing_receipt_when_post_replace_directory_fsync_fails
     assert not list(output_path.parent.glob(f".{output_path.name}.*.tmp"))
 
 
+def test_probe_preserves_concurrent_receipt_when_its_post_replace_directory_fsync_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit = _fake_upstream_checkout(tmp_path)
+    request = _request(tmp_path, checkout, commit)
+    output_path = tmp_path / request.output_path
+    output_path.parent.mkdir(parents=True)
+    output_path.write_bytes(b"prior receipt bytes\n")
+    concurrent_payload = b"concurrent successful receipt\n"
+    concurrent_path = output_path.parent / ".concurrent-receipt.tmp"
+    original_fsync = os.fsync
+    failed = False
+
+    def _publish_concurrent_then_fail(file_descriptor: int) -> None:
+        nonlocal failed
+        if not failed and stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
+            concurrent_path.write_bytes(concurrent_payload)
+            concurrent_path.replace(output_path)
+            original_fsync(file_descriptor)
+            failed = True
+            raise OSError("simulated superseded publication fsync failure")
+        original_fsync(file_descriptor)
+
+    monkeypatch.setattr(os, "fsync", _publish_concurrent_then_fail)
+
+    with pytest.raises(
+        LigandMpnnContextPublicationUncertainError,
+        match="receipt changed before publication recovery",
+    ):
+        materialize_ligandmpnn_context_inventory(
+            request,
+            execution_root=tmp_path,
+            checkout_root=checkout,
+        )
+
+    assert failed
+    assert output_path.read_bytes() == concurrent_payload
+    assert not concurrent_path.exists()
+
+
 def test_probe_syncs_each_parent_that_receives_a_new_output_directory(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
