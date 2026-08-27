@@ -185,6 +185,27 @@ def test_probe_records_the_effective_upstream_y_context_and_nucleotide_identitie
     assert payload["observed"]["effective_nucleotide_atom_count"] == 4
 
 
+def test_public_materializer_anchors_relative_checkout_to_execution_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit = _fake_upstream_checkout(tmp_path)
+    request = _request(tmp_path, checkout, commit)
+    foreign_cwd = tmp_path / "foreign-cwd"
+    foreign_cwd.mkdir()
+    monkeypatch.chdir(foreign_cwd)
+
+    reference = materialize_ligandmpnn_context_inventory(
+        request,
+        execution_root=tmp_path,
+        checkout_root=checkout.relative_to(tmp_path),
+    )
+
+    inventory = load_ligandmpnn_context_inventory(reference, execution_root=tmp_path)
+    assert inventory.upstream_commit == commit
+    assert (tmp_path / reference.path).is_file()
+
+
 def test_probe_fails_before_writing_when_expected_nucleotide_context_is_absent(tmp_path: Path) -> None:
     checkout, commit = _fake_upstream_checkout(tmp_path)
     request = _request(tmp_path, checkout, commit, pdb_name="protein_only.pdb")

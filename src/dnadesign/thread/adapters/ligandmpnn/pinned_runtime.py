@@ -17,6 +17,7 @@ import errno
 import hashlib
 import json
 import os
+import re
 import secrets
 import stat
 import subprocess
@@ -65,6 +66,7 @@ _ALTERNATE_SOURCE_FLAGS = frozenset(
 
 _LINUX_RENAME_NOREPLACE = 1
 _MACOS_RENAME_EXCL = 0x00000004
+_REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 _ATTESTATION_SENSITIVE_FLAGS = frozenset(
     {
         _MODEL_TYPE_FLAG,
@@ -125,6 +127,7 @@ def pinned_runtime_prefix(
     upstream_commit: str,
     checkpoint_sha256: str,
     pdb_sha256: str,
+    request_id: str,
     context_inventory_path: Path | None,
     context_inventory_sha256: str | None,
     execution_root: Path | None,
@@ -145,6 +148,7 @@ def pinned_runtime_prefix(
         context_inventory_sha256=context_inventory_sha256,
         execution_root=execution_root,
     )
+    _validate_request_id(request_id)
     prefix = [
         python_executable,
         "-m",
@@ -161,6 +165,7 @@ def pinned_runtime_prefix(
             pdb_sha256,
         ]
     )
+    _append_cli_option(prefix, "--request-id", request_id)
     if context_inventory_path is not None:
         if context_inventory_sha256 is None or execution_root is None:
             raise ValueError("context inventory runtime binding must be complete")
@@ -193,6 +198,7 @@ def build_pinned_runtime_command(
     upstream_commit: str,
     checkpoint_sha256: str,
     pdb_sha256: str,
+    request_id: str,
     context_inventory_path: Path | None = None,
     context_inventory_sha256: str | None = None,
     execution_root: Path | None = None,
@@ -217,6 +223,7 @@ def build_pinned_runtime_command(
         upstream_commit=upstream_commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        request_id=request_id,
         context_inventory_path=context_inventory_path,
         context_inventory_sha256=context_inventory_sha256,
         execution_root=execution_root,
@@ -232,6 +239,7 @@ def build_pinned_runtime_command(
             upstream_commit=upstream_commit,
             checkpoint_sha256=checkpoint_sha256,
             pdb_sha256=pdb_sha256,
+            request_id=request_id,
             context_inventory_path=context_inventory_path,
             context_inventory_sha256=context_inventory_sha256,
             execution_root=execution_root,
@@ -252,6 +260,7 @@ def pinned_execution_sha256(
     upstream_commit: str,
     checkpoint_sha256: str,
     pdb_sha256: str,
+    request_id: str,
     context_inventory_path: Path | None = None,
     context_inventory_sha256: str | None = None,
     execution_root: Path | None = None,
@@ -268,6 +277,7 @@ def pinned_execution_sha256(
         upstream_commit=upstream_commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        request_id=request_id,
         context_inventory_path=context_inventory_path,
         context_inventory_sha256=context_inventory_sha256,
         execution_root=execution_root,
@@ -287,6 +297,7 @@ def parse_pinned_runtime_prefix(
     upstream_commit: str,
     checkpoint_sha256: str,
     pdb_sha256: str,
+    request_id: str,
     context_inventory_path: Path | None = None,
     context_inventory_sha256: str | None = None,
     execution_root: Path | None = None,
@@ -308,6 +319,7 @@ def parse_pinned_runtime_prefix(
         upstream_commit=upstream_commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        request_id=request_id,
         context_inventory_path=context_inventory_path,
         context_inventory_sha256=context_inventory_sha256,
         execution_root=execution_root,
@@ -322,6 +334,7 @@ def parse_pinned_runtime_prefix(
         upstream_commit=upstream_commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        request_id=request_id,
         context_inventory_path=context_inventory_path,
         context_inventory_sha256=context_inventory_sha256,
         execution_root=execution_root,
@@ -343,6 +356,7 @@ def pinned_runtime_completion_contract(
     upstream_commit: str,
     checkpoint_sha256: str,
     pdb_sha256: str,
+    request_id: str,
     context_inventory_path: Path | None = None,
     context_inventory_sha256: str | None = None,
     execution_root: Path | None = None,
@@ -359,6 +373,7 @@ def pinned_runtime_completion_contract(
         upstream_commit=upstream_commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        request_id=request_id,
         context_inventory_path=context_inventory_path,
         context_inventory_sha256=context_inventory_sha256,
         execution_root=execution_root,
@@ -372,6 +387,7 @@ def pinned_runtime_completion_contract(
         upstream_commit=upstream_commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        request_id=request_id,
         context_inventory_path=context_inventory_path,
         context_inventory_sha256=context_inventory_sha256,
         execution_root=execution_root,
@@ -395,6 +411,7 @@ def execute_pinned_entrypoint(
     upstream_commit: str,
     checkpoint_sha256: str,
     pdb_sha256: str,
+    request_id: str,
     context_inventory_path: Path | None,
     context_inventory_sha256: str | None,
     execution_root: Path | None,
@@ -420,6 +437,7 @@ def execute_pinned_entrypoint(
         upstream_commit=upstream_commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        request_id=request_id,
         context_inventory_path=context_inventory_path,
         context_inventory_sha256=context_inventory_sha256,
         execution_root=execution_root,
@@ -625,6 +643,7 @@ def execute_pinned_entrypoint(
         if design_publication is not None:
             temporary_output_root, output_root = design_publication
             design_failure: BaseException | None = None
+            design_published = False
             try:
                 _sync_regular_directory_tree(temporary_output_root)
                 design_output_manifest = build_design_output_manifest(temporary_output_root)
@@ -644,11 +663,12 @@ def execute_pinned_entrypoint(
                 if build_design_output_manifest(temporary_output_root) != design_output_manifest:
                     raise ValueError("design output tree changed before atomic publication")
                 _publish_design_output_directory(temporary_output_root, output_root)
+                design_published = True
             except BaseException as error:
                 design_failure = error
                 raise
             finally:
-                if design_attempt_path is not None and design_attempt_identity is not None:
+                if not design_published and design_attempt_path is not None and design_attempt_identity is not None:
                     try:
                         _cleanup_private_attempt_directory(
                             design_attempt_path,
@@ -683,6 +703,7 @@ def _pinned_execution_payload(
     upstream_commit: str,
     checkpoint_sha256: str,
     pdb_sha256: str,
+    request_id: str,
     context_inventory_path: Path | None,
     context_inventory_sha256: str | None,
     execution_root: Path | None,
@@ -694,11 +715,13 @@ def _pinned_execution_payload(
 ) -> dict[str, object]:
     if not isinstance(arguments, tuple) or any(not isinstance(value, str) for value in arguments):
         raise ValueError("LigandMPNN runtime arguments must be a tuple of strings")
+    _validate_request_id(request_id)
     payload: dict[str, object] = {
         "checkout_root": str(checkout_root),
         "upstream_commit": upstream_commit,
         "checkpoint_sha256": checkpoint_sha256,
         "pdb_sha256": pdb_sha256,
+        "request_id": request_id,
         "packing_checkpoint_sha256": packing_checkpoint_sha256,
         "residue_alphabet_sha256": residue_alphabet_sha256,
         "entrypoint": entrypoint,
@@ -730,6 +753,11 @@ def _validate_context_binding_fields(
         raise ValueError("design runtime requires a complete context inventory binding")
     if entrypoint == "score.py" and not all(bound):
         raise ValueError("score runtime requires a complete context inventory binding")
+
+
+def _validate_request_id(request_id: str) -> None:
+    if not isinstance(request_id, str) or _REQUEST_ID.fullmatch(request_id) is None:
+        raise ValueError("runtime request_id must contain only letters, numbers, dots, underscores, or hyphens")
 
 
 def _validate_runtime_context_inventory(
@@ -782,7 +810,7 @@ def _completion_record(
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "schema_id": "thread.ligandmpnn.execution_completion",
-        "schema_version": 3 if design_output_manifest is not None else 2,
+        "schema_version": 4 if design_output_manifest is not None else 3,
         "status": "completed",
         "execution_sha256": f"sha256:{execution_sha256}",
         "score_output_sha256": score_output_sha256,
@@ -1773,6 +1801,7 @@ def main() -> None:
     parser.add_argument("--upstream-commit", required=True)
     parser.add_argument("--checkpoint-sha256", required=True)
     parser.add_argument("--pdb-sha256", required=True)
+    parser.add_argument("--request-id", required=True)
     parser.add_argument("--execution-root", type=Path)
     parser.add_argument("--context-inventory-path", type=Path)
     parser.add_argument("--context-inventory-sha256")
@@ -1789,6 +1818,7 @@ def main() -> None:
         upstream_commit=args.upstream_commit,
         checkpoint_sha256=args.checkpoint_sha256,
         pdb_sha256=args.pdb_sha256,
+        request_id=args.request_id,
         context_inventory_path=args.context_inventory_path,
         context_inventory_sha256=args.context_inventory_sha256,
         execution_root=args.execution_root,

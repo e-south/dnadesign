@@ -184,6 +184,7 @@ def _derive_ligandmpnn_context_inventory(
     root = execution_root.expanduser().resolve()
     if not root.is_dir():
         raise ValueError("execution_root must be an existing directory")
+    checkout_root = _resolve_context_probe_checkout_root(checkout_root, execution_root=root)
     input_path = _within_root(root, request.pdb_path, field_name="context probe pdb_path")
     if input_path.is_symlink() or not input_path.is_file():
         raise ValueError("context probe input must be an existing regular file, not a symlink")
@@ -223,6 +224,16 @@ def _derive_ligandmpnn_context_inventory(
         required_polymer_types=request.required_polymer_types,
         atoms=atoms,
     )
+
+
+def _resolve_context_probe_checkout_root(checkout_root: Path, *, execution_root: Path) -> Path:
+    if checkout_root.is_absolute():
+        return checkout_root
+    if ".." in checkout_root.parts:
+        raise ValueError("relative context probe checkout_root must not contain traversal")
+    if str(checkout_root).startswith("~"):
+        raise ValueError("relative context probe checkout_root must not begin with '~'")
+    return execution_root / checkout_root
 
 
 def _publish_context_inventory(execution_root: Path, output_path: Path, payload: bytes) -> None:

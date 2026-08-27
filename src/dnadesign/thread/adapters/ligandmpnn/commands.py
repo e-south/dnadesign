@@ -97,6 +97,7 @@ def build_ligandmpnn_commands(
             upstream_commit=request.upstream.commit,
             checkpoint_sha256=request.upstream.checkpoint_sha256,
             pdb_sha256=request.pdb_sha256,
+            request_id=request.request_id,
             context_inventory_path=request.context_inventory.path,
             context_inventory_sha256=request.context_inventory.sha256,
             execution_root=execution_root,

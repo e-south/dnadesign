@@ -149,6 +149,8 @@ def test_single_aa_probability_command_is_explicit(tmp_path: Path) -> None:
         _DIGEST,
         "--pdb-sha256",
         request.pdb_sha256,
+        "--request-id",
+        request.request_id,
         "--execution-root",
         str(tmp_path),
         "--context-inventory-path",

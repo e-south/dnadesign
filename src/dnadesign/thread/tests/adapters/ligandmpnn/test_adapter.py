@@ -243,6 +243,8 @@ def test_build_commands_declares_exact_official_ligandmpnn_flags_per_seed(tmp_pa
         _DIGEST,
         "--pdb-sha256",
         request.pdb_sha256,
+        "--request-id",
+        request.request_id,
         "--execution-root",
         str(tmp_path),
         "--context-inventory-path",

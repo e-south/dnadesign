@@ -90,20 +90,26 @@ def parse_ligandmpnn_design_outputs(
         raise ValueError("commands must be a nonempty tuple")
     root = resolve_execution_root_for_execution(execution_root)
     first = commands[0]
-    checkout_root, python_executable, _completion_path, _execution_sha256 = parse_pinned_runtime_prefix(
-        first.argv,
-        upstream_commit=request.upstream.commit,
-        checkpoint_sha256=request.upstream.checkpoint_sha256,
-        pdb_sha256=request.pdb_sha256,
-        context_inventory_path=request.context_inventory.path,
-        context_inventory_sha256=request.context_inventory.sha256,
-        execution_root=root,
-        packing_checkpoint_sha256=(request.upstream.packing_checkpoint_sha256 if request.packing.enabled else None),
-        residue_alphabet_sha256=(
-            residue_alphabet_sidecar.sha256.removeprefix("sha256:") if residue_alphabet_sidecar is not None else None
-        ),
-        entrypoint="run.py",
-    )
+    try:
+        checkout_root, python_executable, _completion_path, _execution_sha256 = parse_pinned_runtime_prefix(
+            first.argv,
+            upstream_commit=request.upstream.commit,
+            checkpoint_sha256=request.upstream.checkpoint_sha256,
+            pdb_sha256=request.pdb_sha256,
+            request_id=request.request_id,
+            context_inventory_path=request.context_inventory.path,
+            context_inventory_sha256=request.context_inventory.sha256,
+            execution_root=root,
+            packing_checkpoint_sha256=(request.upstream.packing_checkpoint_sha256 if request.packing.enabled else None),
+            residue_alphabet_sha256=(
+                residue_alphabet_sidecar.sha256.removeprefix("sha256:")
+                if residue_alphabet_sidecar is not None
+                else None
+            ),
+            entrypoint="run.py",
+        )
+    except ValueError as error:
+        raise ValueError("commands do not exactly match the design request") from error
     expected_commands = build_ligandmpnn_commands(
         request,
         checkout_root=checkout_root,
@@ -137,6 +143,7 @@ def parse_ligandmpnn_design_outputs(
             upstream_commit=request.upstream.commit,
             checkpoint_sha256=request.upstream.checkpoint_sha256,
             pdb_sha256=request.pdb_sha256,
+            request_id=request.request_id,
             context_inventory_path=request.context_inventory.path,
             context_inventory_sha256=request.context_inventory.sha256,
             execution_root=root,

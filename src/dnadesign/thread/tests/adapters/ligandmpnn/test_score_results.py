@@ -162,6 +162,7 @@ def _write_output(
         upstream_commit=request.upstream.commit,
         checkpoint_sha256=request.upstream.checkpoint_sha256,
         pdb_sha256=request.pdb_sha256,
+        request_id=request.request_id,
         context_inventory_path=request.context_inventory.path,
         context_inventory_sha256=request.context_inventory.sha256,
         execution_root=root,
@@ -290,6 +291,25 @@ def test_parser_binds_exact_request_commands_inputs_and_raw_probabilities(tmp_pa
     assert receipt["context"]["observed_inventory"]["observed"]["effective_nucleotide_atom_count"] == 2
 
 
+def test_score_admission_rejects_completed_execution_for_different_request_id(tmp_path: Path) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    commands = build_ligandmpnn_score_commands(
+        request,
+        checkout_root=tmp_path / "LigandMPNN",
+        execution_root=tmp_path,
+    )
+    _write_output(tmp_path, request, 7)
+    replayed_request = replace(request, request_id="different_score_request")
+
+    with pytest.raises(ValueError, match="commands do not exactly match score request"):
+        parse_ligandmpnn_score_outputs(
+            replayed_request,
+            commands,
+            execution_root=tmp_path,
+            trust=LigandMpnnScoreOutputTrust.PINNED_LOCAL_EXECUTION,
+        )
+
+
 def test_parser_requires_exact_actual_execution_completion(tmp_path: Path) -> None:
     request = _prepare_request(tmp_path, seeds=(7,))
     _write_output(tmp_path, request, 7)
@@ -303,6 +323,7 @@ def test_parser_requires_exact_actual_execution_completion(tmp_path: Path) -> No
         upstream_commit=request.upstream.commit,
         checkpoint_sha256=request.upstream.checkpoint_sha256,
         pdb_sha256=request.pdb_sha256,
+        request_id=request.request_id,
         context_inventory_path=request.context_inventory.path,
         context_inventory_sha256=request.context_inventory.sha256,
         execution_root=tmp_path,
@@ -311,6 +332,8 @@ def test_parser_requires_exact_actual_execution_completion(tmp_path: Path) -> No
         entrypoint="score.py",
         score_output_sha256=f"sha256:{_sha256((tmp_path / request.output_dir / 'seed_7/target.pt').read_bytes())}",
     )
+    assert completion["schema_version"] == 3
+    assert completion["execution"]["request_id"] == request.request_id
     absolute_completion_path = tmp_path / completion_path
     absolute_completion_path.unlink()
     with pytest.raises(ValueError, match="execution completion record does not exist"):
@@ -353,6 +376,7 @@ def test_parser_rejects_symlinked_execution_completion_leaf(tmp_path: Path) -> N
         upstream_commit=request.upstream.commit,
         checkpoint_sha256=request.upstream.checkpoint_sha256,
         pdb_sha256=request.pdb_sha256,
+        request_id=request.request_id,
         context_inventory_path=request.context_inventory.path,
         context_inventory_sha256=request.context_inventory.sha256,
         execution_root=tmp_path,
@@ -690,6 +714,7 @@ def test_parser_requires_explicit_trust_and_still_uses_weights_only_loading(tmp_
         upstream_commit=request.upstream.commit,
         checkpoint_sha256=request.upstream.checkpoint_sha256,
         pdb_sha256=request.pdb_sha256,
+        request_id=request.request_id,
         context_inventory_path=request.context_inventory.path,
         context_inventory_sha256=request.context_inventory.sha256,
         execution_root=tmp_path,

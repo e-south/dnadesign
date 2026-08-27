@@ -72,6 +72,7 @@ def execute_pinned_entrypoint(**kwargs: object) -> None:
     context_inventory_path = kwargs.pop("context_inventory_path", None)
     context_inventory_sha256 = kwargs.pop("context_inventory_sha256", None)
     execution_root = kwargs.pop("execution_root", None)
+    request_id = kwargs.pop("request_id", "test_request")
     if entrypoint in {"run.py", "score.py"} and context_inventory_path is None:
         execution_root = checkout_root.parent
         pdb_value = planned_arguments[planned_arguments.index("--pdb_path") + 1]
@@ -102,6 +103,7 @@ def execute_pinned_entrypoint(**kwargs: object) -> None:
         upstream_commit=str(kwargs["upstream_commit"]),
         checkpoint_sha256=str(kwargs["checkpoint_sha256"]),
         pdb_sha256=str(kwargs["pdb_sha256"]),
+        request_id=str(request_id),
         packing_checkpoint_sha256=kwargs["packing_checkpoint_sha256"],  # type: ignore[arg-type]
         residue_alphabet_sha256=kwargs["residue_alphabet_sha256"],  # type: ignore[arg-type]
         context_inventory_path=context_inventory_path,  # type: ignore[arg-type]
@@ -113,6 +115,7 @@ def execute_pinned_entrypoint(**kwargs: object) -> None:
     )
     _execute_pinned_entrypoint(
         **kwargs,  # type: ignore[arg-type]
+        request_id=str(request_id),
         context_inventory_path=context_inventory_path,  # type: ignore[arg-type]
         context_inventory_sha256=context_inventory_sha256,  # type: ignore[arg-type]
         execution_root=execution_root,  # type: ignore[arg-type]
@@ -237,6 +240,7 @@ def test_pinned_runtime_command_preserves_option_looking_checkout_roots(
         upstream_commit="1" * 40,
         checkpoint_sha256="a" * 64,
         pdb_sha256="b" * 64,
+        request_id="test_request",
         packing_checkpoint_sha256=None,
         residue_alphabet_sha256=None,
         entrypoint=entrypoint,
@@ -260,6 +264,7 @@ def test_pinned_runtime_command_preserves_option_looking_checkout_roots(
         upstream_commit="1" * 40,
         checkpoint_sha256="a" * 64,
         pdb_sha256="b" * 64,
+        request_id="test_request",
         context_inventory_path=Path("evidence/context.json"),
         context_inventory_sha256="c" * 64,
         execution_root=Path("-execution"),
@@ -313,6 +318,7 @@ def test_pinned_runtime_ignores_timestamp_valid_poisoned_parser_bytecode(tmp_pat
         upstream_commit=commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        request_id="test_request",
         packing_checkpoint_sha256=None,
         residue_alphabet_sha256=None,
         entrypoint="run.py",
@@ -434,6 +440,7 @@ def test_generated_runtime_command_executes_and_records_complete_cli_arguments(t
         upstream_commit=commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        request_id="test_request",
         context_inventory_path=context_inventory.path,
         context_inventory_sha256=context_inventory.sha256,
         execution_root=tmp_path,
@@ -449,6 +456,7 @@ def test_generated_runtime_command_executes_and_records_complete_cli_arguments(t
 
     completion = json.loads((output_dir / ".dnadesign-ligandmpnn-execution.json").read_text(encoding="utf-8"))
     assert completion["execution"]["arguments"] == list(arguments)
+    assert completion["execution"]["request_id"] == "test_request"
     assert completion["execution"]["context_inventory_path"] == context_inventory.path.as_posix()
     assert completion["execution"]["context_inventory_sha256"] == context_inventory.sha256
     assert completion["execution_sha256"].startswith("sha256:")
@@ -1557,30 +1565,26 @@ def test_pinned_design_runtime_preserves_recreated_attempt_after_successful_publ
         _publish_then_recreate_attempt,
     )
 
-    with pytest.raises(
-        pinned_runtime_module.LigandMpnnDesignPublicationUncertainError,
-        match="design attempt cleanup target changed",
-    ):
-        execute_pinned_entrypoint(
-            checkout_root=checkout,
-            upstream_commit=commit,
-            checkpoint_sha256=checkpoint_sha256,
-            pdb_sha256=pdb_sha256,
-            packing_checkpoint_sha256=None,
-            residue_alphabet_sha256=None,
-            entrypoint="run.py",
-            completion_record_path=completion_path,
-            arguments=(
-                "--model_type",
-                "ligand_mpnn",
-                "--checkpoint_ligand_mpnn",
-                str(checkpoint),
-                "--pdb_path",
-                str(pdb),
-                "--out_folder",
-                str(output_root),
-            ),
-        )
+    execute_pinned_entrypoint(
+        checkout_root=checkout,
+        upstream_commit=commit,
+        checkpoint_sha256=checkpoint_sha256,
+        pdb_sha256=pdb_sha256,
+        packing_checkpoint_sha256=None,
+        residue_alphabet_sha256=None,
+        entrypoint="run.py",
+        completion_record_path=completion_path,
+        arguments=(
+            "--model_type",
+            "ligand_mpnn",
+            "--checkpoint_ligand_mpnn",
+            str(checkpoint),
+            "--pdb_path",
+            str(pdb),
+            "--out_folder",
+            str(output_root),
+        ),
+    )
 
     assert recreated_attempt is not None
     assert (recreated_attempt / "foreign.txt").read_text(encoding="utf-8") == "foreign"

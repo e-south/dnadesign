@@ -15,6 +15,7 @@ import hashlib
 import json
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -96,13 +97,25 @@ def test_design_admission_binds_exact_published_tree(tmp_path: Path) -> None:
     )
 
     completion = json.loads((output_root / ".dnadesign-ligandmpnn-execution.json").read_text(encoding="utf-8"))
-    assert completion["schema_version"] == 3
+    assert completion["schema_version"] == 4
     assert completion["design_output_manifest"] == result.outputs[0].manifest
     assert result.outputs[0].sequence_count == 1
     assert result.sequence_count == request.expected_sequence_count == 1
     assert result.to_dict()["expected_sequence_count"] == 1
     assert result.to_dict()["sequence_count"] == 1
     assert any(entry["path"] == "seqs/input.fa" for entry in result.outputs[0].manifest["entries"])
+
+
+def test_design_admission_rejects_completed_execution_for_different_request_id(tmp_path: Path) -> None:
+    request, commands, _output_root = _execute_design(tmp_path)
+    replayed_request = replace(request, request_id="different_design_request")
+
+    with pytest.raises(ValueError, match="commands do not exactly match the design request"):
+        parse_ligandmpnn_design_outputs(
+            replayed_request,
+            commands,
+            execution_root=tmp_path,
+        )
 
 
 def test_design_builder_and_admission_normalize_symlinked_execution_root(tmp_path: Path) -> None:
