@@ -72,9 +72,11 @@ existing manifest. Paths passed with `--input`, `--metadata`, or `--cache`
 receive those roles; remaining workspace/store files are artifacts, while all
 tool-cache files are cache material.
 
-For `--demo`, existing resources must already be small and tracked. Inventory
-creates the new manifest with status `created-pending-git-add`; add that
-manifest to Git, then run `dnadesign-storage validate` to reach `verified`.
+For `--demo`, existing resources must already be small, tracked, and byte-for-byte
+identical to their Git index entries. Inventory creates the new manifest with
+status `created-pending-git-add`; add that manifest to Git, then run
+`dnadesign-storage validate` to reach `verified`. Unstaged demo edits fail so a
+manifest-only commit cannot describe bytes absent from a clean checkout.
 Operational objects never use this two-step exception.
 
 An active workspace or durable store may change only through its owning tool.

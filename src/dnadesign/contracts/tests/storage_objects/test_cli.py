@@ -177,6 +177,53 @@ def test_inventory_bootstraps_demo_then_requires_manifest_to_be_tracked(
     assert json.loads(after_add.stdout)["status"] == "verified"
 
 
+def test_inventory_demo_requires_resource_bytes_to_match_git_index(tmp_path: Path) -> None:
+    checkout = tmp_path / "checkout"
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    root = checkout / "examples" / "pilot"
+    root.mkdir(parents=True)
+    payload = root / "payload.txt"
+    payload.write_text("indexed\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot/payload.txt"], check=True)
+    payload.write_text("unstaged\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="demo file differs from Git index"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+            demo=True,
+        )
+
+    assert not (root / MANIFEST_NAME).exists()
+    assert payload.read_text(encoding="utf-8") == "unstaged\n"
+
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot/payload.txt"], check=True)
+    assert (
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+            demo=True,
+        )["status"]
+        == "created-pending-git-add"
+    )
+
+
 def test_validate_root_emits_inventory_summary(tmp_path: Path) -> None:
     storage_root = tmp_path / "storage"
     for shelf in ("workspaces", "stores", "tool-cache"):

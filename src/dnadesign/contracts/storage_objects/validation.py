@@ -292,9 +292,9 @@ def _verify_demo(
     total_bytes = verified.manifest_path.stat().st_size + sum(resource.size_bytes for resource in verified.resources)
     if total_bytes > MAX_DEMO_BYTES:
         raise StorageObjectError(f"demo exceeds {MAX_DEMO_BYTES} bytes: {total_bytes}")
-    for path in (
-        verified.manifest_path,
-        *(resource.path for resource in verified.resources),
+    for path, expected_digest in (
+        (verified.manifest_path, verified.manifest_digest),
+        *((resource.path, resource.digest) for resource in verified.resources),
     ):
         relative = path.relative_to(checkout).as_posix()
         try:
@@ -318,6 +318,21 @@ def _verify_demo(
             if allow_untracked_manifest and path == verified.manifest_path:
                 continue
             raise StorageObjectError(f"demo file is not tracked: {relative}")
+        try:
+            indexed = subprocess.run(
+                ["git", "-C", str(checkout), "cat-file", "blob", f":{relative}"],
+                check=False,
+                capture_output=True,
+            )
+        except OSError as exc:
+            raise StorageObjectError(f"cannot verify demo Git index bytes for {relative}: {exc}") from exc
+        if indexed.returncode != 0:
+            detail = indexed.stderr.decode(errors="replace").strip()
+            raise StorageObjectError(
+                f"cannot verify demo Git index bytes for {relative}: {detail or 'git cat-file failed'}"
+            )
+        if _sha256_bytes(indexed.stdout) != expected_digest:
+            raise StorageObjectError(f"demo file differs from Git index: {relative}")
 
 
 def verify_storage_object(
