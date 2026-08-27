@@ -299,6 +299,7 @@ def _verify_demo_git_index_entry(checkout: Path, path: Path, expected_digest: st
         completed = subprocess.run(
             [
                 "git",
+                "--no-replace-objects",
                 "-C",
                 str(checkout),
                 "ls-files",
@@ -332,7 +333,7 @@ def _verify_demo_git_index_entry(checkout: Path, path: Path, expected_digest: st
         )
     try:
         indexed = subprocess.run(
-            ["git", "-C", str(checkout), "cat-file", "blob", object_id],
+            ["git", "--no-replace-objects", "-C", str(checkout), "cat-file", "blob", object_id],
             check=False,
             capture_output=True,
         )

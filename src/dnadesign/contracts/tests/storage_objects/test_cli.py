@@ -299,6 +299,52 @@ def test_demo_validation_requires_empty_lock_to_match_git_index(tmp_path: Path) 
     assert verify_storage_object(root).summary()["status"] == "verified"
 
 
+def test_demo_validation_reads_original_index_blob_despite_git_replace_ref(tmp_path: Path) -> None:
+    root, manifest_path = _seed_tracked_demo(tmp_path)
+    checkout = root.parents[1]
+    payload_path = root / "payload.txt"
+    relative_payload = payload_path.relative_to(checkout).as_posix()
+    indexed_blob = subprocess.run(
+        ["git", "-C", str(checkout), "ls-files", "--stage", "--", relative_payload],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.split()[1]
+    replacement_bytes = b"replacement payload\n"
+    replacement_blob = (
+        subprocess.run(
+            ["git", "-C", str(checkout), "hash-object", "-w", "--stdin"],
+            input=replacement_bytes,
+            check=True,
+            capture_output=True,
+        )
+        .stdout.decode()
+        .strip()
+    )
+    subprocess.run(
+        ["git", "-C", str(checkout), "replace", indexed_blob, replacement_blob],
+        check=True,
+    )
+    payload_path.write_bytes(replacement_bytes)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["resources"][0]["digest"] = f"sha256:{hashlib.sha256(replacement_bytes).hexdigest()}"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "-C", str(checkout), "add", manifest_path.relative_to(checkout).as_posix()],
+        check=True,
+    )
+
+    replaced_blob = subprocess.run(
+        ["git", "-C", str(checkout), "cat-file", "blob", indexed_blob],
+        check=True,
+        capture_output=True,
+    ).stdout
+    assert replaced_blob == replacement_bytes
+
+    with pytest.raises(StorageObjectError, match=f"demo file differs from Git index: {relative_payload}"):
+        verify_storage_object(root)
+
+
 def test_demo_validation_normalizes_late_manifest_stat_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
