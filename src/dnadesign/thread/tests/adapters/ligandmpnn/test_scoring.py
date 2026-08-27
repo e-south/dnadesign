@@ -79,6 +79,15 @@ def test_score_request_preserves_valid_nested_relative_output_directory() -> Non
     assert command.argv[command.argv.index("--out_folder") + 1] == "results/nested/scores/seed_7"
 
 
+def test_score_request_preserves_dot_output_as_an_execution_root_seed_directory() -> None:
+    request = _request(output_dir=Path("."))
+
+    command = build_ligandmpnn_score_commands(request, checkout_root=Path("LigandMPNN"))[0]
+
+    assert command.output_dir == Path("seed_7")
+    assert command.argv[command.argv.index("--out_folder") + 1] == "seed_7"
+
+
 def test_single_aa_probability_command_is_explicit() -> None:
     command = build_ligandmpnn_score_commands(
         _request(), checkout_root=Path("/opt/LigandMPNN"), python_executable="python3"

@@ -536,7 +536,7 @@ def execute_pinned_entrypoint(
                 raise ValueError(f"score output directory could not be opened safely: {output_root}") from exc
             else:
                 os.close(output_directory_fd)
-            score_attempt_root = output_root.parent.parent
+            score_attempt_root = output_root.parent
             try:
                 score_attempt_root_fd = _open_directory_path(score_attempt_root, create=False)
             except OSError as exc:
@@ -593,6 +593,7 @@ def execute_pinned_entrypoint(
                         design_output_manifest=design_output_manifest,
                     ),
                     rollback_output_path=None,
+                    rollback_output_identity=None,
                 )
                 _sync_regular_directory_tree(temporary_output_root)
                 if build_design_output_manifest(temporary_output_root) != design_output_manifest:
@@ -611,6 +612,7 @@ def execute_pinned_entrypoint(
             design_output_manifest=None,
         ),
         rollback_output_path=published_score_path,
+        rollback_output_identity=published_score_identity,
     )
 
 
@@ -735,24 +737,33 @@ def _write_completion_record(
     payload: dict[str, object],
     *,
     rollback_output_path: Path | None,
+    rollback_output_identity: tuple[int, int] | None,
 ) -> None:
     if not isinstance(path, Path):
         raise ValueError("completion record path must be a Path")
     if not path.name or ".." in path.parts:
         raise ValueError("completion record path must not contain traversal")
+    if (rollback_output_path is None) != (rollback_output_identity is None):
+        raise ValueError("completion rollback output path and identity must be supplied together")
     encoded = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
     try:
         directory_fd = _open_directory_path(path.parent, create=True)
     except OSError as exc:
-        _rollback_output_after_completion_failure(rollback_output_path)
+        _rollback_output_after_completion_failure(
+            rollback_output_path,
+            rollback_output_identity=rollback_output_identity,
+        )
         raise ValueError(f"LigandMPNN completion record directory could not be opened safely: {path}") from exc
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
     completion_created = False
+    completion_identity: tuple[int, int] | None = None
     durability_failure = False
     try:
         try:
             file_descriptor = os.open(path.name, flags, 0o600, dir_fd=directory_fd)
             completion_created = True
+            completion_status = os.fstat(file_descriptor)
+            completion_identity = (completion_status.st_dev, completion_status.st_ino)
             try:
                 handle = os.fdopen(file_descriptor, "wb")
             except BaseException:
@@ -773,7 +784,9 @@ def _write_completion_record(
                     directory_fd,
                     completion_name=path.name,
                     completion_created=completion_created,
+                    completion_identity=completion_identity,
                     rollback_output_path=rollback_output_path,
+                    rollback_output_identity=rollback_output_identity,
                 )
             except OSError as rollback_error:
                 raise LigandMpnnCompletionPublicationUncertainError(
@@ -832,7 +845,9 @@ def _rollback_completion_and_output(
     *,
     completion_name: str,
     completion_created: bool,
+    completion_identity: tuple[int, int] | None,
     rollback_output_path: Path | None,
+    rollback_output_identity: tuple[int, int] | None,
 ) -> None:
     """Remove incomplete lifecycle entries and make their absence durable."""
 
@@ -840,16 +855,44 @@ def _rollback_completion_and_output(
     if rollback_output_path is not None:
         output_directory_fd = _open_directory_path(rollback_output_path.parent, create=False)
     try:
+        completion_owned = False
         if completion_created:
-            try:
-                os.unlink(completion_name, dir_fd=completion_directory_fd)
-            except FileNotFoundError:
-                pass
+            if completion_identity is None:
+                raise LigandMpnnCompletionPublicationUncertainError(
+                    "LigandMPNN completion publication ownership was not recorded"
+                )
+            completion_owned = _owned_leaf_exists(
+                completion_directory_fd,
+                completion_name,
+                completion_identity,
+                error_type=LigandMpnnCompletionPublicationUncertainError,
+                changed_message="LigandMPNN completion publication rollback target changed",
+                inspect_message="LigandMPNN completion publication rollback target could not be inspected",
+            )
+        output_owned = False
         if output_directory_fd is not None and rollback_output_path is not None:
+            if rollback_output_identity is None:
+                raise LigandMpnnCompletionPublicationUncertainError(
+                    "LigandMPNN completion publication output ownership was not recorded"
+                )
             try:
-                os.unlink(rollback_output_path.name, dir_fd=output_directory_fd)
-            except FileNotFoundError:
-                pass
+                output_owned = _owned_leaf_exists(
+                    output_directory_fd,
+                    rollback_output_path.name,
+                    rollback_output_identity,
+                    error_type=LigandMpnnCompletionPublicationUncertainError,
+                    changed_message="LigandMPNN completion publication output rollback target changed",
+                    inspect_message="LigandMPNN completion publication output rollback target could not be inspected",
+                )
+            except LigandMpnnCompletionPublicationUncertainError:
+                if completion_owned:
+                    os.unlink(completion_name, dir_fd=completion_directory_fd)
+                    os.fsync(completion_directory_fd)
+                raise
+        if completion_owned:
+            os.unlink(completion_name, dir_fd=completion_directory_fd)
+        if output_owned and output_directory_fd is not None and rollback_output_path is not None:
+            os.unlink(rollback_output_path.name, dir_fd=output_directory_fd)
         if completion_created:
             os.fsync(completion_directory_fd)
         if output_directory_fd is not None:
@@ -859,18 +902,31 @@ def _rollback_completion_and_output(
             os.close(output_directory_fd)
 
 
-def _rollback_output_after_completion_failure(rollback_output_path: Path | None) -> None:
+def _rollback_output_after_completion_failure(
+    rollback_output_path: Path | None,
+    *,
+    rollback_output_identity: tuple[int, int] | None,
+) -> None:
     """Roll back a score if its completion directory cannot be opened safely."""
 
     if rollback_output_path is None:
         return
+    if rollback_output_identity is None:
+        raise LigandMpnnCompletionPublicationUncertainError(
+            "LigandMPNN completion publication output ownership was not recorded"
+        )
     try:
         output_directory_fd = _open_directory_path(rollback_output_path.parent, create=False)
         try:
-            try:
+            if _owned_leaf_exists(
+                output_directory_fd,
+                rollback_output_path.name,
+                rollback_output_identity,
+                error_type=LigandMpnnCompletionPublicationUncertainError,
+                changed_message="LigandMPNN completion publication output rollback target changed",
+                inspect_message="LigandMPNN completion publication output rollback target could not be inspected",
+            ):
                 os.unlink(rollback_output_path.name, dir_fd=output_directory_fd)
-            except FileNotFoundError:
-                pass
             os.fsync(output_directory_fd)
         finally:
             os.close(output_directory_fd)
@@ -1038,6 +1094,28 @@ def _sync_regular_directory_tree(root: Path) -> None:
             raise ValueError(f"design output directory could not be synced safely: {directory_path}") from exc
 
 
+def _owned_leaf_exists(
+    directory_fd: int,
+    name: str,
+    expected_identity: tuple[int, int],
+    *,
+    error_type: type[RuntimeError],
+    changed_message: str,
+    inspect_message: str,
+) -> bool:
+    """Return whether a no-follow leaf still belongs to this publication."""
+
+    try:
+        observed = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        raise error_type(inspect_message) from exc
+    if (observed.st_dev, observed.st_ino) != expected_identity:
+        raise error_type(changed_message)
+    return True
+
+
 def _publish_design_output_directory(source_path: Path, destination_path: Path) -> None:
     """Publish one complete private output tree through an exclusive reservation."""
 
@@ -1047,8 +1125,9 @@ def _publish_design_output_directory(source_path: Path, destination_path: Path) 
         parent_fd = _open_directory_path(destination_path.parent, create=False)
     except OSError as exc:
         raise ValueError(f"design output parent could not be opened safely: {destination_path.parent}") from exc
-    placeholder_created = False
+    placeholder_identity: tuple[int, int] | None = None
     published = False
+    source_identity: tuple[int, int] | None = None
     try:
         try:
             source_fd = os.open(
@@ -1059,13 +1138,36 @@ def _publish_design_output_directory(source_path: Path, destination_path: Path) 
         except OSError as exc:
             raise ValueError(f"design output attempt directory is not safe: {source_path}") from exc
         else:
-            os.close(source_fd)
+            try:
+                source_status = os.fstat(source_fd)
+                source_identity = (source_status.st_dev, source_status.st_ino)
+            except OSError as exc:
+                raise ValueError(f"design output attempt directory is not safe: {source_path}") from exc
+            finally:
+                os.close(source_fd)
         try:
             os.mkdir(destination_path.name, mode=0o700, dir_fd=parent_fd)
-            placeholder_created = True
         except FileExistsError as exc:
             raise ValueError(f"design output directory already exists: {destination_path}") from exc
         try:
+            placeholder_status = os.stat(destination_path.name, dir_fd=parent_fd, follow_symlinks=False)
+            placeholder_identity = (placeholder_status.st_dev, placeholder_status.st_ino)
+        except OSError as exc:
+            raise LigandMpnnDesignPublicationUncertainError(
+                "LigandMPNN design placeholder ownership could not be recorded"
+            ) from exc
+        try:
+            if not _owned_leaf_exists(
+                parent_fd,
+                destination_path.name,
+                placeholder_identity,
+                error_type=LigandMpnnDesignPublicationUncertainError,
+                changed_message="LigandMPNN design placeholder changed before publication",
+                inspect_message="LigandMPNN design placeholder could not be inspected before publication",
+            ):
+                raise LigandMpnnDesignPublicationUncertainError(
+                    "LigandMPNN design placeholder disappeared before publication"
+                )
             os.rename(
                 source_path.name,
                 destination_path.name,
@@ -1077,13 +1179,29 @@ def _publish_design_output_directory(source_path: Path, destination_path: Path) 
         except OSError as publication_error:
             try:
                 if published:
-                    os.rename(
+                    assert source_identity is not None
+                    if _owned_leaf_exists(
+                        parent_fd,
                         destination_path.name,
-                        source_path.name,
-                        src_dir_fd=parent_fd,
-                        dst_dir_fd=parent_fd,
-                    )
-                elif placeholder_created:
+                        source_identity,
+                        error_type=LigandMpnnDesignPublicationUncertainError,
+                        changed_message="LigandMPNN design publication rollback target changed",
+                        inspect_message="LigandMPNN design publication rollback target could not be inspected",
+                    ):
+                        os.rename(
+                            destination_path.name,
+                            source_path.name,
+                            src_dir_fd=parent_fd,
+                            dst_dir_fd=parent_fd,
+                        )
+                elif placeholder_identity is not None and _owned_leaf_exists(
+                    parent_fd,
+                    destination_path.name,
+                    placeholder_identity,
+                    error_type=LigandMpnnDesignPublicationUncertainError,
+                    changed_message="LigandMPNN design placeholder rollback target changed",
+                    inspect_message="LigandMPNN design placeholder rollback target could not be inspected",
+                ):
                     os.rmdir(destination_path.name, dir_fd=parent_fd)
                 os.fsync(parent_fd)
             except OSError as rollback_error:
@@ -1138,10 +1256,15 @@ def _publish_score_output(source_path: Path, destination_path: Path) -> tuple[st
             os.fsync(directory_fd)
         except OSError as publication_error:
             try:
-                try:
+                if _owned_leaf_exists(
+                    directory_fd,
+                    destination_path.name,
+                    source_identity,
+                    error_type=LigandMpnnScorePublicationUncertainError,
+                    changed_message="LigandMPNN score publication rollback target changed",
+                    inspect_message="LigandMPNN score publication rollback target could not be inspected",
+                ):
                     os.unlink(destination_path.name, dir_fd=directory_fd)
-                except FileNotFoundError:
-                    pass
                 os.fsync(directory_fd)
             except OSError as rollback_error:
                 raise LigandMpnnScorePublicationUncertainError(
