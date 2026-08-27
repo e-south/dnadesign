@@ -437,6 +437,7 @@ def validate_context_inventory_for_input(
     use_side_chain_context: bool,
     checkout_root: Path,
     execution_root: Path,
+    require_clean_parser_checkout: bool = True,
 ) -> None:
     """Require an inventory produced for the exact input and context settings."""
 
@@ -479,6 +480,7 @@ def validate_context_inventory_for_input(
         ),
         execution_root=execution_root,
         checkout_root=checkout_root,
+        require_clean_parser_checkout=require_clean_parser_checkout,
     )
     if inventory != derived:
         raise ValueError("context inventory does not match pinned parser derivation")

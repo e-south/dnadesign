@@ -14,6 +14,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from dnadesign.thread.adapters.ligandmpnn.alphabets import LigandMpnnResidueAlphabetSidecar
+from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
+    load_ligandmpnn_context_inventory,
+    validate_context_inventory_for_input,
+)
 from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnCommand, LigandMpnnRequest
 from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import build_pinned_runtime_command
 
@@ -22,11 +26,25 @@ def build_ligandmpnn_commands(
     request: LigandMpnnRequest,
     *,
     checkout_root: Path,
+    execution_root: Path,
     python_executable: str = "python",
     residue_alphabet_sidecar: LigandMpnnResidueAlphabetSidecar | None = None,
 ) -> tuple[LigandMpnnCommand, ...]:
     """Build one explicit official ``run.py`` invocation per requested seed."""
 
+    context_inventory = load_ligandmpnn_context_inventory(
+        request.context_inventory,
+        execution_root=execution_root,
+    )
+    validate_context_inventory_for_input(
+        context_inventory,
+        pdb_path=request.pdb_path,
+        pdb_sha256=request.pdb_sha256,
+        upstream=request.upstream,
+        use_side_chain_context=request.use_side_chain_context,
+        checkout_root=checkout_root,
+        execution_root=execution_root,
+    )
     _validate_alphabet_sidecar(request, residue_alphabet_sidecar)
     commands: list[LigandMpnnCommand] = []
     for seed in request.seeds:
@@ -77,6 +95,9 @@ def build_ligandmpnn_commands(
             upstream_commit=request.upstream.commit,
             checkpoint_sha256=request.upstream.checkpoint_sha256,
             pdb_sha256=request.pdb_sha256,
+            context_inventory_path=request.context_inventory.path,
+            context_inventory_sha256=request.context_inventory.sha256,
+            execution_root=execution_root,
             packing_checkpoint_sha256=(request.upstream.packing_checkpoint_sha256 if request.packing.enabled else None),
             residue_alphabet_sha256=(
                 residue_alphabet_sidecar.sha256.removeprefix("sha256:")

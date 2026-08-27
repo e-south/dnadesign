@@ -177,6 +177,7 @@ def _derive_ligandmpnn_context_inventory(
     *,
     execution_root: Path,
     checkout_root: Path,
+    require_clean_parser_checkout: bool = True,
 ) -> LigandMpnnContextInventory:
     """Derive one inventory from exact input bytes and the pinned parser without publishing it."""
 
@@ -203,6 +204,7 @@ def _derive_ligandmpnn_context_inventory(
         chains=request.chains,
         parse_all_atoms=request.parse_all_atoms,
         parse_atoms_with_zero_occupancy=request.parse_atoms_with_zero_occupancy,
+        require_clean_checkout=require_clean_parser_checkout,
     )
     atoms = _effective_context_atoms(parsed, other_atoms, element_dict_rev=element_dict_rev)
     return LigandMpnnContextInventory(
@@ -375,6 +377,7 @@ def _run_pinned_upstream_parser(
     chains: tuple[str, ...],
     parse_all_atoms: bool,
     parse_atoms_with_zero_occupancy: bool,
+    require_clean_checkout: bool = True,
 ) -> tuple[Any, Any, dict[int, str], str]:
     checkout = checkout_root.expanduser().resolve()
     if not checkout.is_dir():
@@ -387,12 +390,21 @@ def _run_pinned_upstream_parser(
         raise ValueError("pinned LigandMPNN checkout does not track data_utils.py")
     if index_path_matches_commit(checkout, expected_commit, "data_utils.py") is not True:
         raise ValueError("data_utils.py Git index does not match the pinned commit")
-    source_bytes = attested_working_tree_path_bytes(checkout, expected_commit, "data_utils.py")
-    if source_bytes is None:
-        raise ValueError("data_utils.py must be clean at the pinned commit")
-    working_source_path = checkout / "data_utils.py"
-    if working_source_path.is_symlink() or not working_source_path.is_file():
-        raise ValueError("pinned LigandMPNN data_utils.py must be a regular file")
+    if require_clean_checkout:
+        source_bytes = attested_working_tree_path_bytes(checkout, expected_commit, "data_utils.py")
+        if source_bytes is None:
+            raise ValueError("data_utils.py must be clean at the pinned commit")
+        working_source_path = checkout / "data_utils.py"
+        if working_source_path.is_symlink() or not working_source_path.is_file():
+            raise ValueError("pinned LigandMPNN data_utils.py must be a regular file")
+    else:
+        try:
+            source_bytes = subprocess.check_output(
+                ["git", "--no-replace-objects", "-C", str(checkout), "show", f"{expected_commit}:data_utils.py"],
+                stderr=subprocess.DEVNULL,
+            )
+        except (OSError, subprocess.CalledProcessError) as error:
+            raise ValueError("pinned LigandMPNN parser blob could not be read") from error
     with tempfile.TemporaryDirectory(prefix="dnadesign-ligandmpnn-context-") as temporary:
         snapshot = Path(temporary) / "source"
         snapshot.mkdir()

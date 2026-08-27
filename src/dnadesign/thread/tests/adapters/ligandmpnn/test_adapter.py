@@ -125,6 +125,31 @@ def _request(**overrides: object) -> LigandMpnnRequest:
     return LigandMpnnRequest(**values)  # type: ignore[arg-type]
 
 
+def _validated_request(tmp_path: Path, **overrides: object) -> tuple[LigandMpnnRequest, Path]:
+    checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
+    pdb_sha256 = _write_context_input(tmp_path)
+    parse_all_atoms = bool(overrides.get("use_side_chain_context", True))
+    context_inventory = write_context_inventory(
+        tmp_path,
+        input_path=Path("inputs/target.pdb"),
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=parse_all_atoms,
+        parser_sha256=parser_sha256,
+    )
+    values: dict[str, object] = {
+        "pdb_sha256": pdb_sha256,
+        "context_inventory": context_inventory,
+        "upstream": LigandMpnnUpstreamPin(
+            commit=commit,
+            checkpoint_sha256=_DIGEST,
+            packing_checkpoint_sha256=_PACKING_DIGEST,
+        ),
+    }
+    values.update(overrides)
+    return _request(**values), checkout_root
+
+
 @pytest.mark.parametrize(
     ("field_name", "value", "message"),
     [
@@ -146,21 +171,22 @@ def test_request_rejects_paths_that_cannot_round_trip_through_runtime_argv(
         _request(**{field_name: value})
 
 
-def test_request_preserves_valid_nested_relative_output_directory() -> None:
-    request = _request(output_dir=Path("results/nested/designs"))
+def test_request_preserves_valid_nested_relative_output_directory(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path, output_dir=Path("results/nested/designs"))
 
-    command = build_ligandmpnn_commands(request, checkout_root=Path("LigandMPNN"))[0]
+    command = build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)[0]
 
     assert command.output_dir == Path("results/nested/designs/seed_7")
     assert command.argv[command.argv.index("--out_folder") + 1] == "results/nested/designs/seed_7"
 
 
-def test_build_commands_declares_exact_official_ligandmpnn_flags_per_seed() -> None:
-    request = _request()
+def test_build_commands_declares_exact_official_ligandmpnn_flags_per_seed(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path)
 
     commands = build_ligandmpnn_commands(
         request,
-        checkout_root=Path("/opt/LigandMPNN"),
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
         python_executable="python3",
     )
 
@@ -172,13 +198,19 @@ def test_build_commands_declares_exact_official_ligandmpnn_flags_per_seed() -> N
         "-m",
         "dnadesign.thread.adapters.ligandmpnn.pinned_runtime",
         "--checkout-root",
-        "/opt/LigandMPNN",
+        str(checkout_root),
         "--upstream-commit",
-        _COMMIT,
+        request.upstream.commit,
         "--checkpoint-sha256",
         _DIGEST,
         "--pdb-sha256",
-        _DIGEST,
+        request.pdb_sha256,
+        "--execution-root",
+        str(tmp_path),
+        "--context-inventory-path",
+        request.context_inventory.path.as_posix(),
+        "--context-inventory-sha256",
+        request.context_inventory.sha256,
         "--packing-checkpoint-sha256",
         _PACKING_DIGEST,
         "--planned-execution-sha256",
@@ -191,7 +223,7 @@ def test_build_commands_declares_exact_official_ligandmpnn_flags_per_seed() -> N
         "--model_type",
         "ligand_mpnn",
         "--checkpoint_ligand_mpnn",
-        "/opt/LigandMPNN/model_params/ligandmpnn_v_32_010_25.pt",
+        str(checkout_root / "model_params/ligandmpnn_v_32_010_25.pt"),
         "--pdb_path",
         "inputs/target.pdb",
         "--out_folder",
@@ -219,31 +251,32 @@ def test_build_commands_declares_exact_official_ligandmpnn_flags_per_seed() -> N
         "--pack_with_ligand_context",
         "1",
         "--checkpoint_path_sc",
-        "/opt/LigandMPNN/model_params/ligandmpnn_sc_v_32_002_16.pt",
+        str(checkout_root / "model_params/ligandmpnn_sc_v_32_002_16.pt"),
     )
     assert commands[1].seed == 11
     assert commands[1].argv[commands[1].argv.index("--seed") + 1] == "11"
     assert request.expected_sequence_count == 12
 
 
-def test_redesigned_residues_use_the_distinct_official_flag() -> None:
-    request = _request(
+def test_redesigned_residues_use_the_distinct_official_flag(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(
+        tmp_path,
         fixed_residues=(),
         redesigned_residues=(LigandMpnnResidue(chain_id="B", residue_number=-2, insertion_code="A"),),
         packing=LigandMpnnPackingConfig(),
     )
 
-    argv = build_ligandmpnn_commands(request, checkout_root=Path("tool"))[0].argv
+    argv = build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)[0].argv
 
     assert "--fixed_residues" not in argv
     assert argv[argv.index("--redesigned_residues") + 1] == "B-2A"
     assert argv[argv.index("--pack_side_chains") + 1] == "0"
 
 
-def test_command_preserves_requested_temperature_precision() -> None:
-    request = _request(temperature=0.123456789)
+def test_command_preserves_requested_temperature_precision(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path, temperature=0.123456789)
 
-    argv = build_ligandmpnn_commands(request, checkout_root=Path("tool"))[0].argv
+    argv = build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)[0].argv
 
     assert argv[argv.index("--temperature") + 1] == "0.123456789"
 
@@ -328,7 +361,7 @@ def test_planned_receipt_is_normalized_and_records_no_execution_claim(tmp_path: 
             packing_checkpoint_sha256=_PACKING_DIGEST,
         ),
     )
-    commands = build_ligandmpnn_commands(request, checkout_root=checkout_root)
+    commands = build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
 
     receipt = build_planned_receipt(
         request,
@@ -377,7 +410,7 @@ def test_planned_receipt_rejects_missing_or_partial_command_sets(tmp_path: Path)
             packing_checkpoint_sha256=_PACKING_DIGEST,
         ),
     )
-    commands = build_ligandmpnn_commands(request, checkout_root=checkout_root)
+    commands = build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
 
     for supplied in ((), commands[:-1]):
         with pytest.raises(ValueError, match="commands do not match the deterministic request command set"):
@@ -441,14 +474,11 @@ def test_planned_receipt_rejects_context_inventory_for_different_request(
             packing_checkpoint_sha256=_PACKING_DIGEST,
         ),
     )
-    commands = build_ligandmpnn_commands(request, checkout_root=checkout_root)
-
     with pytest.raises(ValueError, match=message):
-        build_planned_receipt(
+        build_ligandmpnn_commands(
             request,
-            commands,
-            execution_root=tmp_path,
             checkout_root=checkout_root,
+            execution_root=tmp_path,
         )
 
 
@@ -470,14 +500,11 @@ def test_planned_receipt_rejects_inventory_from_different_parser_blob(tmp_path: 
             packing_checkpoint_sha256=_PACKING_DIGEST,
         ),
     )
-    commands = build_ligandmpnn_commands(request, checkout_root=checkout_root)
-
     with pytest.raises(ValueError, match="parser digest does not match pinned upstream commit"):
-        build_planned_receipt(
+        build_ligandmpnn_commands(
             request,
-            commands,
-            execution_root=tmp_path,
             checkout_root=checkout_root,
+            execution_root=tmp_path,
         )
 
 
@@ -520,12 +547,33 @@ def test_planned_receipt_rejects_self_asserted_context_atoms(tmp_path: Path) -> 
             packing_checkpoint_sha256=_PACKING_DIGEST,
         ),
     )
-    commands = build_ligandmpnn_commands(request, checkout_root=checkout_root)
-
     with pytest.raises(ValueError, match="context inventory does not match pinned parser derivation"):
-        build_planned_receipt(
+        build_ligandmpnn_commands(
             request,
-            commands,
-            execution_root=tmp_path,
             checkout_root=checkout_root,
+            execution_root=tmp_path,
+        )
+
+
+def test_command_builder_rejects_missing_context_inventory(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path)
+    (tmp_path / request.context_inventory.path).unlink()
+
+    with pytest.raises(ValueError, match="context inventory does not exist"):
+        build_ligandmpnn_commands(
+            request,
+            checkout_root=checkout_root,
+            execution_root=tmp_path,
+        )
+
+
+def test_command_builder_rejects_tampered_context_inventory_bytes(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path)
+    (tmp_path / request.context_inventory.path).write_bytes(b"tampered")
+
+    with pytest.raises(ValueError, match="context inventory SHA256 mismatch"):
+        build_ligandmpnn_commands(
+            request,
+            checkout_root=checkout_root,
+            execution_root=tmp_path,
         )

@@ -124,6 +124,7 @@ def build_planned_receipt(
     expected_commands = build_ligandmpnn_commands(
         request,
         checkout_root=checkout_root,
+        execution_root=execution_root,
         python_executable=python_executable,
         residue_alphabet_sidecar=residue_alphabet_sidecar,
     )

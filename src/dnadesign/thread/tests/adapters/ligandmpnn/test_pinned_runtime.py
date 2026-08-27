@@ -28,6 +28,8 @@ from pathlib import Path
 import pytest
 
 import dnadesign.thread.adapters.ligandmpnn.pinned_runtime as pinned_runtime_module
+from dnadesign.thread.adapters.ligandmpnn.commands import build_ligandmpnn_commands
+from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnRequest, LigandMpnnUpstreamPin
 from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import (
     _validate_runtime_option_contract,
     build_pinned_runtime_command,
@@ -35,6 +37,10 @@ from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import (
 )
 from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import (
     execute_pinned_entrypoint as _execute_pinned_entrypoint,
+)
+from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import (
+    PINNED_CONTEXT_PARSER_PAYLOAD,
+    write_context_inventory,
 )
 
 
@@ -52,6 +58,35 @@ def execute_pinned_entrypoint(**kwargs: object) -> None:
     assert isinstance(completion_record_path, Path)
     planned_arguments = kwargs.pop("planned_arguments", arguments)
     assert isinstance(planned_arguments, tuple)
+    entrypoint = str(kwargs["entrypoint"])
+    context_inventory_path = kwargs.pop("context_inventory_path", None)
+    context_inventory_sha256 = kwargs.pop("context_inventory_sha256", None)
+    execution_root = kwargs.pop("execution_root", None)
+    if entrypoint == "run.py" and context_inventory_path is None:
+        execution_root = checkout_root.parent
+        pdb_value = planned_arguments[planned_arguments.index("--pdb_path") + 1]
+        pdb_path = Path(pdb_value)
+        relative_pdb_path = pdb_path.relative_to(execution_root) if pdb_path.is_absolute() else pdb_path
+        use_side_chain_context = (
+            planned_arguments[planned_arguments.index("--ligand_mpnn_use_side_chain_context") + 1] == "1"
+            if "--ligand_mpnn_use_side_chain_context" in planned_arguments
+            else False
+        )
+        parser_payload = subprocess.check_output(
+            ["git", "-C", str(checkout_root), "show", f"{kwargs['upstream_commit']}:data_utils.py"]
+        )
+        parser_sha256 = hashlib.sha256(parser_payload).hexdigest()
+        reference = write_context_inventory(
+            execution_root,
+            input_path=relative_pdb_path,
+            input_sha256=str(kwargs["pdb_sha256"]),
+            upstream_commit=str(kwargs["upstream_commit"]),
+            parse_all_atoms=use_side_chain_context,
+            parser_sha256=parser_sha256,
+            relative_path=Path("evidence") / f"context-{relative_pdb_path.stem}-{kwargs['pdb_sha256']}.json",
+        )
+        context_inventory_path = reference.path
+        context_inventory_sha256 = reference.sha256
     planned_execution_sha256 = pinned_execution_sha256(
         checkout_root=checkout_root,
         upstream_commit=str(kwargs["upstream_commit"]),
@@ -59,12 +94,18 @@ def execute_pinned_entrypoint(**kwargs: object) -> None:
         pdb_sha256=str(kwargs["pdb_sha256"]),
         packing_checkpoint_sha256=kwargs["packing_checkpoint_sha256"],  # type: ignore[arg-type]
         residue_alphabet_sha256=kwargs["residue_alphabet_sha256"],  # type: ignore[arg-type]
-        entrypoint=str(kwargs["entrypoint"]),
+        context_inventory_path=context_inventory_path,  # type: ignore[arg-type]
+        context_inventory_sha256=context_inventory_sha256,  # type: ignore[arg-type]
+        execution_root=execution_root,  # type: ignore[arg-type]
+        entrypoint=entrypoint,
         completion_record_path=completion_record_path,
         arguments=planned_arguments,
     )
     _execute_pinned_entrypoint(
         **kwargs,  # type: ignore[arg-type]
+        context_inventory_path=context_inventory_path,  # type: ignore[arg-type]
+        context_inventory_sha256=context_inventory_sha256,  # type: ignore[arg-type]
+        execution_root=execution_root,  # type: ignore[arg-type]
         planned_execution_sha256=planned_execution_sha256,
         completion_record_path=completion_record_path,
     )
@@ -73,7 +114,7 @@ def execute_pinned_entrypoint(**kwargs: object) -> None:
 def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
     root = tmp_path / "LigandMPNN"
     root.mkdir()
-    (root / "data_utils.py").write_text("VALUE = 'attested'\n", encoding="utf-8")
+    (root / "data_utils.py").write_bytes(PINNED_CONTEXT_PARSER_PAYLOAD)
     (root / "model_utils.py").write_text("HELPER = 'helper-attested'\n", encoding="utf-8")
     (root / "run.py").write_text(
         "import argparse\n"
@@ -90,7 +131,7 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
         "parser.add_argument('--ligand_mpnn_use_atom_context')\n"
         "parser.add_argument('--output')\n"
         "parser.add_argument('--out_folder')\n"
-        "args = parser.parse_args()\n"
+        "args, _ = parser.parse_known_args()\n"
         "checkpoint = Path(args.checkpoint_ligand_mpnn).read_text(encoding='utf-8')\n"
         "pdb = Path(args.pdb_path).read_text(encoding='utf-8')\n"
         "sidecar = (\n"
@@ -157,6 +198,13 @@ def test_pinned_runtime_command_preserves_option_looking_checkout_roots(
     monkeypatch: pytest.MonkeyPatch,
     entrypoint: str,
 ) -> None:
+    context_binding: dict[str, object] = {}
+    if entrypoint == "run.py":
+        context_binding = {
+            "execution_root": Path("-execution"),
+            "context_inventory_path": Path("evidence/context.json"),
+            "context_inventory_sha256": "c" * 64,
+        }
     command = build_pinned_runtime_command(
         checkout_root=Path("-checkout"),
         upstream_commit="1" * 40,
@@ -168,6 +216,7 @@ def test_pinned_runtime_command_preserves_option_looking_checkout_roots(
         python_executable=sys.executable,
         output_dir=Path("outputs/seed_1"),
         arguments=(),
+        **context_binding,  # type: ignore[arg-type]
     )
     observed: list[dict[str, object]] = []
     monkeypatch.setattr(sys, "argv", ["pinned-runtime", *command[3:]])
@@ -184,6 +233,9 @@ def test_pinned_runtime_command_preserves_option_looking_checkout_roots(
         upstream_commit="1" * 40,
         checkpoint_sha256="a" * 64,
         pdb_sha256="b" * 64,
+        context_inventory_path=(Path("evidence/context.json") if entrypoint == "run.py" else None),
+        context_inventory_sha256=("c" * 64 if entrypoint == "run.py" else None),
+        execution_root=(Path("-execution") if entrypoint == "run.py" else None),
         packing_checkpoint_sha256=None,
         residue_alphabet_sha256=None,
         entrypoint=entrypoint,
@@ -197,7 +249,7 @@ def test_pinned_runtime_ignores_timestamp_valid_poisoned_parser_bytecode(tmp_pat
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     parser_path = checkout / "data_utils.py"
     malicious_source = tmp_path / "data_utils.py"
-    malicious_source.write_text("VALUE = 'poisoned'\n", encoding="utf-8")
+    malicious_source.write_bytes(parser_path.read_bytes().replace(b'VALUE = "attested"', b'VALUE = "poisoned"'))
     assert malicious_source.stat().st_size == parser_path.stat().st_size
     parser_mtime = parser_path.stat().st_mtime
     os.utime(malicious_source, (parser_mtime, parser_mtime))
@@ -338,11 +390,22 @@ def test_generated_runtime_command_executes_and_records_complete_cli_arguments(t
         "--output",
         str(output),
     )
+    context_inventory = write_context_inventory(
+        tmp_path,
+        input_path=pdb.relative_to(tmp_path),
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=False,
+        parser_sha256=hashlib.sha256((checkout / "data_utils.py").read_bytes()).hexdigest(),
+    )
     command = build_pinned_runtime_command(
         checkout_root=checkout,
         upstream_commit=commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        context_inventory_path=context_inventory.path,
+        context_inventory_sha256=context_inventory.sha256,
+        execution_root=tmp_path,
         packing_checkpoint_sha256=None,
         residue_alphabet_sha256=None,
         entrypoint="run.py",
@@ -355,7 +418,133 @@ def test_generated_runtime_command_executes_and_records_complete_cli_arguments(t
 
     completion = json.loads((output_dir / ".dnadesign-ligandmpnn-execution.json").read_text(encoding="utf-8"))
     assert completion["execution"]["arguments"] == list(arguments)
+    assert completion["execution"]["context_inventory_path"] == context_inventory.path.as_posix()
+    assert completion["execution"]["context_inventory_sha256"] == context_inventory.sha256
     assert completion["execution_sha256"].startswith("sha256:")
+
+
+def test_public_design_builder_executes_only_with_bound_context_evidence(tmp_path: Path) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    reference = write_context_inventory(
+        tmp_path,
+        input_path=pdb.relative_to(tmp_path),
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=False,
+        parser_sha256=hashlib.sha256((checkout / "data_utils.py").read_bytes()).hexdigest(),
+    )
+    request = LigandMpnnRequest(
+        request_id="direct_public_builder",
+        pdb_path=pdb.relative_to(tmp_path),
+        pdb_sha256=pdb_sha256,
+        output_dir=Path("designs"),
+        upstream=LigandMpnnUpstreamPin(
+            commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            checkpoint_path=checkpoint.relative_to(checkout),
+        ),
+        context_inventory=reference,
+        seeds=(7,),
+    )
+
+    command = build_ligandmpnn_commands(
+        request,
+        checkout_root=checkout,
+        execution_root=tmp_path,
+        python_executable=sys.executable,
+    )[0]
+    subprocess.run(command.argv, cwd=tmp_path, check=True)
+
+    output_root = tmp_path / command.output_dir
+    completion = json.loads((output_root / ".dnadesign-ligandmpnn-execution.json").read_text(encoding="utf-8"))
+    assert (output_root / "design.txt").read_text(encoding="utf-8") == "input-v1"
+    assert completion["execution"]["context_inventory_path"] == reference.path.as_posix()
+    assert completion["execution"]["context_inventory_sha256"] == reference.sha256
+
+
+def test_pinned_design_runtime_rejects_context_inventory_tampered_after_planning(tmp_path: Path) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    reference = write_context_inventory(
+        tmp_path,
+        input_path=pdb.relative_to(tmp_path),
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=False,
+        parser_sha256=hashlib.sha256((checkout / "data_utils.py").read_bytes()).hexdigest(),
+    )
+    (tmp_path / reference.path).write_bytes(b"tampered-after-planning")
+    output_root = tmp_path / "designs/seed_7"
+
+    with pytest.raises(ValueError, match="context inventory SHA256 mismatch"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            context_inventory_path=reference.path,
+            context_inventory_sha256=reference.sha256,
+            execution_root=tmp_path,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            completion_record_path=output_root / ".dnadesign-ligandmpnn-execution.json",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert not output_root.exists()
+
+
+def test_pinned_design_runtime_rejects_symlinked_context_inventory_after_planning(tmp_path: Path) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    reference = write_context_inventory(
+        tmp_path,
+        input_path=pdb.relative_to(tmp_path),
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=False,
+        parser_sha256=hashlib.sha256((checkout / "data_utils.py").read_bytes()).hexdigest(),
+    )
+    inventory_path = tmp_path / reference.path
+    outside = tmp_path / "outside-context.json"
+    inventory_path.replace(outside)
+    inventory_path.symlink_to(outside)
+    output_root = tmp_path / "designs/seed_7"
+
+    with pytest.raises(ValueError, match="context inventory could not be opened safely"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            context_inventory_path=reference.path,
+            context_inventory_sha256=reference.sha256,
+            execution_root=tmp_path,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            completion_record_path=output_root / ".dnadesign-ligandmpnn-execution.json",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert not output_root.exists()
 
 
 def test_pinned_runtime_rejects_checkpoint_changed_after_planning(tmp_path: Path) -> None:

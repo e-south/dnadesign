@@ -21,6 +21,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
+    load_ligandmpnn_context_inventory,
+    validate_context_inventory_for_input,
+)
+from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnContextInventoryReference, LigandMpnnUpstreamPin
 from dnadesign.thread.adapters.ligandmpnn.pinned_checkout import materialize_pinned_tree
 
 _ENTRYPOINTS = frozenset({"run.py", "score.py"})
@@ -108,6 +113,9 @@ def pinned_runtime_prefix(
     upstream_commit: str,
     checkpoint_sha256: str,
     pdb_sha256: str,
+    context_inventory_path: Path | None,
+    context_inventory_sha256: str | None,
+    execution_root: Path | None,
     packing_checkpoint_sha256: str | None,
     residue_alphabet_sha256: str | None,
     entrypoint: str,
@@ -119,6 +127,12 @@ def pinned_runtime_prefix(
 
     if entrypoint not in _ENTRYPOINTS:
         raise ValueError(f"unsupported LigandMPNN entrypoint: {entrypoint!r}")
+    _validate_context_binding_fields(
+        entrypoint=entrypoint,
+        context_inventory_path=context_inventory_path,
+        context_inventory_sha256=context_inventory_sha256,
+        execution_root=execution_root,
+    )
     prefix = [
         python_executable,
         "-m",
@@ -135,6 +149,14 @@ def pinned_runtime_prefix(
             pdb_sha256,
         ]
     )
+    if context_inventory_path is not None:
+        if context_inventory_sha256 is None or execution_root is None:
+            raise ValueError("context inventory runtime binding must be complete")
+        _append_cli_option(prefix, "--execution-root", str(execution_root))
+        _append_cli_option(prefix, "--context-inventory-path", str(context_inventory_path))
+        prefix.extend(["--context-inventory-sha256", context_inventory_sha256])
+    elif context_inventory_sha256 is not None or execution_root is not None:
+        raise ValueError("context inventory runtime binding must be complete")
     if packing_checkpoint_sha256 is not None:
         prefix.extend(["--packing-checkpoint-sha256", packing_checkpoint_sha256])
     if residue_alphabet_sha256 is not None:
@@ -159,6 +181,9 @@ def build_pinned_runtime_command(
     upstream_commit: str,
     checkpoint_sha256: str,
     pdb_sha256: str,
+    context_inventory_path: Path | None = None,
+    context_inventory_sha256: str | None = None,
+    execution_root: Path | None = None,
     packing_checkpoint_sha256: str | None,
     residue_alphabet_sha256: str | None,
     entrypoint: str,
@@ -168,12 +193,21 @@ def build_pinned_runtime_command(
 ) -> tuple[str, ...]:
     """Bind a generated command to its complete semantic execution payload."""
 
+    _validate_context_binding_fields(
+        entrypoint=entrypoint,
+        context_inventory_path=context_inventory_path,
+        context_inventory_sha256=context_inventory_sha256,
+        execution_root=execution_root,
+    )
     completion_record_path = output_dir / _COMPLETION_RECORD_NAME
     planned_execution_sha256 = pinned_execution_sha256(
         checkout_root=checkout_root,
         upstream_commit=upstream_commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        context_inventory_path=context_inventory_path,
+        context_inventory_sha256=context_inventory_sha256,
+        execution_root=execution_root,
         packing_checkpoint_sha256=packing_checkpoint_sha256,
         residue_alphabet_sha256=residue_alphabet_sha256,
         entrypoint=entrypoint,
@@ -186,6 +220,9 @@ def build_pinned_runtime_command(
             upstream_commit=upstream_commit,
             checkpoint_sha256=checkpoint_sha256,
             pdb_sha256=pdb_sha256,
+            context_inventory_path=context_inventory_path,
+            context_inventory_sha256=context_inventory_sha256,
+            execution_root=execution_root,
             packing_checkpoint_sha256=packing_checkpoint_sha256,
             residue_alphabet_sha256=residue_alphabet_sha256,
             entrypoint=entrypoint,
@@ -203,6 +240,9 @@ def pinned_execution_sha256(
     upstream_commit: str,
     checkpoint_sha256: str,
     pdb_sha256: str,
+    context_inventory_path: Path | None = None,
+    context_inventory_sha256: str | None = None,
+    execution_root: Path | None = None,
     packing_checkpoint_sha256: str | None,
     residue_alphabet_sha256: str | None,
     entrypoint: str,
@@ -216,6 +256,9 @@ def pinned_execution_sha256(
         upstream_commit=upstream_commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        context_inventory_path=context_inventory_path,
+        context_inventory_sha256=context_inventory_sha256,
+        execution_root=execution_root,
         packing_checkpoint_sha256=packing_checkpoint_sha256,
         residue_alphabet_sha256=residue_alphabet_sha256,
         entrypoint=entrypoint,
@@ -232,6 +275,9 @@ def parse_pinned_runtime_prefix(
     upstream_commit: str,
     checkpoint_sha256: str,
     pdb_sha256: str,
+    context_inventory_path: Path | None = None,
+    context_inventory_sha256: str | None = None,
+    execution_root: Path | None = None,
     packing_checkpoint_sha256: str | None,
     residue_alphabet_sha256: str | None,
     entrypoint: str,
@@ -250,6 +296,9 @@ def parse_pinned_runtime_prefix(
         upstream_commit=upstream_commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        context_inventory_path=context_inventory_path,
+        context_inventory_sha256=context_inventory_sha256,
+        execution_root=execution_root,
         packing_checkpoint_sha256=packing_checkpoint_sha256,
         residue_alphabet_sha256=residue_alphabet_sha256,
         entrypoint=entrypoint,
@@ -261,6 +310,9 @@ def parse_pinned_runtime_prefix(
         upstream_commit=upstream_commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        context_inventory_path=context_inventory_path,
+        context_inventory_sha256=context_inventory_sha256,
+        execution_root=execution_root,
         packing_checkpoint_sha256=packing_checkpoint_sha256,
         residue_alphabet_sha256=residue_alphabet_sha256,
         entrypoint=entrypoint,
@@ -279,6 +331,9 @@ def pinned_runtime_completion_contract(
     upstream_commit: str,
     checkpoint_sha256: str,
     pdb_sha256: str,
+    context_inventory_path: Path | None = None,
+    context_inventory_sha256: str | None = None,
+    execution_root: Path | None = None,
     packing_checkpoint_sha256: str | None,
     residue_alphabet_sha256: str | None,
     entrypoint: str,
@@ -291,6 +346,9 @@ def pinned_runtime_completion_contract(
         upstream_commit=upstream_commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        context_inventory_path=context_inventory_path,
+        context_inventory_sha256=context_inventory_sha256,
+        execution_root=execution_root,
         packing_checkpoint_sha256=packing_checkpoint_sha256,
         residue_alphabet_sha256=residue_alphabet_sha256,
         entrypoint=entrypoint,
@@ -301,6 +359,9 @@ def pinned_runtime_completion_contract(
         upstream_commit=upstream_commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        context_inventory_path=context_inventory_path,
+        context_inventory_sha256=context_inventory_sha256,
+        execution_root=execution_root,
         packing_checkpoint_sha256=packing_checkpoint_sha256,
         residue_alphabet_sha256=residue_alphabet_sha256,
         entrypoint=entrypoint,
@@ -320,6 +381,9 @@ def execute_pinned_entrypoint(
     upstream_commit: str,
     checkpoint_sha256: str,
     pdb_sha256: str,
+    context_inventory_path: Path | None,
+    context_inventory_sha256: str | None,
+    execution_root: Path | None,
     packing_checkpoint_sha256: str | None,
     residue_alphabet_sha256: str | None,
     entrypoint: str,
@@ -331,11 +395,20 @@ def execute_pinned_entrypoint(
 
     if entrypoint not in _ENTRYPOINTS:
         raise ValueError(f"unsupported LigandMPNN entrypoint: {entrypoint!r}")
+    _validate_context_binding_fields(
+        entrypoint=entrypoint,
+        context_inventory_path=context_inventory_path,
+        context_inventory_sha256=context_inventory_sha256,
+        execution_root=execution_root,
+    )
     execution = _pinned_execution_payload(
         checkout_root=checkout_root,
         upstream_commit=upstream_commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
+        context_inventory_path=context_inventory_path,
+        context_inventory_sha256=context_inventory_sha256,
+        execution_root=execution_root,
         packing_checkpoint_sha256=packing_checkpoint_sha256,
         residue_alphabet_sha256=residue_alphabet_sha256,
         entrypoint=entrypoint,
@@ -364,6 +437,7 @@ def execute_pinned_entrypoint(
         if not entrypoint_path.is_file():
             raise ValueError(f"pinned LigandMPNN commit does not contain {entrypoint}")
         runtime_arguments = list(arguments)
+        requested_pdb_path = Path(_runtime_option_value(runtime_arguments, _PDB_FLAG)).expanduser()
         weights_root = snapshot / ".dnadesign-weights"
         weights_root.mkdir()
         _replace_verified_file(
@@ -391,6 +465,27 @@ def execute_pinned_entrypoint(
             destination=inputs_root / "pdb",
             preserve_source_name=True,
         )
+        if entrypoint == "run.py":
+            assert context_inventory_path is not None
+            assert context_inventory_sha256 is not None
+            assert execution_root is not None
+            _validate_runtime_context_inventory(
+                reference=LigandMpnnContextInventoryReference(
+                    path=context_inventory_path,
+                    sha256=context_inventory_sha256,
+                ),
+                execution_root=execution_root,
+                checkout_root=checkout,
+                upstream_commit=upstream_commit,
+                checkpoint_sha256=checkpoint_sha256,
+                packing_checkpoint_sha256=packing_checkpoint_sha256,
+                requested_pdb_path=requested_pdb_path,
+                requested_pdb_sha256=pdb_sha256,
+                use_side_chain_context=_runtime_boolean_option(
+                    runtime_arguments,
+                    "--ligand_mpnn_use_side_chain_context",
+                ),
+            )
         if residue_alphabet_sha256 is None:
             if _has_flag(runtime_arguments, _RESIDUE_ALPHABET_FLAG):
                 raise ValueError("residue alphabet sidecar was supplied without a pinned digest")
@@ -516,6 +611,9 @@ def _pinned_execution_payload(
     upstream_commit: str,
     checkpoint_sha256: str,
     pdb_sha256: str,
+    context_inventory_path: Path | None,
+    context_inventory_sha256: str | None,
+    execution_root: Path | None,
     packing_checkpoint_sha256: str | None,
     residue_alphabet_sha256: str | None,
     entrypoint: str,
@@ -524,7 +622,7 @@ def _pinned_execution_payload(
 ) -> dict[str, object]:
     if not isinstance(arguments, tuple) or any(not isinstance(value, str) for value in arguments):
         raise ValueError("LigandMPNN runtime arguments must be a tuple of strings")
-    return {
+    payload: dict[str, object] = {
         "checkout_root": str(checkout_root),
         "upstream_commit": upstream_commit,
         "checkpoint_sha256": checkpoint_sha256,
@@ -535,6 +633,72 @@ def _pinned_execution_payload(
         "completion_record_path": str(completion_record_path),
         "arguments": list(arguments),
     }
+    if context_inventory_path is not None:
+        assert context_inventory_sha256 is not None
+        assert execution_root is not None
+        payload["context_inventory_path"] = str(context_inventory_path)
+        payload["context_inventory_sha256"] = context_inventory_sha256
+        payload["execution_root"] = str(execution_root)
+    return payload
+
+
+def _validate_context_binding_fields(
+    *,
+    entrypoint: str,
+    context_inventory_path: Path | None,
+    context_inventory_sha256: str | None,
+    execution_root: Path | None,
+) -> None:
+    bound = (
+        context_inventory_path is not None,
+        context_inventory_sha256 is not None,
+        execution_root is not None,
+    )
+    if entrypoint == "run.py" and not all(bound):
+        raise ValueError("design runtime requires a complete context inventory binding")
+    if entrypoint == "score.py" and any(bound):
+        raise ValueError("score runtime does not accept a design context inventory binding")
+
+
+def _validate_runtime_context_inventory(
+    *,
+    reference: LigandMpnnContextInventoryReference,
+    execution_root: Path,
+    checkout_root: Path,
+    upstream_commit: str,
+    checkpoint_sha256: str,
+    packing_checkpoint_sha256: str | None,
+    requested_pdb_path: Path,
+    requested_pdb_sha256: str,
+    use_side_chain_context: bool,
+) -> None:
+    """Revalidate bound design evidence immediately before execution."""
+
+    root = execution_root.expanduser().resolve()
+    if requested_pdb_path.is_absolute():
+        try:
+            relative_pdb_path = requested_pdb_path.relative_to(root)
+        except ValueError as exc:
+            raise ValueError("runtime PDB path is outside the bound execution root") from exc
+    else:
+        relative_pdb_path = requested_pdb_path
+    inventory = load_ligandmpnn_context_inventory(reference, execution_root=root)
+    if inventory.input_path != relative_pdb_path:
+        raise ValueError("context inventory input path does not match runtime PDB path")
+    validate_context_inventory_for_input(
+        inventory,
+        pdb_path=relative_pdb_path,
+        pdb_sha256=requested_pdb_sha256,
+        upstream=LigandMpnnUpstreamPin(
+            commit=upstream_commit,
+            checkpoint_sha256=checkpoint_sha256,
+            packing_checkpoint_sha256=packing_checkpoint_sha256,
+        ),
+        use_side_chain_context=use_side_chain_context,
+        checkout_root=checkout_root,
+        execution_root=root,
+        require_clean_parser_checkout=False,
+    )
 
 
 def _completion_record(
@@ -805,6 +969,25 @@ def _runtime_output_root(arguments: list[str]) -> tuple[int, Path]:
     return positions[0] + 1, output_root
 
 
+def _runtime_option_value(arguments: list[str], flag: str) -> str:
+    attached_prefix = f"{flag}="
+    if any(value.startswith(attached_prefix) for value in arguments):
+        raise ValueError(f"runtime arguments must use the split form of {flag} exactly once")
+    positions = [index for index, value in enumerate(arguments) if value == flag]
+    if len(positions) != 1 or positions[0] + 1 >= len(arguments):
+        raise ValueError(f"runtime arguments must contain exactly one {flag}")
+    return arguments[positions[0] + 1]
+
+
+def _runtime_boolean_option(arguments: list[str], flag: str) -> bool:
+    if not _has_flag(arguments, flag):
+        return False
+    value = _runtime_option_value(arguments, flag)
+    if value not in {"0", "1"}:
+        raise ValueError(f"runtime argument {flag} must be 0 or 1")
+    return value == "1"
+
+
 def _lexical_absolute_path(path: Path) -> Path:
     """Anchor a relative path without resolving away symlink evidence."""
 
@@ -1024,6 +1207,9 @@ def main() -> None:
     parser.add_argument("--upstream-commit", required=True)
     parser.add_argument("--checkpoint-sha256", required=True)
     parser.add_argument("--pdb-sha256", required=True)
+    parser.add_argument("--execution-root", type=Path)
+    parser.add_argument("--context-inventory-path", type=Path)
+    parser.add_argument("--context-inventory-sha256")
     parser.add_argument("--packing-checkpoint-sha256")
     parser.add_argument("--residue-alphabet-sha256")
     parser.add_argument("--planned-execution-sha256", required=True)
@@ -1037,6 +1223,9 @@ def main() -> None:
         upstream_commit=args.upstream_commit,
         checkpoint_sha256=args.checkpoint_sha256,
         pdb_sha256=args.pdb_sha256,
+        context_inventory_path=args.context_inventory_path,
+        context_inventory_sha256=args.context_inventory_sha256,
+        execution_root=args.execution_root,
         packing_checkpoint_sha256=args.packing_checkpoint_sha256,
         residue_alphabet_sha256=args.residue_alphabet_sha256,
         entrypoint=args.entrypoint,

@@ -59,6 +59,35 @@ def _request(*alphabets: LigandMpnnResidueAlphabet) -> LigandMpnnRequest:
     )
 
 
+def _validated_request(
+    tmp_path: Path,
+    *alphabets: LigandMpnnResidueAlphabet,
+) -> tuple[LigandMpnnRequest, Path]:
+    checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
+    pdb_payload = b"ATOM pinned context input\n"
+    pdb_path = tmp_path / "inputs/target.pdb"
+    pdb_path.parent.mkdir(parents=True, exist_ok=True)
+    pdb_path.write_bytes(pdb_payload)
+    pdb_sha256 = hashlib.sha256(pdb_payload).hexdigest()
+    request = _request(*alphabets)
+    return (
+        replace(
+            request,
+            pdb_sha256=pdb_sha256,
+            upstream=LigandMpnnUpstreamPin(commit=commit, checkpoint_sha256=_DIGEST),
+            context_inventory=write_context_inventory(
+                tmp_path,
+                input_path=request.pdb_path,
+                input_sha256=pdb_sha256,
+                upstream_commit=commit,
+                parse_all_atoms=request.use_side_chain_context,
+                parser_sha256=parser_sha256,
+            ),
+        ),
+        checkout_root,
+    )
+
+
 def test_alphabet_rejects_noncanonical_empty_or_duplicate_values() -> None:
     residue = LigandMpnnResidue("A", 12)
     with pytest.raises(ValueError, match="must not be empty"):
@@ -501,12 +530,16 @@ def test_valid_relative_sidecar_path_emits_argparse_safe_command(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    request, checkout_root = _validated_request(
+        tmp_path,
+        LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")),
+    )
     monkeypatch.chdir(tmp_path)
     sidecar = materialize_residue_alphabet_sidecar(request, Path("inputs/omit.json"))
     argv = build_ligandmpnn_commands(
         request,
-        checkout_root=Path("tool"),
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
         residue_alphabet_sidecar=sidecar,
     )[0].argv
     option_index = argv.index("--omit_AA_per_residue")
@@ -520,14 +553,18 @@ def test_valid_relative_sidecar_path_emits_argparse_safe_command(
 
 
 def test_command_requires_and_verifies_typed_sidecar(tmp_path: Path) -> None:
-    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    request, checkout_root = _validated_request(
+        tmp_path,
+        LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")),
+    )
     with pytest.raises(ValueError, match="typed residue alphabet sidecar"):
-        build_ligandmpnn_commands(request, checkout_root=Path("tool"))
+        build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
 
     sidecar = materialize_residue_alphabet_sidecar(request, tmp_path / "omit.json")
     argv = build_ligandmpnn_commands(
         request,
-        checkout_root=Path("tool"),
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
         residue_alphabet_sidecar=sidecar,
     )[0].argv
     assert argv[argv.index("--omit_AA_per_residue") + 1] == str(sidecar.path)
@@ -537,20 +574,25 @@ def test_command_requires_and_verifies_typed_sidecar(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="SHA256 does not match"):
         build_ligandmpnn_commands(
             request,
-            checkout_root=Path("tool"),
+            checkout_root=checkout_root,
+            execution_root=tmp_path,
             residue_alphabet_sidecar=sidecar,
         )
 
 
 def test_sidecar_can_stage_bytes_while_binding_final_execution_path(tmp_path: Path) -> None:
-    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    request, checkout_root = _validated_request(
+        tmp_path,
+        LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")),
+    )
     final_path = tmp_path / "final" / "omit.json"
     staging_path = tmp_path / "staging" / "omit.json"
 
     sidecar = materialize_residue_alphabet_sidecar(request, final_path, write_path=staging_path)
     commands = build_ligandmpnn_commands(
         request,
-        checkout_root=Path("tool"),
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
         residue_alphabet_sidecar=sidecar,
     )
 
@@ -590,6 +632,7 @@ def test_planned_receipt_binds_the_sidecar_digest(tmp_path: Path) -> None:
     commands = build_ligandmpnn_commands(
         request,
         checkout_root=checkout_root,
+        execution_root=tmp_path,
         residue_alphabet_sidecar=sidecar,
     )
 
