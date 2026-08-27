@@ -41,6 +41,10 @@ files, and digest mismatches fail validation.
 `demo: true` is a narrow exception for small tracked examples inside Git. A
 demo is capped at 2 MB, and its manifest, empty coordination lock, and every
 resource must be tracked and match their stage-0 Git index bytes.
+When one routed root contains multiple demos, they must share one resolved Git
+checkout. Root validation binds that shared index before revalidation and
+rechecks it after every object pass; it rejects demos split across independent
+checkouts because Git cannot provide one atomic multi-repository index snapshot.
 Operational objects must set `demo: false` and live outside a Git checkout.
 Place the external root beneath an account-private filesystem boundary. The v1
 manifest verifies routing and bytes; operating-system ACLs remain an explicit

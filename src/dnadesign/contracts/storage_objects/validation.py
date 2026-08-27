@@ -47,6 +47,7 @@ _SHELF_KINDS = {
 _ALLOWED_ROOT_FILES = {"AGENTS.md"}
 _GitIndexEntry = tuple[bytes, bytes, bytes]
 _GitIndexSnapshot = tuple[bytes, dict[str, tuple[_GitIndexEntry, ...]]]
+_DemoGitAuthority = tuple[Path, tuple[Path, ...], dict[str, str], bytes]
 _StorageTreeEntryState = tuple[str, int, int, int, int, int, int, int, int, int]
 _CoordinationState = tuple[
     tuple[int, int, int, int, int, int],
@@ -680,6 +681,7 @@ def _assert_demo_git_index_stable(
     expected_snapshot: bytes,
     *,
     git_environment: dict[str, str],
+    validation_scope: str = "validation",
 ) -> None:
     """Reject authority assembled across more than one Git index state."""
 
@@ -689,7 +691,7 @@ def _assert_demo_git_index_stable(
     )
     if observed_snapshot != expected_snapshot:
         raise StorageObjectError(
-            "demo Git index changed during validation; retry while repository staging is quiescent"
+            f"demo Git index changed during {validation_scope}; retry while repository staging is quiescent"
         )
 
 
@@ -1036,6 +1038,67 @@ def _route_coordination_identity(routes: tuple[_RoutedObject, ...]) -> tuple[tup
     )
 
 
+def _demo_checkout_groups(
+    objects: tuple[VerifiedStorageObject, ...] | list[VerifiedStorageObject],
+) -> tuple[tuple[Path, tuple[Path, ...]], ...]:
+    """Group demo roots by their independent Git index authority."""
+
+    grouped: dict[Path, list[Path]] = {}
+    for verified in objects:
+        if not verified.manifest.demo:
+            continue
+        checkout = _git_checkout_ancestor(verified.root, include_root=True)
+        if checkout is None:
+            raise StorageObjectError(f"demo storage object must live inside a Git checkout: {verified.root}")
+        grouped.setdefault(checkout, []).append(verified.root)
+    return tuple(
+        (checkout, tuple(sorted(grouped[checkout], key=lambda path: path.as_posix())))
+        for checkout in sorted(grouped, key=lambda path: path.as_posix())
+    )
+
+
+def _capture_demo_git_authorities(
+    objects: tuple[VerifiedStorageObject, ...] | list[VerifiedStorageObject],
+) -> tuple[_DemoGitAuthority, ...]:
+    """Capture each checkout index once for the full locked root-validation pass."""
+
+    checkout_groups = _demo_checkout_groups(objects)
+    if len(checkout_groups) > 1:
+        raise StorageObjectError(
+            "routed root demos must share one Git checkout because separate indexes "
+            "cannot provide one coherent root authority snapshot"
+        )
+    authorities: list[_DemoGitAuthority] = []
+    for checkout, member_roots in checkout_groups:
+        git_environment = _git_authority_environment()
+        snapshot, _entries = _read_demo_git_index_snapshot(
+            checkout,
+            git_environment=git_environment,
+        )
+        authorities.append((checkout, member_roots, git_environment, snapshot))
+    return tuple(authorities)
+
+
+def _assert_demo_git_authorities_stable(
+    objects: tuple[VerifiedStorageObject, ...],
+    authorities: tuple[_DemoGitAuthority, ...],
+) -> None:
+    """Recheck every independent checkout after all object rebinds finish."""
+
+    expected_groups = tuple((checkout, member_roots) for checkout, member_roots, _environment, _snapshot in authorities)
+    if _demo_checkout_groups(objects) != expected_groups:
+        raise StorageObjectError(
+            "demo Git checkout grouping changed during root validation; retry while repository routing is quiescent"
+        )
+    for checkout, _member_roots, git_environment, snapshot in authorities:
+        _assert_demo_git_index_stable(
+            checkout,
+            snapshot,
+            git_environment=git_environment,
+            validation_scope="root validation",
+        )
+
+
 def _verify_locked_storage_root(root: Path, routes: tuple[_RoutedObject, ...]) -> VerifiedStorageRoot:
     """Verify all routes while every discovered object writer lock is held."""
 
@@ -1062,6 +1125,7 @@ def _verify_locked_storage_root(root: Path, routes: tuple[_RoutedObject, ...]) -
             raise StorageObjectError(f"storage identity is duplicated: {identity}")
         identities.add(identity)
         objects.append(verified)
+    demo_git_authorities = _capture_demo_git_authorities(objects)
     revalidated_objects: list[VerifiedStorageObject] = []
     for verified in objects:
         _recheck_verified_manifest(verified)
@@ -1076,6 +1140,7 @@ def _verify_locked_storage_root(root: Path, routes: tuple[_RoutedObject, ...]) -
     final_objects = tuple(_rebind_verified_storage_object(verified) for verified in revalidated_objects)
     if routes != _routed_object_directories(root):
         raise StorageObjectError("storage root changed during validation; retry while object routing is quiescent")
+    _assert_demo_git_authorities_stable(final_objects, demo_git_authorities)
     return VerifiedStorageRoot(root=root, objects=final_objects)
 
 

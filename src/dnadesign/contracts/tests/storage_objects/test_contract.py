@@ -1201,6 +1201,84 @@ def test_verify_storage_root_rechecks_earlier_object_after_later_final_rebind(
     assert later_calls == 3
 
 
+def test_verify_storage_root_rejects_earlier_demo_index_drift_during_later_rebind(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout = tmp_path / "checkout"
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    storage_root = checkout / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+    earlier = storage_root / "workspaces" / "cruncher" / "earlier"
+    later = storage_root / "workspaces" / "cruncher" / "later"
+    _write_object(earlier, storage_id="earlier", demo=True)
+    _write_object(later, storage_id="later", demo=True)
+    subprocess.run(["git", "-C", str(checkout), "add", "storage"], check=True)
+    original_rebind = storage_validation._rebind_verified_storage_object
+    removed_relative = (earlier / "outputs" / "result.json").relative_to(checkout).as_posix()
+    changed = False
+
+    def _rebind(verified):
+        nonlocal changed
+        if verified.root == later and not changed:
+            subprocess.run(
+                ["git", "-C", str(checkout), "update-index", "--force-remove", "--", removed_relative],
+                check=True,
+            )
+            changed = True
+        return original_rebind(verified)
+
+    monkeypatch.setattr(storage_validation, "_rebind_verified_storage_object", _rebind)
+
+    with pytest.raises(StorageObjectError, match="demo Git index changed during root validation"):
+        verify_storage_root(storage_root)
+
+    assert changed
+    assert (checkout / removed_relative).is_file()
+    assert (
+        subprocess.run(
+            ["git", "-C", str(checkout), "ls-files", "--error-unmatch", "--", removed_relative],
+            check=False,
+            capture_output=True,
+        ).returncode
+        != 0
+    )
+
+
+def test_root_demo_authority_rejects_distinct_checkouts_before_sequential_rechecks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout = tmp_path / "checkout"
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    earlier = checkout / "earlier"
+    later = checkout / "later"
+    _write_object(earlier, storage_id="earlier", demo=True)
+    _write_object(later, storage_id="later", demo=True)
+    subprocess.run(["git", "-C", str(checkout), "add", "earlier", "later"], check=True)
+    verified = [verify_storage_object(earlier), verify_storage_object(later)]
+    distinct_checkouts = {
+        earlier.resolve(): tmp_path / "checkout-a",
+        later.resolve(): tmp_path / "checkout-b",
+    }
+
+    monkeypatch.setattr(
+        storage_validation,
+        "_git_checkout_ancestor",
+        lambda root, *, include_root: distinct_checkouts[root],
+    )
+    monkeypatch.setattr(storage_validation, "_git_authority_environment", lambda: {})
+    monkeypatch.setattr(
+        storage_validation,
+        "_read_demo_git_index_snapshot",
+        lambda checkout, *, git_environment: (checkout.as_posix().encode(), {}),
+    )
+
+    with pytest.raises(StorageObjectError, match="root demos must share one Git checkout"):
+        storage_validation._capture_demo_git_authorities(verified)
+
+
 def test_verify_storage_root_rejects_object_directory_replaced_after_revalidation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
