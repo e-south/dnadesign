@@ -2138,7 +2138,7 @@ def test_writer_lock_race_never_opens_or_truncates_replacement(
 
     monkeypatch.setattr(storage_inventory, "_acquire_existing_manifest_lock", _acquire_after_replacement)
 
-    with pytest.raises(StorageObjectError, match="lock changed|cannot open existing"):
+    with pytest.raises(StorageObjectError, match=r"lock(?: posture)? changed|cannot open existing"):
         if operation == "inventory":
             inventory_storage_object(
                 root,
