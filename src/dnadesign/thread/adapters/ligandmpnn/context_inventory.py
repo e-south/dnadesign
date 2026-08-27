@@ -61,9 +61,12 @@ class LigandMpnnProteinStructureEvidence:
     residue_ids: tuple[str, ...]
     chain_ids: tuple[str, ...]
     native_sequence: tuple[str, ...]
+    residue_validity_mask: tuple[int, ...]
 
     def __post_init__(self) -> None:
-        if not (len(self.residue_ids) == len(self.chain_ids) == len(self.native_sequence)):
+        if not (
+            len(self.residue_ids) == len(self.chain_ids) == len(self.native_sequence) == len(self.residue_validity_mask)
+        ):
             raise ValueError("pinned parser protein evidence lengths differ")
         if len(set(self.residue_ids)) != len(self.residue_ids):
             raise ValueError("pinned parser returned duplicate protein residue identities")
@@ -76,6 +79,11 @@ class LigandMpnnProteinStructureEvidence:
             for item in self.native_sequence
         ):
             raise ValueError("pinned parser native sequence must use the LigandMPNN alphabet")
+        if any(
+            isinstance(item, bool) or not isinstance(item, int) or item not in {0, 1}
+            for item in self.residue_validity_mask
+        ):
+            raise ValueError("pinned parser residue validity mask must contain only zero or one")
 
     @property
     def residue_id_set(self) -> frozenset[str]:
@@ -106,6 +114,33 @@ class LigandMpnnProteinStructureEvidence:
             )
             for chain_id in sorted(set(self.chain_ids))
         )
+
+    def expected_selector_mask(
+        self,
+        *,
+        fixed_residue_ids: frozenset[str],
+        redesigned_residue_ids: frozenset[str],
+    ) -> tuple[int, ...]:
+        """Return the exact ``score.py`` chain mask for bound residue selectors."""
+
+        if fixed_residue_ids and redesigned_residue_ids:
+            raise ValueError("fixed and redesigned residue selectors are mutually exclusive")
+        if redesigned_residue_ids:
+            return tuple(int(residue_id in redesigned_residue_ids) for residue_id in self.residue_ids)
+        if fixed_residue_ids:
+            return tuple(int(residue_id not in fixed_residue_ids) for residue_id in self.residue_ids)
+        return (1,) * len(self.residue_ids)
+
+    def parser_sequence_from_fasta_segments(self, segments: tuple[str, ...]) -> tuple[str, ...]:
+        """Map one official sorted-chain FASTA sequence back to parser order."""
+
+        flattened = tuple("".join(segments))
+        if len(flattened) != len(self.fasta_order):
+            raise ValueError("official LigandMPNN FASTA residue count does not match pinned parser protein residues")
+        parser_order = [""] * len(flattened)
+        for fasta_index, parser_index in enumerate(self.fasta_order):
+            parser_order[parser_index] = flattened[fasta_index]
+        return tuple(parser_order)
 
 
 @dataclass(frozen=True)

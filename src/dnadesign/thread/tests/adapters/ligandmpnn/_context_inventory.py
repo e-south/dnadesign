@@ -26,12 +26,17 @@ from dnadesign.thread.adapters.ligandmpnn import (
 )
 from dnadesign.thread.adapters.ligandmpnn.context_probe import _probe_request_sha256
 
-PINNED_CONTEXT_PARSER_PAYLOAD = b"""import numpy as np
+PINNED_CONTEXT_PARSER_PAYLOAD = b"""from pathlib import Path
+
+import numpy as np
 
 VALUE = "attested"
 
 element_dict_rev = {7: "N", 15: "P"}
 restype_int_to_str = dict(enumerate("ACDEFGHIKLMNPQRSTVWYX"))
+restype_str_to_int = {value: key for key, value in restype_int_to_str.items()}
+restype_1to3 = {"A": "ALA", "C": "CYS", "D": "ASP", "E": "GLU", "Y": "TYR"}
+restype_3to1 = {value: key for key, value in restype_1to3.items()}
 
 
 class _Tensor:
@@ -65,8 +70,68 @@ class _Selection:
         ))
 
 
-def parse_PDB(*args, **kwargs):
+def packed_pdb_payload(sequence):
+    identities = (("A", 12, ""), ("A", 13, "B"), ("B", -2, "A"), ("B", 2, ""))
+    if len(sequence) != len(identities):
+        raise ValueError("packed fixture sequence length mismatch")
+    lines = ["REMARK DNADESIGN PACKED FIXTURE"]
+    serial = 1
+    for amino_acid, (chain, residue_number, insertion_code) in zip(sequence, identities):
+        residue_name = restype_1to3[amino_acid]
+        for atom_name, element in (("N", "N"), ("CA", "C"), ("C", "C"), ("O", "O")):
+            coordinate = float(serial)
+            lines.append(
+                f"ATOM  {serial:5d} {atom_name:^4s} {residue_name:>3s} {chain}{residue_number:4d}{insertion_code:1s}"
+                f"   {coordinate:8.3f}{0.0:8.3f}{0.0:8.3f}{1.0:6.2f}{0.0:6.2f}          {element:>2s}"
+            )
+            serial += 1
+    lines.append("END")
+    return "\\n".join(lines) + "\\n"
+
+
+def _parse_packed_pdb(input_path):
+    lines = Path(input_path).read_text(encoding="utf-8").splitlines()
+    atom_lines = [line for line in lines if line.startswith("ATOM  ")]
+    if not atom_lines or any(len(line) < 78 for line in atom_lines):
+        raise ValueError("invalid packed PDB fixture")
+    residue_order = []
+    residue_names = {}
+    residue_atoms = {}
+    for line in atom_lines:
+        atom_name = line[12:16].strip()
+        residue_name = line[17:20].strip()
+        chain = line[21:22]
+        residue_number = int(line[22:26])
+        insertion_code = line[26:27].strip()
+        float(line[30:38]); float(line[38:46]); float(line[46:54])
+        key = chain, residue_number, insertion_code
+        if key not in residue_names:
+            residue_order.append(key)
+            residue_names[key] = residue_name
+            residue_atoms[key] = set()
+        if residue_names[key] != residue_name:
+            raise ValueError("inconsistent packed PDB residue name")
+        residue_atoms[key].add(atom_name)
+    try:
+        native_sequence = [restype_str_to_int[restype_3to1[residue_names[key]]] for key in residue_order]
+    except KeyError as error:
+        raise ValueError("unknown packed PDB residue") from error
+    parsed = {
+        "Y": _Tensor(((1.0, 0.0, 0.0), (2.0, 0.0, 0.0))),
+        "Y_t": _Tensor((15, 7)),
+        "Y_m": _Tensor((1, 1)),
+        "R_idx": _Tensor(tuple(key[1] for key in residue_order)),
+        "chain_letters": np.asarray(tuple(key[0] for key in residue_order)),
+        "S": _Tensor(tuple(native_sequence)),
+        "mask": _Tensor(tuple(int({"N", "CA", "C", "O"}.issubset(residue_atoms[key])) for key in residue_order)),
+    }
+    return parsed, None, _Selection(), tuple(key[2] for key in residue_order), None
+
+
+def parse_PDB(input_path, *args, **kwargs):
     del args, kwargs
+    if "_packed_" in Path(input_path).name:
+        return _parse_packed_pdb(input_path)
     parsed = {
         "Y": _Tensor(((1.0, 0.0, 0.0), (2.0, 0.0, 0.0))),
         "Y_t": _Tensor((15, 7)),
@@ -74,6 +139,7 @@ def parse_PDB(*args, **kwargs):
         "R_idx": _Tensor((12, 13, -2, 2)),
         "chain_letters": np.asarray(("A", "A", "B", "B")),
         "S": _Tensor((0, 1, 2, 3)),
+        "mask": _Tensor((1, 0, 1, 1)),
     }
     return parsed, None, _Selection(), ("", "B", "A", ""), None
 """

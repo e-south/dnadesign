@@ -198,10 +198,11 @@ def parse_ligandmpnn_design_outputs(
             )
         except ValueError as error:
             raise ValueError(f"official LigandMPNN FASTA is missing or unreadable: {fasta_relative_path}") from error
-        _validate_fasta_manifest_binding(
+        _validate_manifest_file_binding(
             observed_manifest,
             relative_path=Path("seqs") / f"{input_name}.fa",
             payload=fasta_bytes,
+            label="official LigandMPNN FASTA",
         )
         parsed_fasta = parse_official_design_fasta_records(
             fasta_bytes,
@@ -211,10 +212,21 @@ def parse_ligandmpnn_design_outputs(
         _validate_design_sequence_contract(request, protein_evidence, parsed_fasta)
         sequence_count = parsed_fasta.design_count
         if request.packing.enabled:
-            _validate_packed_artifact_manifest(
+            packed_paths = _validate_packed_artifact_manifest(
                 observed_manifest,
                 input_name=input_name,
                 design_count=request.batch_size * request.number_of_batches,
+                pack_count=request.packing.number_of_packs_per_design,
+            )
+            _validate_packed_artifact_contents(
+                root=root,
+                output_dir=command.output_dir,
+                manifest=observed_manifest,
+                packed_paths=packed_paths,
+                checkout_root=checkout_root,
+                upstream_commit=request.upstream.commit,
+                input_evidence=protein_evidence,
+                fasta=parsed_fasta,
                 pack_count=request.packing.number_of_packs_per_design,
             )
         outputs.append(
@@ -287,11 +299,12 @@ def _official_input_name(pdb_path: Path) -> str:
     return name[:-4] if name.endswith(".pdb") else name
 
 
-def _validate_fasta_manifest_binding(
+def _validate_manifest_file_binding(
     manifest: dict[str, object],
     *,
     relative_path: Path,
     payload: bytes,
+    label: str,
 ) -> None:
     entries = manifest.get("entries")
     if not isinstance(entries, list):
@@ -305,7 +318,7 @@ def _validate_fasta_manifest_binding(
         "size_bytes": len(payload),
         "sha256": observed_digest,
     }:
-        raise ValueError(f"official LigandMPNN FASTA does not match admitted manifest: {expected_path}")
+        raise ValueError(f"{label} does not match admitted manifest: {expected_path}")
 
 
 def _validate_packed_artifact_manifest(
@@ -314,7 +327,7 @@ def _validate_packed_artifact_manifest(
     input_name: str,
     design_count: int,
     pack_count: int,
-) -> None:
+) -> tuple[Path, ...]:
     entries = manifest.get("entries")
     if not isinstance(entries, list):
         raise ValueError("design output manifest entries are invalid")
@@ -325,14 +338,81 @@ def _validate_packed_artifact_manifest(
         and isinstance(entry.get("path"), str)
         and (entry["path"] == "packed" or entry["path"].startswith("packed/"))
     }
-    expected = {("packed", "directory")}
-    expected.update(
-        (f"packed/{input_name}_packed_{design_id}_{pack_id}.pdb", "file")
+    expected_paths = tuple(
+        Path("packed") / f"{input_name}_packed_{design_id}_{pack_id}.pdb"
         for design_id in range(1, design_count + 1)
         for pack_id in range(1, pack_count + 1)
     )
+    expected = {("packed", "directory")}
+    expected.update((path.as_posix(), "file") for path in expected_paths)
     if observed != expected:
         raise ValueError("official LigandMPNN packed artifacts do not exactly match the packing request")
+    return expected_paths
+
+
+def _validate_packed_artifact_contents(
+    *,
+    root: Path,
+    output_dir: Path,
+    manifest: dict[str, object],
+    packed_paths: tuple[Path, ...],
+    checkout_root: Path,
+    upstream_commit: str,
+    input_evidence: LigandMpnnProteinStructureEvidence,
+    fasta: OfficialLigandMpnnDesignFasta,
+    pack_count: int,
+) -> None:
+    payloads: list[tuple[str, bytes]] = []
+    for packed_path in packed_paths:
+        execution_relative_path = output_dir / packed_path
+        try:
+            payload = _read_descriptor_relative_regular_bytes(
+                root,
+                execution_relative_path,
+                label="official LigandMPNN packed PDB",
+            )
+        except ValueError as error:
+            raise ValueError(f"official LigandMPNN packed PDB is invalid: {packed_path}") from error
+        _validate_manifest_file_binding(
+            manifest,
+            relative_path=packed_path,
+            payload=payload,
+            label="official LigandMPNN packed PDB",
+        )
+        payloads.append((packed_path.name, payload))
+
+    from dnadesign.thread.adapters.ligandmpnn.context_probe import (
+        _derive_pinned_protein_evidence_for_payloads,
+    )
+
+    try:
+        packed_evidence = _derive_pinned_protein_evidence_for_payloads(
+            checkout_root,
+            expected_commit=upstream_commit,
+            inputs=tuple(payloads),
+        )
+    except Exception as error:
+        raise ValueError("official LigandMPNN packed PDB is invalid") from error
+
+    expected_sequences = tuple(
+        input_evidence.parser_sequence_from_fasta_segments(design_segments)
+        for design_segments in fasta.designed_segments
+        for _pack_index in range(pack_count)
+    )
+    for packed_path, observed, expected_sequence in zip(
+        packed_paths,
+        packed_evidence,
+        expected_sequences,
+        strict=True,
+    ):
+        if not observed.residue_ids or any(value != 1 for value in observed.residue_validity_mask):
+            raise ValueError(f"official LigandMPNN packed PDB is invalid: {packed_path}")
+        if observed.residue_ids != input_evidence.residue_ids:
+            raise ValueError(
+                f"official LigandMPNN packed PDB structural identity does not match pinned input: {packed_path}"
+            )
+        if observed.native_sequence != expected_sequence:
+            raise ValueError(f"official LigandMPNN packed PDB does not match designed sequence identity: {packed_path}")
 
 
 __all__ = [

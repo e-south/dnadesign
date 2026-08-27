@@ -54,6 +54,14 @@ _MACOS_RENAME_EXCL = 0x00000004
 _ReceiptIdentity = tuple[int, int]
 
 
+@dataclass(frozen=True)
+class _PinnedParserResult:
+    parsed: Any
+    other_atoms: Any
+    insertion_codes: Any
+    protein_evidence: LigandMpnnProteinStructureEvidence
+
+
 class LigandMpnnContextPublicationUncertainError(RuntimeError):
     """Receipt rollback could not establish a durable pre-publication state."""
 
@@ -968,6 +976,52 @@ def _run_pinned_upstream_parser(
     parse_atoms_with_zero_occupancy: bool,
     require_clean_checkout: bool = True,
 ) -> tuple[Any, Any, dict[int, str], str, LigandMpnnProteinStructureEvidence]:
+    results, element_dict_rev, parser_sha256 = _run_pinned_upstream_parser_batch(
+        checkout_root,
+        expected_commit=expected_commit,
+        inputs=((input_name, input_bytes),),
+        chains=chains,
+        parse_all_atoms=parse_all_atoms,
+        parse_atoms_with_zero_occupancy=parse_atoms_with_zero_occupancy,
+        require_clean_checkout=require_clean_checkout,
+    )
+    result = results[0]
+    return result.parsed, result.other_atoms, element_dict_rev, parser_sha256, result.protein_evidence
+
+
+def _derive_pinned_protein_evidence_for_payloads(
+    checkout_root: Path,
+    *,
+    expected_commit: str,
+    inputs: tuple[tuple[str, bytes], ...],
+) -> tuple[LigandMpnnProteinStructureEvidence, ...]:
+    """Parse multiple bound PDB payloads through one attested pinned snapshot."""
+
+    results, _element_dict_rev, _parser_sha256 = _run_pinned_upstream_parser_batch(
+        checkout_root,
+        expected_commit=expected_commit,
+        inputs=inputs,
+        chains=(),
+        parse_all_atoms=False,
+        parse_atoms_with_zero_occupancy=False,
+        retain_parser_outputs=False,
+    )
+    return tuple(result.protein_evidence for result in results)
+
+
+def _run_pinned_upstream_parser_batch(
+    checkout_root: Path,
+    *,
+    expected_commit: str,
+    inputs: tuple[tuple[str, bytes], ...],
+    chains: tuple[str, ...],
+    parse_all_atoms: bool,
+    parse_atoms_with_zero_occupancy: bool,
+    require_clean_checkout: bool = True,
+    retain_parser_outputs: bool = True,
+) -> tuple[tuple[_PinnedParserResult, ...], dict[int, str], str]:
+    if not inputs:
+        raise ValueError("pinned parser inputs must not be empty")
     checkout = checkout_root.expanduser().resolve()
     if not checkout.is_dir():
         raise ValueError("LigandMPNN checkout_root must be an existing directory")
@@ -1002,10 +1056,6 @@ def _run_pinned_upstream_parser(
         snapshot_source_bytes = source_path.read_bytes()
         if snapshot_source_bytes != source_bytes:
             raise ValueError("materialized data_utils.py does not match the pinned commit")
-        input_path = snapshot / ".dnadesign-inputs" / input_name
-        input_path.parent.mkdir()
-        input_path.write_bytes(input_bytes)
-        input_path.chmod(0o400)
         module = _import_upstream_module(
             source_bytes,
             source_path=source_path,
@@ -1025,19 +1075,34 @@ def _run_pinned_upstream_parser(
             not isinstance(key, int) or not isinstance(value, str) for key, value in restype_int_to_str.items()
         ):
             raise ValueError("pinned LigandMPNN data_utils.py does not expose restype_int_to_str")
-        parsed, _, other_atoms, insertion_codes, _ = parser(
-            str(input_path),
-            device="cpu",
-            chains=list(chains),
-            parse_all_atoms=parse_all_atoms,
-            parse_atoms_with_zero_occupancy=parse_atoms_with_zero_occupancy,
-        )
-    protein_evidence = _pinned_parser_protein_evidence(
-        parsed,
-        insertion_codes,
-        restype_int_to_str=restype_int_to_str,
-    )
-    return parsed, other_atoms, element_dict_rev, hashlib.sha256(source_bytes).hexdigest(), protein_evidence
+        results: list[_PinnedParserResult] = []
+        for input_index, (input_name, input_bytes) in enumerate(inputs):
+            if not input_name or Path(input_name).name != input_name:
+                raise ValueError("pinned parser input names must be plain file names")
+            input_path = snapshot / ".dnadesign-inputs" / str(input_index) / input_name
+            input_path.parent.mkdir(parents=True)
+            input_path.write_bytes(input_bytes)
+            input_path.chmod(0o400)
+            parsed, _, other_atoms, insertion_codes, _ = parser(
+                str(input_path),
+                device="cpu",
+                chains=list(chains),
+                parse_all_atoms=parse_all_atoms,
+                parse_atoms_with_zero_occupancy=parse_atoms_with_zero_occupancy,
+            )
+            results.append(
+                _PinnedParserResult(
+                    parsed=parsed if retain_parser_outputs else None,
+                    other_atoms=other_atoms if retain_parser_outputs else None,
+                    insertion_codes=insertion_codes if retain_parser_outputs else None,
+                    protein_evidence=_pinned_parser_protein_evidence(
+                        parsed,
+                        insertion_codes,
+                        restype_int_to_str=restype_int_to_str,
+                    ),
+                )
+            )
+    return tuple(results), element_dict_rev, hashlib.sha256(source_bytes).hexdigest()
 
 
 def _pinned_parser_protein_evidence(
@@ -1048,13 +1113,20 @@ def _pinned_parser_protein_evidence(
 ) -> LigandMpnnProteinStructureEvidence:
     """Encode exact identities and native sequence consumed by pinned entrypoints."""
 
-    if not isinstance(parsed, dict) or not {"R_idx", "chain_letters", "S"}.issubset(parsed):
-        raise ValueError("upstream parse_PDB did not return R_idx, chain_letters, and S")
+    if not isinstance(parsed, dict) or not {"R_idx", "chain_letters", "S", "mask"}.issubset(parsed):
+        raise ValueError("upstream parse_PDB did not return R_idx, chain_letters, S, and mask")
     residue_numbers = _to_numpy(parsed["R_idx"]).reshape(-1)
     chain_letters = _to_numpy(parsed["chain_letters"]).reshape(-1)
     insertion_codes_array = _to_numpy(insertion_codes).reshape(-1)
     native_indices = _to_numpy(parsed["S"]).reshape(-1)
-    if not (len(residue_numbers) == len(chain_letters) == len(insertion_codes_array) == len(native_indices)):
+    residue_validity_mask = _to_numpy(parsed["mask"]).reshape(-1)
+    if not (
+        len(residue_numbers)
+        == len(chain_letters)
+        == len(insertion_codes_array)
+        == len(native_indices)
+        == len(residue_validity_mask)
+    ):
         raise ValueError("upstream protein residue identity lengths differ")
     identities: list[str] = []
     native_sequence: list[str] = []
@@ -1080,7 +1152,20 @@ def _pinned_parser_protein_evidence(
         residue_ids=tuple(identities),
         chain_ids=tuple(str(item) for item in chain_letters),
         native_sequence=tuple(native_sequence),
+        residue_validity_mask=_pinned_parser_binary_mask(residue_validity_mask),
     )
+
+
+def _pinned_parser_binary_mask(values: np.ndarray) -> tuple[int, ...]:
+    mask: list[int] = []
+    for value in values:
+        if isinstance(value, (bool, np.bool_)) or not np.issubdtype(type(value), np.integer):
+            raise ValueError("upstream protein residue validity mask must contain integers")
+        integer = int(value)
+        if integer not in {0, 1}:
+            raise ValueError("upstream protein residue validity mask must contain only zero or one")
+        mask.append(integer)
+    return tuple(mask)
 
 
 def _import_upstream_module(

@@ -194,6 +194,58 @@ def test_design_admission_rejects_incomplete_or_nonofficial_packed_artifact_set(
         parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
 
 
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("empty", "packed PDB is invalid"),
+        ("truncated", "packed PDB is invalid"),
+        ("invalid", "packed PDB is invalid"),
+        ("wrong-structure", "structural identity does not match pinned input"),
+        ("wrong-design", "does not match designed sequence identity"),
+    ],
+)
+def test_design_admission_rejects_invalid_or_wrong_identity_packed_pdb(
+    tmp_path: Path,
+    mutation: str,
+    message: str,
+) -> None:
+    request, commands, output_root, _sidecar = _execute_design(
+        tmp_path,
+        packing=LigandMpnnPackingConfig(enabled=True),
+    )
+    packed_path = output_root / "packed/input_packed_1_1.pdb"
+    if mutation == "empty":
+        packed_path.write_bytes(b"")
+    elif mutation == "truncated":
+        packed_path.write_bytes(packed_path.read_bytes()[:30])
+    elif mutation == "invalid":
+        packed_path.write_bytes(b"not a PDB")
+    else:
+        payload = packed_path.read_bytes()
+        if mutation == "wrong-structure":
+            replaced = payload.replace(b" ALA A  12", b" ALA A  99")
+        else:
+            replaced = payload.replace(b" ALA A  12", b" TYR A  12")
+        assert replaced != payload
+        packed_path.write_bytes(replaced)
+    _rebind_completion_to_current_tree(output_root)
+
+    with pytest.raises(ValueError, match=message):
+        parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
+
+
+def test_design_admission_binds_each_packed_pdb_to_corresponding_design_record(tmp_path: Path) -> None:
+    request, commands, output_root, _sidecar = _execute_design(
+        tmp_path,
+        batch_size=2,
+        packing=LigandMpnnPackingConfig(enabled=True, number_of_packs_per_design=1),
+    )
+    _replace_official_fasta(output_root, native="AC:DE", designs=("AC:DE", "AG:DE"))
+
+    with pytest.raises(ValueError, match=r"designed sequence identity: packed/input_packed_2_1\.pdb"):
+        parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
+
+
 def test_design_admission_rejects_completed_execution_for_different_request_id(tmp_path: Path) -> None:
     request, commands, _output_root, _sidecar = _execute_design(tmp_path)
     replayed_request = replace(request, request_id="different_design_request")

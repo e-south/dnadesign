@@ -143,7 +143,7 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
     (root / "run.py").write_text(
         "import argparse\n"
         "from pathlib import Path\n"
-        "from data_utils import VALUE\n"
+        "from data_utils import VALUE, packed_pdb_payload\n"
         "from model_utils import HELPER\n"
         "parser = argparse.ArgumentParser()\n"
         "parser.add_argument('--model_type', required=True)\n"
@@ -198,7 +198,7 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
         "        for design_id in range(1, args.batch_size * args.number_of_batches + 1):\n"
         "            for pack_id in range(1, args.number_of_packs_per_design + 1):\n"
         "                (packed / f'{name}_packed_{design_id}_{pack_id}.pdb').write_text(\n"
-        "                    f'packed:{design_id}:{pack_id}', encoding='utf-8'\n"
+        "                    packed_pdb_payload('ACDE'), encoding='utf-8'\n"
         "                )\n",
         encoding="utf-8",
     )

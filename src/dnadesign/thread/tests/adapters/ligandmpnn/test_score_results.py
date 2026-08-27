@@ -33,6 +33,7 @@ from dnadesign.thread.adapters.ligandmpnn import (
     EXPECTED_LIGANDMPNN_SCORE_ALPHABET,
     LigandMpnnCanonical20Policy,
     LigandMpnnContextInventoryReference,
+    LigandMpnnResidue,
     LigandMpnnScoreMode,
     LigandMpnnScoreOutputTrust,
     LigandMpnnScoreRequest,
@@ -54,7 +55,13 @@ def _sha256(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def _prepare_request(root: Path, *, seeds: tuple[int, ...] = (7, 11)) -> LigandMpnnScoreRequest:
+def _prepare_request(
+    root: Path,
+    *,
+    seeds: tuple[int, ...] = (7, 11),
+    fixed_residues: tuple[LigandMpnnResidue, ...] = (),
+    redesigned_residues: tuple[LigandMpnnResidue, ...] = (),
+) -> LigandMpnnScoreRequest:
     _checkout, commit, parser_sha256 = create_pinned_context_checkout(root)
     pdb_payload = b"ATOM      1  N   ALA A   1      0.000   0.000   0.000\n"
     pdb_path = root / "inputs/target.pdb"
@@ -73,6 +80,8 @@ def _prepare_request(root: Path, *, seeds: tuple[int, ...] = (7, 11)) -> LigandM
         output_dir=Path("outputs/scores"),
         upstream=LigandMpnnUpstreamPin(commit=commit, checkpoint_sha256=_CHECKPOINT_SHA256),
         context_inventory=context_inventory,
+        fixed_residues=fixed_residues,
+        redesigned_residues=redesigned_residues,
         seeds=seeds,
         batch_size=2,
         number_of_batches=10,
@@ -197,8 +206,8 @@ def _score_payload(
         "log_probs": log_probabilities,
         "decoding_order": decoding_order,
         "native_sequence": np.asarray([0, 1, 2, 3], dtype=np.int64),
-        "mask": np.ones(residue_count, dtype=np.float32),
-        "chain_mask": np.asarray([1, 0, 1, 1], dtype=np.int64),
+        "mask": np.asarray([1, 0, 1, 1], dtype=np.float32),
+        "chain_mask": np.ones(residue_count, dtype=np.int64),
         "seed": seed,
         "alphabet": list(EXPECTED_LIGANDMPNN_SCORE_ALPHABET),
         "residue_names": residue_names,
@@ -470,6 +479,67 @@ def test_score_admission_rejects_native_sequence_not_matching_pinned_parser(tmp_
     )
 
     with pytest.raises(ValueError, match="native sequence does not match pinned parser"):
+        _parse(tmp_path, request)
+
+
+@pytest.mark.parametrize(
+    ("fixed_residues", "redesigned_residues", "observed_chain_mask"),
+    [
+        ((LigandMpnnResidue("A", 13, "B"),), (), np.asarray([1, 1, 1, 1], dtype=np.int64)),
+        ((), (LigandMpnnResidue("B", -2, "A"),), np.asarray([1, 1, 1, 1], dtype=np.int64)),
+    ],
+    ids=["fixed", "redesigned"],
+)
+def test_score_admission_rejects_chain_mask_not_matching_bound_selectors(
+    tmp_path: Path,
+    fixed_residues: tuple[LigandMpnnResidue, ...],
+    redesigned_residues: tuple[LigandMpnnResidue, ...],
+    observed_chain_mask: np.ndarray,
+) -> None:
+    request = _prepare_request(
+        tmp_path,
+        seeds=(7,),
+        fixed_residues=fixed_residues,
+        redesigned_residues=redesigned_residues,
+    )
+    _write_output(tmp_path, request, 7, chain_mask=observed_chain_mask)
+
+    with pytest.raises(ValueError, match="chain_mask does not match pinned parser and requested selectors"):
+        _parse(tmp_path, request)
+
+
+@pytest.mark.parametrize(
+    ("fixed_residues", "redesigned_residues", "expected_chain_mask"),
+    [
+        ((LigandMpnnResidue("A", 13, "B"),), (), np.asarray([1, 0, 1, 1], dtype=np.int64)),
+        ((), (LigandMpnnResidue("B", -2, "A"),), np.asarray([0, 0, 1, 0], dtype=np.int64)),
+    ],
+    ids=["fixed", "redesigned"],
+)
+def test_score_admission_accepts_chain_mask_matching_bound_selectors(
+    tmp_path: Path,
+    fixed_residues: tuple[LigandMpnnResidue, ...],
+    redesigned_residues: tuple[LigandMpnnResidue, ...],
+    expected_chain_mask: np.ndarray,
+) -> None:
+    request = _prepare_request(
+        tmp_path,
+        seeds=(7,),
+        fixed_residues=fixed_residues,
+        redesigned_residues=redesigned_residues,
+    )
+    _write_output(tmp_path, request, 7, chain_mask=expected_chain_mask)
+
+    result = _parse(tmp_path, request)
+
+    assert result.outputs[0].residue_names == ("A12", "A13B", "B-2A", "B2")
+
+
+def test_score_admission_rejects_residue_mask_not_matching_pinned_parser(tmp_path: Path) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    _write_output(tmp_path, request, 7, mask=np.ones(4, dtype=np.int64))
+
+    with pytest.raises(ValueError, match="mask does not match pinned parser residue validity"):
         _parse(tmp_path, request)
 
 

@@ -383,6 +383,11 @@ def parse_ligandmpnn_score_outputs(
             mode=request.mode,
             expected_residue_names=protein_evidence.residue_ids,
             expected_native_sequence=protein_evidence.native_sequence,
+            expected_residue_mask=protein_evidence.residue_validity_mask,
+            expected_chain_mask=protein_evidence.expected_selector_mask(
+                fixed_residue_ids=frozenset(item.upstream_id for item in request.fixed_residues),
+                redesigned_residue_ids=frozenset(item.upstream_id for item in request.redesigned_residues),
+            ),
         )
         outputs.append(
             LigandMpnnScoreOutput(
@@ -541,6 +546,8 @@ def _validate_payload(
     mode: LigandMpnnScoreMode,
     expected_residue_names: tuple[str, ...],
     expected_native_sequence: tuple[str, ...],
+    expected_residue_mask: tuple[int, ...],
+    expected_chain_mask: tuple[int, ...],
 ) -> tuple[tuple[str, ...], np.ndarray]:
     keys = set(payload)
     missing = sorted(_EXPECTED_KEYS - keys)
@@ -581,8 +588,6 @@ def _validate_payload(
     native_sequence = _integer_array(payload, "native_sequence", shape=(residue_count,))
     if np.any(native_sequence < 0) or np.any(native_sequence >= 21):
         raise ValueError("score output native_sequence contains an out-of-range alphabet index")
-    _binary_array(payload, "mask", shape=(residue_count,))
-    _binary_array(payload, "chain_mask", shape=(residue_count,))
 
     residue_names = _residue_names(payload["residue_names"], residue_count=residue_count)
     if residue_names != expected_residue_names:
@@ -590,6 +595,13 @@ def _validate_payload(
             "score output residue axis does not match pinned parser protein residue identities: "
             f"expected {expected_residue_names}; observed {residue_names}"
         )
+    residue_mask = _binary_array(payload, "mask", shape=(residue_count,))
+    if not np.array_equal(residue_mask, np.asarray(expected_residue_mask)):
+        raise ValueError("score output mask does not match pinned parser residue validity")
+    chain_mask = _binary_array(payload, "chain_mask", shape=(residue_count,))
+    if not np.array_equal(chain_mask, np.asarray(expected_chain_mask)):
+        raise ValueError("score output chain_mask does not match pinned parser and requested selectors")
+
     sequence = payload["sequence"]
     expected_sequence = [EXPECTED_LIGANDMPNN_SCORE_ALPHABET[index] for index in native_sequence]
     if sequence != expected_sequence:

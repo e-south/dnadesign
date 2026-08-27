@@ -112,6 +112,7 @@ def parse_PDB(input_path, device="cpu", chains=[], parse_all_atoms=False,
         "R_idx": _Tensor((12, 13, -2)),
         "chain_letters": np.asarray(("A", "A", "B")),
         "S": _Tensor((0, 1, 2)),
+        "mask": _Tensor((1, 1, 1)),
     }
     return parsed, None, _Selection(atoms), ("", "B", "A"), None
 """.lstrip()
