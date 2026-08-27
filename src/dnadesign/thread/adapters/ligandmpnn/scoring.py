@@ -71,6 +71,10 @@ class LigandMpnnScoreRequest:
         object.__setattr__(self, "pdb_sha256", self.pdb_sha256.lower())
         if not isinstance(self.output_dir, Path):
             raise ValueError("output_dir must be a Path")
+        if self.output_dir.is_absolute() or str(self.output_dir).startswith("~"):
+            raise ValueError("output_dir must be a safe non-option relative Path")
+        if ".." in self.output_dir.parts:
+            raise ValueError("output_dir must not contain traversal")
         if str(self.output_dir).startswith("-"):
             raise ValueError("output_dir must not begin with a hyphen")
         if not isinstance(self.upstream, LigandMpnnUpstreamPin):

@@ -86,7 +86,10 @@ def _request(**overrides: object) -> LigandMpnnRequest:
     [
         ("pdb_path", Path("/tmp/target.pdb"), "safe non-option relative"),
         ("pdb_path", Path("-option-like-input.pdb"), "safe non-option relative"),
+        ("output_dir", Path("/tmp/designs"), "safe non-option relative"),
+        ("output_dir", Path("~/designs"), "safe non-option relative"),
         ("output_dir", Path("-option-like-output"), "must not begin with a hyphen"),
+        ("output_dir", Path("results/../designs"), "must not contain traversal"),
     ],
 )
 def test_request_rejects_paths_that_cannot_round_trip_through_runtime_argv(
@@ -96,6 +99,15 @@ def test_request_rejects_paths_that_cannot_round_trip_through_runtime_argv(
 ) -> None:
     with pytest.raises(ValueError, match=message):
         _request(**{field_name: value})
+
+
+def test_request_preserves_valid_nested_relative_output_directory() -> None:
+    request = _request(output_dir=Path("results/nested/designs"))
+
+    command = build_ligandmpnn_commands(request, checkout_root=Path("LigandMPNN"))[0]
+
+    assert command.output_dir == Path("results/nested/designs/seed_7")
+    assert command.argv[command.argv.index("--out_folder") + 1] == "results/nested/designs/seed_7"
 
 
 def test_build_commands_declares_exact_official_ligandmpnn_flags_per_seed() -> None:

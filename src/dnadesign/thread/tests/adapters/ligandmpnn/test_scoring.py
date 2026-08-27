@@ -54,7 +54,10 @@ def _request(**overrides: object) -> LigandMpnnScoreRequest:
     [
         ("pdb_path", Path("/tmp/target.pdb"), "safe non-option relative"),
         ("pdb_path", Path("-option-like-input.pdb"), "safe non-option relative"),
+        ("output_dir", Path("/tmp/scores"), "safe non-option relative"),
+        ("output_dir", Path("~/scores"), "safe non-option relative"),
         ("output_dir", Path("-option-like-output"), "must not begin with a hyphen"),
+        ("output_dir", Path("results/../scores"), "must not contain traversal"),
     ],
 )
 def test_score_request_rejects_paths_that_cannot_round_trip_through_runtime_argv(
@@ -64,6 +67,15 @@ def test_score_request_rejects_paths_that_cannot_round_trip_through_runtime_argv
 ) -> None:
     with pytest.raises(ValueError, match=message):
         _request(**{field_name: value})
+
+
+def test_score_request_preserves_valid_nested_relative_output_directory() -> None:
+    request = _request(output_dir=Path("results/nested/scores"))
+
+    command = build_ligandmpnn_score_commands(request, checkout_root=Path("LigandMPNN"))[0]
+
+    assert command.output_dir == Path("results/nested/scores/seed_7")
+    assert command.argv[command.argv.index("--out_folder") + 1] == "results/nested/scores/seed_7"
 
 
 def test_single_aa_probability_command_is_explicit() -> None:
