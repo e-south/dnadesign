@@ -40,6 +40,32 @@ def _digest(path: Path) -> str:
     return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
 
 
+def _set_git_index_mode(checkout: Path, path: Path, mode: str) -> None:
+    relative = path.relative_to(checkout).as_posix()
+    if mode == "160000":
+        object_id = subprocess.run(
+            ["git", "-C", str(checkout), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    else:
+        object_id = (
+            subprocess.run(
+                ["git", "-C", str(checkout), "hash-object", "-w", "--stdin"],
+                input=path.read_bytes(),
+                check=True,
+                capture_output=True,
+            )
+            .stdout.decode()
+            .strip()
+        )
+    subprocess.run(
+        ["git", "-C", str(checkout), "update-index", "--add", "--cacheinfo", f"{mode},{object_id},{relative}"],
+        check=True,
+    )
+
+
 def test_inventory_creates_a_closed_manifest_then_refuses_overwrite(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     (root / "inputs").mkdir(parents=True)
@@ -222,6 +248,93 @@ def test_demo_validation_requires_empty_lock_to_match_git_index(tmp_path: Path) 
     assert verify_storage_object(root).summary()["status"] == "verified"
 
 
+@pytest.mark.parametrize(
+    ("target_name", "index_mode"),
+    [
+        (MANIFEST_NAME, "120000"),
+        (LOCK_NAME, "120000"),
+        ("payload.txt", "120000"),
+        ("payload.txt", "160000"),
+    ],
+)
+def test_demo_validation_rejects_nonregular_git_index_modes(
+    tmp_path: Path,
+    target_name: str,
+    index_mode: str,
+) -> None:
+    checkout = tmp_path / "checkout"
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    root = checkout / "examples" / "pilot"
+    root.mkdir(parents=True)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot/payload.txt"], check=True)
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+        demo=True,
+    )
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(checkout),
+            "-c",
+            "user.name=Storage Test",
+            "-c",
+            "user.email=storage-test@example.invalid",
+            "commit",
+            "-qm",
+            "seed demo",
+        ],
+        check=True,
+    )
+    target = root / target_name
+    _set_git_index_mode(checkout, target, index_mode)
+
+    assert target.is_file() and not target.is_symlink()
+    with pytest.raises(
+        StorageObjectError,
+        match=rf"demo Git index entry must be a regular file.*mode {index_mode}",
+    ):
+        verify_storage_object(root)
+
+
+def test_demo_validation_accepts_regular_executable_git_index_mode(tmp_path: Path) -> None:
+    checkout = tmp_path / "checkout"
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    root = checkout / "examples" / "pilot"
+    root.mkdir(parents=True)
+    payload = root / "payload.txt"
+    payload.write_text("payload\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot/payload.txt"], check=True)
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+        demo=True,
+    )
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot"], check=True)
+    _set_git_index_mode(checkout, payload, "100755")
+
+    assert verify_storage_object(root).summary()["status"] == "verified"
+
+
 def test_inventory_demo_requires_resource_bytes_to_match_git_index(tmp_path: Path) -> None:
     checkout = tmp_path / "checkout"
     subprocess.run(["git", "init", "-q", str(checkout)], check=True)
@@ -344,6 +457,7 @@ def test_refresh_demo_allows_only_manifest_to_enter_pending_git_state(tmp_path: 
         ("dirty", "demo file differs from Git index"),
         ("dirty-demo-flag", "demo file differs from Git index"),
         ("untracked", "demo file is not tracked"),
+        ("symlink-index", "demo Git index entry must be a regular file.*mode 120000"),
     ],
 )
 def test_refresh_demo_requires_prior_manifest_to_match_git_index(
@@ -390,12 +504,14 @@ def test_refresh_demo_requires_prior_manifest_to_match_git_index(
         else:
             manifest["demo"] = False
         manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    else:
+    elif prior_state == "untracked":
         subprocess.run(
             ["git", "-C", str(checkout), "rm", "--cached", "--", "examples/pilot/storage.object.json"],
             check=True,
             capture_output=True,
         )
+    else:
+        _set_git_index_mode(checkout, manifest_path, "120000")
     prior_bytes = manifest_path.read_bytes()
     publication_calls = 0
     original_publish = storage_inventory._publish_refresh_manifest

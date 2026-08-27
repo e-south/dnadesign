@@ -302,21 +302,37 @@ def _verify_demo_git_index_entry(checkout: Path, path: Path, expected_digest: st
                 "-C",
                 str(checkout),
                 "ls-files",
+                "--stage",
+                "-z",
                 "--error-unmatch",
                 "--",
                 f":(literal){relative}",
             ],
             check=False,
             capture_output=True,
-            text=True,
         )
     except OSError as exc:
         raise StorageObjectError(f"cannot verify demo Git tracking for {relative}: {exc}") from exc
     if completed.returncode != 0:
         raise StorageObjectError(f"demo file is not tracked: {relative}")
+    records = completed.stdout.removesuffix(b"\0").split(b"\0") if completed.stdout else []
+    if len(records) != 1:
+        raise StorageObjectError(f"demo Git index entry must have exactly one stage-0 record: {relative}")
+    header, separator, indexed_path = records[0].partition(b"\t")
+    fields = header.split()
+    if not separator or len(fields) != 3 or indexed_path.decode(errors="surrogateescape") != relative:
+        raise StorageObjectError(f"cannot parse demo Git index entry for {relative}")
+    index_mode, object_id, index_stage = fields
+    if index_stage != b"0":
+        raise StorageObjectError(f"demo Git index entry must be stage 0: {relative}")
+    if index_mode not in {b"100644", b"100755"}:
+        mode_label = index_mode.decode(errors="replace")
+        raise StorageObjectError(
+            f"demo Git index entry must be a regular file (mode 100644 or 100755); found mode {mode_label}: {relative}"
+        )
     try:
         indexed = subprocess.run(
-            ["git", "-C", str(checkout), "cat-file", "blob", f":{relative}"],
+            ["git", "-C", str(checkout), "cat-file", "blob", object_id],
             check=False,
             capture_output=True,
         )
