@@ -187,6 +187,13 @@ def parse_ligandmpnn_design_outputs(
             input_stem=input_name,
             expected_design_count=request.batch_size * request.number_of_batches,
         )
+        if request.packing.enabled:
+            _validate_packed_artifact_manifest(
+                observed_manifest,
+                input_name=input_name,
+                design_count=request.batch_size * request.number_of_batches,
+                pack_count=request.packing.number_of_packs_per_design,
+            )
         outputs.append(
             LigandMpnnDesignOutput(
                 seed=command.seed,
@@ -232,6 +239,33 @@ def _validate_fasta_manifest_binding(
         "sha256": observed_digest,
     }:
         raise ValueError(f"official LigandMPNN FASTA does not match admitted manifest: {expected_path}")
+
+
+def _validate_packed_artifact_manifest(
+    manifest: dict[str, object],
+    *,
+    input_name: str,
+    design_count: int,
+    pack_count: int,
+) -> None:
+    entries = manifest.get("entries")
+    if not isinstance(entries, list):
+        raise ValueError("design output manifest entries are invalid")
+    observed = {
+        (entry.get("path"), entry.get("type"))
+        for entry in entries
+        if isinstance(entry, dict)
+        and isinstance(entry.get("path"), str)
+        and (entry["path"] == "packed" or entry["path"].startswith("packed/"))
+    }
+    expected = {("packed", "directory")}
+    expected.update(
+        (f"packed/{input_name}_packed_{design_id}_{pack_id}.pdb", "file")
+        for design_id in range(1, design_count + 1)
+        for pack_id in range(1, pack_count + 1)
+    )
+    if observed != expected:
+        raise ValueError("official LigandMPNN packed artifacts do not exactly match the packing request")
 
 
 __all__ = [

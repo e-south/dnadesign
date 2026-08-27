@@ -23,6 +23,7 @@ import pytest
 import dnadesign.thread.adapters.ligandmpnn.design_results as design_results_module
 from dnadesign.thread.adapters.ligandmpnn import (
     LigandMpnnCommand,
+    LigandMpnnPackingConfig,
     LigandMpnnRequest,
     LigandMpnnUpstreamPin,
     build_ligandmpnn_commands,
@@ -40,6 +41,7 @@ def _execute_design(
     number_of_batches: int = 1,
     seeds: tuple[int, ...] = (7,),
     pdb_name: str = "input.pdb",
+    packing: LigandMpnnPackingConfig | None = None,
 ) -> tuple[LigandMpnnRequest, tuple[LigandMpnnCommand, ...], Path]:
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     if pdb.name != pdb_name:
@@ -54,6 +56,10 @@ def _execute_design(
         parse_all_atoms=False,
         parser_sha256=hashlib.sha256((checkout / "data_utils.py").read_bytes()).hexdigest(),
     )
+    packing = packing or LigandMpnnPackingConfig()
+    packing_checkpoint = checkout / "packing.pt"
+    packing_checkpoint.write_text("packing-checkpoint-v1", encoding="utf-8")
+    packing_checkpoint_sha256 = hashlib.sha256(packing_checkpoint.read_bytes()).hexdigest()
     request = LigandMpnnRequest(
         request_id="admit_design",
         pdb_path=pdb.relative_to(tmp_path),
@@ -63,11 +69,14 @@ def _execute_design(
             commit=commit,
             checkpoint_sha256=checkpoint_sha256,
             checkpoint_path=checkpoint.relative_to(checkout),
+            packing_checkpoint_sha256=(packing_checkpoint_sha256 if packing.enabled else None),
+            packing_checkpoint_path=packing_checkpoint.relative_to(checkout),
         ),
         context_inventory=reference,
         seeds=seeds,
         batch_size=batch_size,
         number_of_batches=number_of_batches,
+        packing=packing,
     )
     commands = build_ligandmpnn_commands(
         request,
@@ -104,6 +113,54 @@ def test_design_admission_binds_exact_published_tree(tmp_path: Path) -> None:
     assert result.to_dict()["expected_sequence_count"] == 1
     assert result.to_dict()["sequence_count"] == 1
     assert any(entry["path"] == "seqs/input.fa" for entry in result.outputs[0].manifest["entries"])
+
+
+def test_design_admission_accepts_complete_official_packed_artifact_set(tmp_path: Path) -> None:
+    request, commands, _output_root = _execute_design(
+        tmp_path,
+        batch_size=2,
+        packing=LigandMpnnPackingConfig(enabled=True, number_of_packs_per_design=2),
+    )
+
+    result = parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
+
+    packed_paths = {
+        entry["path"]
+        for entry in result.outputs[0].manifest["entries"]
+        if entry.get("type") == "file" and str(entry["path"]).startswith("packed/")
+    }
+    assert packed_paths == {
+        "packed/input_packed_1_1.pdb",
+        "packed/input_packed_1_2.pdb",
+        "packed/input_packed_2_1.pdb",
+        "packed/input_packed_2_2.pdb",
+    }
+
+
+@pytest.mark.parametrize("mutation", ["missing", "partial", "extra", "wrong"])
+def test_design_admission_rejects_incomplete_or_nonofficial_packed_artifact_set(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    request, commands, output_root = _execute_design(
+        tmp_path,
+        batch_size=2,
+        packing=LigandMpnnPackingConfig(enabled=True, number_of_packs_per_design=2),
+    )
+    packed_paths = sorted((output_root / "packed").glob("*.pdb"))
+    if mutation == "missing":
+        for packed_path in packed_paths:
+            packed_path.unlink()
+    elif mutation == "partial":
+        packed_paths[-1].unlink()
+    elif mutation == "extra":
+        (output_root / "packed/input_packed_3_1.pdb").write_text("extra", encoding="utf-8")
+    else:
+        packed_paths[-1].rename(output_root / "packed/input_packed_0_1.pdb")
+    _rebind_completion_to_current_tree(output_root)
+
+    with pytest.raises(ValueError, match="packed artifacts do not exactly match"):
+        parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
 
 
 def test_design_admission_rejects_completed_execution_for_different_request_id(tmp_path: Path) -> None:

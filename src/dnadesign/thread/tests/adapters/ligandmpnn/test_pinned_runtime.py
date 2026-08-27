@@ -148,6 +148,8 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
         "parser.add_argument('--temperature', type=float, default=0.1)\n"
         "parser.add_argument('--batch_size', type=int, default=1)\n"
         "parser.add_argument('--number_of_batches', type=int, default=1)\n"
+        "parser.add_argument('--pack_side_chains', type=int, default=0)\n"
+        "parser.add_argument('--number_of_packs_per_design', type=int, default=4)\n"
         "args, _ = parser.parse_known_args()\n"
         "checkpoint = Path(args.checkpoint_ligand_mpnn).read_text(encoding='utf-8')\n"
         "pdb = Path(args.pdb_path).read_text(encoding='utf-8')\n"
@@ -178,7 +180,15 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
         "            f'>{name}, id={design_id}, T={args.temperature}, seed={args.seed}, ' \n"
         "            'overall_confidence=0.1, ligand_confidence=0.2, seq_rec=0.3\\nACD'\n"
         "        )\n"
-        "    (seqs / f'{name}.fa').write_text('\\n'.join(records), encoding='utf-8')\n",
+        "    (seqs / f'{name}.fa').write_text('\\n'.join(records), encoding='utf-8')\n"
+        "    if args.pack_side_chains:\n"
+        "        packed = output_root / 'packed'\n"
+        "        packed.mkdir()\n"
+        "        for design_id in range(1, args.batch_size * args.number_of_batches + 1):\n"
+        "            for pack_id in range(1, args.number_of_packs_per_design + 1):\n"
+        "                (packed / f'{name}_packed_{design_id}_{pack_id}.pdb').write_text(\n"
+        "                    f'packed:{design_id}:{pack_id}', encoding='utf-8'\n"
+        "                )\n",
         encoding="utf-8",
     )
     (root / "score.py").write_text(
