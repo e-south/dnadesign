@@ -121,6 +121,8 @@ def _digest(content: bytes) -> str:
 def _require_json_path(path: object, *, field_name: str) -> None:
     if not isinstance(path, Path) or path.suffix.lower() != ".json":
         raise ValueError(f"{field_name} must be a Path ending in .json")
+    if ".." in path.parts:
+        raise ValueError(f"{field_name} must not contain traversal")
     if str(path).startswith("~"):
         raise ValueError(f"{field_name} must not begin with '~'")
     if str(path).startswith("-"):
@@ -153,11 +155,9 @@ def _publish_complete_file(directory_fd: int, target: Path, content: bytes) -> N
                 follow_symlinks=False,
             )
         except FileExistsError:
-            existing = _read_regular_file_from_directory(directory_fd, target.name, label="sidecar target")
-            if existing is None:
-                raise ValueError("sidecar target changed during materialization")
-            if existing != content:
-                raise FileExistsError(f"refusing to overwrite different residue alphabet sidecar: {target}")
+            os.unlink(temporary_name, dir_fd=directory_fd)
+            temporary_present = False
+            _validate_matching_existing_file(directory_fd, target, content)
             return
         except OSError as error:
             raise ValueError("sidecar target could not be published safely") from error
@@ -238,6 +238,32 @@ def _rollback_publication(
     os.fsync(directory_fd)
 
 
+def _validate_matching_existing_file(directory_fd: int, target: Path, content: bytes) -> None:
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        descriptor = os.open(target.name, flags, dir_fd=directory_fd)
+    except FileNotFoundError as error:
+        raise ValueError("sidecar target changed during materialization") from error
+    except OSError as error:
+        raise ValueError("sidecar target must be a regular file") from error
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise ValueError("sidecar target must be a regular file")
+        existing = _read_descriptor_bytes(descriptor)
+        if existing != content:
+            raise FileExistsError(f"refusing to overwrite different residue alphabet sidecar: {target}")
+        try:
+            os.fsync(descriptor)
+        except OSError as error:
+            raise ValueError("matching sidecar could not be made durable") from error
+    finally:
+        os.close(descriptor)
+    try:
+        os.fsync(directory_fd)
+    except OSError as error:
+        raise ValueError("matching sidecar could not be made durable") from error
+
+
 def _read_regular_file_bytes(path: Path, *, label: str) -> bytes | None:
     try:
         directory_fd = _open_directory_path(path.parent, create=False)
@@ -260,12 +286,16 @@ def _read_regular_file_from_directory(directory_fd: int, name: str, *, label: st
     try:
         if not stat.S_ISREG(os.fstat(descriptor).st_mode):
             raise ValueError(f"{label} must be a regular file")
-        chunks: list[bytes] = []
-        while chunk := os.read(descriptor, 1024 * 1024):
-            chunks.append(chunk)
-        return b"".join(chunks)
+        return _read_descriptor_bytes(descriptor)
     finally:
         os.close(descriptor)
+
+
+def _read_descriptor_bytes(descriptor: int) -> bytes:
+    chunks: list[bytes] = []
+    while chunk := os.read(descriptor, 1024 * 1024):
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 def _open_directory_path(path: Path, *, create: bool) -> int:
