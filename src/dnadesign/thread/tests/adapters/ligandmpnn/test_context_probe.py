@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
@@ -487,8 +488,12 @@ def test_probe_restores_existing_receipt_when_post_replace_directory_fsync_fails
 
     def _fail_post_replace_directory_fsync(file_descriptor: int) -> None:
         nonlocal failed
-        if not failed and stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
-            assert output_path.read_bytes() != prior_payload
+        if (
+            not failed
+            and stat.S_ISDIR(os.fstat(file_descriptor).st_mode)
+            and output_path.is_file()
+            and output_path.read_bytes() != prior_payload
+        ):
             failed = True
             raise OSError("simulated directory fsync failure")
         original_fsync(file_descriptor)
@@ -524,20 +529,37 @@ def test_probe_preserves_concurrent_receipt_when_its_post_replace_directory_fsyn
     published_identity: tuple[int, int] | None = None
     failed = False
 
-    def _capture_published_identity(directory_fd: int, temporary_name: str, payload: bytes) -> tuple[int, int]:
+    def _capture_published_identity(
+        directory_fd: int,
+        temporary_name: str,
+        payload: bytes,
+    ) -> object:
         nonlocal published_identity
-        published_identity = original_write_temporary(directory_fd, temporary_name, payload)
-        return published_identity
+        written_receipt = original_write_temporary(directory_fd, temporary_name, payload)
+        published_identity = written_receipt.identity
+        return written_receipt
 
     def _simulate_reused_identity(directory_fd: int, name: str) -> tuple[tuple[int, int], bytes]:
         observed_identity, observed_payload = original_read_quarantined(directory_fd, name)
+        if name != "publication":
+            return observed_identity, observed_payload
         assert observed_identity != published_identity
         assert published_identity is not None
         return published_identity, observed_payload
 
     def _publish_concurrent_then_fail(file_descriptor: int) -> None:
         nonlocal failed
-        if not failed and stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
+        try:
+            output_status = output_path.stat()
+        except FileNotFoundError:
+            output_status = None
+        if (
+            not failed
+            and stat.S_ISDIR(os.fstat(file_descriptor).st_mode)
+            and published_identity is not None
+            and output_status is not None
+            and (output_status.st_dev, output_status.st_ino) == published_identity
+        ):
             concurrent_path.write_bytes(concurrent_payload)
             concurrent_path.replace(output_path)
             original_fsync(file_descriptor)
@@ -562,7 +584,9 @@ def test_probe_preserves_concurrent_receipt_when_its_post_replace_directory_fsyn
     assert failed
     assert output_path.read_bytes() == concurrent_payload
     assert not concurrent_path.exists()
-    assert not list(output_path.parent.glob(f".{output_path.name}.*.recovery"))
+    recoveries = list(output_path.parent.glob(f".{output_path.name}.*.recovery"))
+    assert len(recoveries) == 1
+    assert (recoveries[0] / "prior").read_bytes() == b"prior receipt bytes\n"
 
 
 @pytest.mark.parametrize("prior_payload", (None, b"prior receipt bytes\n"))
@@ -579,7 +603,7 @@ def test_probe_serializes_concurrent_publication_across_prior_snapshot_and_repla
     first_snapshot_read = threading.Event()
     concurrent_completed = threading.Event()
     original_read_prior = context_probe_module._read_prior_receipt
-    original_replace = os.replace
+    original_rename_no_replace = context_probe_module._rename_no_replace
     original_fsync = os.fsync
     main_thread = threading.get_ident()
     main_published = False
@@ -596,14 +620,14 @@ def test_probe_serializes_concurrent_publication_across_prior_snapshot_and_repla
         return observed
 
     def _track_main_publication(
-        source: os.PathLike[str] | str,
-        destination: os.PathLike[str] | str,
+        source: str,
+        destination: str,
         *,
-        src_dir_fd: int | None = None,
-        dst_dir_fd: int | None = None,
+        src_dir_fd: int,
+        dst_dir_fd: int,
     ) -> None:
         nonlocal main_published
-        original_replace(
+        original_rename_no_replace(
             source,
             destination,
             src_dir_fd=src_dir_fd,
@@ -634,7 +658,7 @@ def test_probe_serializes_concurrent_publication_across_prior_snapshot_and_repla
         concurrent_completed.set()
 
     monkeypatch.setattr(context_probe_module, "_read_prior_receipt", _pause_after_first_snapshot)
-    monkeypatch.setattr(os, "replace", _track_main_publication)
+    monkeypatch.setattr(context_probe_module, "_rename_no_replace", _track_main_publication)
     monkeypatch.setattr(os, "fsync", _fail_main_publication_fsync)
     concurrent = threading.Thread(target=_publish_concurrently)
     concurrent.start()
@@ -651,6 +675,188 @@ def test_probe_serializes_concurrent_publication_across_prior_snapshot_and_repla
     assert failed_main_directory_fsync
     assert concurrent_completed.is_set()
     assert output_path.read_bytes() == b"concurrent durable receipt\n"
+
+
+@pytest.mark.parametrize("prior_payload", (None, b"prior receipt bytes\n"))
+def test_probe_never_overwrites_noncooperating_receipt_published_after_prior_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    prior_payload: bytes | None,
+) -> None:
+    relative_output = Path("evidence/context-inventory.json")
+    output_path = tmp_path / relative_output
+    output_path.parent.mkdir(parents=True)
+    if prior_payload is not None:
+        output_path.write_bytes(prior_payload)
+    concurrent_payload = b"noncooperating durable receipt\n"
+    concurrent_path = output_path.parent / ".noncooperating-receipt.tmp"
+    original_read_prior = context_probe_module._read_prior_receipt
+    original_fsync = os.fsync
+    snapshot_interleaving_started = False
+
+    def _publish_after_snapshot(directory_fd: int, output_name: str) -> bytes | None:
+        nonlocal snapshot_interleaving_started
+        observed = original_read_prior(directory_fd, output_name)
+        if not snapshot_interleaving_started:
+            snapshot_interleaving_started = True
+            concurrent_path.write_bytes(concurrent_payload)
+            os.replace(concurrent_path, output_path)
+            original_fsync(directory_fd)
+        return observed
+
+    monkeypatch.setattr(context_probe_module, "_read_prior_receipt", _publish_after_snapshot)
+
+    with pytest.raises(
+        LigandMpnnContextPublicationUncertainError,
+        match="receipt changed before publication",
+    ):
+        context_probe_module._publish_context_inventory(
+            tmp_path,
+            relative_output,
+            b"receipt that must not overwrite the concurrent publisher\n",
+        )
+
+    assert snapshot_interleaving_started
+    assert output_path.read_bytes() == concurrent_payload
+    assert not concurrent_path.exists()
+
+
+@pytest.mark.parametrize("prior_payload", (None, b"prior receipt bytes\n"))
+@pytest.mark.parametrize("replacement_kind", ("fifo", "symlink"))
+def test_probe_preserves_nonregular_leaf_installed_after_prior_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    prior_payload: bytes | None,
+    replacement_kind: str,
+) -> None:
+    relative_output = Path("evidence/context-inventory.json")
+    output_path = tmp_path / relative_output
+    output_path.parent.mkdir(parents=True)
+    if prior_payload is not None:
+        output_path.write_bytes(prior_payload)
+    concurrent_path = output_path.parent / ".nonregular-receipt.tmp"
+    outside_path = tmp_path / "outside-receipt.json"
+    outside_payload = b"outside receipt sentinel\n"
+    outside_path.write_bytes(outside_payload)
+    original_read_prior = context_probe_module._read_prior_receipt
+    replacement_installed = False
+
+    def _install_nonregular_after_snapshot(
+        directory_fd: int,
+        output_name: str,
+    ) -> object:
+        nonlocal replacement_installed
+        observed = original_read_prior(directory_fd, output_name)
+        if replacement_kind == "fifo":
+            os.mkfifo(concurrent_path)
+        else:
+            concurrent_path.symlink_to(outside_path)
+        os.rename(concurrent_path, output_path)
+        replacement_installed = True
+        return observed
+
+    monkeypatch.setattr(context_probe_module, "_read_prior_receipt", _install_nonregular_after_snapshot)
+
+    with pytest.raises(
+        LigandMpnnContextPublicationUncertainError,
+        match="receipt changed before publication",
+    ):
+        context_probe_module._publish_context_inventory(
+            tmp_path,
+            relative_output,
+            b"receipt that must not overwrite the nonregular leaf\n",
+        )
+
+    assert replacement_installed
+    if replacement_kind == "fifo":
+        assert stat.S_ISFIFO(output_path.lstat().st_mode)
+    else:
+        assert output_path.is_symlink()
+        assert output_path.readlink() == outside_path
+        assert outside_path.read_bytes() == outside_payload
+    assert not list(output_path.parent.glob(f".{output_path.name}.*.recovery"))
+
+
+def test_probe_preserves_destination_created_after_prior_receipt_is_claimed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    relative_output = Path("evidence/context-inventory.json")
+    output_path = tmp_path / relative_output
+    output_path.parent.mkdir(parents=True)
+    prior_payload = b"prior receipt bytes\n"
+    output_path.write_bytes(prior_payload)
+    concurrent_payload = b"receipt published after destination claim\n"
+    concurrent_path = output_path.parent / ".post-claim-receipt.tmp"
+    original_rename_no_replace = context_probe_module._rename_no_replace
+    original_fsync = os.fsync
+    collision_installed = False
+
+    def _install_collision_before_publication(
+        source: str,
+        destination: str,
+        *,
+        src_dir_fd: int,
+        dst_dir_fd: int,
+    ) -> None:
+        nonlocal collision_installed
+        if destination == output_path.name and source.endswith(".tmp") and not collision_installed:
+            concurrent_path.write_bytes(concurrent_payload)
+            os.replace(concurrent_path, output_path)
+            original_fsync(dst_dir_fd)
+            collision_installed = True
+        original_rename_no_replace(
+            source,
+            destination,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+        )
+
+    monkeypatch.setattr(context_probe_module, "_rename_no_replace", _install_collision_before_publication)
+
+    with pytest.raises(
+        LigandMpnnContextPublicationUncertainError,
+        match="prior receipt retained",
+    ):
+        context_probe_module._publish_context_inventory(
+            tmp_path,
+            relative_output,
+            b"receipt that must lose the no-replace race\n",
+        )
+
+    assert collision_installed
+    assert output_path.read_bytes() == concurrent_payload
+    recoveries = list(output_path.parent.glob(f".{output_path.name}.*.recovery"))
+    assert len(recoveries) == 1
+    assert (recoveries[0] / "prior").read_bytes() == prior_payload
+    assert not list(output_path.parent.glob(f".{output_path.name}.*.tmp"))
+
+
+def test_probe_rejects_unavailable_atomic_no_replace_before_receipt_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    relative_output = Path("evidence/context-inventory.json")
+    output_path = tmp_path / relative_output
+    output_path.parent.mkdir(parents=True)
+    prior_payload = b"prior receipt bytes\n"
+    output_path.write_bytes(prior_payload)
+
+    def _unsupported() -> tuple[object, int]:
+        raise OSError(errno.ENOTSUP, "atomic no-replace unavailable")
+
+    monkeypatch.setattr(context_probe_module, "_resolve_rename_no_replace", _unsupported)
+
+    with pytest.raises(ValueError, match="context probe output could not be published atomically"):
+        context_probe_module._publish_context_inventory(
+            tmp_path,
+            relative_output,
+            b"receipt that cannot be safely published\n",
+        )
+
+    assert output_path.read_bytes() == prior_payload
+    assert not list(output_path.parent.glob(f".{output_path.name}.*.tmp"))
+    assert not list(output_path.parent.glob(f".{output_path.name}.*.recovery"))
 
 
 @pytest.mark.parametrize("prior_payload", (None, b"prior receipt bytes\n"))
@@ -671,10 +877,16 @@ def test_probe_restoration_never_overwrites_replacement_after_ownership_check(
     original_read_quarantined = context_probe_module._read_quarantined_receipt
     publication_fsync_failed = False
     replacement_published = False
+    publication_payload = b"publication that cannot be made durable\n"
 
     def _fail_publication_fsync(file_descriptor: int) -> None:
         nonlocal publication_fsync_failed
-        if not publication_fsync_failed and stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
+        if (
+            not publication_fsync_failed
+            and stat.S_ISDIR(os.fstat(file_descriptor).st_mode)
+            and output_path.is_file()
+            and output_path.read_bytes() == publication_payload
+        ):
             publication_fsync_failed = True
             raise OSError("simulated publication directory fsync failure")
         original_fsync(file_descriptor)
@@ -682,7 +894,7 @@ def test_probe_restoration_never_overwrites_replacement_after_ownership_check(
     def _replace_after_owned_read(directory_fd: int, name: str) -> tuple[tuple[int, int], bytes]:
         nonlocal replacement_published
         observed = original_read_quarantined(directory_fd, name)
-        if publication_fsync_failed and not replacement_published:
+        if name == "publication" and publication_fsync_failed and not replacement_published:
             concurrent_path.write_bytes(concurrent_payload)
             original_replace(concurrent_path, output_path)
             parent_fd = os.open(output_path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
@@ -703,14 +915,19 @@ def test_probe_restoration_never_overwrites_replacement_after_ownership_check(
         context_probe_module._publish_context_inventory(
             tmp_path,
             relative_output,
-            b"publication that cannot be made durable\n",
+            publication_payload,
         )
 
     assert publication_fsync_failed
     assert replacement_published
     assert output_path.read_bytes() == concurrent_payload
     assert not concurrent_path.exists()
-    assert not list(output_path.parent.glob(f".{output_path.name}.*.recovery"))
+    recoveries = list(output_path.parent.glob(f".{output_path.name}.*.recovery"))
+    if prior_payload is None:
+        assert not recoveries
+    else:
+        assert len(recoveries) == 1
+        assert (recoveries[0] / "prior").read_bytes() == prior_payload
 
 
 def test_probe_syncs_each_parent_that_receives_a_new_output_directory(
@@ -803,12 +1020,39 @@ def test_probe_reports_typed_uncertainty_when_restoration_directory_fsync_also_f
     prior_payload = b"prior receipt bytes\n"
     output_path.write_bytes(prior_payload)
     original_fsync = os.fsync
+    original_write_temporary = context_probe_module._write_temporary_receipt
+    published_identity: tuple[int, int] | None = None
+    publication_failure_started = False
+
+    def _capture_published_identity(
+        directory_fd: int,
+        temporary_name: str,
+        payload: bytes,
+    ) -> object:
+        nonlocal published_identity
+        written_receipt = original_write_temporary(directory_fd, temporary_name, payload)
+        published_identity = written_receipt.identity
+        return written_receipt
 
     def _fail_directory_fsync(file_descriptor: int) -> None:
-        if stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
+        nonlocal publication_failure_started
+        try:
+            output_status = output_path.stat()
+        except FileNotFoundError:
+            output_status = None
+        is_directory = stat.S_ISDIR(os.fstat(file_descriptor).st_mode)
+        if (
+            is_directory
+            and published_identity is not None
+            and output_status is not None
+            and (output_status.st_dev, output_status.st_ino) == published_identity
+        ):
+            publication_failure_started = True
+        if is_directory and publication_failure_started:
             raise OSError("simulated persistent directory fsync failure")
         original_fsync(file_descriptor)
 
+    monkeypatch.setattr(context_probe_module, "_write_temporary_receipt", _capture_published_identity)
     monkeypatch.setattr(os, "fsync", _fail_directory_fsync)
 
     with pytest.raises(

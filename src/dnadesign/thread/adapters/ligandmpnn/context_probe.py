@@ -12,6 +12,8 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import argparse
+import ctypes
+import errno
 import fcntl
 import hashlib
 import json
@@ -45,10 +47,33 @@ from dnadesign.thread.adapters.ligandmpnn.pinned_checkout import (
 
 _DNA_RESIDUE_NAMES = frozenset({"DA", "DC", "DG", "DI", "DT", "DU"})
 _RNA_RESIDUE_NAMES = frozenset({"A", "C", "G", "I", "U", "RA", "RC", "RG", "RI", "RU"})
+_LINUX_RENAME_NOREPLACE = 1
+_MACOS_RENAME_EXCL = 0x00000004
+_ReceiptIdentity = tuple[int, int]
 
 
 class LigandMpnnContextPublicationUncertainError(RuntimeError):
     """Receipt rollback could not establish a durable pre-publication state."""
+
+
+@dataclass(frozen=True)
+class _ReceiptSnapshot:
+    descriptor: int
+    identity: _ReceiptIdentity
+    payload: bytes
+
+
+@dataclass(frozen=True)
+class _WrittenReceipt:
+    descriptor: int
+    identity: _ReceiptIdentity
+
+
+@dataclass(frozen=True)
+class _ClaimedReceipt:
+    quarantine_name: str
+    quarantine_fd: int
+    leaf_name: str
 
 
 @dataclass(frozen=True)
@@ -238,7 +263,7 @@ def _resolve_context_probe_checkout_root(checkout_root: Path, *, execution_root:
 
 
 def _publish_context_inventory(execution_root: Path, output_path: Path, payload: bytes) -> None:
-    """Atomically replace one receipt through a descriptor-pinned directory chain."""
+    """Publish one receipt without overwriting a concurrent materializer."""
 
     temporary_name = f".{output_path.name}.{uuid.uuid4().hex}.tmp"
     try:
@@ -246,16 +271,30 @@ def _publish_context_inventory(execution_root: Path, output_path: Path, payload:
     except OSError as error:
         raise ValueError("context probe output directory could not be opened safely") from error
     lock_fd: int | None = None
+    claim: _ClaimedReceipt | None = None
+    prior_snapshot: _ReceiptSnapshot | None = None
+    written_receipt: _WrittenReceipt | None = None
     try:
+        _resolve_rename_no_replace()
         lock_fd = _lock_context_receipt(directory_fd, output_path.name)
-        prior_payload = _read_prior_receipt(directory_fd, output_path.name)
-        published_identity = _write_temporary_receipt(directory_fd, temporary_name, payload)
-        os.replace(
-            temporary_name,
-            output_path.name,
-            src_dir_fd=directory_fd,
-            dst_dir_fd=directory_fd,
-        )
+        prior_snapshot = _read_prior_receipt(directory_fd, output_path.name)
+        written_receipt = _write_temporary_receipt(directory_fd, temporary_name, payload)
+        if prior_snapshot is not None:
+            claim = _claim_prior_receipt(directory_fd, output_path.name, prior_snapshot)
+        try:
+            _rename_no_replace(
+                temporary_name,
+                output_path.name,
+                src_dir_fd=directory_fd,
+                dst_dir_fd=directory_fd,
+            )
+        except FileExistsError as error:
+            recovery = (
+                f"; prior receipt retained in {claim.quarantine_name}/{claim.leaf_name}" if claim is not None else ""
+            )
+            raise LigandMpnnContextPublicationUncertainError(
+                "context probe receipt changed before publication" + recovery
+            ) from error
         try:
             os.fsync(directory_fd)
         except OSError as durability_error:
@@ -263,15 +302,22 @@ def _publish_context_inventory(execution_root: Path, output_path: Path, payload:
                 _restore_prior_receipt(
                     directory_fd,
                     output_path.name,
-                    prior_payload,
-                    published_identity=published_identity,
+                    claim,
+                    published_identity=written_receipt.identity,
                     published_payload=payload,
                 )
+                if claim is not None:
+                    os.close(claim.quarantine_fd)
+                claim = None
             except OSError as restoration_error:
                 raise LigandMpnnContextPublicationUncertainError(
                     "context probe receipt restoration could not be made durable after publication failure"
                 ) from restoration_error
             raise ValueError("context probe output could not be published atomically") from durability_error
+        if claim is not None:
+            _discard_claimed_prior_receipt(directory_fd, claim)
+            os.close(claim.quarantine_fd)
+            claim = None
     except LigandMpnnContextPublicationUncertainError:
         raise
     except OSError as error:
@@ -282,6 +328,12 @@ def _publish_context_inventory(execution_root: Path, output_path: Path, payload:
         except FileNotFoundError:
             pass
         finally:
+            if claim is not None:
+                os.close(claim.quarantine_fd)
+            if prior_snapshot is not None:
+                os.close(prior_snapshot.descriptor)
+            if written_receipt is not None:
+                os.close(written_receipt.descriptor)
             if lock_fd is not None:
                 os.close(lock_fd)
             os.close(directory_fd)
@@ -303,7 +355,7 @@ def _lock_context_receipt(directory_fd: int, output_name: str) -> int:
         raise
 
 
-def _read_prior_receipt(directory_fd: int, output_name: str) -> bytes | None:
+def _read_prior_receipt(directory_fd: int, output_name: str) -> _ReceiptSnapshot | None:
     """Read restorable regular-file bytes without following a receipt symlink."""
 
     try:
@@ -318,60 +370,65 @@ def _read_prior_receipt(directory_fd: int, output_name: str) -> bytes | None:
     except FileNotFoundError:
         return None
     try:
-        handle = os.fdopen(file_descriptor, "rb")
+        opened = os.fstat(file_descriptor)
+        if not stat.S_ISREG(opened.st_mode):
+            raise ValueError("context probe output must be absent or an existing regular file")
+        handle = os.fdopen(file_descriptor, "rb", closefd=False)
+        with handle:
+            payload = handle.read()
+        return _ReceiptSnapshot(
+            descriptor=file_descriptor,
+            identity=(opened.st_dev, opened.st_ino),
+            payload=payload,
+        )
     except BaseException:
         os.close(file_descriptor)
         raise
-    with handle:
-        if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
-            raise ValueError("context probe output must be absent or an existing regular file")
-        return handle.read()
 
 
-def _write_temporary_receipt(directory_fd: int, temporary_name: str, payload: bytes) -> tuple[int, int]:
+def _write_temporary_receipt(directory_fd: int, temporary_name: str, payload: bytes) -> _WrittenReceipt:
     """Write and sync one no-follow temporary receipt in an opened directory."""
 
     file_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
     file_descriptor = os.open(temporary_name, file_flags, 0o600, dir_fd=directory_fd)
     try:
-        handle = os.fdopen(file_descriptor, "wb")
+        handle = os.fdopen(file_descriptor, "wb", closefd=False)
+        with handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        status = os.fstat(file_descriptor)
+        return _WrittenReceipt(
+            descriptor=file_descriptor,
+            identity=(status.st_dev, status.st_ino),
+        )
     except BaseException:
         os.close(file_descriptor)
         raise
-    with handle:
-        handle.write(payload)
-        handle.flush()
-        os.fsync(handle.fileno())
-        status = os.fstat(handle.fileno())
-        return status.st_dev, status.st_ino
 
 
-def _restore_prior_receipt(
+def _claim_prior_receipt(
     directory_fd: int,
     output_name: str,
-    prior_payload: bytes | None,
-    *,
-    published_identity: tuple[int, int],
-    published_payload: bytes,
-) -> None:
-    """Quarantine the current leaf, then restore without overwriting a replacement."""
+    snapshot: _ReceiptSnapshot,
+) -> _ClaimedReceipt:
+    """Move and verify the actual destination leaf before replacing it."""
 
     quarantine_name = f".{output_name}.{uuid.uuid4().hex}.recovery"
-    quarantine_leaf = "publication"
+    quarantine_leaf = "prior"
+    quarantine_fd: int | None = None
+    quarantine_created = False
+    receipt_displaced = False
+    claim_returned = False
     try:
         os.mkdir(quarantine_name, mode=0o700, dir_fd=directory_fd)
+        quarantine_created = True
         quarantine_fd = os.open(
             quarantine_name,
             os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
             dir_fd=directory_fd,
         )
-    except OSError as error:
-        raise LigandMpnnContextPublicationUncertainError(
-            "context probe receipt restoration could not be made durable after publication failure"
-        ) from error
-    quarantined = False
-    restoration_name: str | None = None
-    try:
+        os.fsync(directory_fd)
         try:
             os.rename(
                 output_name,
@@ -379,15 +436,16 @@ def _restore_prior_receipt(
                 src_dir_fd=directory_fd,
                 dst_dir_fd=quarantine_fd,
             )
+            receipt_displaced = True
         except FileNotFoundError as error:
             os.rmdir(quarantine_name, dir_fd=directory_fd)
             os.fsync(directory_fd)
             raise LigandMpnnContextPublicationUncertainError(
-                "context probe receipt changed before publication recovery"
+                "context probe receipt changed before publication"
             ) from error
-        quarantined = True
-        observed_identity, observed_payload = _read_quarantined_receipt(quarantine_fd, quarantine_leaf)
-        if observed_identity != published_identity or observed_payload != published_payload:
+        try:
+            observed_identity, observed_payload = _read_quarantined_receipt(quarantine_fd, quarantine_leaf)
+        except OSError as error:
             _restore_quarantined_receipt_without_overwrite(
                 directory_fd,
                 output_name,
@@ -395,43 +453,111 @@ def _restore_prior_receipt(
                 quarantine_leaf,
                 quarantine_name=quarantine_name,
             )
-            quarantined = False
+            receipt_displaced = False
+            raise LigandMpnnContextPublicationUncertainError(
+                "context probe receipt changed before publication"
+            ) from error
+        if observed_identity != snapshot.identity or observed_payload != snapshot.payload:
+            _restore_quarantined_receipt_without_overwrite(
+                directory_fd,
+                output_name,
+                quarantine_fd,
+                quarantine_leaf,
+                quarantine_name=quarantine_name,
+            )
+            receipt_displaced = False
+            raise LigandMpnnContextPublicationUncertainError("context probe receipt changed before publication")
+        try:
+            os.fsync(quarantine_fd)
+            os.fsync(directory_fd)
+        except OSError as error:
+            _restore_quarantined_receipt_without_overwrite(
+                directory_fd,
+                output_name,
+                quarantine_fd,
+                quarantine_leaf,
+                quarantine_name=quarantine_name,
+            )
+            raise LigandMpnnContextPublicationUncertainError(
+                "context probe receipt claim could not be made durable"
+            ) from error
+        claim = _ClaimedReceipt(
+            quarantine_name=quarantine_name,
+            quarantine_fd=quarantine_fd,
+            leaf_name=quarantine_leaf,
+        )
+        claim_returned = True
+        return claim
+    except LigandMpnnContextPublicationUncertainError:
+        raise
+    except OSError as error:
+        if quarantine_created and not receipt_displaced:
+            try:
+                os.rmdir(quarantine_name, dir_fd=directory_fd)
+                os.fsync(directory_fd)
+            except OSError:
+                pass
+        recovery = f"; displaced receipt retained in {quarantine_name}/{quarantine_leaf}" if receipt_displaced else ""
+        raise LigandMpnnContextPublicationUncertainError("context probe receipt claim failed" + recovery) from error
+    finally:
+        if quarantine_fd is not None and not claim_returned:
+            os.close(quarantine_fd)
+
+
+def _restore_prior_receipt(
+    directory_fd: int,
+    output_name: str,
+    claim: _ClaimedReceipt | None,
+    *,
+    published_identity: _ReceiptIdentity,
+    published_payload: bytes,
+) -> None:
+    """Quarantine this publication and restore the actually claimed prior leaf."""
+
+    owns_quarantine = claim is None
+    if claim is None:
+        quarantine_name = f".{output_name}.{uuid.uuid4().hex}.recovery"
+        os.mkdir(quarantine_name, mode=0o700, dir_fd=directory_fd)
+        quarantine_fd = os.open(
+            quarantine_name,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+            dir_fd=directory_fd,
+        )
+    else:
+        quarantine_name = claim.quarantine_name
+        quarantine_fd = claim.quarantine_fd
+    publication_leaf = "publication"
+    publication_quarantined = False
+    try:
+        os.rename(
+            output_name,
+            publication_leaf,
+            src_dir_fd=directory_fd,
+            dst_dir_fd=quarantine_fd,
+        )
+        publication_quarantined = True
+        observed_identity, observed_payload = _read_quarantined_receipt(quarantine_fd, publication_leaf)
+        if observed_identity != published_identity or observed_payload != published_payload:
+            _restore_quarantined_receipt_without_overwrite(
+                directory_fd,
+                output_name,
+                quarantine_fd,
+                publication_leaf,
+                quarantine_name=quarantine_name,
+                remove_quarantine=False,
+            )
+            publication_quarantined = False
             raise LigandMpnnContextPublicationUncertainError(
                 "context probe receipt changed before publication recovery"
             )
-
-        if prior_payload is not None:
-            restoration_name = f".{output_name}.{uuid.uuid4().hex}.restore.tmp"
-            _write_temporary_receipt(directory_fd, restoration_name, prior_payload)
-            try:
-                os.link(
-                    restoration_name,
-                    output_name,
-                    src_dir_fd=directory_fd,
-                    dst_dir_fd=directory_fd,
-                    follow_symlinks=False,
-                )
-            except FileExistsError as error:
-                os.unlink(restoration_name, dir_fd=directory_fd)
-                restoration_name = None
-                quarantined = False
-                _discard_quarantined_receipt(
-                    directory_fd,
-                    quarantine_fd,
-                    quarantine_name=quarantine_name,
-                    quarantine_leaf=quarantine_leaf,
-                )
-                raise LigandMpnnContextPublicationUncertainError(
-                    "context probe receipt changed before publication recovery"
-                ) from error
-            os.unlink(restoration_name, dir_fd=directory_fd)
-            restoration_name = None
-        os.unlink(quarantine_leaf, dir_fd=quarantine_fd)
-        quarantined = False
-        os.fsync(quarantine_fd)
-        os.rmdir(quarantine_name, dir_fd=directory_fd)
-        os.fsync(directory_fd)
-        if prior_payload is None:
+        os.unlink(publication_leaf, dir_fd=quarantine_fd)
+        publication_quarantined = False
+        if claim is not None:
+            _restore_claimed_prior_receipt(directory_fd, output_name, claim)
+        else:
+            os.fsync(quarantine_fd)
+            os.rmdir(quarantine_name, dir_fd=directory_fd)
+            os.fsync(directory_fd)
             try:
                 os.stat(output_name, dir_fd=directory_fd, follow_symlinks=False)
             except FileNotFoundError:
@@ -442,20 +568,20 @@ def _restore_prior_receipt(
     except LigandMpnnContextPublicationUncertainError:
         raise
     except OSError as error:
-        recovery = f"; displaced receipt retained in {quarantine_name}/{quarantine_leaf}" if quarantined else ""
+        recovery = (
+            f"; displaced publication retained in {quarantine_name}/{publication_leaf}"
+            if publication_quarantined
+            else ""
+        )
         raise LigandMpnnContextPublicationUncertainError(
             "context probe receipt restoration could not be made durable after publication failure" + recovery
         ) from error
     finally:
-        if restoration_name is not None:
-            try:
-                os.unlink(restoration_name, dir_fd=directory_fd)
-            except FileNotFoundError:
-                pass
-        os.close(quarantine_fd)
+        if owns_quarantine:
+            os.close(quarantine_fd)
 
 
-def _read_quarantined_receipt(directory_fd: int, name: str) -> tuple[tuple[int, int], bytes]:
+def _read_quarantined_receipt(directory_fd: int, name: str) -> tuple[_ReceiptIdentity, bytes]:
     """Read identity and bytes from one no-follow regular recovery leaf."""
 
     flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK
@@ -479,53 +605,135 @@ def _restore_quarantined_receipt_without_overwrite(
     quarantine_leaf: str,
     *,
     quarantine_name: str,
+    remove_quarantine: bool = True,
 ) -> None:
     """Restore a displaced foreign receipt only when its public name is absent."""
 
     try:
-        os.link(
+        _rename_no_replace(
             quarantine_leaf,
             output_name,
             src_dir_fd=quarantine_fd,
             dst_dir_fd=directory_fd,
-            follow_symlinks=False,
         )
     except FileExistsError as error:
         raise LigandMpnnContextPublicationUncertainError(
             f"context probe receipt changed before publication recovery; displaced receipt retained in "
             f"{quarantine_name}/{quarantine_leaf}"
         ) from error
-    quarantined = True
     try:
-        os.unlink(quarantine_leaf, dir_fd=quarantine_fd)
-        quarantined = False
         os.fsync(quarantine_fd)
-        os.rmdir(quarantine_name, dir_fd=directory_fd)
         os.fsync(directory_fd)
+        if remove_quarantine:
+            os.rmdir(quarantine_name, dir_fd=directory_fd)
+            os.fsync(directory_fd)
     except OSError as error:
-        recovery = (
-            f"; displaced receipt retained in {quarantine_name}/{quarantine_leaf}"
-            if quarantined
-            else "; restored concurrent receipt durability is uncertain"
-        )
         raise LigandMpnnContextPublicationUncertainError(
-            "context probe receipt restoration could not be made durable after publication failure" + recovery
+            "context probe receipt restoration could not be made durable after publication failure; "
+            "restored concurrent receipt durability is uncertain"
         ) from error
 
 
-def _discard_quarantined_receipt(
+def _restore_claimed_prior_receipt(
     directory_fd: int,
-    quarantine_fd: int,
-    *,
-    quarantine_name: str,
-    quarantine_leaf: str,
+    output_name: str,
+    claim: _ClaimedReceipt,
 ) -> None:
-    """Remove one known-owned recovery leaf and make its cleanup durable."""
+    """Restore the exact displaced prior leaf without overwriting a replacement."""
 
-    os.unlink(quarantine_leaf, dir_fd=quarantine_fd)
-    os.fsync(quarantine_fd)
-    os.rmdir(quarantine_name, dir_fd=directory_fd)
-    os.fsync(directory_fd)
+    try:
+        _rename_no_replace(
+            claim.leaf_name,
+            output_name,
+            src_dir_fd=claim.quarantine_fd,
+            dst_dir_fd=directory_fd,
+        )
+    except FileExistsError as error:
+        raise LigandMpnnContextPublicationUncertainError(
+            f"context probe receipt changed before publication recovery; prior receipt retained in "
+            f"{claim.quarantine_name}/{claim.leaf_name}"
+        ) from error
+    try:
+        os.fsync(claim.quarantine_fd)
+        os.fsync(directory_fd)
+        os.rmdir(claim.quarantine_name, dir_fd=directory_fd)
+        os.fsync(directory_fd)
+    except OSError as error:
+        raise LigandMpnnContextPublicationUncertainError(
+            "context probe receipt restoration could not be made durable after publication failure"
+        ) from error
+
+
+def _discard_claimed_prior_receipt(directory_fd: int, claim: _ClaimedReceipt) -> None:
+    """Discard one superseded claimed leaf after the replacement is durable."""
+
+    prior_retained = True
+    recovery_directory_exists = True
+    try:
+        os.unlink(claim.leaf_name, dir_fd=claim.quarantine_fd)
+        prior_retained = False
+        os.fsync(claim.quarantine_fd)
+        os.rmdir(claim.quarantine_name, dir_fd=directory_fd)
+        recovery_directory_exists = False
+        os.fsync(directory_fd)
+    except OSError as error:
+        if prior_retained:
+            detail = f"; recovery at {claim.quarantine_name}/{claim.leaf_name}"
+        elif recovery_directory_exists:
+            detail = f"; empty recovery directory at {claim.quarantine_name}"
+        else:
+            detail = "; recovery-directory removal durability is uncertain"
+        raise LigandMpnnContextPublicationUncertainError(
+            "context probe receipt is durable but superseded prior cleanup is uncertain" + detail
+        ) from error
+
+
+def _resolve_rename_no_replace() -> tuple[ctypes._CFuncPtr, int]:
+    """Resolve the platform-native atomic no-replace operation before mutation."""
+
+    libc = ctypes.CDLL(None, use_errno=True)
+    try:
+        if sys.platform.startswith("linux"):
+            rename_function = libc.renameat2
+            flags = _LINUX_RENAME_NOREPLACE
+        elif sys.platform == "darwin":
+            rename_function = libc.renameatx_np
+            flags = _MACOS_RENAME_EXCL
+        else:
+            raise OSError(errno.ENOTSUP, "atomic no-replace rename is not supported on this platform")
+    except AttributeError as error:
+        raise OSError(errno.ENOTSUP, "atomic no-replace rename is unavailable") from error
+    rename_function.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename_function.restype = ctypes.c_int
+    return rename_function, flags
+
+
+def _rename_no_replace(
+    source_name: str,
+    destination_name: str,
+    *,
+    src_dir_fd: int,
+    dst_dir_fd: int,
+) -> None:
+    """Atomically rename one leaf without replacing any destination type."""
+
+    rename_function, flags = _resolve_rename_no_replace()
+    result = rename_function(
+        src_dir_fd,
+        os.fsencode(source_name),
+        dst_dir_fd,
+        os.fsencode(destination_name),
+        flags,
+    )
+    if result != 0:
+        error_number = ctypes.get_errno()
+        raise OSError(error_number, os.strerror(error_number), destination_name)
 
 
 def _open_output_directory(execution_root: Path, relative_parent: Path) -> int:
