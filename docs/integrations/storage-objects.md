@@ -133,7 +133,11 @@ publication stays on the same filesystem. Create-only inventory commits with
 an atomic hard-link-if-absent operation after preflighting the no-replace
 primitive required for conditional rollback. Refresh commits with a native atomic
 file exchange on Darwin or Linux, validates the displaced receipt against the
-exact bytes that authorized the refresh, and swaps it back on mismatch. A
+exact inode and bytes that authorized the refresh, and swaps back only that
+verified prior receipt when publication must be rolled back. If the displaced
+pathname changes, the published candidate and changed entry are retained for
+explicit recovery. If a last-boundary race exchanges an unverified entry, the
+verified candidate is restored before the operation reports uncertainty. A
 platform or filesystem without the required primitive fails closed as
 `StorageObjectPublicationUnsupported`. If an exchange cannot prove that its
 swap-back completed, it raises `StorageObjectPublicationUncertain` and retains

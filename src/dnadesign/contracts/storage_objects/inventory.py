@@ -23,6 +23,7 @@ import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import NoReturn
 
 from filelock import FileLock, Timeout
 
@@ -143,6 +144,34 @@ def _rollback_manifest(
 def _entry_identity(path: Path) -> tuple[int, int]:
     entry_stat = path.lstat()
     return entry_stat.st_dev, entry_stat.st_ino
+
+
+def _entry_matches_regular_bytes(
+    path: Path,
+    *,
+    expected_identity: tuple[int, int],
+    expected_bytes: bytes,
+) -> bool:
+    """Match one pathname to an exact regular-file inode and byte snapshot."""
+
+    try:
+        before = path.lstat()
+        if not stat.S_ISREG(before.st_mode) or (before.st_dev, before.st_ino) != expected_identity:
+            return False
+        content = path.read_bytes()
+        after = path.lstat()
+    except OSError:
+        return False
+    return (
+        stat.S_ISREG(after.st_mode) and (after.st_dev, after.st_ino) == expected_identity and content == expected_bytes
+    )
+
+
+def _entry_has_identity(path: Path, expected_identity: tuple[int, int]) -> bool:
+    try:
+        return _entry_identity(path) == expected_identity
+    except OSError:
+        return False
 
 
 def _fsync_directory(directory: Path) -> None:
@@ -409,6 +438,59 @@ def _publish_create_only_manifest(
     return published_identity
 
 
+def _recover_candidate_from_unverified_refresh_rollback(
+    temporary: Path,
+    manifest_path: Path,
+    *,
+    staged_identity: tuple[int, int],
+    staged_bytes: bytes,
+    publication_error: BaseException,
+    rollback_error: BaseException | None,
+) -> NoReturn:
+    """Restore the verified candidate after rollback exchanged an unrelated entry."""
+
+    try:
+        candidate_retained = _entry_matches_regular_bytes(
+            temporary,
+            expected_identity=staged_identity,
+            expected_bytes=staged_bytes,
+        )
+        unexpected_identity = _entry_identity(manifest_path)
+    except OSError as inspection_error:
+        raise StorageObjectPublicationUncertain(
+            "atomic refresh rollback promoted an unverified receipt; recovery outcome is uncertain"
+        ) from inspection_error
+    if not candidate_retained:
+        raise StorageObjectPublicationUncertain(
+            "atomic refresh rollback promoted an unverified receipt; candidate recovery is uncertain"
+        )
+    try:
+        _atomic_exchange(temporary, manifest_path)
+    except BaseException as recovery_error:
+        recovered = _entry_matches_regular_bytes(
+            manifest_path,
+            expected_identity=staged_identity,
+            expected_bytes=staged_bytes,
+        )
+        retained_unexpected = _entry_has_identity(temporary, unexpected_identity)
+        if not recovered or not retained_unexpected:
+            raise StorageObjectPublicationUncertain(
+                "atomic refresh rollback promoted an unverified receipt; candidate recovery failed"
+            ) from recovery_error
+    if not _entry_matches_regular_bytes(
+        manifest_path,
+        expected_identity=staged_identity,
+        expected_bytes=staged_bytes,
+    ) or not _entry_has_identity(temporary, unexpected_identity):
+        raise StorageObjectPublicationUncertain(
+            "atomic refresh rollback promoted an unverified receipt; candidate recovery is uncertain"
+        )
+    _fsync_directory(manifest_path.parent)
+    raise StorageObjectPublicationUncertain(
+        "displaced receipt changed during atomic refresh rollback; retained candidate and recovery entries"
+    ) from (rollback_error or publication_error)
+
+
 def _publish_refresh_manifest(
     temporary: Path,
     manifest_path: Path,
@@ -418,6 +500,8 @@ def _publish_refresh_manifest(
     """Exchange the staged receipt, validate the displaced receipt, and commit or swap back."""
 
     staged_identity = _entry_identity(temporary)
+    staged_bytes = temporary.read_bytes()
+    previous_identity = _entry_identity(manifest_path)
     exchange_error: BaseException | None = None
     try:
         _atomic_exchange(temporary, manifest_path)
@@ -432,53 +516,80 @@ def _publish_refresh_manifest(
         if not exchanged:
             raise
 
+    if not _entry_matches_regular_bytes(
+        temporary,
+        expected_identity=previous_identity,
+        expected_bytes=previous_bytes,
+    ):
+        raise StorageObjectPublicationUncertain(
+            "displaced receipt changed after atomic refresh exchange; retained candidate and recovery entries"
+        )
+    if not _entry_matches_regular_bytes(
+        manifest_path,
+        expected_identity=staged_identity,
+        expected_bytes=staged_bytes,
+    ):
+        raise StorageObjectPublicationUncertain(
+            "published refresh candidate changed after atomic exchange; retained candidate and recovery entries"
+        )
+
     try:
-        displaced_stat = temporary.lstat()
-        if not stat.S_ISREG(displaced_stat.st_mode):
-            raise StorageObjectError("storage object manifest changed before publication; refusing to overwrite it")
-        displaced_bytes = temporary.read_bytes()
-        if displaced_bytes != previous_bytes:
-            raise StorageObjectError("storage object manifest changed before publication; refusing to overwrite it")
         if exchange_error is not None:
             raise exchange_error
-        if _entry_identity(manifest_path) != staged_identity:
-            raise StorageObjectPublicationUncertain(
-                "storage object manifest changed after atomic exchange; publication outcome is uncertain"
-            )
         _fsync_directory(manifest_path.parent)
         temporary.unlink()
         _fsync_directory(manifest_path.parent)
         return
     except BaseException as publication_error:
-        displaced_identity: tuple[int, int] | None
-        try:
-            displaced_identity = _entry_identity(temporary)
-        except OSError:
-            displaced_identity = None
+        if not _entry_matches_regular_bytes(
+            temporary,
+            expected_identity=previous_identity,
+            expected_bytes=previous_bytes,
+        ) or not _entry_matches_regular_bytes(
+            manifest_path,
+            expected_identity=staged_identity,
+            expected_bytes=staged_bytes,
+        ):
+            raise StorageObjectPublicationUncertain(
+                "displaced receipt changed before atomic refresh rollback; retained candidate and recovery entries"
+            ) from publication_error
+        rollback_error: BaseException | None = None
         try:
             _atomic_exchange(temporary, manifest_path)
-        except BaseException as rollback_error:
-            try:
-                rollback_succeeded = (
-                    displaced_identity is not None
-                    and _entry_identity(manifest_path) == displaced_identity
-                    and _entry_identity(temporary) == staged_identity
-                )
-            except OSError:
-                rollback_succeeded = False
-            if not rollback_succeeded:
+        except BaseException as exc:
+            rollback_error = exc
+        rollback_succeeded = _entry_matches_regular_bytes(
+            manifest_path,
+            expected_identity=previous_identity,
+            expected_bytes=previous_bytes,
+        ) and _entry_matches_regular_bytes(
+            temporary,
+            expected_identity=staged_identity,
+            expected_bytes=staged_bytes,
+        )
+        if not rollback_succeeded:
+            publication_retained = _entry_matches_regular_bytes(
+                manifest_path,
+                expected_identity=staged_identity,
+                expected_bytes=staged_bytes,
+            ) and _entry_matches_regular_bytes(
+                temporary,
+                expected_identity=previous_identity,
+                expected_bytes=previous_bytes,
+            )
+            if publication_retained:
                 raise StorageObjectPublicationUncertain(
-                    "atomic storage manifest rollback failed; publication outcome is uncertain"
-                ) from rollback_error
+                    "atomic storage manifest rollback failed; retained candidate and recovery entries"
+                ) from (rollback_error or publication_error)
+            _recover_candidate_from_unverified_refresh_rollback(
+                temporary,
+                manifest_path,
+                staged_identity=staged_identity,
+                staged_bytes=staged_bytes,
+                publication_error=publication_error,
+                rollback_error=rollback_error,
+            )
         try:
-            if displaced_identity is None or _entry_identity(manifest_path) != displaced_identity:
-                raise StorageObjectPublicationUncertain(
-                    "atomic storage manifest rollback restored an unexpected receipt; outcome is uncertain"
-                )
-            if _entry_identity(temporary) != staged_identity:
-                raise StorageObjectPublicationUncertain(
-                    "atomic storage manifest rollback displaced unrelated receipt bytes; outcome is uncertain"
-                )
             _fsync_directory(manifest_path.parent)
             temporary.unlink()
             _fsync_directory(manifest_path.parent)

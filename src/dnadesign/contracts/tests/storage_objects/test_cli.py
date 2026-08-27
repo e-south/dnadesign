@@ -1473,11 +1473,13 @@ def test_validation_rejects_transient_refresh_candidate_until_cas_finishes(
                 verify_storage_object(root)
         finally:
             allow_refresh_to_finish.set()
-        with pytest.raises(StorageObjectError, match="manifest changed before publication"):
+        with pytest.raises(StorageObjectPublicationUncertain, match="displaced receipt changed.*retained"):
             refresh_future.result(timeout=5)
 
-    verified = verify_storage_object(root)
-    assert verified.manifest.producer_revision == "competing-revision"
+    assert json.loads(manifest_path.read_bytes())["producer_revision"] == "test-revision-2"
+    staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert len(staging) == 1
+    assert staging[0].read_bytes() == competitor_bytes
 
 
 def test_refresh_advances_authoritative_store_receipt(tmp_path: Path) -> None:
@@ -1942,7 +1944,7 @@ def test_refresh_hashes_and_parses_one_snapshot_then_rejects_manifest_replaced_b
     monkeypatch.setattr(storage_inventory, "_atomic_exchange", _exchange_after_competing_receipt)
     monkeypatch.setattr(storage_inventory, "load_storage_object_manifest_bytes", _record_parsed_snapshot)
 
-    with pytest.raises(StorageObjectError, match="manifest changed before publication"):
+    with pytest.raises(StorageObjectPublicationUncertain, match="displaced receipt changed.*retained"):
         refresh_storage_object(
             root,
             expected_manifest_digest=expected_digest,
@@ -1951,8 +1953,10 @@ def test_refresh_hashes_and_parses_one_snapshot_then_rejects_manifest_replaced_b
 
     assert parsed_snapshots == [initial_bytes]
     assert injected
-    assert manifest_path.read_bytes() == replacement_bytes
-    assert not tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert json.loads(manifest_path.read_bytes())["producer_revision"] == "test-revision-2"
+    staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert len(staging) == 1
+    assert staging[0].read_bytes() == replacement_bytes
 
 
 def test_refresh_reports_typed_unsupported_platform_without_mutation(
@@ -2070,7 +2074,7 @@ def test_inventory_preflights_create_rollback_support_before_publication(
     assert not tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
 
 
-def test_refresh_preserves_both_receipts_when_atomic_swap_back_fails(
+def test_refresh_retains_both_receipts_when_displaced_receipt_changes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2110,7 +2114,7 @@ def test_refresh_preserves_both_receipts_when_atomic_swap_back_fails(
 
     with pytest.raises(
         StorageObjectPublicationUncertain,
-        match="rollback failed.*outcome is uncertain",
+        match="displaced receipt changed.*retained",
     ):
         refresh_storage_object(
             root,
@@ -2118,7 +2122,7 @@ def test_refresh_preserves_both_receipts_when_atomic_swap_back_fails(
             producer_revision="test-revision-2",
         )
 
-    assert exchange_calls == 2
+    assert exchange_calls == 1
     published = json.loads(manifest_path.read_bytes())
     assert published["producer_revision"] == "test-revision-2"
     staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
@@ -2510,6 +2514,161 @@ def test_refresh_swaps_back_when_atomic_exchange_is_interrupted(
     assert exchange_calls == 2
 
 
+def test_refresh_retains_candidate_when_displaced_receipt_is_replaced_before_inspection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    foreign_bytes = b"foreign displaced receipt\n"
+    original_exchange = storage_inventory._atomic_exchange
+    injected = False
+
+    def _exchange_then_replace_displaced(source: Path, destination: Path) -> None:
+        nonlocal injected
+        original_exchange(source, destination)
+        if not injected:
+            replacement = source.with_name(f"{source.name}.competitor")
+            replacement.write_bytes(foreign_bytes)
+            replacement.replace(source)
+            injected = True
+
+    monkeypatch.setattr(storage_inventory, "_atomic_exchange", _exchange_then_replace_displaced)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="displaced receipt changed.*retained"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert injected
+    assert json.loads(manifest_path.read_bytes())["producer_revision"] == "test-revision-2"
+    staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert len(staging) == 1
+    assert staging[0].read_bytes() == foreign_bytes
+
+
+def test_refresh_retains_both_receipts_when_swap_back_fails_before_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    previous_bytes = manifest_path.read_bytes()
+    original_exchange = storage_inventory._atomic_exchange
+    exchange_calls = 0
+
+    def _fail_before_swap_back(source: Path, destination: Path) -> None:
+        nonlocal exchange_calls
+        exchange_calls += 1
+        if exchange_calls == 1:
+            original_exchange(source, destination)
+            raise OSError("injected exchange completion error")
+        raise OSError("injected swap-back failure")
+
+    monkeypatch.setattr(storage_inventory, "_atomic_exchange", _fail_before_swap_back)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="rollback failed.*retained"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert exchange_calls == 2
+    assert json.loads(manifest_path.read_bytes())["producer_revision"] == "test-revision-2"
+    staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert len(staging) == 1
+    assert staging[0].read_bytes() == previous_bytes
+
+
+@pytest.mark.parametrize("raise_after_foreign_swap", [False, True])
+def test_refresh_retains_candidate_when_displaced_receipt_is_replaced_before_swap_back(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    raise_after_foreign_swap: bool,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    foreign_bytes = b"foreign displaced receipt\n"
+    original_exchange = storage_inventory._atomic_exchange
+    injected = False
+    exchange_calls = 0
+
+    def _replace_displaced_at_swap_back(source: Path, destination: Path) -> None:
+        nonlocal exchange_calls, injected
+        exchange_calls += 1
+        if exchange_calls == 2:
+            replacement = source.with_name(f"{source.name}.competitor")
+            replacement.write_bytes(foreign_bytes)
+            replacement.replace(source)
+            injected = True
+        original_exchange(source, destination)
+        if exchange_calls == 1:
+            raise OSError("injected exchange completion error")
+        if exchange_calls == 2 and raise_after_foreign_swap:
+            raise OSError("injected foreign swap completion error")
+
+    monkeypatch.setattr(storage_inventory, "_atomic_exchange", _replace_displaced_at_swap_back)
+
+    with pytest.raises(StorageObjectPublicationUncertain):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert injected
+    assert exchange_calls == 3
+    assert json.loads(manifest_path.read_bytes())["producer_revision"] == "test-revision-2"
+    staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert len(staging) == 1
+    assert staging[0].read_bytes() == foreign_bytes
+
+
 def test_refresh_rollback_preserves_receipt_replaced_at_commit_boundary(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2564,7 +2723,7 @@ def test_refresh_rollback_preserves_receipt_replaced_at_commit_boundary(
 
     monkeypatch.setattr(storage_inventory, "verify_storage_object", _fail_verification)
 
-    with pytest.raises(StorageObjectError):
+    with pytest.raises(StorageObjectPublicationUncertain, match="displaced receipt changed.*retained"):
         refresh_storage_object(
             root,
             expected_manifest_digest=_digest(manifest_path),
@@ -2572,11 +2731,13 @@ def test_refresh_rollback_preserves_receipt_replaced_at_commit_boundary(
         )
 
     assert injected
-    assert manifest_path.read_bytes() == competitor_bytes
-    assert not tuple(root.glob(f".{MANIFEST_NAME}.restore-*"))
+    assert manifest_path.read_bytes() == previous_bytes
+    recovery_paths = tuple(root.glob(f".{MANIFEST_NAME}.restore-*"))
+    assert len(recovery_paths) == 1
+    assert recovery_paths[0].read_bytes() == competitor_bytes
 
 
-def test_refresh_rollback_retains_both_receipts_when_swap_back_fails(
+def test_refresh_rollback_retains_both_receipts_when_displaced_receipt_changes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2604,7 +2765,7 @@ def test_refresh_rollback_retains_both_receipts_when_swap_back_fails(
 
     with pytest.raises(
         StorageObjectPublicationUncertain,
-        match="rollback failed.*outcome is uncertain",
+        match="displaced receipt changed.*retained",
     ):
         storage_inventory._rollback_manifest(
             manifest_path,
@@ -2614,7 +2775,7 @@ def test_refresh_rollback_retains_both_receipts_when_swap_back_fails(
             operation_error=StorageObjectError("injected validation failure"),
         )
 
-    assert exchange_calls == 2
+    assert exchange_calls == 1
     assert manifest_path.read_bytes() == previous_bytes
     recovery_paths = tuple(tmp_path.glob(f".{MANIFEST_NAME}.restore-*"))
     assert len(recovery_paths) == 1
