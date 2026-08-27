@@ -26,9 +26,19 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import NoReturn
 
-from filelock import FileLock, Timeout
-
 from .loading import load_storage_object_manifest_bytes, normalize_relative_path
+from .locking import (
+    acquire_existing_lock as _acquire_existing_manifest_lock,
+)
+from .locking import (
+    acquire_new_lock as _acquire_new_manifest_lock,
+)
+from .locking import (
+    release_lock as _release_manifest_lock,
+)
+from .locking import (
+    unavailable_locking_capabilities,
+)
 from .models import (
     LOCK_NAME,
     MANIFEST_NAME,
@@ -73,6 +83,7 @@ def _require_posix_publication_capabilities() -> None:
     for name in ("O_DIRECTORY", "O_NOFOLLOW"):
         if not hasattr(os, name):
             unavailable.append(name)
+    unavailable.extend(unavailable_locking_capabilities())
 
     supports_dir_fd = getattr(os, "supports_dir_fd", ())
     for name in ("stat", "unlink"):
@@ -101,7 +112,7 @@ def _require_posix_publication_capabilities() -> None:
         raise StorageObjectPublicationUnsupported(
             "storage manifest publication requires POSIX ownership, directory-descriptor, "
             "symlink-safe, and atomic rename capabilities before mutation; unavailable: "
-            + ", ".join(unavailable)
+            + ", ".join(dict.fromkeys(unavailable))
             + "; use a supported macOS or Linux filesystem"
         )
 
@@ -1192,22 +1203,31 @@ def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]
         lock_mode = 0o664 if root_mode & stat.S_IWGRP else 0o644
     else:
         lock_mode = stat.S_IMODE(inspected_lock_stat.st_mode)
-    lock = FileLock(lock_path, timeout=30, mode=lock_mode)
     try:
-        lock.acquire()
-    except Timeout as exc:
-        raise StorageObjectError(f"timed out waiting for storage object manifest lock: {root}") from exc
+        if inspected_lock_identity is None:
+            lock_descriptor, acquired_lock_identity = _acquire_new_manifest_lock(
+                lock_path,
+                mode=lock_mode,
+                expected_gid=root_stat.st_gid if root_mode & stat.S_IWGRP else None,
+                expected_parent_identity=(root_stat.st_dev, root_stat.st_ino),
+            )
+        else:
+            lock_descriptor = _acquire_existing_manifest_lock(
+                lock_path,
+                expected_identity=inspected_lock_identity,
+                expected_mode=lock_mode,
+                expected_gid=inspected_lock_stat.st_gid,
+                expected_size=0,
+            )
+            acquired_lock_identity = inspected_lock_identity
+    except StorageObjectError:
+        raise
     except (OSError, NotImplementedError) as exc:
         raise StorageObjectError(f"cannot acquire storage object manifest lock {lock_path}: {exc}") from exc
     try:
         lock_stat = lock_path.stat(follow_symlinks=False)
-        acquired_lock_identity = (lock_stat.st_dev, lock_stat.st_ino)
-        if inspected_lock_identity is not None and acquired_lock_identity != inspected_lock_identity:
+        if (lock_stat.st_dev, lock_stat.st_ino) != acquired_lock_identity:
             raise StorageObjectError(f"storage object lock changed before acquisition completed: {lock_path}")
-        lock_context = getattr(lock, "_context", None)
-        lock_descriptor = getattr(lock_context, "lock_file_fd", None)
-        if not isinstance(lock_descriptor, int):
-            raise StorageObjectError(f"cannot identify the held storage object lock descriptor: {lock_path}")
         held_stat = os.fstat(lock_descriptor)
         if (held_stat.st_dev, held_stat.st_ino) != acquired_lock_identity:
             raise StorageObjectError(f"storage object lock changed before acquisition completed: {lock_path}")
@@ -1223,7 +1243,7 @@ def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]
             raise StorageObjectError(f"storage object lock must be group-readable in a shared object root: {lock_path}")
     except (OSError, StorageObjectError) as inspection_error:
         try:
-            lock.release()
+            _release_manifest_lock(lock_descriptor)
         except OSError as release_error:
             raise StorageObjectError(
                 f"cannot inspect storage object lock after acquisition and lock {lock_path} could not be released: "
@@ -1238,7 +1258,7 @@ def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]
         yield
     except BaseException as body_error:
         try:
-            lock.release()
+            _release_manifest_lock(lock_descriptor)
         except OSError as release_error:
             if isinstance(body_error, StorageObjectPublicationUncertain):
                 raise StorageObjectPublicationUncertain(
@@ -1275,7 +1295,7 @@ def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]
             f"{shlex.quote(sys.executable)} -m dnadesign.contracts.storage_objects validate {shlex.quote(str(root))}"
         )
         try:
-            lock.release()
+            _release_manifest_lock(lock_descriptor)
         except OSError as release_error:
             if completion_error is not None:
                 raise StorageObjectPublicationUncertain(

@@ -11,22 +11,16 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import errno
 import hashlib
 import os
 import stat
 import subprocess
-import time
 from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
-try:
-    import fcntl
-except ImportError:  # pragma: no cover - exercised on non-POSIX platforms
-    fcntl = None  # type: ignore[assignment]
-
 from .loading import load_storage_object_manifest_bytes
+from .locking import acquire_existing_lock, release_lock
 from .models import (
     LOCK_NAME,
     MANIFEST_NAME,
@@ -521,57 +515,19 @@ def _acquire_existing_validation_lock(
     timeout_seconds: float = 30.0,
 ) -> int:
     """Lock an existing no-follow descriptor without creating or truncating its path."""
-
-    if fcntl is None or not hasattr(os, "O_NOFOLLOW"):
-        raise StorageObjectError(
-            "storage-root validation requires POSIX no-follow advisory locking; "
-            f"cannot acquire existing coordination lock: {lock_path}"
-        )
-    flags = os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0)
-    try:
-        descriptor = os.open(lock_path, flags)
-    except OSError as exc:
-        raise StorageObjectError(f"cannot open existing storage object lock {lock_path}: {exc}") from exc
-    deadline = time.monotonic() + timeout_seconds
-    try:
-        opened = os.fstat(descriptor)
-        if (opened.st_dev, opened.st_ino) != expected_identity:
-            raise StorageObjectError(f"storage object lock changed before acquisition completed: {lock_path}")
-        if (
-            not stat.S_ISREG(opened.st_mode)
-            or stat.S_IMODE(opened.st_mode) != expected_mode
-            or opened.st_gid != expected_gid
-            or opened.st_size != expected_size
-        ):
-            raise StorageObjectError(f"storage object lock posture changed before acquisition completed: {lock_path}")
-        while True:
-            try:
-                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                return descriptor
-            except OSError as exc:
-                if exc.errno == errno.EINTR:
-                    continue
-                if exc.errno not in {errno.EACCES, errno.EAGAIN}:
-                    raise StorageObjectError(f"cannot acquire storage object manifest lock {lock_path}: {exc}") from exc
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise StorageObjectError(f"timed out waiting for storage object manifest lock: {lock_path.parent}")
-                time.sleep(min(0.05, remaining))
-    except BaseException:
-        os.close(descriptor)
-        raise
+    return acquire_existing_lock(
+        lock_path,
+        expected_identity=expected_identity,
+        expected_mode=expected_mode,
+        expected_gid=expected_gid,
+        expected_size=expected_size,
+        timeout_seconds=timeout_seconds,
+    )
 
 
 def _release_validation_lock(descriptor: int) -> None:
     """Release and close one validation-owned advisory-lock descriptor."""
-
-    if fcntl is None:  # pragma: no cover - acquisition rejects this platform
-        os.close(descriptor)
-        return
-    try:
-        fcntl.flock(descriptor, fcntl.LOCK_UN)
-    finally:
-        os.close(descriptor)
+    release_lock(descriptor)
 
 
 def _git_authority_environment() -> dict[str, str]:

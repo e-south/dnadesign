@@ -120,6 +120,11 @@ same POSIX filesystem serialize receipt updates. The lock is contract-owned
 coordination state, is excluded from the content manifest, and must remain at a
 stable pathname and inode for the lifetime of an object. Inventory alone may
 bootstrap it before the first receipt; refresh and validation reject absence.
+Existing locks are opened through a no-follow descriptor without create or
+truncate flags. Bootstrap uses an exclusive create, verifies the new regular
+file's inode, mode, empty content, and inherited group through the held
+descriptor, then durably syncs the lock and parent directory before locking it.
+If another entry wins either race, the writer preserves that entry and fails.
 Before a writer reports success, it rechecks the lock pathname, mode, and shared
 posture against the inode held by its open lock descriptor. If that binding
 changes after a receipt commits, the call raises
