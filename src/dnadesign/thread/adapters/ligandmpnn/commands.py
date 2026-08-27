@@ -32,6 +32,7 @@ def build_ligandmpnn_commands(
 ) -> tuple[LigandMpnnCommand, ...]:
     """Build one explicit official ``run.py`` invocation per requested seed."""
 
+    checkout_root = resolve_checkout_root_for_execution(checkout_root, execution_root=execution_root)
     context_inventory = load_ligandmpnn_context_inventory(
         request.context_inventory,
         execution_root=execution_root,
@@ -111,6 +112,20 @@ def build_ligandmpnn_commands(
         )
         commands.append(LigandMpnnCommand(seed=seed, output_dir=output_dir, argv=argv))
     return tuple(commands)
+
+
+def resolve_checkout_root_for_execution(checkout_root: Path, *, execution_root: Path) -> Path:
+    """Anchor a safe relative checkout at the command's execution root."""
+
+    if not execution_root.is_absolute():
+        raise ValueError("execution_root must be an absolute directory")
+    if checkout_root.is_absolute():
+        return checkout_root
+    if ".." in checkout_root.parts:
+        raise ValueError("relative checkout_root must not contain traversal")
+    if str(checkout_root).startswith("~"):
+        raise ValueError("relative checkout_root must not begin with '~'")
+    return execution_root / checkout_root
 
 
 def _validate_alphabet_sidecar(

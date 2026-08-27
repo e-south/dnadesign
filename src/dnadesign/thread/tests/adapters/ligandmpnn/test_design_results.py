@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+import dnadesign.thread.adapters.ligandmpnn.design_results as design_results_module
 from dnadesign.thread.adapters.ligandmpnn import (
     LigandMpnnCommand,
     LigandMpnnRequest,
@@ -26,11 +27,18 @@ from dnadesign.thread.adapters.ligandmpnn import (
     build_ligandmpnn_commands,
     parse_ligandmpnn_design_outputs,
 )
+from dnadesign.thread.adapters.ligandmpnn.design_manifest import build_design_output_manifest
 from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import write_context_inventory
 from dnadesign.thread.tests.adapters.ligandmpnn.test_pinned_runtime import _checkout
 
 
-def _execute_design(tmp_path: Path) -> tuple[LigandMpnnRequest, tuple[LigandMpnnCommand, ...], Path]:
+def _execute_design(
+    tmp_path: Path,
+    *,
+    batch_size: int = 1,
+    number_of_batches: int = 1,
+    seeds: tuple[int, ...] = (7,),
+) -> tuple[LigandMpnnRequest, tuple[LigandMpnnCommand, ...], Path]:
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     reference = write_context_inventory(
         tmp_path,
@@ -51,7 +59,9 @@ def _execute_design(tmp_path: Path) -> tuple[LigandMpnnRequest, tuple[LigandMpnn
             checkpoint_path=checkpoint.relative_to(checkout),
         ),
         context_inventory=reference,
-        seeds=(7,),
+        seeds=seeds,
+        batch_size=batch_size,
+        number_of_batches=number_of_batches,
     )
     commands = build_ligandmpnn_commands(
         request,
@@ -59,8 +69,16 @@ def _execute_design(tmp_path: Path) -> tuple[LigandMpnnRequest, tuple[LigandMpnn
         execution_root=tmp_path,
         python_executable=sys.executable,
     )
-    subprocess.run(commands[0].argv, cwd=tmp_path, check=True)
+    for command in commands:
+        subprocess.run(command.argv, cwd=tmp_path, check=True)
     return request, commands, tmp_path / commands[0].output_dir
+
+
+def _rebind_completion_to_current_tree(output_root: Path) -> None:
+    completion_path = output_root / ".dnadesign-ligandmpnn-execution.json"
+    completion = json.loads(completion_path.read_text(encoding="utf-8"))
+    completion["design_output_manifest"] = build_design_output_manifest(output_root)
+    completion_path.write_text(json.dumps(completion, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def test_design_admission_binds_exact_published_tree(tmp_path: Path) -> None:
@@ -75,14 +93,122 @@ def test_design_admission_binds_exact_published_tree(tmp_path: Path) -> None:
     completion = json.loads((output_root / ".dnadesign-ligandmpnn-execution.json").read_text(encoding="utf-8"))
     assert completion["schema_version"] == 3
     assert completion["design_output_manifest"] == result.outputs[0].manifest
-    assert result.outputs[0].manifest["entries"] == [
-        {
-            "path": "design.txt",
-            "type": "file",
-            "size_bytes": len(b"input-v1"),
-            "sha256": f"sha256:{hashlib.sha256(b'input-v1').hexdigest()}",
-        }
-    ]
+    assert result.outputs[0].sequence_count == 1
+    assert result.sequence_count == request.expected_sequence_count == 1
+    assert result.to_dict()["expected_sequence_count"] == 1
+    assert result.to_dict()["sequence_count"] == 1
+    assert any(entry["path"] == "seqs/input.fa" for entry in result.outputs[0].manifest["entries"])
+
+
+def test_design_admission_rejects_completed_tree_without_official_fasta(tmp_path: Path) -> None:
+    request, commands, output_root = _execute_design(tmp_path)
+    (output_root / "seqs/input.fa").unlink()
+    _rebind_completion_to_current_tree(output_root)
+
+    with pytest.raises(ValueError, match="official LigandMPNN FASTA"):
+        parse_ligandmpnn_design_outputs(
+            request,
+            commands,
+            execution_root=tmp_path,
+        )
+
+
+@pytest.mark.parametrize(
+    ("records", "message"),
+    [
+        ([">input, T=0.1, seed=7\nACD"], "expected 2 designed records; observed 0"),
+        (
+            [
+                ">input, T=0.1, seed=7\nACD",
+                ">input, id=1, T=0.1, seed=7\nACD",
+            ],
+            "expected 2 designed records; observed 1",
+        ),
+        (
+            [
+                ">input, T=0.1, seed=7\nACD",
+                ">input, id=1, T=0.1, seed=7\nACD",
+                ">input, id=2, T=0.1, seed=7\nACD",
+                ">input, id=3, T=0.1, seed=7\nACD",
+            ],
+            "expected 2 designed records; observed 3",
+        ),
+        (
+            [
+                ">input, T=0.1, seed=7\nACD",
+                ">input, id=1, T=0.1, seed=7\nACD",
+                ">input, id=1, T=0.1, seed=7\nACD",
+            ],
+            "design record ids must be exactly",
+        ),
+        (
+            [
+                ">input, T=0.1, seed=7\nACD",
+                ">input, id=1, T=0.1, seed=7\nAC*",
+                ">input, id=2, T=0.1, seed=7\nACD",
+            ],
+            "invalid amino-acid sequence",
+        ),
+    ],
+)
+def test_design_admission_rejects_invalid_official_fasta_records(
+    tmp_path: Path,
+    records: list[str],
+    message: str,
+) -> None:
+    request, commands, output_root = _execute_design(tmp_path, batch_size=2)
+    (output_root / "seqs/input.fa").write_text("\n".join(records), encoding="utf-8")
+    _rebind_completion_to_current_tree(output_root)
+
+    with pytest.raises(ValueError, match=message):
+        parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
+
+
+def test_design_admission_counts_only_the_official_input_fasta(tmp_path: Path) -> None:
+    request, commands, output_root = _execute_design(tmp_path, batch_size=2)
+    (output_root / "unrelated.fasta").write_text(">foreign\nAAAA\n", encoding="utf-8")
+    (output_root / "seqs/unrelated.fa").write_text(">foreign\nAAAA\n", encoding="utf-8")
+    _rebind_completion_to_current_tree(output_root)
+
+    result = parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
+
+    assert result.sequence_count == request.expected_sequence_count == 2
+
+
+def test_design_admission_binds_parsed_fasta_bytes_to_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request, commands, _output_root = _execute_design(tmp_path)
+    original_reader = design_results_module._read_descriptor_relative_regular_bytes
+
+    def _replace_fasta_after_manifest(root: Path, path: Path, *, label: str) -> bytes:
+        if label == "official LigandMPNN FASTA":
+            return b">input, T=0.1, seed=7\nAAA\n>input, id=1, T=0.1, seed=7\nAAA"
+        return original_reader(root, path, label=label)
+
+    monkeypatch.setattr(
+        design_results_module,
+        "_read_descriptor_relative_regular_bytes",
+        _replace_fasta_after_manifest,
+    )
+
+    with pytest.raises(ValueError, match="does not match admitted manifest"):
+        parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
+
+
+def test_design_admission_enforces_seed_batch_total(tmp_path: Path) -> None:
+    request, commands, _output_root = _execute_design(
+        tmp_path,
+        seeds=(7, 11),
+        batch_size=2,
+        number_of_batches=3,
+    )
+
+    result = parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
+
+    assert tuple(output.sequence_count for output in result.outputs) == (6, 6)
+    assert result.sequence_count == request.expected_sequence_count == 12
 
 
 @pytest.mark.parametrize("mutation", ["edit", "replace", "add", "delete"])

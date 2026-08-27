@@ -17,7 +17,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dnadesign.thread.adapters.ligandmpnn.alphabets import LigandMpnnResidueAlphabetSidecar
-from dnadesign.thread.adapters.ligandmpnn.commands import build_ligandmpnn_commands
+from dnadesign.thread.adapters.ligandmpnn.commands import (
+    build_ligandmpnn_commands,
+    resolve_checkout_root_for_execution,
+)
 from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
     load_ligandmpnn_context_inventory,
     validate_context_inventory_for_input,
@@ -104,6 +107,7 @@ def build_planned_receipt(
 ) -> LigandMpnnRunReceipt:
     """Normalize a validated request and its deterministic commands."""
 
+    checkout_root = resolve_checkout_root_for_execution(checkout_root, execution_root=execution_root)
     context_inventory = load_ligandmpnn_context_inventory(
         request.context_inventory,
         execution_root=execution_root,

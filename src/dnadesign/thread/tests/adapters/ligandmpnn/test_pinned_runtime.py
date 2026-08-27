@@ -131,6 +131,10 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
         "parser.add_argument('--ligand_mpnn_use_atom_context')\n"
         "parser.add_argument('--output')\n"
         "parser.add_argument('--out_folder')\n"
+        "parser.add_argument('--seed', type=int, default=0)\n"
+        "parser.add_argument('--temperature', type=float, default=0.1)\n"
+        "parser.add_argument('--batch_size', type=int, default=1)\n"
+        "parser.add_argument('--number_of_batches', type=int, default=1)\n"
         "args, _ = parser.parse_known_args()\n"
         "checkpoint = Path(args.checkpoint_ligand_mpnn).read_text(encoding='utf-8')\n"
         "pdb = Path(args.pdb_path).read_text(encoding='utf-8')\n"
@@ -146,7 +150,20 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
         "if args.out_folder:\n"
         "    output_root = Path(args.out_folder)\n"
         "    output_root.mkdir(parents=True, exist_ok=True)\n"
-        "    (output_root / 'design.txt').write_text(pdb, encoding='utf-8')\n",
+        "    (output_root / 'design.txt').write_text(pdb, encoding='utf-8')\n"
+        "    seqs = output_root / 'seqs'\n"
+        "    seqs.mkdir()\n"
+        "    name = Path(args.pdb_path).stem\n"
+        "    records = [(\n"
+        "        f'>{name}, T={args.temperature}, seed={args.seed}, batch_size={args.batch_size}, ' \n"
+        "        f'number_of_batches={args.number_of_batches}, model_path={args.checkpoint_ligand_mpnn}\\nACD'\n"
+        "    )]\n"
+        "    for design_id in range(1, args.batch_size * args.number_of_batches + 1):\n"
+        "        records.append(\n"
+        "            f'>{name}, id={design_id}, T={args.temperature}, seed={args.seed}, ' \n"
+        "            'overall_confidence=0.1, ligand_confidence=0.2, seq_rec=0.3\\nACD'\n"
+        "        )\n"
+        "    (seqs / f'{name}.fa').write_text('\\n'.join(records), encoding='utf-8')\n",
         encoding="utf-8",
     )
     (root / "score.py").write_text(
@@ -460,6 +477,48 @@ def test_public_design_builder_executes_only_with_bound_context_evidence(tmp_pat
     assert (output_root / "design.txt").read_text(encoding="utf-8") == "input-v1"
     assert completion["execution"]["context_inventory_path"] == reference.path.as_posix()
     assert completion["execution"]["context_inventory_sha256"] == reference.sha256
+
+
+def test_public_design_builder_runs_relative_checkout_against_execution_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    reference = write_context_inventory(
+        tmp_path,
+        input_path=pdb.relative_to(tmp_path),
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=False,
+        parser_sha256=hashlib.sha256((checkout / "data_utils.py").read_bytes()).hexdigest(),
+    )
+    request = LigandMpnnRequest(
+        request_id="relative_checkout_builder",
+        pdb_path=pdb.relative_to(tmp_path),
+        pdb_sha256=pdb_sha256,
+        output_dir=Path("designs"),
+        upstream=LigandMpnnUpstreamPin(
+            commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            checkpoint_path=checkpoint.relative_to(checkout),
+        ),
+        context_inventory=reference,
+        seeds=(7,),
+    )
+    foreign_cwd = tmp_path / "foreign-cwd"
+    foreign_cwd.mkdir()
+    monkeypatch.chdir(foreign_cwd)
+
+    command = build_ligandmpnn_commands(
+        request,
+        checkout_root=checkout.relative_to(tmp_path),
+        execution_root=tmp_path,
+        python_executable=sys.executable,
+    )[0]
+    subprocess.run(command.argv, cwd=tmp_path, check=True)
+
+    assert command.argv[command.argv.index("--checkout-root") + 1] == str(checkout)
+    assert (tmp_path / command.output_dir / "seqs/input.fa").is_file()
 
 
 def test_pinned_design_runtime_rejects_context_inventory_tampered_after_planning(tmp_path: Path) -> None:

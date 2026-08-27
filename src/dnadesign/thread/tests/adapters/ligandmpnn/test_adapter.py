@@ -180,6 +180,44 @@ def test_request_preserves_valid_nested_relative_output_directory(tmp_path: Path
     assert command.argv[command.argv.index("--out_folder") + 1] == "results/nested/designs/seed_7"
 
 
+def test_build_commands_resolves_relative_checkout_against_execution_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request, checkout_root = _validated_request(tmp_path, packing=LigandMpnnPackingConfig())
+    option_looking_checkout = checkout_root.with_name("-checkout")
+    checkout_root.rename(option_looking_checkout)
+    checkout_root = option_looking_checkout
+    relative_checkout = checkout_root.relative_to(tmp_path)
+    foreign_cwd = tmp_path / "foreign-cwd"
+    foreign_cwd.mkdir()
+    monkeypatch.chdir(foreign_cwd)
+
+    command = build_ligandmpnn_commands(
+        request,
+        checkout_root=relative_checkout,
+        execution_root=tmp_path,
+        python_executable=sys.executable,
+    )[0]
+
+    assert command.argv[command.argv.index("--checkout-root") + 1] == str(checkout_root)
+    assert "--checkout-root=-checkout" not in command.argv
+    assert command.argv[command.argv.index("--checkpoint_ligand_mpnn") + 1] == str(
+        checkout_root / request.upstream.checkpoint_path
+    )
+
+
+@pytest.mark.parametrize("checkout_root", [Path("../LigandMPNN"), Path("~/LigandMPNN")])
+def test_build_commands_rejects_escaping_relative_checkout_root(
+    tmp_path: Path,
+    checkout_root: Path,
+) -> None:
+    request, _absolute_checkout = _validated_request(tmp_path, packing=LigandMpnnPackingConfig())
+
+    with pytest.raises(ValueError, match="relative checkout_root"):
+        build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
+
+
 def test_build_commands_declares_exact_official_ligandmpnn_flags_per_seed(tmp_path: Path) -> None:
     request, checkout_root = _validated_request(tmp_path)
 

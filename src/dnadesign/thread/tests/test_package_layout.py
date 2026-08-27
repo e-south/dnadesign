@@ -45,6 +45,7 @@ _LIGANDMPNN_FILES = {
     "context_inventory.py",
     "context_probe.py",
     "context_probe_cli.py",
+    "design_fasta.py",
     "design_manifest.py",
     "design_results.py",
     "models.py",

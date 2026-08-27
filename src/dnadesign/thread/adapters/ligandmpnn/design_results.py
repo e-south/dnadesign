@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,6 +19,7 @@ from pathlib import Path
 from dnadesign.thread.adapters.ligandmpnn.alphabets import LigandMpnnResidueAlphabetSidecar
 from dnadesign.thread.adapters.ligandmpnn.commands import build_ligandmpnn_commands
 from dnadesign.thread.adapters.ligandmpnn.context_inventory import _read_descriptor_relative_regular_bytes
+from dnadesign.thread.adapters.ligandmpnn.design_fasta import parse_official_design_fasta
 from dnadesign.thread.adapters.ligandmpnn.design_manifest import build_design_output_manifest
 from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnCommand, LigandMpnnRequest
 from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import (
@@ -35,12 +37,14 @@ class LigandMpnnDesignOutput:
     seed: int
     output_dir: Path
     manifest: dict[str, object]
+    sequence_count: int
 
     def to_dict(self) -> dict[str, object]:
         return {
             "seed": self.seed,
             "output_dir": self.output_dir.as_posix(),
             "manifest": self.manifest,
+            "sequence_count": self.sequence_count,
         }
 
 
@@ -49,14 +53,23 @@ class LigandMpnnDesignResult:
     """Validated design outputs admitted against atomic completion records."""
 
     request_id: str
+    expected_sequence_count: int
     outputs: tuple[LigandMpnnDesignOutput, ...]
+
+    @property
+    def sequence_count(self) -> int:
+        """Return the admitted designed-record count across every seed."""
+
+        return sum(output.sequence_count for output in self.outputs)
 
     def to_dict(self) -> dict[str, object]:
         return {
             "schema_id": "thread.ligandmpnn.design_result",
-            "schema_version": 1,
+            "schema_version": 2,
             "status": "completed_validated",
             "request_id": self.request_id,
+            "expected_sequence_count": self.expected_sequence_count,
+            "sequence_count": self.sequence_count,
             "outputs": [output.to_dict() for output in self.outputs],
         }
 
@@ -146,14 +159,71 @@ def parse_ligandmpnn_design_outputs(
             raise ValueError("design completion record path does not match planned output")
         if completion != expected_completion:
             raise ValueError(f"design completion record does not match planned execution: {command.output_dir}")
+        input_name = _official_input_name(request.pdb_path)
+        fasta_relative_path = command.output_dir / "seqs" / f"{input_name}.fa"
+        try:
+            fasta_bytes = _read_descriptor_relative_regular_bytes(
+                root,
+                fasta_relative_path,
+                label="official LigandMPNN FASTA",
+            )
+        except ValueError as error:
+            raise ValueError(f"official LigandMPNN FASTA is missing or unreadable: {fasta_relative_path}") from error
+        _validate_fasta_manifest_binding(
+            observed_manifest,
+            relative_path=Path("seqs") / f"{input_name}.fa",
+            payload=fasta_bytes,
+        )
+        sequence_count = parse_official_design_fasta(
+            fasta_bytes,
+            input_stem=input_name,
+            expected_design_count=request.batch_size * request.number_of_batches,
+        )
         outputs.append(
             LigandMpnnDesignOutput(
                 seed=command.seed,
                 output_dir=command.output_dir,
                 manifest=observed_manifest,
+                sequence_count=sequence_count,
             )
         )
-    return LigandMpnnDesignResult(request_id=request.request_id, outputs=tuple(outputs))
+    result = LigandMpnnDesignResult(
+        request_id=request.request_id,
+        expected_sequence_count=request.expected_sequence_count,
+        outputs=tuple(outputs),
+    )
+    if result.sequence_count != request.expected_sequence_count:
+        raise ValueError(
+            f"design result expected {request.expected_sequence_count} designed records; "
+            f"observed {result.sequence_count}"
+        )
+    return result
+
+
+def _official_input_name(pdb_path: Path) -> str:
+    name = pdb_path.name
+    return name[:-4] if name.endswith(".pdb") else name
+
+
+def _validate_fasta_manifest_binding(
+    manifest: dict[str, object],
+    *,
+    relative_path: Path,
+    payload: bytes,
+) -> None:
+    entries = manifest.get("entries")
+    if not isinstance(entries, list):
+        raise ValueError("design output manifest entries are invalid")
+    expected_path = relative_path.as_posix()
+    matching_entries = [entry for entry in entries if isinstance(entry, dict) and entry.get("path") == expected_path]
+    observed_digest = f"sha256:{hashlib.sha256(payload).hexdigest()}"
+    if len(matching_entries) != 1 or matching_entries[0] != {
+        "path": expected_path,
+        "type": "file",
+        "size_bytes": len(payload),
+        "sha256": observed_digest,
+    }:
+        raise ValueError(f"official LigandMPNN FASTA does not match admitted manifest: {expected_path}")
 
 
 __all__ = [
