@@ -107,6 +107,33 @@ HETATM 6 P P . DA D 2 1 4.000 0.000 0.000 D 1 ? 1.00 80.00 1
 #
 """
 
+_ATOM_NAME_FALLBACK_MMCIF = """\
+data_atom_name_fallback
+loop_
+_atom_site.group_PDB
+_atom_site.id
+_atom_site.type_symbol
+_atom_site.label_atom_id
+_atom_site.auth_atom_id
+_atom_site.label_alt_id
+_atom_site.label_comp_id
+_atom_site.label_asym_id
+_atom_site.label_entity_id
+_atom_site.label_seq_id
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+_atom_site.auth_asym_id
+_atom_site.auth_seq_id
+_atom_site.pdbx_PDB_ins_code
+_atom_site.occupancy
+_atom_site.B_iso_or_equiv
+_atom_site.pdbx_PDB_model_num
+ATOM 1 C . CA . SER A 1 3 1.000 1.000 0.000 A 3 ? 1.00 80.00 1
+ATOM 2 C CB AUTH . SER A 1 3 2.000 1.000 0.000 A 3 ? 1.00 80.00 1
+#
+"""
+
 _MIXED_POLYMER_MMCIF_WITH_UNQUOTED_PRIME_ATOMS = """\
 data_mixed_polymer
 loop_
@@ -752,6 +779,34 @@ def test_py3dmol_backend_preserves_quoted_literal_atom_site_null_tokens() -> Non
     assert 'ATOM 1 N "N" "." SER A 3 0.000 0.000 0.000 A 3 "?" 1.00 80.00 1' in serialized
 
 
+def test_py3dmol_backend_uses_concrete_auth_atom_name_for_unquoted_label_null() -> None:
+    serialized = serialize_mmcif_atom_sites_for_3dmol(_ATOM_NAME_FALLBACK_MMCIF)
+
+    assert 'ATOM 1 C "CA" . SER A 3 1.000 1.000 0.000 A 3 ? 1.00 80.00 1' in serialized
+    assert 'ATOM 2 C "CB" . SER A 3 2.000 1.000 0.000 A 3 ? 1.00 80.00 1' in serialized
+    assert '"AUTH"' not in serialized
+
+
+def test_py3dmol_backend_preserves_source_quoted_literal_label_atom_name() -> None:
+    structure = _ATOM_NAME_FALLBACK_MMCIF.replace("ATOM 1 C . CA .", "ATOM 1 C '.' CA .")
+
+    serialized = serialize_mmcif_atom_sites_for_3dmol(structure)
+
+    assert 'ATOM 1 C "." . SER A 3 1.000 1.000 0.000 A 3 ? 1.00 80.00 1' in serialized
+
+
+def test_py3dmol_backend_rejects_null_label_and_auth_atom_names() -> None:
+    structure = _ATOM_NAME_FALLBACK_MMCIF.replace("ATOM 1 C . CA .", "ATOM 1 C . ? .")
+
+    with pytest.raises(ValueError, match="concrete label_atom_id or auth_atom_id"):
+        serialize_mmcif_atom_sites_for_3dmol(structure)
+
+
+def test_mmcif_token_serializer_rejects_null_marker_with_unknown_quote_provenance() -> None:
+    with pytest.raises(ValueError, match="quote provenance is unknown"):
+        _browser_cif_token(".", field="_atom_site.label_alt_id", source_quoted=None)
+
+
 def test_py3dmol_backend_rejects_atom_identifiers_with_both_quote_delimiters() -> None:
     with pytest.raises(ValueError, match="atom name cannot be serialized safely"):
         _quote_3dmol_atom_name("C'\"1")
@@ -797,9 +852,14 @@ def test_py3dmol_backend_quotes_reserved_mmcif_identifiers(identifier: str) -> N
     assert f'"{identifier}"' in serialized
 
 
-@pytest.mark.parametrize("value", (".", "?", "loop_", "LOOP_", "stop_", "global_"))
+@pytest.mark.parametrize("value", ("loop_", "LOOP_", "stop_", "global_"))
 def test_mmcif_token_serializer_quotes_reserved_control_words(value: str) -> None:
     assert _browser_cif_token(value, field="_atom_site.auth_asym_id") == f'"{value}"'
+
+
+@pytest.mark.parametrize("value", (".", "?"))
+def test_mmcif_token_serializer_quotes_source_quoted_null_literals(value: str) -> None:
+    assert _browser_cif_token(value, field="_atom_site.auth_asym_id", source_quoted=True) == f'"{value}"'
 
 
 def test_structure_atom_content_summary_detects_sidechain_atoms() -> None:

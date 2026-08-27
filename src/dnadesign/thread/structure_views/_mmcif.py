@@ -184,6 +184,40 @@ def _browser_atom_site_columns(
         joined = ", ".join((name, *fallback_names))
         raise ValueError(f"mmCIF browser serialization requires one of these atom-site columns: {joined}")
 
+    def required_concrete_column(name: str, fallback_name: str) -> _BrowserAtomSiteColumn:
+        candidates = [
+            (candidate_name, column(candidate_name))
+            for candidate_name in (name, fallback_name)
+            if candidate_name in source
+        ]
+        if not candidates:
+            raise ValueError(
+                f"mmCIF browser serialization requires one of these atom-site columns: {name}, {fallback_name}"
+            )
+        for candidate_name, candidate in candidates:
+            if len(candidate.values) != row_count:
+                raise ValueError(
+                    "mmCIF browser serialization received inconsistent atom-site column lengths: "
+                    f"expected {row_count}, got {candidate_name}={len(candidate.values)}"
+                )
+
+        values: list[str] = []
+        quoted: list[bool | None] = []
+        for row_index in range(row_count):
+            for candidate_name, candidate in candidates:
+                value = candidate.values[row_index]
+                source_quoted = candidate.source_quoted[row_index]
+                if not _is_unquoted_cif_null(value, source_quoted=source_quoted, field=candidate_name):
+                    values.append(value)
+                    quoted.append(source_quoted)
+                    break
+            else:
+                raise ValueError(
+                    "mmCIF browser serialization requires a concrete label_atom_id or auth_atom_id "
+                    f"at row {row_index + 1}"
+                )
+        return _BrowserAtomSiteColumn(values=tuple(values), source_quoted=tuple(quoted))
+
     return {
         "_atom_site.group_pdb": column("_atom_site.group_pdb"),
         "_atom_site.id": (
@@ -195,7 +229,10 @@ def _browser_atom_site_columns(
             )
         ),
         "_atom_site.type_symbol": column("_atom_site.type_symbol"),
-        "_atom_site.label_atom_id": column("_atom_site.label_atom_id", "_atom_site.auth_atom_id"),
+        "_atom_site.label_atom_id": required_concrete_column(
+            "_atom_site.label_atom_id",
+            "_atom_site.auth_atom_id",
+        ),
         "_atom_site.label_alt_id": column("_atom_site.label_alt_id", default="."),
         "_atom_site.label_comp_id": column("_atom_site.label_comp_id", "_atom_site.auth_comp_id"),
         "_atom_site.label_asym_id": column("_atom_site.label_asym_id", "_atom_site.auth_asym_id"),
@@ -237,7 +274,7 @@ def _browser_cif_token(value: str, *, field: str, source_quoted: bool | None = N
         return value
     if not value or any(character in value for character in ("\n", "\r")):
         raise ValueError(f"mmCIF value cannot be serialized safely for 3Dmol at {field}: {value!r}")
-    if value in {".", "?"} and source_quoted is False:
+    if _is_unquoted_cif_null(value, source_quoted=source_quoted, field=field):
         return value
     lowered = value.casefold()
     requires_quotes = (
@@ -255,6 +292,14 @@ def _browser_cif_token(value: str, *, field: str, source_quoted: bool | None = N
             return f"'{value}'"
         raise ValueError(f"mmCIF value cannot be serialized safely for 3Dmol at {field}: {value!r}")
     return value
+
+
+def _is_unquoted_cif_null(value: str, *, source_quoted: bool | None, field: str) -> bool:
+    if value not in {".", "?"}:
+        return False
+    if source_quoted is None:
+        raise ValueError(f"mmCIF null-marker quote provenance is unknown at {field}")
+    return not source_quoted
 
 
 def iter_mmcif_atom_site_records(structure_text: str) -> Iterator[MmcifAtomSiteRecord]:
