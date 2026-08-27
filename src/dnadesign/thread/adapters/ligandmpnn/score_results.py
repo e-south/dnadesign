@@ -290,7 +290,7 @@ def parse_ligandmpnn_score_outputs(
         request.context_inventory,
         execution_root=root,
     )
-    validate_context_inventory_for_input(
+    protein_evidence = validate_context_inventory_for_input(
         context_inventory,
         pdb_path=request.pdb_path,
         pdb_sha256=request.pdb_sha256,
@@ -381,6 +381,8 @@ def parse_ligandmpnn_score_outputs(
             seed=command.seed,
             expected_draws=request.batch_size * request.number_of_batches,
             mode=request.mode,
+            expected_residue_names=protein_evidence.residue_ids,
+            expected_native_sequence=protein_evidence.native_sequence,
         )
         outputs.append(
             LigandMpnnScoreOutput(
@@ -537,6 +539,8 @@ def _validate_payload(
     seed: int,
     expected_draws: int,
     mode: LigandMpnnScoreMode,
+    expected_residue_names: tuple[str, ...],
+    expected_native_sequence: tuple[str, ...],
 ) -> tuple[tuple[str, ...], np.ndarray]:
     keys = set(payload)
     missing = sorted(_EXPECTED_KEYS - keys)
@@ -581,10 +585,17 @@ def _validate_payload(
     _binary_array(payload, "chain_mask", shape=(residue_count,))
 
     residue_names = _residue_names(payload["residue_names"], residue_count=residue_count)
+    if residue_names != expected_residue_names:
+        raise ValueError(
+            "score output residue axis does not match pinned parser protein residue identities: "
+            f"expected {expected_residue_names}; observed {residue_names}"
+        )
     sequence = payload["sequence"]
     expected_sequence = [EXPECTED_LIGANDMPNN_SCORE_ALPHABET[index] for index in native_sequence]
     if sequence != expected_sequence:
         raise ValueError("score output sequence does not match native_sequence and raw alphabet")
+    if tuple(expected_sequence) != expected_native_sequence:
+        raise ValueError("score output native sequence does not match pinned parser protein sequence")
     _validate_summary(
         payload["mean_of_probs"],
         expected=probabilities.mean(axis=0),

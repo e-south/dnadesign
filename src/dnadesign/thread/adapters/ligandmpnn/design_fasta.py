@@ -12,8 +12,21 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 _SEQUENCE_ALPHABET = frozenset("ACDEFGHIKLMNPQRSTVWYX:")
+
+
+@dataclass(frozen=True)
+class OfficialLigandMpnnDesignFasta:
+    """Parsed native and designed sequences in upstream sorted-chain order."""
+
+    native_segments: tuple[str, ...]
+    designed_segments: tuple[tuple[str, ...], ...]
+
+    @property
+    def design_count(self) -> int:
+        return len(self.designed_segments)
 
 
 def parse_official_design_fasta(
@@ -23,6 +36,21 @@ def parse_official_design_fasta(
     expected_design_count: int,
 ) -> int:
     """Validate one official ``run.py`` FASTA and return its design count."""
+
+    return parse_official_design_fasta_records(
+        payload,
+        input_stem=input_stem,
+        expected_design_count=expected_design_count,
+    ).design_count
+
+
+def parse_official_design_fasta_records(
+    payload: bytes,
+    *,
+    input_stem: str,
+    expected_design_count: int,
+) -> OfficialLigandMpnnDesignFasta:
+    """Validate and return exact native/design segments from official ``run.py`` FASTA."""
 
     try:
         text = payload.decode("utf-8")
@@ -35,7 +63,8 @@ def parse_official_design_fasta(
     native_header, native_sequence = records[0]
     if not native_header.startswith(f"{input_stem}, T="):
         raise ValueError("official LigandMPNN FASTA has an invalid native record header")
-    native_segment_lengths = _validate_sequence(native_sequence)
+    native_segments = _validate_sequence(native_sequence)
+    native_segment_lengths = tuple(len(segment) for segment in native_segments)
 
     design_records = records[1:]
     observed_count = len(design_records)
@@ -45,12 +74,15 @@ def parse_official_design_fasta(
         )
     id_pattern = re.compile(rf"^{re.escape(input_stem)}, id=([0-9]+), ")
     observed_ids: list[int] = []
+    designed_segments: list[tuple[str, ...]] = []
     for header, sequence in design_records:
         match = id_pattern.match(header)
         if match is None:
             raise ValueError("official LigandMPNN FASTA has an invalid design record header")
         observed_ids.append(int(match.group(1)))
-        designed_segment_lengths = _validate_sequence(sequence)
+        segments = _validate_sequence(sequence)
+        designed_segments.append(segments)
+        designed_segment_lengths = tuple(len(segment) for segment in segments)
         if designed_segment_lengths != native_segment_lengths:
             raise ValueError(
                 "official LigandMPNN FASTA design must preserve native ordered chain-segment lengths: "
@@ -61,7 +93,10 @@ def parse_official_design_fasta(
         raise ValueError(
             f"official LigandMPNN FASTA design record ids must be exactly {expected_ids}; observed {observed_ids}"
         )
-    return observed_count
+    return OfficialLigandMpnnDesignFasta(
+        native_segments=native_segments,
+        designed_segments=tuple(designed_segments),
+    )
 
 
 def _parse_fasta_records(text: str) -> list[tuple[str, str]]:
@@ -88,7 +123,7 @@ def _parse_fasta_records(text: str) -> list[tuple[str, str]]:
     return records
 
 
-def _validate_sequence(sequence: str) -> tuple[int, ...]:
+def _validate_sequence(sequence: str) -> tuple[str, ...]:
     segments = sequence.split(":")
     if (
         not sequence
@@ -96,7 +131,11 @@ def _validate_sequence(sequence: str) -> tuple[int, ...]:
         or any(residue not in _SEQUENCE_ALPHABET for residue in sequence)
     ):
         raise ValueError("official LigandMPNN FASTA contains an invalid amino-acid sequence")
-    return tuple(len(segment) for segment in segments)
+    return tuple(segments)
 
 
-__all__ = ["parse_official_design_fasta"]
+__all__ = [
+    "OfficialLigandMpnnDesignFasta",
+    "parse_official_design_fasta",
+    "parse_official_design_fasta_records",
+]

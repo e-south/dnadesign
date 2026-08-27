@@ -39,7 +39,7 @@ def build_ligandmpnn_commands(
         request.context_inventory,
         execution_root=execution_root,
     )
-    protein_residue_ids = validate_context_inventory_for_input(
+    protein_evidence = validate_context_inventory_for_input(
         context_inventory,
         pdb_path=request.pdb_path,
         pdb_sha256=request.pdb_sha256,
@@ -51,7 +51,7 @@ def build_ligandmpnn_commands(
     validate_ligandmpnn_residue_selection(
         fixed_residue_ids=tuple(item.upstream_id for item in request.fixed_residues),
         redesigned_residue_ids=tuple(item.upstream_id for item in request.redesigned_residues),
-        protein_residue_ids=protein_residue_ids,
+        protein_residue_ids=protein_evidence.residue_id_set,
     )
     _validate_alphabet_sidecar(
         request,

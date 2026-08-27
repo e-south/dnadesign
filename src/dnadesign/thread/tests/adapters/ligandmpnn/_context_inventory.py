@@ -31,6 +31,7 @@ PINNED_CONTEXT_PARSER_PAYLOAD = b"""import numpy as np
 VALUE = "attested"
 
 element_dict_rev = {7: "N", 15: "P"}
+restype_int_to_str = dict(enumerate("ACDEFGHIKLMNPQRSTVWYX"))
 
 
 class _Tensor:
@@ -72,6 +73,7 @@ def parse_PDB(*args, **kwargs):
         "Y_m": _Tensor((1, 1)),
         "R_idx": _Tensor((12, 13, -2, 2)),
         "chain_letters": np.asarray(("A", "A", "B", "B")),
+        "S": _Tensor((0, 1, 2, 3)),
     }
     return parsed, None, _Selection(), ("", "B", "A", ""), None
 """

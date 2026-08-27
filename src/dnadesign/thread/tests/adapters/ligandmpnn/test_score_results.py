@@ -177,37 +177,73 @@ def _score_payload(
     draws: int = 20,
     mode: LigandMpnnScoreMode = LigandMpnnScoreMode.SINGLE_AA,
 ) -> dict[str, object]:
-    residue_names = {0: "A1", 1: "A2", 2: "A3"}
-    raw_probabilities = np.full((draws, 3, 21), 0.95 / 20.0, dtype=np.float32)
+    residue_names = {0: "A12", 1: "A13B", 2: "B-2A", 3: "B2"}
+    residue_count = len(residue_names)
+    raw_probabilities = np.full((draws, residue_count, 21), 0.95 / 20.0, dtype=np.float32)
     raw_probabilities[..., -1] = 0.05
     log_probabilities = np.log(raw_probabilities).astype(np.float32)
     means = np.mean(raw_probabilities, axis=0)
     standard_deviations = np.std(raw_probabilities, axis=0)
     if mode is LigandMpnnScoreMode.SINGLE_AA:
-        decoding_order = np.tile(np.arange(3, dtype=np.float32), (draws, 3, 1))
+        decoding_order = np.tile(
+            np.arange(residue_count, dtype=np.float32),
+            (draws, residue_count, 1),
+        )
     else:
-        decoding_order = np.tile(np.arange(3, dtype=np.int64), (draws, 1))
+        decoding_order = np.tile(np.arange(residue_count, dtype=np.int64), (draws, 1))
     return {
         "logits": log_probabilities.copy(),
         "probs": raw_probabilities,
         "log_probs": log_probabilities,
         "decoding_order": decoding_order,
-        "native_sequence": np.asarray([0, 1, 20], dtype=np.int64),
-        "mask": np.ones(3, dtype=np.float32),
-        "chain_mask": np.asarray([1, 0, 1], dtype=np.int64),
+        "native_sequence": np.asarray([0, 1, 2, 3], dtype=np.int64),
+        "mask": np.ones(residue_count, dtype=np.float32),
+        "chain_mask": np.asarray([1, 0, 1, 1], dtype=np.int64),
         "seed": seed,
         "alphabet": list(EXPECTED_LIGANDMPNN_SCORE_ALPHABET),
         "residue_names": residue_names,
-        "sequence": ["A", "C", "X"],
+        "sequence": ["A", "C", "D", "E"],
         "mean_of_probs": {
             residue_names[index]: dict(zip(EXPECTED_LIGANDMPNN_SCORE_ALPHABET, means[index], strict=True))
-            for index in range(3)
+            for index in range(residue_count)
         },
         "std_of_probs": {
             residue_names[index]: dict(zip(EXPECTED_LIGANDMPNN_SCORE_ALPHABET, standard_deviations[index], strict=True))
-            for index in range(3)
+            for index in range(residue_count)
         },
     }
+
+
+def _score_payload_with_residue_names(seed: int, names: tuple[str, ...]) -> dict[str, object]:
+    payload = _score_payload(seed)
+    original_names = tuple(payload["residue_names"].values())  # type: ignore[union-attr]
+    payload["residue_names"] = dict(enumerate(names))
+    for field_name in ("mean_of_probs", "std_of_probs"):
+        original = payload[field_name]
+        assert isinstance(original, dict)
+        payload[field_name] = {
+            name: original[original_name] for name, original_name in zip(names, original_names, strict=True)
+        }
+    return payload
+
+
+def _truncated_score_payload(seed: int) -> dict[str, object]:
+    payload = _score_payload(seed)
+    residue_count = 2
+    for field_name in ("logits", "probs", "log_probs"):
+        payload[field_name] = payload[field_name][:, :residue_count, :]  # type: ignore[index]
+    payload["decoding_order"] = np.tile(
+        np.arange(residue_count, dtype=np.float32),
+        (20, residue_count, 1),
+    )
+    for field_name in ("native_sequence", "mask", "chain_mask"):
+        payload[field_name] = payload[field_name][:residue_count]  # type: ignore[index]
+    payload["sequence"] = payload["sequence"][:residue_count]  # type: ignore[index]
+    names = tuple(payload["residue_names"][index] for index in range(residue_count))  # type: ignore[index]
+    payload["residue_names"] = dict(enumerate(names))
+    for field_name in ("mean_of_probs", "std_of_probs"):
+        payload[field_name] = {name: payload[field_name][name] for name in names}  # type: ignore[index]
+    return payload
 
 
 def _write_output(
@@ -370,7 +406,8 @@ def test_parser_binds_exact_request_commands_inputs_and_raw_probabilities(tmp_pa
     assert result.context_inventory.effective_nucleotide_atom_count == 2
     assert result.expected_draws_per_seed == 20
     assert [output.seed for output in result.outputs] == [7, 11]
-    assert all(output.raw_probabilities.shape == (20, 3, 21) for output in result.outputs)
+    assert result.outputs[0].residue_names == ("A12", "A13B", "B-2A", "B2")
+    assert all(output.raw_probabilities.shape == (20, 4, 21) for output in result.outputs)
     assert np.allclose(result.outputs[0].raw_x_probabilities, 0.05)
     assert not result.outputs[0].raw_probabilities.flags.writeable
     with pytest.raises(ValueError, match="cannot set WRITEABLE flag"):
@@ -379,7 +416,7 @@ def test_parser_binds_exact_request_commands_inputs_and_raw_probabilities(tmp_pa
 
     policy = LigandMpnnCanonical20Policy(minimum_canonical_mass=0.90)
     canonical = result.outputs[0].canonical20_probabilities(policy)
-    assert canonical.shape == (20, 3, 20)
+    assert canonical.shape == (20, 4, 20)
     assert np.allclose(canonical.sum(axis=-1), 1.0)
     assert not canonical.flags.writeable
     with pytest.raises(ValueError, match="minimum canonical mass"):
@@ -400,6 +437,40 @@ def test_parser_binds_exact_request_commands_inputs_and_raw_probabilities(tmp_pa
     assert receipt["context"]["atom_context_status"] == "enabled_with_observed_nucleotide_context"
     assert receipt["context"]["inventory_reference"] == request.context_inventory.to_dict()
     assert receipt["context"]["observed_inventory"]["observed"]["effective_nucleotide_atom_count"] == 2
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        _truncated_score_payload(7),
+        _score_payload_with_residue_names(7, ("A13B", "A12", "B-2A", "B2")),
+        _score_payload_with_residue_names(7, ("A12", "A13B", "B-2A", "Z999")),
+    ],
+    ids=["truncated", "reordered", "mislabeled"],
+)
+def test_score_admission_rejects_residue_axis_not_identical_to_pinned_parser(
+    tmp_path: Path,
+    payload: dict[str, object],
+) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    _write_output(tmp_path, request, 7, **payload)
+
+    with pytest.raises(ValueError, match="pinned parser protein residue identities"):
+        _parse(tmp_path, request)
+
+
+def test_score_admission_rejects_native_sequence_not_matching_pinned_parser(tmp_path: Path) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    _write_output(
+        tmp_path,
+        request,
+        7,
+        native_sequence=np.asarray([1, 1, 2, 3], dtype=np.int64),
+        sequence=["C", "C", "D", "E"],
+    )
+
+    with pytest.raises(ValueError, match="native sequence does not match pinned parser"):
+        _parse(tmp_path, request)
 
 
 def test_score_admission_rejects_completed_execution_for_different_request_id(tmp_path: Path) -> None:
@@ -466,7 +537,7 @@ def test_parser_rejects_valid_score_replaced_after_execution_completion(tmp_path
     output_path = _write_output(tmp_path, request, 7)
     original_sha256 = _sha256(output_path.read_bytes())
     foreign_payload = _score_payload(7, mode=request.mode)
-    foreign_payload["chain_mask"] = np.asarray([0, 1, 0], dtype=np.int64)
+    foreign_payload["chain_mask"] = np.asarray([0, 1, 0, 1], dtype=np.int64)
     torch.save(foreign_payload, output_path)
     assert _sha256(output_path.read_bytes()) != original_sha256
 
@@ -690,7 +761,7 @@ def test_parser_rejects_expected_score_replaced_by_symlink_after_discovery(
     [
         ({"alphabet": list("XCDEFGHIKLMNPQRSTVWYA")}, "raw alphabet"),
         ({"seed": 999}, "seed"),
-        ({"probs": np.ones((19, 3, 21), dtype=np.float32) / 21.0}, "expected 20 draws"),
+        ({"probs": np.ones((19, 4, 21), dtype=np.float32) / 21.0}, "expected 20 draws"),
         ({"extra": "schema drift"}, "unexpected keys"),
     ],
 )

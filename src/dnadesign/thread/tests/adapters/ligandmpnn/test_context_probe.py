@@ -51,6 +51,7 @@ def _fake_upstream_checkout(root: Path) -> tuple[Path, str]:
 import numpy as np
 
 element_dict_rev = {6: "C", 7: "N", 8: "O", 15: "P", 30: "ZN"}
+restype_int_to_str = dict(enumerate("ACDEFGHIKLMNPQRSTVWYX"))
 
 
 class _Tensor:
@@ -110,6 +111,7 @@ def parse_PDB(input_path, device="cpu", chains=[], parse_all_atoms=False,
         "Y_m": _Tensor([1] * len(types)),
         "R_idx": _Tensor((12, 13, -2)),
         "chain_letters": np.asarray(("A", "A", "B")),
+        "S": _Tensor((0, 1, 2)),
     }
     return parsed, None, _Selection(atoms), ("", "B", "A"), None
 """.lstrip()

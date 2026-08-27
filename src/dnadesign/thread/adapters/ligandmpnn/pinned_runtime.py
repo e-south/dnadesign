@@ -816,7 +816,7 @@ def _validate_runtime_context_inventory(
     inventory = load_ligandmpnn_context_inventory(reference, execution_root=root)
     if inventory.input_path != relative_pdb_path:
         raise ValueError("context inventory input path does not match runtime PDB path")
-    protein_residue_ids = validate_context_inventory_for_input(
+    protein_evidence = validate_context_inventory_for_input(
         inventory,
         pdb_path=relative_pdb_path,
         pdb_sha256=requested_pdb_sha256,
@@ -833,7 +833,7 @@ def _validate_runtime_context_inventory(
     validate_ligandmpnn_residue_selection(
         fixed_residue_ids=fixed_residue_ids,
         redesigned_residue_ids=redesigned_residue_ids,
-        protein_residue_ids=protein_residue_ids,
+        protein_residue_ids=protein_evidence.residue_id_set,
     )
 
 

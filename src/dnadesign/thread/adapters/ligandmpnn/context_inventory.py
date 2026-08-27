@@ -55,6 +55,60 @@ class LigandMpnnContextPolymer(str, Enum):
 
 
 @dataclass(frozen=True)
+class LigandMpnnProteinStructureEvidence:
+    """Ordered protein identities and native sequence from pinned ``parse_PDB``."""
+
+    residue_ids: tuple[str, ...]
+    chain_ids: tuple[str, ...]
+    native_sequence: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not (len(self.residue_ids) == len(self.chain_ids) == len(self.native_sequence)):
+            raise ValueError("pinned parser protein evidence lengths differ")
+        if len(set(self.residue_ids)) != len(self.residue_ids):
+            raise ValueError("pinned parser returned duplicate protein residue identities")
+        if any(not isinstance(item, str) or not item for item in self.residue_ids):
+            raise ValueError("pinned parser protein residue identities must be nonempty text")
+        if any(not isinstance(item, str) for item in self.chain_ids):
+            raise ValueError("pinned parser protein chain identities must be text")
+        if any(
+            not isinstance(item, str) or len(item) != 1 or item not in "ACDEFGHIKLMNPQRSTVWYX"
+            for item in self.native_sequence
+        ):
+            raise ValueError("pinned parser native sequence must use the LigandMPNN alphabet")
+
+    @property
+    def residue_id_set(self) -> frozenset[str]:
+        return frozenset(self.residue_ids)
+
+    @property
+    def fasta_order(self) -> tuple[int, ...]:
+        """Return the exact sorted-chain mask order used by pinned ``run.py``."""
+
+        return tuple(
+            index
+            for chain_id in sorted(set(self.chain_ids))
+            for index, observed_chain_id in enumerate(self.chain_ids)
+            if observed_chain_id == chain_id
+        )
+
+    @property
+    def fasta_residue_ids(self) -> tuple[str, ...]:
+        return tuple(self.residue_ids[index] for index in self.fasta_order)
+
+    @property
+    def fasta_native_segments(self) -> tuple[str, ...]:
+        return tuple(
+            "".join(
+                self.native_sequence[index]
+                for index, observed_chain_id in enumerate(self.chain_ids)
+                if observed_chain_id == chain_id
+            )
+            for chain_id in sorted(set(self.chain_ids))
+        )
+
+
+@dataclass(frozen=True)
 class LigandMpnnContextAtom:
     """One effective nonprotein atom returned in upstream ``Y/Y_t/Y_m``."""
 
@@ -438,7 +492,7 @@ def validate_context_inventory_for_input(
     checkout_root: Path,
     execution_root: Path,
     require_clean_parser_checkout: bool = True,
-) -> frozenset[str]:
+) -> LigandMpnnProteinStructureEvidence:
     """Require an inventory produced for the exact input and context settings."""
 
     if inventory.input_path != pdb_path or inventory.input_sha256 != pdb_sha256:
@@ -465,7 +519,7 @@ def validate_context_inventory_for_input(
         _derive_ligandmpnn_context_evidence,
     )
 
-    derived, protein_residue_ids = _derive_ligandmpnn_context_evidence(
+    derived, protein_evidence = _derive_ligandmpnn_context_evidence(
         LigandMpnnContextProbeRequest(
             request_id=inventory.request_id,
             pdb_path=inventory.input_path,
@@ -484,7 +538,7 @@ def validate_context_inventory_for_input(
     )
     if inventory != derived:
         raise ValueError("context inventory does not match pinned parser derivation")
-    return protein_residue_ids
+    return protein_evidence
 
 
 def validate_ligandmpnn_residue_selection(

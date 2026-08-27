@@ -21,8 +21,16 @@ from dnadesign.thread.adapters.ligandmpnn.commands import (
     build_ligandmpnn_commands,
     resolve_execution_root_for_execution,
 )
-from dnadesign.thread.adapters.ligandmpnn.context_inventory import _read_descriptor_relative_regular_bytes
-from dnadesign.thread.adapters.ligandmpnn.design_fasta import parse_official_design_fasta
+from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
+    LigandMpnnProteinStructureEvidence,
+    _read_descriptor_relative_regular_bytes,
+    load_ligandmpnn_context_inventory,
+    validate_context_inventory_for_input,
+)
+from dnadesign.thread.adapters.ligandmpnn.design_fasta import (
+    OfficialLigandMpnnDesignFasta,
+    parse_official_design_fasta_records,
+)
 from dnadesign.thread.adapters.ligandmpnn.design_manifest import build_design_output_manifest
 from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnCommand, LigandMpnnRequest
 from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import (
@@ -119,6 +127,19 @@ def parse_ligandmpnn_design_outputs(
     )
     if commands != expected_commands:
         raise ValueError("commands do not exactly match the design request")
+    context_inventory = load_ligandmpnn_context_inventory(
+        request.context_inventory,
+        execution_root=root,
+    )
+    protein_evidence = validate_context_inventory_for_input(
+        context_inventory,
+        pdb_path=request.pdb_path,
+        pdb_sha256=request.pdb_sha256,
+        upstream=request.upstream,
+        use_side_chain_context=request.use_side_chain_context,
+        checkout_root=checkout_root,
+        execution_root=root,
+    )
 
     outputs: list[LigandMpnnDesignOutput] = []
     for command in commands:
@@ -182,11 +203,13 @@ def parse_ligandmpnn_design_outputs(
             relative_path=Path("seqs") / f"{input_name}.fa",
             payload=fasta_bytes,
         )
-        sequence_count = parse_official_design_fasta(
+        parsed_fasta = parse_official_design_fasta_records(
             fasta_bytes,
             input_stem=input_name,
             expected_design_count=request.batch_size * request.number_of_batches,
         )
+        _validate_design_sequence_contract(request, protein_evidence, parsed_fasta)
+        sequence_count = parsed_fasta.design_count
         if request.packing.enabled:
             _validate_packed_artifact_manifest(
                 observed_manifest,
@@ -213,6 +236,50 @@ def parse_ligandmpnn_design_outputs(
             f"observed {result.sequence_count}"
         )
     return result
+
+
+def _validate_design_sequence_contract(
+    request: LigandMpnnRequest,
+    evidence: LigandMpnnProteinStructureEvidence,
+    fasta: OfficialLigandMpnnDesignFasta,
+) -> None:
+    """Require every admitted sequence to obey the exact pinned-parser design mask."""
+
+    if fasta.native_segments != evidence.fasta_native_segments:
+        raise ValueError(
+            "official LigandMPNN FASTA native sequence does not match pinned parser protein sequence: "
+            f"expected {evidence.fasta_native_segments}; observed {fasta.native_segments}"
+        )
+    residue_ids = evidence.fasta_residue_ids
+    native_sequence = tuple("".join(fasta.native_segments))
+    if len(residue_ids) != len(native_sequence):
+        raise ValueError("official LigandMPNN FASTA residue count does not match pinned parser protein residues")
+    fixed_ids = {item.upstream_id for item in request.fixed_residues}
+    redesigned_ids = {item.upstream_id for item in request.redesigned_residues}
+    alphabets = {item.residue.upstream_id: frozenset(item.allowed_amino_acids) for item in request.residue_alphabets}
+    for design_index, segments in enumerate(fasta.designed_segments, start=1):
+        designed_sequence = tuple("".join(segments))
+        for residue_id, native_residue, designed_residue in zip(
+            residue_ids,
+            native_sequence,
+            designed_sequence,
+            strict=True,
+        ):
+            if residue_id in fixed_ids and designed_residue != native_residue:
+                raise ValueError(
+                    f"official LigandMPNN FASTA design {design_index} fixed residue {residue_id} was mutated"
+                )
+            if redesigned_ids and residue_id not in redesigned_ids and designed_residue != native_residue:
+                raise ValueError(
+                    f"official LigandMPNN FASTA design {design_index} mutated residue {residue_id} "
+                    "outside redesigned_residues"
+                )
+            allowed = alphabets.get(residue_id)
+            if allowed is not None and designed_residue not in allowed:
+                raise ValueError(
+                    f"official LigandMPNN FASTA design {design_index} violates residue alphabet constraint "
+                    f"{residue_id}: observed {designed_residue}"
+                )
 
 
 def _official_input_name(pdb_path: Path) -> str:

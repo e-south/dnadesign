@@ -34,6 +34,7 @@ from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
     LigandMpnnContextAtom,
     LigandMpnnContextInventory,
     LigandMpnnContextPolymer,
+    LigandMpnnProteinStructureEvidence,
     _read_descriptor_relative_regular_bytes,
 )
 from dnadesign.thread.adapters.ligandmpnn.models import (
@@ -223,7 +224,7 @@ def _derive_ligandmpnn_context_evidence(
     execution_root: Path,
     checkout_root: Path,
     require_clean_parser_checkout: bool = True,
-) -> tuple[LigandMpnnContextInventory, frozenset[str]]:
+) -> tuple[LigandMpnnContextInventory, LigandMpnnProteinStructureEvidence]:
     """Derive context and exact protein selector identities from one pinned parse."""
 
     root = execution_root.expanduser().resolve()
@@ -240,7 +241,7 @@ def _derive_ligandmpnn_context_evidence(
         raise ValueError(
             f"context probe input SHA256 mismatch: expected {request.pdb_sha256}, observed {observed_input_sha256}"
         )
-    parsed, other_atoms, element_dict_rev, parser_sha256, protein_residue_ids = _run_pinned_upstream_parser(
+    parsed, other_atoms, element_dict_rev, parser_sha256, protein_evidence = _run_pinned_upstream_parser(
         checkout_root,
         expected_commit=request.upstream.commit,
         input_bytes=input_bytes,
@@ -267,7 +268,7 @@ def _derive_ligandmpnn_context_evidence(
         required_polymer_types=request.required_polymer_types,
         atoms=atoms,
     )
-    return inventory, protein_residue_ids
+    return inventory, protein_evidence
 
 
 def _resolve_context_probe_checkout_root(checkout_root: Path, *, execution_root: Path) -> Path:
@@ -966,7 +967,7 @@ def _run_pinned_upstream_parser(
     parse_all_atoms: bool,
     parse_atoms_with_zero_occupancy: bool,
     require_clean_checkout: bool = True,
-) -> tuple[Any, Any, dict[int, str], str, frozenset[str]]:
+) -> tuple[Any, Any, dict[int, str], str, LigandMpnnProteinStructureEvidence]:
     checkout = checkout_root.expanduser().resolve()
     if not checkout.is_dir():
         raise ValueError("LigandMPNN checkout_root must be an existing directory")
@@ -1019,6 +1020,11 @@ def _run_pinned_upstream_parser(
             not isinstance(key, int) or not isinstance(value, str) for key, value in element_dict_rev.items()
         ):
             raise ValueError("pinned LigandMPNN data_utils.py does not expose element_dict_rev")
+        restype_int_to_str = getattr(module, "restype_int_to_str", None)
+        if not isinstance(restype_int_to_str, dict) or any(
+            not isinstance(key, int) or not isinstance(value, str) for key, value in restype_int_to_str.items()
+        ):
+            raise ValueError("pinned LigandMPNN data_utils.py does not expose restype_int_to_str")
         parsed, _, other_atoms, insertion_codes, _ = parser(
             str(input_path),
             device="cpu",
@@ -1026,25 +1032,37 @@ def _run_pinned_upstream_parser(
             parse_all_atoms=parse_all_atoms,
             parse_atoms_with_zero_occupancy=parse_atoms_with_zero_occupancy,
         )
-    protein_residue_ids = _pinned_parser_protein_residue_ids(parsed, insertion_codes)
-    return parsed, other_atoms, element_dict_rev, hashlib.sha256(source_bytes).hexdigest(), protein_residue_ids
+    protein_evidence = _pinned_parser_protein_evidence(
+        parsed,
+        insertion_codes,
+        restype_int_to_str=restype_int_to_str,
+    )
+    return parsed, other_atoms, element_dict_rev, hashlib.sha256(source_bytes).hexdigest(), protein_evidence
 
 
-def _pinned_parser_protein_residue_ids(parsed: Any, insertion_codes: Any) -> frozenset[str]:
-    """Encode the exact residue identities consumed by pinned run.py/score.py."""
+def _pinned_parser_protein_evidence(
+    parsed: Any,
+    insertion_codes: Any,
+    *,
+    restype_int_to_str: dict[int, str],
+) -> LigandMpnnProteinStructureEvidence:
+    """Encode exact identities and native sequence consumed by pinned entrypoints."""
 
-    if not isinstance(parsed, dict) or not {"R_idx", "chain_letters"}.issubset(parsed):
-        raise ValueError("upstream parse_PDB did not return R_idx and chain_letters")
+    if not isinstance(parsed, dict) or not {"R_idx", "chain_letters", "S"}.issubset(parsed):
+        raise ValueError("upstream parse_PDB did not return R_idx, chain_letters, and S")
     residue_numbers = _to_numpy(parsed["R_idx"]).reshape(-1)
     chain_letters = _to_numpy(parsed["chain_letters"]).reshape(-1)
     insertion_codes_array = _to_numpy(insertion_codes).reshape(-1)
-    if not (len(residue_numbers) == len(chain_letters) == len(insertion_codes_array)):
+    native_indices = _to_numpy(parsed["S"]).reshape(-1)
+    if not (len(residue_numbers) == len(chain_letters) == len(insertion_codes_array) == len(native_indices)):
         raise ValueError("upstream protein residue identity lengths differ")
     identities: list[str] = []
-    for chain_id, residue_number, insertion_code in zip(
+    native_sequence: list[str] = []
+    for chain_id, residue_number, insertion_code, native_index in zip(
         chain_letters,
         residue_numbers,
         insertion_codes_array,
+        native_indices,
         strict=True,
     ):
         if not isinstance(chain_id, str) or not isinstance(insertion_code, str):
@@ -1052,9 +1070,17 @@ def _pinned_parser_protein_residue_ids(parsed: Any, insertion_codes: Any) -> fro
         if isinstance(residue_number, (bool, np.bool_)) or not np.issubdtype(type(residue_number), np.integer):
             raise ValueError("upstream protein residue numbers must be integers")
         identities.append(f"{chain_id}{int(residue_number)}{insertion_code}")
-    if len(set(identities)) != len(identities):
-        raise ValueError("upstream parse_PDB returned duplicate protein residue identities")
-    return frozenset(identities)
+        if isinstance(native_index, (bool, np.bool_)) or not np.issubdtype(type(native_index), np.integer):
+            raise ValueError("upstream native sequence indices must be integers")
+        native_residue = restype_int_to_str.get(int(native_index))
+        if native_residue is None:
+            raise ValueError("upstream native sequence contains an unknown residue index")
+        native_sequence.append(native_residue)
+    return LigandMpnnProteinStructureEvidence(
+        residue_ids=tuple(identities),
+        chain_ids=tuple(str(item) for item in chain_letters),
+        native_sequence=tuple(native_sequence),
+    )
 
 
 def _import_upstream_module(
