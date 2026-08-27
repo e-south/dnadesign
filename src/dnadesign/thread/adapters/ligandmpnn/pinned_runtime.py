@@ -607,6 +607,21 @@ def execute_pinned_entrypoint(
                         raise ValueError("score attempt cleanup failed after publication") from cleanup_error
                     else:
                         raise
+            if (
+                execution_failure is not None
+                and design_attempt_path is not None
+                and design_attempt_identity is not None
+            ):
+                try:
+                    _cleanup_private_attempt_directory(
+                        design_attempt_path,
+                        design_attempt_identity,
+                        error_type=LigandMpnnDesignPublicationUncertainError,
+                        changed_message="LigandMPNN design attempt cleanup target changed",
+                        durability_message="LigandMPNN design attempt cleanup durability is uncertain",
+                    )
+                except BaseException as cleanup_error:
+                    execution_failure.add_note(f"private design attempt cleanup also failed: {cleanup_error}")
         if design_publication is not None:
             temporary_output_root, output_root = design_publication
             design_failure: BaseException | None = None

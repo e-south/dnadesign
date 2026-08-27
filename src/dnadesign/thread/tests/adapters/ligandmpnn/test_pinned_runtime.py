@@ -1167,6 +1167,116 @@ def test_pinned_score_cleanup_failure_does_not_mask_original_execution_failure(
     assert not (output_root / "input.pt").exists()
 
 
+@pytest.mark.parametrize(
+    ("entrypoint", "output_root", "attempt_prefix"),
+    [
+        ("run.py", Path("designs/seed_7"), ".seed_7.attempt-"),
+        ("score.py", Path("scores"), ".dnadesign-score-"),
+    ],
+)
+def test_pinned_runtime_cleans_owned_attempt_after_upstream_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entrypoint: str,
+    output_root: Path,
+    attempt_prefix: str,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    absolute_output_root = tmp_path / output_root
+    original_run = subprocess.run
+    attempt_paths: list[Path] = []
+    original_create = pinned_runtime_module._create_private_attempt_directory
+
+    def _record_attempt(*, parent: Path, prefix: str) -> tuple[Path, tuple[int, int]]:
+        result = original_create(parent=parent, prefix=prefix)
+        attempt_paths.append(result[0])
+        return result
+
+    def _fail_upstream(command: object, *args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        if isinstance(command, list) and any(str(value).endswith(entrypoint) for value in command):
+            raise subprocess.CalledProcessError(23, command)
+        return original_run(command, *args, **kwargs)  # type: ignore[arg-type, return-value]
+
+    monkeypatch.setattr(pinned_runtime_module, "_create_private_attempt_directory", _record_attempt)
+    monkeypatch.setattr(subprocess, "run", _fail_upstream)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint=entrypoint,
+            completion_record_path=(
+                absolute_output_root / ".dnadesign-ligandmpnn-execution.json"
+                if entrypoint == "run.py"
+                else tmp_path / ".test-ligandmpnn-execution.json"
+            ),
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(absolute_output_root),
+            ),
+        )
+
+    assert attempt_paths
+    assert all(path.name.startswith(attempt_prefix) and not path.exists() for path in attempt_paths)
+
+
+def test_pinned_design_cleanup_failure_does_not_mask_original_execution_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "designs" / "seed_7"
+    original_run = subprocess.run
+    original_cleanup = pinned_runtime_module._cleanup_private_attempt_directory
+
+    def _fail_design_execution(command: object, *args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        if isinstance(command, list) and any(str(value).endswith("run.py") for value in command):
+            raise subprocess.CalledProcessError(23, command)
+        return original_run(command, *args, **kwargs)  # type: ignore[arg-type, return-value]
+
+    def _fail_design_cleanup(path: Path, identity: tuple[int, int], **kwargs: object) -> None:
+        if path.name.startswith(".seed_7.attempt-"):
+            raise OSError("simulated design cleanup failure during execution failure")
+        original_cleanup(path, identity, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(subprocess, "run", _fail_design_execution)
+    monkeypatch.setattr(pinned_runtime_module, "_cleanup_private_attempt_directory", _fail_design_cleanup)
+
+    with pytest.raises(subprocess.CalledProcessError) as captured:
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            completion_record_path=output_root / ".dnadesign-ligandmpnn-execution.json",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert any("private design attempt cleanup also failed" in note for note in captured.value.__notes__)
+
+
 def test_pinned_score_runtime_retries_with_abandoned_legacy_private_attempt(tmp_path: Path) -> None:
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     output_root = tmp_path / "scores"
