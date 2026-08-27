@@ -95,7 +95,8 @@ produced the refreshed bytes, inventories new artifacts, and accepts `--cache`
 for newly created cache files. Input and metadata bytes are protected: removing
 or changing them fails rather than silently authorizing a new input identity.
 For a demo refresh, changed resources must already be staged and match their Git
-index entries. The refreshed manifest alone enters
+index entries, and the existing manifest must already match its indexed blob.
+The refreshed manifest alone enters
 `refreshed-pending-git-add`; add it with the returned command to restore the
 fully `verified` state.
 If an initial receipt incorrectly classified a mutable operational ledger as

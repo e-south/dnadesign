@@ -283,6 +283,77 @@ def test_refresh_demo_allows_only_manifest_to_enter_pending_git_state(tmp_path: 
     assert verify_storage_object(root).manifest.producer_revision == "test-revision-3"
 
 
+@pytest.mark.parametrize(
+    ("prior_state", "error"),
+    [
+        ("dirty", "demo file differs from Git index"),
+        ("dirty-demo-flag", "demo file differs from Git index"),
+        ("untracked", "demo file is not tracked"),
+    ],
+)
+def test_refresh_demo_requires_prior_manifest_to_match_git_index(
+    tmp_path: Path,
+    prior_state: str,
+    error: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout = tmp_path / "checkout"
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    root = checkout / "examples" / "pilot"
+    root.mkdir(parents=True)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot/payload.txt"], check=True)
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+        demo=True,
+    )
+    manifest_path = root / MANIFEST_NAME
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot/storage.object.json"], check=True)
+    if prior_state in {"dirty", "dirty-demo-flag"}:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if prior_state == "dirty":
+            manifest["retention_policy"] = "retain"
+        else:
+            manifest["demo"] = False
+        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    else:
+        subprocess.run(
+            ["git", "-C", str(checkout), "rm", "--cached", "--", "examples/pilot/storage.object.json"],
+            check=True,
+            capture_output=True,
+        )
+    prior_bytes = manifest_path.read_bytes()
+    publication_calls = 0
+    original_publish = storage_inventory._publish_refresh_manifest
+
+    def _record_publication(*args: object, **kwargs: object) -> None:
+        nonlocal publication_calls
+        publication_calls += 1
+        original_publish(*args, **kwargs)
+
+    monkeypatch.setattr(storage_inventory, "_publish_refresh_manifest", _record_publication)
+
+    with pytest.raises(StorageObjectError, match=error):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert manifest_path.read_bytes() == prior_bytes
+    assert publication_calls == 0
+    assert not tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+
+
 def test_validate_root_emits_inventory_summary(tmp_path: Path) -> None:
     storage_root = tmp_path / "storage"
     for shelf in ("workspaces", "stores", "tool-cache"):

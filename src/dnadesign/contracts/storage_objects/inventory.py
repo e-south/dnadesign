@@ -39,7 +39,12 @@ from .models import (
     StorageObjectPublicationUncertain,
     StorageObjectPublicationUnsupported,
 )
-from .validation import resolve_storage_path, storage_file_paths, verify_storage_object
+from .validation import (
+    resolve_storage_path,
+    storage_file_paths,
+    verify_manifest_index_if_git_resident,
+    verify_storage_object,
+)
 
 _LINUX_RENAME_NOREPLACE = 0x00000001
 _RENAME_EXCHANGE = 0x00000002
@@ -790,7 +795,14 @@ def refresh_storage_object(
                 "storage object manifest changed before refresh: "
                 f"expected {expected_manifest_digest}, observed {observed_manifest_digest}"
             )
+        prior_manifest_is_git_resident = verify_manifest_index_if_git_resident(
+            root,
+            manifest_path,
+            observed_manifest_digest,
+        )
         manifest = load_storage_object_manifest_bytes(previous_bytes, source_label=str(manifest_path))
+        if manifest.demo and not prior_manifest_is_git_resident:
+            raise StorageObjectError(f"demo storage object must live inside a Git checkout: {root}")
         if manifest.object_kind not in {ObjectKind.WORKSPACE, ObjectKind.STORE}:
             raise StorageObjectError(
                 "storage receipt refresh is limited to active workspaces and stores; "

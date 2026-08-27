@@ -288,6 +288,56 @@ def _verify_coordination_posture(
     )
 
 
+def _verify_demo_git_index_entry(checkout: Path, path: Path, expected_digest: str) -> None:
+    """Bind one verified demo file snapshot to its stage-0 Git index blob."""
+
+    relative = path.relative_to(checkout).as_posix()
+    try:
+        completed = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(checkout),
+                "ls-files",
+                "--error-unmatch",
+                "--",
+                f":(literal){relative}",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        raise StorageObjectError(f"cannot verify demo Git tracking for {relative}: {exc}") from exc
+    if completed.returncode != 0:
+        raise StorageObjectError(f"demo file is not tracked: {relative}")
+    try:
+        indexed = subprocess.run(
+            ["git", "-C", str(checkout), "cat-file", "blob", f":{relative}"],
+            check=False,
+            capture_output=True,
+        )
+    except OSError as exc:
+        raise StorageObjectError(f"cannot verify demo Git index bytes for {relative}: {exc}") from exc
+    if indexed.returncode != 0:
+        detail = indexed.stderr.decode(errors="replace").strip()
+        raise StorageObjectError(
+            f"cannot verify demo Git index bytes for {relative}: {detail or 'git cat-file failed'}"
+        )
+    if _sha256_bytes(indexed.stdout) != expected_digest:
+        raise StorageObjectError(f"demo file differs from Git index: {relative}")
+
+
+def verify_manifest_index_if_git_resident(root: Path, manifest_path: Path, expected_digest: str) -> bool:
+    """Bind a Git-resident prior receipt to its index before refresh."""
+
+    checkout = _git_checkout_ancestor(root, include_root=True)
+    if checkout is None:
+        return False
+    _verify_demo_git_index_entry(checkout, manifest_path, expected_digest)
+    return True
+
+
 def _verify_demo(
     checkout: Path,
     verified: VerifiedStorageObject,
@@ -301,43 +351,9 @@ def _verify_demo(
         (verified.manifest_path, verified.manifest_digest),
         *((resource.path, resource.digest) for resource in verified.resources),
     ):
-        relative = path.relative_to(checkout).as_posix()
         if allow_pending_manifest and path == verified.manifest_path:
             continue
-        try:
-            completed = subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(checkout),
-                    "ls-files",
-                    "--error-unmatch",
-                    "--",
-                    f":(literal){relative}",
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-        except OSError as exc:
-            raise StorageObjectError(f"cannot verify demo Git tracking for {relative}: {exc}") from exc
-        if completed.returncode != 0:
-            raise StorageObjectError(f"demo file is not tracked: {relative}")
-        try:
-            indexed = subprocess.run(
-                ["git", "-C", str(checkout), "cat-file", "blob", f":{relative}"],
-                check=False,
-                capture_output=True,
-            )
-        except OSError as exc:
-            raise StorageObjectError(f"cannot verify demo Git index bytes for {relative}: {exc}") from exc
-        if indexed.returncode != 0:
-            detail = indexed.stderr.decode(errors="replace").strip()
-            raise StorageObjectError(
-                f"cannot verify demo Git index bytes for {relative}: {detail or 'git cat-file failed'}"
-            )
-        if _sha256_bytes(indexed.stdout) != expected_digest:
-            raise StorageObjectError(f"demo file differs from Git index: {relative}")
+        _verify_demo_git_index_entry(checkout, path, expected_digest)
 
 
 def verify_storage_object(
