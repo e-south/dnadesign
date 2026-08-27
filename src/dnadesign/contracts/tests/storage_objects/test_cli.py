@@ -381,6 +381,30 @@ def test_inventory_creates_group_writable_lock_for_shared_object(tmp_path: Path)
     assert (root / MANIFEST_NAME).stat().st_gid == root.stat().st_gid
 
 
+def test_inventory_rejects_other_writable_object_root_before_locking(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(0o707)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+
+    with pytest.raises(StorageObjectError, match="must not be other-writable"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert not (root / LOCK_NAME).exists()
+    assert not (root / MANIFEST_NAME).exists()
+
+
 def test_inventory_rejects_non_group_writable_lock_in_shared_object(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     root.mkdir()

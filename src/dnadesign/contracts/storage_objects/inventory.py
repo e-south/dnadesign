@@ -501,6 +501,11 @@ def _manifest_lock(root: Path) -> Iterator[None]:
     try:
         root_stat = root.stat(follow_symlinks=False)
         root_mode = stat.S_IMODE(root_stat.st_mode)
+        if root_mode & stat.S_IWOTH:
+            raise StorageObjectError(
+                "storage object roots must not be other-writable because unrelated accounts "
+                "cannot share a trusted coordination boundary"
+            )
         if root_mode & stat.S_IWGRP and not root_mode & stat.S_ISGID:
             raise StorageObjectError(
                 "group-writable storage object roots must set the setgid bit "

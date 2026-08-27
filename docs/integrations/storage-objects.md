@@ -108,7 +108,9 @@ receipt changes. Writers lock
 same POSIX filesystem serialize receipt updates. The lock is contract-owned
 coordination state and is excluded from the content manifest. Group-writable
 object roots must also be group-traversable, set the POSIX setgid bit, and not
-set the sticky bit. These fail-fast requirements let collaborators reach
+set the sticky bit. Other-writable object roots are rejected because unrelated
+accounts cannot participate in a trusted shared coordination boundary. These
+fail-fast requirements let collaborators reach
 coordination files, ensure locks, staging files, and newly inventoried manifests
 inherit the shared directory group instead of the writer's primary group, and
 allow a group collaborator to atomically replace a receipt owned by another

@@ -169,6 +169,15 @@ def test_verify_storage_object_rejects_group_unreadable_shared_lock(tmp_path: Pa
         verify_storage_object(root)
 
 
+def test_verify_storage_object_rejects_other_writable_root(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    root.chmod(0o707)
+
+    with pytest.raises(StorageObjectError, match="must not be other-writable"):
+        verify_storage_object(root)
+
+
 @pytest.mark.parametrize("mode", [0o200, 0o400])
 def test_verify_storage_object_rejects_owner_inaccessible_lock(tmp_path: Path, mode: int) -> None:
     root = tmp_path / "pilot"
@@ -371,6 +380,29 @@ def test_verify_storage_object_rechecks_coordination_posture_on_second_pass(
     monkeypatch.setattr(storage_validation, "_storage_tree_paths", _tree_paths)
 
     with pytest.raises(StorageObjectError, match="manifest must be group-readable"):
+        verify_storage_object(root)
+
+
+def test_verify_storage_object_rejects_root_made_other_writable_during_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    original_tree_paths = storage_validation._storage_tree_paths
+    calls = 0
+
+    def _tree_paths(root_path: Path):
+        nonlocal calls
+        paths = original_tree_paths(root_path)
+        calls += 1
+        if calls == 2:
+            root.chmod(0o707)
+        return paths
+
+    monkeypatch.setattr(storage_validation, "_storage_tree_paths", _tree_paths)
+
+    with pytest.raises(StorageObjectError, match="must not be other-writable"):
         verify_storage_object(root)
 
 
