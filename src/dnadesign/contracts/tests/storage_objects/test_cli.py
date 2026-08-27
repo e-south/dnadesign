@@ -2624,7 +2624,7 @@ def test_refresh_hashes_and_parses_one_snapshot_then_rejects_manifest_replaced_b
     assert staging[0].read_bytes() == replacement_bytes
 
 
-def test_refresh_reports_typed_unsupported_platform_without_mutation(
+def test_refresh_rejects_unsupported_publication_platform_before_mutation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2645,11 +2645,14 @@ def test_refresh_reports_typed_unsupported_platform_without_mutation(
     )
     manifest_path = root / MANIFEST_NAME
     previous_bytes = manifest_path.read_bytes()
+    lock_path = root / LOCK_NAME
+    lock_state = lock_path.stat()
+    previous_recovery_paths = tuple(sorted(root.glob(f".{MANIFEST_NAME}.*-*")))
     monkeypatch.setattr(storage_inventory.sys, "platform", "unsupported")
 
     with pytest.raises(
-        StorageObjectPublicationUncertain,
-        match="safe manifest staging cleanup is unsupported.*retained",
+        StorageObjectPublicationUnsupported,
+        match="requires POSIX ownership.*atomic rename",
     ):
         refresh_storage_object(
             root,
@@ -2658,8 +2661,181 @@ def test_refresh_reports_typed_unsupported_platform_without_mutation(
         )
 
     assert manifest_path.read_bytes() == previous_bytes
-    retained = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
-    assert len(retained) == 1
+    assert tuple(sorted(root.glob(f".{MANIFEST_NAME}.*-*"))) == previous_recovery_paths
+    assert lock_path.read_bytes() == b""
+    assert (lock_path.stat().st_dev, lock_path.stat().st_ino) == (lock_state.st_dev, lock_state.st_ino)
+
+
+@pytest.mark.parametrize("operation", ["inventory", "refresh"])
+def test_writers_reject_missing_geteuid_before_lock_or_cleanup_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    payload_path = root / "payload.txt"
+    payload_path.write_text("payload\n", encoding="utf-8")
+    if operation == "refresh":
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+    manifest_path = root / MANIFEST_NAME
+    lock_path = root / LOCK_NAME
+    previous_manifest = manifest_path.read_bytes() if manifest_path.exists() else None
+    previous_lock_identity = (lock_path.stat().st_dev, lock_path.stat().st_ino) if lock_path.exists() else None
+    previous_recovery_paths = tuple(sorted(root.glob(f".{MANIFEST_NAME}.*-*")))
+    monkeypatch.delattr(storage_inventory.os, "geteuid")
+
+    with pytest.raises(StorageObjectPublicationUnsupported, match="POSIX ownership.*geteuid"):
+        if operation == "inventory":
+            inventory_storage_object(
+                root,
+                storage_id="pilot",
+                owner_repository="dnadesign",
+                owner_tool="cruncher",
+                object_kind="workspace",
+                content_schema="cruncher.workspace",
+                content_schema_version="1",
+                producer_revision="test-revision-1",
+                storage_class="reproducible",
+                retention_policy="review-before-delete",
+            )
+        else:
+            refresh_storage_object(
+                root,
+                expected_manifest_digest=_digest(manifest_path),
+                producer_revision="test-revision-2",
+            )
+
+    assert payload_path.read_text(encoding="utf-8") == "payload\n"
+    assert tuple(sorted(root.glob(f".{MANIFEST_NAME}.*-*"))) == previous_recovery_paths
+    if operation == "inventory":
+        assert not manifest_path.exists()
+        assert not lock_path.exists()
+    else:
+        assert manifest_path.read_bytes() == previous_manifest
+        assert lock_path.read_bytes() == b""
+        assert (lock_path.stat().st_dev, lock_path.stat().st_ino) == previous_lock_identity
+
+
+@pytest.mark.parametrize("operation", ["inventory", "refresh", "refresh_rollback"])
+def test_writers_use_held_descriptor_chmod_without_nofollow_path_chmod(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    if operation.startswith("refresh"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+    supported = set(storage_inventory.os.supports_follow_symlinks)
+    supported.discard(storage_inventory.os.chmod)
+    monkeypatch.setattr(storage_inventory.os, "supports_follow_symlinks", supported)
+    original_chmod = Path.chmod
+
+    def _chmod(path: Path, mode: int, *, follow_symlinks: bool = True) -> None:
+        if not follow_symlinks:
+            raise NotImplementedError("injected Linux no-follow chmod limitation")
+        original_chmod(path, mode, follow_symlinks=follow_symlinks)
+
+    monkeypatch.setattr(Path, "chmod", _chmod)
+
+    if operation == "inventory":
+        summary = inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+        assert summary["status"] == "verified"
+    elif operation == "refresh":
+        manifest_path = root / MANIFEST_NAME
+        summary = refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+        assert summary["status"] == "verified"
+        assert json.loads(manifest_path.read_text(encoding="utf-8"))["producer_revision"] == "test-revision-2"
+    else:
+        manifest_path = root / MANIFEST_NAME
+        previous_bytes = manifest_path.read_bytes()
+
+        def _reject_published_receipt(*_args: object, **_kwargs: object) -> object:
+            raise StorageObjectError("injected post-publication validation failure")
+
+        monkeypatch.setattr(storage_inventory, "verify_storage_object", _reject_published_receipt)
+        with pytest.raises(StorageObjectError, match="injected post-publication validation failure"):
+            refresh_storage_object(
+                root,
+                expected_manifest_digest=_digest(manifest_path),
+                producer_revision="test-revision-2",
+            )
+        assert manifest_path.read_bytes() == previous_bytes
+
+
+@pytest.mark.parametrize("capability", ["fchmod", "stat_dir_fd", "unlink_dir_fd"])
+def test_inventory_preflights_adjacent_posix_publication_capabilities(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capability: str,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    if capability == "fchmod":
+        monkeypatch.delattr(storage_inventory.os, "fchmod")
+    else:
+        function_name = capability.removesuffix("_dir_fd")
+        supported = set(storage_inventory.os.supports_dir_fd)
+        supported.discard(getattr(storage_inventory.os, function_name))
+        monkeypatch.setattr(storage_inventory.os, "supports_dir_fd", supported)
+
+    with pytest.raises(StorageObjectPublicationUnsupported, match=capability.split("_")[0]):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert not (root / MANIFEST_NAME).exists()
+    assert not (root / LOCK_NAME).exists()
+    assert not tuple(root.glob(f".{MANIFEST_NAME}.*-*"))
 
 
 def test_inventory_reports_typed_unsupported_hard_link_without_mutation(

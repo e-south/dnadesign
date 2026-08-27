@@ -53,6 +53,59 @@ _RENAME_EXCHANGE = 0x00000002
 _DARWIN_RENAME_EXCL = 0x00000004
 
 
+def _require_posix_publication_capabilities() -> None:
+    """Fail before mutation when safe manifest publication is unavailable."""
+
+    unavailable: list[str] = []
+    required_functions = (
+        "geteuid",
+        "fchmod",
+        "fstat",
+        "fsync",
+        "link",
+        "open",
+        "stat",
+        "unlink",
+    )
+    for name in required_functions:
+        if not callable(getattr(os, name, None)):
+            unavailable.append(name)
+    for name in ("O_DIRECTORY", "O_NOFOLLOW"):
+        if not hasattr(os, name):
+            unavailable.append(name)
+
+    supports_dir_fd = getattr(os, "supports_dir_fd", ())
+    for name in ("stat", "unlink"):
+        if not any(getattr(function, "__name__", None) == name for function in supports_dir_fd):
+            unavailable.append(f"{name}_dir_fd")
+    supports_follow_symlinks = getattr(os, "supports_follow_symlinks", ())
+    for name in ("link", "stat"):
+        if not any(getattr(function, "__name__", None) == name for function in supports_follow_symlinks):
+            unavailable.append(f"{name}_follow_symlinks")
+
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+    except (OSError, TypeError):
+        libc = None
+    native_rename_available = bool(
+        libc is not None
+        and (
+            (sys.platform == "darwin" and hasattr(libc, "renameatx_np"))
+            or (sys.platform.startswith("linux") and hasattr(libc, "renameat2"))
+        )
+    )
+    if not native_rename_available:
+        unavailable.append("atomic rename (renameatx_np or renameat2)")
+
+    if unavailable:
+        raise StorageObjectPublicationUnsupported(
+            "storage manifest publication requires POSIX ownership, directory-descriptor, "
+            "symlink-safe, and atomic rename capabilities before mutation; unavailable: "
+            + ", ".join(unavailable)
+            + "; use a supported macOS or Linux filesystem"
+        )
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     try:
@@ -120,8 +173,8 @@ def _rollback_manifest(
         with os.fdopen(descriptor, "wb") as handle:
             handle.write(previous_bytes)
             handle.flush()
+            os.fchmod(handle.fileno(), previous_mode)
             os.fsync(handle.fileno())
-        restore_path.chmod(previous_mode, follow_symlinks=False)
         try:
             _publish_refresh_manifest(
                 restore_path,
@@ -944,9 +997,8 @@ def _write_manifest(
             descriptor = -1
             handle.write(manifest_text)
             handle.flush()
+            os.fchmod(handle.fileno(), previous_mode)
             os.fsync(handle.fileno())
-        if previous_mode is not None:
-            temporary.chmod(previous_mode, follow_symlinks=False)
         if previous_bytes is None:
             try:
                 published_identity = _publish_create_only_manifest(
@@ -1283,6 +1335,7 @@ def inventory_storage_object(
 ) -> dict[str, object]:
     """Write one no-overwrite manifest, then verify the resulting object."""
 
+    _require_posix_publication_capabilities()
     requested_root = Path(storage_root).expanduser()
     if requested_root.is_symlink():
         raise StorageObjectError(f"storage object root must not be a symlink: {requested_root}")
@@ -1374,6 +1427,7 @@ def refresh_storage_object(
 ) -> dict[str, object]:
     """Refresh changed outputs and explicitly demote mistaken metadata roles."""
 
+    _require_posix_publication_capabilities()
     requested_root = Path(storage_root).expanduser()
     if requested_root.is_symlink():
         raise StorageObjectError(f"storage object root must not be a symlink: {requested_root}")
