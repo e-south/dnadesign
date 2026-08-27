@@ -33,6 +33,8 @@ from dnadesign.thread.adapters.ligandmpnn import (
     materialize_residue_alphabet_sidecar,
     parse_ligandmpnn_design_outputs,
 )
+from dnadesign.thread.adapters.ligandmpnn.context_inventory import LigandMpnnProteinStructureEvidence
+from dnadesign.thread.adapters.ligandmpnn.design_fasta import OfficialLigandMpnnDesignFasta
 from dnadesign.thread.adapters.ligandmpnn.design_manifest import build_design_output_manifest
 from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import write_context_inventory
 from dnadesign.thread.tests.adapters.ligandmpnn.test_pinned_runtime import _checkout
@@ -332,7 +334,7 @@ def test_design_admission_binds_each_packed_pdb_to_corresponding_design_record(t
         batch_size=2,
         packing=LigandMpnnPackingConfig(enabled=True, number_of_packs_per_design=1),
     )
-    _replace_official_fasta(output_root, native="AC:DE", designs=("AC:DE", "AG:DE"))
+    _replace_official_fasta(output_root, native="AC:DE", designs=("AC:DE", "AC:GE"))
 
     with pytest.raises(ValueError, match=r"designed sequence identity: packed/input_packed_2_1\.pdb"):
         parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
@@ -472,7 +474,7 @@ def test_design_admission_accepts_mutations_that_preserve_ordered_native_chain_s
         "\n".join(
             [
                 ">input, T=0.1, seed=7\nAC:DE",
-                ">input, id=1, T=0.1, seed=7\nYY:XX",
+                ">input, id=1, T=0.1, seed=7\nYC:YY",
             ]
         ),
         encoding="utf-8",
@@ -482,6 +484,49 @@ def test_design_admission_accepts_mutations_that_preserve_ordered_native_chain_s
     result = parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
 
     assert result.sequence_count == 1
+
+
+def test_design_admission_rejects_noncanonical_residue_at_default_mutable_position(
+    tmp_path: Path,
+) -> None:
+    request, commands, output_root, _sidecar = _execute_design(tmp_path)
+    _replace_official_fasta(output_root, native="AC:DE", designs=("AC:DX",))
+
+    with pytest.raises(ValueError, match=r"mutable residue B2.*noncanonical amino acid X"):
+        parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
+
+
+def test_design_admission_rejects_mutation_at_parser_masked_position(tmp_path: Path) -> None:
+    request, commands, output_root, _sidecar = _execute_design(tmp_path)
+    _replace_official_fasta(output_root, native="AC:DE", designs=("AY:DE",))
+
+    with pytest.raises(ValueError, match=r"non-designable residue A13B.*was mutated"):
+        parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
+
+
+def test_design_sequence_contract_preserves_native_x_only_at_nonmutable_parser_position(
+    tmp_path: Path,
+) -> None:
+    request, _commands, _output_root, _sidecar = _execute_design(tmp_path)
+    evidence = LigandMpnnProteinStructureEvidence(
+        residue_ids=("B-2A", "A12", "A13B", "B2"),
+        chain_ids=("B", "A", "A", "B"),
+        native_sequence=("D", "A", "X", "E"),
+        residue_validity_mask=(1, 1, 0, 1),
+    )
+    valid_fasta = OfficialLigandMpnnDesignFasta(
+        native_segments=("AX", "DE"),
+        designed_segments=(("AX", "YE"),),
+    )
+
+    design_results_module._validate_design_sequence_contract(request, evidence, valid_fasta)
+
+    invalid_fasta = OfficialLigandMpnnDesignFasta(
+        native_segments=("AX", "DE"),
+        designed_segments=(("AY", "DE"),),
+    )
+    with pytest.raises(ValueError, match=r"non-designable residue A13B.*was mutated"):
+        design_results_module._validate_design_sequence_contract(request, evidence, invalid_fasta)
 
 
 def test_design_admission_rejects_native_chain_order_not_matching_pinned_parser(
@@ -559,16 +604,16 @@ def test_design_admission_rejects_mutation_outside_exact_redesigned_parser_resid
 
 
 def test_design_admission_rejects_disallowed_residue_alphabet_output(tmp_path: Path) -> None:
-    redesigned = LigandMpnnResidue("A", 13, "B")
+    redesigned = LigandMpnnResidue("B", -2, "A")
     alphabet = LigandMpnnResidueAlphabet(redesigned, ("A", "G"))
     request, commands, output_root, sidecar = _execute_design(
         tmp_path,
         redesigned_residues=(redesigned,),
         residue_alphabets=(alphabet,),
     )
-    _replace_official_fasta(output_root, native="AC:DE", designs=("AY:DE",))
+    _replace_official_fasta(output_root, native="AC:DE", designs=("AC:YE",))
 
-    with pytest.raises(ValueError, match="residue alphabet constraint A13B"):
+    with pytest.raises(ValueError, match="residue alphabet constraint B-2A"):
         parse_ligandmpnn_design_outputs(
             request,
             commands,
@@ -583,9 +628,9 @@ def test_design_admission_rejects_disallowed_residue_alphabet_output(tmp_path: P
         ((LigandMpnnResidue("A", 12),), (), (), "AC:YY"),
         (
             (),
-            (LigandMpnnResidue("A", 13, "B"),),
-            (LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 13, "B"), ("G",)),),
-            "AG:DE",
+            (LigandMpnnResidue("B", -2, "A"),),
+            (LigandMpnnResidueAlphabet(LigandMpnnResidue("B", -2, "A"), ("G",)),),
+            "AC:GE",
         ),
     ],
 )

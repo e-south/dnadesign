@@ -34,7 +34,11 @@ from dnadesign.thread.adapters.ligandmpnn.design_fasta import (
     parse_official_design_fasta_records,
 )
 from dnadesign.thread.adapters.ligandmpnn.design_manifest import build_design_output_manifest
-from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnCommand, LigandMpnnRequest
+from dnadesign.thread.adapters.ligandmpnn.models import (
+    CANONICAL_AA_ALPHABET,
+    LigandMpnnCommand,
+    LigandMpnnRequest,
+)
 from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import (
     parse_pinned_runtime_prefix,
     pinned_runtime_completion_contract,
@@ -274,6 +278,20 @@ def _validate_design_sequence_contract(
     fixed_ids = {item.upstream_id for item in request.fixed_residues}
     redesigned_ids = {item.upstream_id for item in request.redesigned_residues}
     alphabets = {item.residue.upstream_id: frozenset(item.allowed_amino_acids) for item in request.residue_alphabets}
+    selector_mask = evidence.expected_selector_mask(
+        fixed_residue_ids=frozenset(fixed_ids),
+        redesigned_residue_ids=frozenset(redesigned_ids),
+    )
+    effective_mutability = {
+        residue_id: bool(parser_validity and selector_validity)
+        for residue_id, parser_validity, selector_validity in zip(
+            evidence.residue_ids,
+            evidence.residue_validity_mask,
+            selector_mask,
+            strict=True,
+        )
+    }
+    canonical_amino_acids = frozenset(CANONICAL_AA_ALPHABET)
     for design_index, segments in enumerate(fasta.designed_segments, start=1):
         designed_sequence = tuple("".join(segments))
         for residue_id, native_residue, designed_residue in zip(
@@ -291,8 +309,17 @@ def _validate_design_sequence_contract(
                     f"official LigandMPNN FASTA design {design_index} mutated residue {residue_id} "
                     "outside redesigned_residues"
                 )
+            if not effective_mutability[residue_id] and designed_residue != native_residue:
+                raise ValueError(
+                    f"official LigandMPNN FASTA design {design_index} non-designable residue {residue_id} was mutated"
+                )
             allowed = alphabets.get(residue_id)
-            if allowed is not None and designed_residue not in allowed:
+            if effective_mutability[residue_id] and designed_residue not in canonical_amino_acids:
+                raise ValueError(
+                    f"official LigandMPNN FASTA design {design_index} mutable residue {residue_id} "
+                    f"contains noncanonical amino acid {designed_residue}"
+                )
+            if effective_mutability[residue_id] and allowed is not None and designed_residue not in allowed:
                 raise ValueError(
                     f"official LigandMPNN FASTA design {design_index} violates residue alphabet constraint "
                     f"{residue_id}: observed {designed_residue}"
