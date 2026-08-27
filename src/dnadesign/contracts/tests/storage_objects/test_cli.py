@@ -1320,12 +1320,15 @@ def test_refresh_rejects_lock_replaced_between_inspection_and_acquisition(
 
     monkeypatch.setattr(storage_inventory.FileLock, "acquire", _acquire_after_replacement)
 
-    with pytest.raises(StorageObjectError, match="lock changed before acquisition completed"):
-        refresh_storage_object(
-            root,
-            expected_manifest_digest=_digest(manifest_path),
-            producer_revision="test-revision-2",
-        )
+    # Keep the stale inode alive, as it would be for a non-cooperating process
+    # holding the unlinked lock, so Linux cannot recycle its inode immediately.
+    with lock_path.open("rb"):
+        with pytest.raises(StorageObjectError, match="lock changed before acquisition completed"):
+            refresh_storage_object(
+                root,
+                expected_manifest_digest=_digest(manifest_path),
+                producer_revision="test-revision-2",
+            )
 
     assert replaced
     assert (lock_path.stat().st_dev, lock_path.stat().st_ino) != initial_identity

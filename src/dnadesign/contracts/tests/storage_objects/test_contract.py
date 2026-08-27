@@ -418,8 +418,11 @@ def test_verify_storage_object_rejects_lock_replaced_between_snapshots(
 
     monkeypatch.setattr(storage_validation, "_storage_tree_paths", _tree_paths)
 
-    with pytest.raises(StorageObjectError, match="storage object changed during validation"):
-        verify_storage_object(root)
+    # Keep the stale inode alive, as it would be for a non-cooperating process
+    # holding the unlinked lock, so Linux cannot recycle its inode immediately.
+    with lock_path.open("rb"):
+        with pytest.raises(StorageObjectError, match="storage object changed during validation"):
+            verify_storage_object(root)
 
     assert (lock_path.stat().st_dev, lock_path.stat().st_ino) != initial_identity
 
