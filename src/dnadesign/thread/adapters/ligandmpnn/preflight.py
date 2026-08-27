@@ -15,6 +15,7 @@ import hashlib
 import stat
 import subprocess
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 
 from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnUpstreamPin
@@ -46,6 +47,13 @@ class LigandMpnnPreflightReport:
         return not self.issues
 
 
+class _RegularFileStatus(Enum):
+    MISSING = "missing"
+    REGULAR = "regular"
+    NOT_REGULAR = "not_regular"
+    UNREADABLE = "unreadable"
+
+
 def preflight_ligandmpnn(
     checkout_root: Path,
     pin: LigandMpnnUpstreamPin,
@@ -64,9 +72,17 @@ def preflight_ligandmpnn(
         issues.append(_issue("missing_score_entrypoint", "checkout is missing official score.py", score_entrypoint))
     parser_module = root / "data_utils.py"
     parser_module_regular = _regular_file_status_no_follow(parser_module)
-    if parser_module_regular is None:
+    if parser_module_regular is _RegularFileStatus.MISSING:
         issues.append(_issue("missing_parser_module", "checkout is missing official data_utils.py", parser_module))
-    elif not parser_module_regular:
+    elif parser_module_regular is _RegularFileStatus.UNREADABLE:
+        issues.append(
+            _issue(
+                "unreadable_parser_module",
+                "pinned LigandMPNN data_utils.py status could not be read",
+                parser_module,
+            )
+        )
+    elif parser_module_regular is _RegularFileStatus.NOT_REGULAR:
         issues.append(
             _issue(
                 "parser_module_not_regular",
@@ -83,7 +99,7 @@ def preflight_ligandmpnn(
             _issue("upstream_commit_mismatch", f"expected commit {pin.commit}, observed {observed_commit}", root)
         )
     if observed_commit == pin.commit:
-        if parser_module_regular is True:
+        if parser_module_regular is _RegularFileStatus.REGULAR:
             parser_tracked = _git_tracks_path(root, parser_module.name)
             if parser_tracked is None:
                 issues.append(
@@ -115,7 +131,7 @@ def preflight_ligandmpnn(
             (parser_module, "parser module", "unreadable_parser_blob", "dirty_parser_module"),
         )
         for source_path, label, unreadable_issue, dirty_issue in declared_sources:
-            if source_path == parser_module and parser_module_regular is not True:
+            if source_path == parser_module and parser_module_regular is not _RegularFileStatus.REGULAR:
                 continue
             if not source_path.is_file():
                 continue
@@ -196,13 +212,16 @@ def _git_tracks_path(root: Path, relative_path: str) -> bool | None:
         return None
 
 
-def _regular_file_status_no_follow(path: Path) -> bool | None:
+def _regular_file_status_no_follow(path: Path) -> _RegularFileStatus:
     """Report a leaf's regular-file status without following a symlink."""
 
     try:
-        return stat.S_ISREG(path.lstat().st_mode)
+        is_regular = stat.S_ISREG(path.lstat().st_mode)
     except FileNotFoundError:
-        return None
+        return _RegularFileStatus.MISSING
+    except OSError:
+        return _RegularFileStatus.UNREADABLE
+    return _RegularFileStatus.REGULAR if is_regular else _RegularFileStatus.NOT_REGULAR
 
 
 def _check_digest(

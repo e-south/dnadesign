@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import subprocess
 from pathlib import Path
@@ -172,6 +173,43 @@ def test_preflight_rejects_symlinked_parser_even_when_target_matches_pinned_byte
     assert not report.ok
     assert [(issue.check_id, issue.path) for issue in report.issues] == [
         ("thread.ligandmpnn.parser_module_not_regular", str(parser))
+    ]
+
+
+@pytest.mark.parametrize(
+    "lstat_error",
+    [
+        PermissionError(errno.EACCES, "parser leaf is inaccessible"),
+        PermissionError(errno.EACCES, "parser ancestor is inaccessible"),
+        OSError(errno.EIO, "parser status I/O failure"),
+    ],
+    ids=["inaccessible-leaf", "inaccessible-ancestor", "other-oserror"],
+)
+def test_preflight_normalizes_unreadable_parser_status(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    lstat_error: OSError,
+) -> None:
+    root, pin = _pinned_checkout(tmp_path)
+    parser = root / "data_utils.py"
+    original_lstat = Path.lstat
+
+    def _raise_for_parser(path: Path):
+        if path == parser:
+            raise lstat_error
+        return original_lstat(path)
+
+    monkeypatch.setattr(Path, "lstat", _raise_for_parser)
+
+    report = preflight_ligandmpnn(root, pin)
+
+    assert not report.ok
+    assert [(issue.check_id, issue.message, issue.path) for issue in report.issues] == [
+        (
+            "thread.ligandmpnn.unreadable_parser_module",
+            "pinned LigandMPNN data_utils.py status could not be read",
+            str(parser),
+        )
     ]
 
 

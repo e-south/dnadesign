@@ -210,6 +210,32 @@ def test_probe_rejects_modified_parser_and_inventory_digest_drift(tmp_path: Path
         load_ligandmpnn_context_inventory(reference, execution_root=tmp_path)
 
 
+def test_probe_fails_hard_when_working_parser_bytes_are_unreadable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit = _fake_upstream_checkout(tmp_path)
+    request = _request(tmp_path, checkout, commit)
+    parser_path = checkout / "data_utils.py"
+    original_read_bytes = Path.read_bytes
+
+    def _reject_parser(path: Path) -> bytes:
+        if path == parser_path:
+            raise PermissionError("parser is unreadable during execution")
+        return original_read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", _reject_parser)
+
+    with pytest.raises(ValueError, match="data_utils.py must be clean at the pinned commit"):
+        materialize_ligandmpnn_context_inventory(
+            request,
+            execution_root=tmp_path,
+            checkout_root=checkout,
+        )
+
+    assert not (tmp_path / request.output_path).exists()
+
+
 def test_probe_rejects_assume_unchanged_modified_parser(tmp_path: Path) -> None:
     checkout, commit = _fake_upstream_checkout(tmp_path)
     request = _request(tmp_path, checkout, commit)
