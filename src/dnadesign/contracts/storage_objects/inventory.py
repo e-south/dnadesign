@@ -1017,6 +1017,59 @@ def _write_manifest(
         raise
 
 
+def _assert_held_manifest_lock_binding(
+    root: Path,
+    lock_path: Path,
+    *,
+    root_identity: tuple[int, int],
+    root_mode: int,
+    root_gid: int,
+    lock_descriptor: int,
+    lock_identity: tuple[int, int],
+    lock_mode: int,
+) -> None:
+    """Prove the held lock inode still owns the canonical coordination pathname."""
+
+    try:
+        final_root_stat = root.stat(follow_symlinks=False)
+        before = lock_path.stat(follow_symlinks=False)
+        held = os.fstat(lock_descriptor)
+        after = lock_path.stat(follow_symlinks=False)
+    except OSError as inspection_error:
+        raise StorageObjectError(
+            f"cannot inspect storage object lock at completion {lock_path}: {inspection_error}"
+        ) from inspection_error
+    if (
+        (final_root_stat.st_dev, final_root_stat.st_ino) != root_identity
+        or stat.S_IMODE(final_root_stat.st_mode) != root_mode
+        or final_root_stat.st_gid != root_gid
+    ):
+        raise StorageObjectError(f"storage object root posture changed while holding its manifest lock: {root}")
+    before_identity = (before.st_dev, before.st_ino)
+    held_identity = (held.st_dev, held.st_ino)
+    after_identity = (after.st_dev, after.st_ino)
+    if before_identity != lock_identity or held_identity != lock_identity or after_identity != lock_identity:
+        raise StorageObjectError(f"storage object lock changed before operation completion: {lock_path}")
+    if not stat.S_ISREG(before.st_mode) or not stat.S_ISREG(held.st_mode) or not stat.S_ISREG(after.st_mode):
+        raise StorageObjectError(f"storage object lock must remain a regular file through completion: {lock_path}")
+    if before.st_size != 0 or held.st_size != 0 or after.st_size != 0:
+        raise StorageObjectError(f"storage object lock must remain empty through completion: {lock_path}")
+    if (
+        stat.S_IMODE(before.st_mode) != lock_mode
+        or stat.S_IMODE(held.st_mode) != lock_mode
+        or stat.S_IMODE(after.st_mode) != lock_mode
+    ):
+        raise StorageObjectError(f"storage object lock mode changed before operation completion: {lock_path}")
+    if root_mode & stat.S_IWGRP and (
+        before.st_gid != root_gid
+        or held.st_gid != root_gid
+        or after.st_gid != root_gid
+        or not before.st_mode & stat.S_IWGRP
+        or not before.st_mode & stat.S_IRGRP
+    ):
+        raise StorageObjectError(f"storage object lock shared-group posture changed before completion: {lock_path}")
+
+
 @contextmanager
 def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]:
     lock_path = root / LOCK_NAME
@@ -1098,10 +1151,11 @@ def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]
             raise StorageObjectError(f"storage object lock changed before acquisition completed: {lock_path}")
         lock_context = getattr(lock, "_context", None)
         lock_descriptor = getattr(lock_context, "lock_file_fd", None)
-        if isinstance(lock_descriptor, int):
-            held_stat = os.fstat(lock_descriptor)
-            if (held_stat.st_dev, held_stat.st_ino) != acquired_lock_identity:
-                raise StorageObjectError(f"storage object lock changed before acquisition completed: {lock_path}")
+        if not isinstance(lock_descriptor, int):
+            raise StorageObjectError(f"cannot identify the held storage object lock descriptor: {lock_path}")
+        held_stat = os.fstat(lock_descriptor)
+        if (held_stat.st_dev, held_stat.st_ino) != acquired_lock_identity:
+            raise StorageObjectError(f"storage object lock changed before acquisition completed: {lock_path}")
         lock_mode = stat.S_IMODE(lock_stat.st_mode)
         owner_required = stat.S_IRUSR | stat.S_IWUSR
         if lock_mode & owner_required != owner_required:
@@ -1136,10 +1190,36 @@ def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]
             ) from body_error
         raise
     else:
+        completion_error: StorageObjectError | None = None
+        try:
+            _assert_held_manifest_lock_binding(
+                root,
+                lock_path,
+                root_identity=(root_stat.st_dev, root_stat.st_ino),
+                root_mode=root_mode,
+                root_gid=root_stat.st_gid,
+                lock_descriptor=lock_descriptor,
+                lock_identity=acquired_lock_identity,
+                lock_mode=lock_mode,
+            )
+        except StorageObjectError as inspection_error:
+            completion_error = inspection_error
         try:
             lock.release()
-        except OSError as exc:
-            raise StorageObjectError(f"cannot release storage object manifest lock {lock_path}: {exc}") from exc
+        except OSError as release_error:
+            if completion_error is not None:
+                raise StorageObjectPublicationUncertain(
+                    "storage operation committed but its coordination lock changed before completion "
+                    f"and the held lock could not be released: {lock_path}: {release_error}"
+                ) from completion_error
+            raise StorageObjectError(
+                f"cannot release storage object manifest lock {lock_path}: {release_error}"
+            ) from release_error
+        if completion_error is not None:
+            raise StorageObjectPublicationUncertain(
+                "storage operation committed but its coordination lock changed before completion; "
+                f"revalidate committed state explicitly: {lock_path}"
+            ) from completion_error
 
 
 def _assert_no_ambiguous_manifest_staging(root: Path) -> None:

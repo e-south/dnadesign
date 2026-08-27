@@ -116,6 +116,11 @@ same POSIX filesystem serialize receipt updates. The lock is contract-owned
 coordination state, is excluded from the content manifest, and must remain at a
 stable pathname and inode for the lifetime of an object. Inventory alone may
 bootstrap it before the first receipt; refresh and validation reject absence.
+Before a writer reports success, it rechecks the lock pathname, mode, and shared
+posture against the inode held by its open lock descriptor. If that binding
+changes after a receipt commits, the call raises
+`StorageObjectPublicationUncertain` and requires explicit revalidation of the
+committed object instead of returning a false verified result.
 Group-writable
 object roots must also be group-traversable, set the POSIX setgid bit, and not
 set the sticky bit. Other-writable object roots are rejected because unrelated

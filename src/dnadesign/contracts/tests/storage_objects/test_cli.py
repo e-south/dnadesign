@@ -1534,6 +1534,112 @@ def test_refresh_rejects_lock_replaced_between_inspection_and_acquisition(
     assert payload.read_text(encoding="utf-8") == "payload\n"
 
 
+def test_inventory_reports_uncertain_when_lock_is_replaced_after_commit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    lock_path = root / LOCK_NAME
+    original_write = storage_inventory._write_manifest
+    second_lock: object | None = None
+
+    def _write_then_replace_lock(*args: object, **kwargs: object) -> dict[str, object]:
+        nonlocal second_lock
+        summary = original_write(*args, **kwargs)
+        replacement = root / ".replacement-lock"
+        replacement.write_bytes(b"")
+        replacement.chmod(0o644)
+        replacement.replace(lock_path)
+        second_lock = storage_inventory.FileLock(lock_path, timeout=0)
+        second_lock.acquire()
+        return summary
+
+    monkeypatch.setattr(storage_inventory, "_write_manifest", _write_then_replace_lock)
+
+    try:
+        with pytest.raises(
+            StorageObjectPublicationUncertain,
+            match="operation committed.*coordination lock changed.*revalidate",
+        ):
+            inventory_storage_object(
+                root,
+                storage_id="pilot",
+                owner_repository="dnadesign",
+                owner_tool="cruncher",
+                object_kind="workspace",
+                content_schema="cruncher.workspace",
+                content_schema_version="1",
+                producer_revision="test-revision-1",
+                storage_class="reproducible",
+                retention_policy="review-before-delete",
+            )
+    finally:
+        if second_lock is not None:
+            second_lock.release()
+
+    manifest = json.loads((root / MANIFEST_NAME).read_text(encoding="utf-8"))
+    assert manifest["producer_revision"] == "test-revision-1"
+    assert verify_storage_object(root).manifest.producer_revision == "test-revision-1"
+
+
+def test_refresh_reports_uncertain_when_lock_is_replaced_after_commit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    prior_digest = _digest(manifest_path)
+    lock_path = root / LOCK_NAME
+    original_write = storage_inventory._write_manifest
+    second_lock: object | None = None
+
+    def _write_then_replace_lock(*args: object, **kwargs: object) -> dict[str, object]:
+        nonlocal second_lock
+        summary = original_write(*args, **kwargs)
+        replacement = root / ".replacement-lock"
+        replacement.write_bytes(b"")
+        replacement.chmod(0o644)
+        replacement.replace(lock_path)
+        second_lock = storage_inventory.FileLock(lock_path, timeout=0)
+        second_lock.acquire()
+        return summary
+
+    monkeypatch.setattr(storage_inventory, "_write_manifest", _write_then_replace_lock)
+
+    try:
+        with pytest.raises(
+            StorageObjectPublicationUncertain,
+            match="operation committed.*coordination lock changed.*revalidate",
+        ):
+            refresh_storage_object(
+                root,
+                expected_manifest_digest=prior_digest,
+                producer_revision="test-revision-2",
+            )
+    finally:
+        if second_lock is not None:
+            second_lock.release()
+
+    assert _digest(manifest_path) != prior_digest
+    assert verify_storage_object(root).manifest.producer_revision == "test-revision-2"
+
+
 def test_inventory_fails_closed_on_preexisting_manifest_temp(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     root.mkdir()
