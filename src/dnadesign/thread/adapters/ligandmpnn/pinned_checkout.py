@@ -35,6 +35,16 @@ def working_tree_path_matches_commit(root: Path, commit: str, path: str) -> bool
     return working_tree_bytes == pinned_bytes
 
 
+def index_path_matches_commit(root: Path, commit: str, path: str) -> bool | None:
+    """Report whether the stage-0 index blob matches the pinned commit blob."""
+
+    pinned_bytes = _pinned_path_bytes(root, commit, path)
+    index_bytes = _index_path_bytes(root, path)
+    if pinned_bytes is None or index_bytes is None:
+        return None
+    return index_bytes == pinned_bytes
+
+
 def materialize_pinned_tree(root: Path, commit: str, destination: Path) -> None:
     """Materialize regular tracked blobs from one exact commit without replacement refs."""
 
@@ -88,4 +98,14 @@ def _working_tree_path_bytes(root: Path, path: str) -> bytes | None:
     try:
         return (root / path).read_bytes()
     except OSError:
+        return None
+
+
+def _index_path_bytes(root: Path, path: str) -> bytes | None:
+    try:
+        return subprocess.check_output(
+            ["git", "--no-replace-objects", "-C", str(root), "show", f":{path}"],
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.CalledProcessError):
         return None

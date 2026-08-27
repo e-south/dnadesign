@@ -233,6 +233,25 @@ def test_probe_rejects_assume_unchanged_modified_parser(tmp_path: Path) -> None:
     assert not (tmp_path / request.output_path).exists()
 
 
+def test_probe_rejects_staged_parser_when_worktree_bytes_match_pin(tmp_path: Path) -> None:
+    checkout, commit = _fake_upstream_checkout(tmp_path)
+    request = _request(tmp_path, checkout, commit)
+    parser_path = checkout / "data_utils.py"
+    pinned_payload = parser_path.read_bytes()
+    parser_path.write_text("def parse_PDB(): return 'staged-modification'\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(checkout), "add", "data_utils.py"], check=True)
+    parser_path.write_bytes(pinned_payload)
+
+    with pytest.raises(ValueError, match="data_utils.py Git index does not match the pinned commit"):
+        materialize_ligandmpnn_context_inventory(
+            request,
+            execution_root=tmp_path,
+            checkout_root=checkout,
+        )
+
+    assert not (tmp_path / request.output_path).exists()
+
+
 def test_probe_executes_attested_source_instead_of_valid_cached_bytecode(tmp_path: Path) -> None:
     checkout, commit = _fake_upstream_checkout(tmp_path)
     request = _request(tmp_path, checkout, commit)

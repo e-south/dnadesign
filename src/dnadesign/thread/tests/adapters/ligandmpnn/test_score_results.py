@@ -12,14 +12,18 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+import importlib
+import io
 import json
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 import torch
 
+import dnadesign.thread.adapters.ligandmpnn.score_results as score_results_module
 from dnadesign.thread.adapters.ligandmpnn import (
     EXPECTED_LIGANDMPNN_SCORE_ALPHABET,
     LigandMpnnCanonical20Policy,
@@ -499,3 +503,28 @@ def test_parser_requires_explicit_trust_and_still_uses_weights_only_loading(tmp_
             execution_root=tmp_path,
             trust=LigandMpnnScoreOutputTrust.PINNED_LOCAL_EXECUTION,
         )
+
+
+def test_weights_only_loader_supports_numpy_without_private_core_namespace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    buffer = io.BytesIO()
+    torch.save({"array": np.asarray([1.0], dtype=np.float32)}, buffer)
+    numpy_1_compat = SimpleNamespace(
+        core=SimpleNamespace(multiarray=importlib.import_module("numpy.core.multiarray")),
+        ndarray=np.ndarray,
+        dtype=np.dtype,
+        float32=np.float32,
+        float64=np.float64,
+        int32=np.int32,
+        int64=np.int64,
+        bool_=np.bool_,
+    )
+    monkeypatch.setattr(score_results_module, "np", numpy_1_compat)
+
+    loaded = score_results_module._load_weights_only_payload(  # noqa: SLF001
+        buffer.getvalue(),
+        artifact_path=Path("score.pt"),
+    )
+
+    assert np.array_equal(loaded["array"], np.asarray([1.0], dtype=np.float32))

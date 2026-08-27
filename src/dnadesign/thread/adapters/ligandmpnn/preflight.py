@@ -18,7 +18,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnUpstreamPin
-from dnadesign.thread.adapters.ligandmpnn.pinned_checkout import working_tree_path_matches_commit
+from dnadesign.thread.adapters.ligandmpnn.pinned_checkout import (
+    index_path_matches_commit,
+    working_tree_path_matches_commit,
+)
 from dnadesign.thread.adapters.ligandmpnn.receipts import LigandMpnnProvenance
 
 
@@ -80,6 +83,32 @@ def preflight_ligandmpnn(
             _issue("upstream_commit_mismatch", f"expected commit {pin.commit}, observed {observed_commit}", root)
         )
     if observed_commit == pin.commit:
+        if parser_module_regular is True:
+            parser_tracked = _git_tracks_path(root, parser_module.name)
+            if parser_tracked is None:
+                issues.append(
+                    _issue(
+                        "unreadable_parser_index",
+                        "pinned checkout data_utils.py index state could not be read",
+                        parser_module,
+                    )
+                )
+            elif parser_tracked is False:
+                issues.append(
+                    _issue(
+                        "untracked_parser_module",
+                        "pinned checkout must track data_utils.py in the Git index",
+                        parser_module,
+                    )
+                )
+            elif index_path_matches_commit(root, pin.commit, parser_module.name) is not True:
+                issues.append(
+                    _issue(
+                        "dirty_parser_index",
+                        "checkout parser module Git index differs from the pinned commit",
+                        parser_module,
+                    )
+                )
         declared_sources = (
             (entrypoint, "entrypoint", "unreadable_entrypoint_blob", "dirty_entrypoint"),
             (score_entrypoint, "entrypoint", "unreadable_entrypoint_blob", "dirty_entrypoint"),
@@ -139,6 +168,31 @@ def _git_commit(root: Path) -> str | None:
             observed = observed.decode("ascii")
         return observed.strip().lower()
     except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def _git_tracks_path(root: Path, relative_path: str) -> bool | None:
+    try:
+        observed = subprocess.check_output(
+            [
+                "git",
+                "--no-replace-objects",
+                "-C",
+                str(root),
+                "ls-files",
+                "--error-unmatch",
+                "--",
+                relative_path,
+            ],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        if isinstance(observed, bytes):
+            observed = observed.decode("utf-8")
+        return observed.strip() == relative_path
+    except subprocess.CalledProcessError:
+        return False
+    except OSError:
         return None
 
 

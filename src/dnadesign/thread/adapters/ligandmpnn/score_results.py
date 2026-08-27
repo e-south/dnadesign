@@ -464,9 +464,13 @@ def _validate_execution_completions(
 
 
 def _load_weights_only_payload(payload: bytes, *, artifact_path: Path) -> dict[str, Any]:
+    try:
+        multiarray = np._core.multiarray  # noqa: SLF001
+    except AttributeError:
+        multiarray = np.core.multiarray
     safe_globals = [
-        np._core.multiarray._reconstruct,  # noqa: SLF001
-        np._core.multiarray.scalar,  # noqa: SLF001
+        multiarray._reconstruct,  # noqa: SLF001
+        multiarray.scalar,
         np.ndarray,
         np.dtype,
         type(np.dtype(np.float32)),

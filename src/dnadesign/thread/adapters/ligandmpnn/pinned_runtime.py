@@ -123,15 +123,18 @@ def pinned_runtime_prefix(
         python_executable,
         "-m",
         _MODULE,
-        "--checkout-root",
-        str(checkout_root),
-        "--upstream-commit",
-        upstream_commit,
-        "--checkpoint-sha256",
-        checkpoint_sha256,
-        "--pdb-sha256",
-        pdb_sha256,
     ]
+    _append_cli_option(prefix, "--checkout-root", str(checkout_root))
+    prefix.extend(
+        [
+            "--upstream-commit",
+            upstream_commit,
+            "--checkpoint-sha256",
+            checkpoint_sha256,
+            "--pdb-sha256",
+            pdb_sha256,
+        ]
+    )
     if packing_checkpoint_sha256 is not None:
         prefix.extend(["--packing-checkpoint-sha256", packing_checkpoint_sha256])
     if residue_alphabet_sha256 is not None:
@@ -235,14 +238,15 @@ def parse_pinned_runtime_prefix(
 ) -> tuple[Path, str, Path, str]:
     """Recover only the two caller-owned fields from an exact wrapper prefix."""
 
-    if len(argv) < 20 or "--" not in argv:
+    if "--" not in argv:
         raise ValueError("command does not use the pinned LigandMPNN runtime")
     delimiter = argv.index("--")
     arguments = argv[delimiter + 1 :]
     prefix = argv[: delimiter + 1]
+    checkout_root = Path(_split_option_value(prefix, "--checkout-root"))
     completion_record_path = Path(_split_option_value(prefix, "--completion-record"))
     planned_execution_sha256 = pinned_execution_sha256(
-        checkout_root=Path(argv[4]),
+        checkout_root=checkout_root,
         upstream_commit=upstream_commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
@@ -253,7 +257,7 @@ def parse_pinned_runtime_prefix(
         arguments=arguments,
     )
     expected = pinned_runtime_prefix(
-        checkout_root=Path(argv[4]),
+        checkout_root=checkout_root,
         upstream_commit=upstream_commit,
         checkpoint_sha256=checkpoint_sha256,
         pdb_sha256=pdb_sha256,
@@ -266,7 +270,7 @@ def parse_pinned_runtime_prefix(
     )
     if prefix != expected:
         raise ValueError("command does not use the pinned LigandMPNN runtime")
-    return Path(argv[4]), argv[0], completion_record_path, planned_execution_sha256
+    return checkout_root, argv[0], completion_record_path, planned_execution_sha256
 
 
 def pinned_runtime_completion_contract(
@@ -670,9 +674,22 @@ def _rollback_output_after_completion_failure(rollback_output_path: Path | None)
         ) from rollback_error
 
 
+def _append_cli_option(argv: list[str], option: str, value: str) -> None:
+    if value.startswith("-"):
+        argv.append(f"{option}={value}")
+    else:
+        argv.extend([option, value])
+
+
 def _split_option_value(argv: tuple[str, ...], option: str) -> str:
     positions = [index for index, value in enumerate(argv) if value == option]
-    if len(positions) != 1 or positions[0] + 1 >= len(argv):
+    attached_prefix = f"{option}="
+    attached = [value.removeprefix(attached_prefix) for value in argv if value.startswith(attached_prefix)]
+    if len(positions) + len(attached) != 1:
+        raise ValueError("command does not use the pinned LigandMPNN runtime")
+    if attached:
+        return attached[0]
+    if positions[0] + 1 >= len(argv):
         raise ValueError("command does not use the pinned LigandMPNN runtime")
     return argv[positions[0] + 1]
 

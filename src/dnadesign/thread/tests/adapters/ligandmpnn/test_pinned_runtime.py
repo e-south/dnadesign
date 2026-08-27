@@ -152,6 +152,47 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
     return root, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256
 
 
+@pytest.mark.parametrize("entrypoint", ["run.py", "score.py"])
+def test_pinned_runtime_command_preserves_option_looking_checkout_roots(
+    monkeypatch: pytest.MonkeyPatch,
+    entrypoint: str,
+) -> None:
+    command = build_pinned_runtime_command(
+        checkout_root=Path("-checkout"),
+        upstream_commit="1" * 40,
+        checkpoint_sha256="a" * 64,
+        pdb_sha256="b" * 64,
+        packing_checkpoint_sha256=None,
+        residue_alphabet_sha256=None,
+        entrypoint=entrypoint,
+        python_executable=sys.executable,
+        output_dir=Path("outputs/seed_1"),
+        arguments=(),
+    )
+    observed: list[dict[str, object]] = []
+    monkeypatch.setattr(sys, "argv", ["pinned-runtime", *command[3:]])
+    monkeypatch.setattr(
+        pinned_runtime_module,
+        "execute_pinned_entrypoint",
+        lambda **kwargs: observed.append(kwargs),
+    )
+
+    assert "--checkout-root=-checkout" in command
+    pinned_runtime_module.main()
+    parsed_checkout, _python, _completion, _digest = pinned_runtime_module.parse_pinned_runtime_prefix(
+        command,
+        upstream_commit="1" * 40,
+        checkpoint_sha256="a" * 64,
+        pdb_sha256="b" * 64,
+        packing_checkpoint_sha256=None,
+        residue_alphabet_sha256=None,
+        entrypoint=entrypoint,
+    )
+
+    assert observed[0]["checkout_root"] == Path("-checkout")
+    assert parsed_checkout == Path("-checkout")
+
+
 def test_pinned_runtime_ignores_timestamp_valid_poisoned_parser_bytecode(tmp_path: Path) -> None:
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     parser_path = checkout / "data_utils.py"

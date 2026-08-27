@@ -38,6 +38,7 @@ from dnadesign.thread.adapters.ligandmpnn.models import (
 )
 from dnadesign.thread.adapters.ligandmpnn.pinned_checkout import (
     attested_working_tree_path_bytes,
+    index_path_matches_commit,
     materialize_pinned_tree,
 )
 
@@ -384,6 +385,8 @@ def _run_pinned_upstream_parser(
     tracked = _git(checkout, "ls-files", "--error-unmatch", "data_utils.py")
     if tracked != "data_utils.py":
         raise ValueError("pinned LigandMPNN checkout does not track data_utils.py")
+    if index_path_matches_commit(checkout, expected_commit, "data_utils.py") is not True:
+        raise ValueError("data_utils.py Git index does not match the pinned commit")
     source_bytes = attested_working_tree_path_bytes(checkout, expected_commit, "data_utils.py")
     if source_bytes is None:
         raise ValueError("data_utils.py must be clean at the pinned commit")

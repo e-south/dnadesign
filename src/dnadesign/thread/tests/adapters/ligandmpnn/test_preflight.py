@@ -38,6 +38,8 @@ def test_preflight_accepts_exact_checkout_commit_and_checkpoint_hashes(tmp_path:
     def _git_output(command, **kwargs):
         if "rev-parse" in command:
             return b"1" * 40 + b"\n"
+        if "ls-files" in command:
+            return b"data_utils.py\n"
         if "show" in command:
             return (root / command[-1].split(":", 1)[1]).read_bytes()
         raise AssertionError(f"unexpected command: {command}")
@@ -123,6 +125,38 @@ def test_preflight_rejects_dirty_parser_after_context_evidence(tmp_path: Path) -
     assert not report.ok
     assert [(issue.check_id, issue.path) for issue in report.issues] == [
         ("thread.ligandmpnn.dirty_parser_module", str(root / "data_utils.py"))
+    ]
+
+
+def test_preflight_rejects_parser_removed_from_git_index(tmp_path: Path) -> None:
+    root, pin = _pinned_checkout(tmp_path)
+    subprocess.run(
+        ["git", "-C", str(root), "rm", "--cached", "--quiet", "data_utils.py"],
+        check=True,
+    )
+    assert (root / "data_utils.py").is_file()
+
+    report = preflight_ligandmpnn(root, pin)
+
+    assert not report.ok
+    assert [(issue.check_id, issue.path) for issue in report.issues] == [
+        ("thread.ligandmpnn.untracked_parser_module", str(root / "data_utils.py"))
+    ]
+
+
+def test_preflight_rejects_staged_parser_when_worktree_bytes_match_pin(tmp_path: Path) -> None:
+    root, pin = _pinned_checkout(tmp_path)
+    parser = root / "data_utils.py"
+    pinned_payload = parser.read_bytes()
+    parser.write_text("def parse_PDB(): return 'staged-modification'\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(root), "add", "data_utils.py"], check=True)
+    parser.write_bytes(pinned_payload)
+
+    report = preflight_ligandmpnn(root, pin)
+
+    assert not report.ok
+    assert [(issue.check_id, issue.path) for issue in report.issues] == [
+        ("thread.ligandmpnn.dirty_parser_index", str(parser))
     ]
 
 
