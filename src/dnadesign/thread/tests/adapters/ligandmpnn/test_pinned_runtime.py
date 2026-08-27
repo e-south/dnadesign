@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import importlib.util
 import json
@@ -913,21 +914,20 @@ def test_pinned_score_runtime_rolls_back_publication_when_private_cleanup_fails_
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     output_root = tmp_path / "scores"
     completion_path = tmp_path / ".test-ligandmpnn-execution.json"
-    original_cleanup = tempfile.TemporaryDirectory.cleanup
+    original_cleanup = pinned_runtime_module._cleanup_private_attempt_directory
     failed = False
     score_attempt_paths: list[Path] = []
 
-    def _fail_first_score_cleanup(directory: tempfile.TemporaryDirectory[str]) -> None:
+    def _fail_first_score_cleanup(path: Path, identity: tuple[int, int], **kwargs: object) -> None:
         nonlocal failed
-        path = Path(directory.name)
         if path.name.startswith(".dnadesign-score-"):
             score_attempt_paths.append(path)
             if not failed:
                 failed = True
                 raise OSError("simulated private score cleanup failure")
-        original_cleanup(directory)
+        original_cleanup(path, identity, **kwargs)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(tempfile.TemporaryDirectory, "cleanup", _fail_first_score_cleanup)
+    monkeypatch.setattr(pinned_runtime_module, "_cleanup_private_attempt_directory", _fail_first_score_cleanup)
     arguments = (
         "--model_type",
         "ligand_mpnn",
@@ -978,23 +978,23 @@ def test_pinned_score_runtime_reports_uncertainty_when_cleanup_rollback_sync_fai
 ) -> None:
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     output_root = tmp_path / "scores"
-    original_cleanup = tempfile.TemporaryDirectory.cleanup
+    original_cleanup = pinned_runtime_module._cleanup_private_attempt_directory
     original_fsync = os.fsync
     cleanup_started = False
 
-    def _fail_score_cleanup(directory: tempfile.TemporaryDirectory[str]) -> None:
+    def _fail_score_cleanup(path: Path, identity: tuple[int, int], **kwargs: object) -> None:
         nonlocal cleanup_started
-        if Path(directory.name).name.startswith(".dnadesign-score-"):
+        if path.name.startswith(".dnadesign-score-"):
             cleanup_started = True
             raise OSError("simulated private score cleanup failure")
-        original_cleanup(directory)
+        original_cleanup(path, identity, **kwargs)  # type: ignore[arg-type]
 
     def _fail_cleanup_rollback_sync(descriptor: int) -> None:
         if cleanup_started and stat.S_ISDIR(os.fstat(descriptor).st_mode):
             raise OSError("simulated cleanup rollback sync failure")
         original_fsync(descriptor)
 
-    monkeypatch.setattr(tempfile.TemporaryDirectory, "cleanup", _fail_score_cleanup)
+    monkeypatch.setattr(pinned_runtime_module, "_cleanup_private_attempt_directory", _fail_score_cleanup)
     monkeypatch.setattr(os, "fsync", _fail_cleanup_rollback_sync)
 
     with pytest.raises(
@@ -1031,16 +1031,16 @@ def test_pinned_score_cleanup_rollback_never_deletes_replacement_output(
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     output_root = tmp_path / "scores"
     published_score = output_root / "input.pt"
-    original_cleanup = tempfile.TemporaryDirectory.cleanup
+    original_cleanup = pinned_runtime_module._cleanup_private_attempt_directory
 
-    def _replace_score_then_fail_cleanup(directory: tempfile.TemporaryDirectory[str]) -> None:
-        if Path(directory.name).name.startswith(".dnadesign-score-"):
+    def _replace_score_then_fail_cleanup(path: Path, identity: tuple[int, int], **kwargs: object) -> None:
+        if path.name.startswith(".dnadesign-score-"):
             published_score.unlink()
             published_score.write_text("unrelated replacement", encoding="utf-8")
             raise OSError("simulated cleanup failure after replacement")
-        original_cleanup(directory)
+        original_cleanup(path, identity, **kwargs)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(tempfile.TemporaryDirectory, "cleanup", _replace_score_then_fail_cleanup)
+    monkeypatch.setattr(pinned_runtime_module, "_cleanup_private_attempt_directory", _replace_score_then_fail_cleanup)
 
     with pytest.raises(
         pinned_runtime_module.LigandMpnnScorePublicationUncertainError,
@@ -1069,13 +1069,64 @@ def test_pinned_score_cleanup_rollback_never_deletes_replacement_output(
     assert published_score.read_text(encoding="utf-8") == "unrelated replacement"
 
 
+def test_pinned_score_cleanup_never_deletes_recreated_attempt_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "scores"
+    original_publish = pinned_runtime_module._publish_score_output
+    displaced_attempt = tmp_path / "owned-score-attempt"
+    recreated_attempt: Path | None = None
+
+    def _publish_then_replace_attempt(source_path: Path, destination_path: Path) -> tuple[str, tuple[int, int]]:
+        nonlocal recreated_attempt
+        result = original_publish(source_path, destination_path)
+        attempt_path = source_path.parent
+        attempt_path.rename(displaced_attempt)
+        attempt_path.mkdir()
+        (attempt_path / "foreign.txt").write_text("foreign", encoding="utf-8")
+        recreated_attempt = attempt_path
+        return result
+
+    monkeypatch.setattr(pinned_runtime_module, "_publish_score_output", _publish_then_replace_attempt)
+
+    with pytest.raises(ValueError, match="score attempt cleanup failed after publication") as captured:
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert recreated_attempt is not None
+    assert isinstance(captured.value.__cause__, pinned_runtime_module.LigandMpnnScorePublicationUncertainError)
+    assert "score attempt cleanup target changed" in str(captured.value.__cause__)
+    assert (recreated_attempt / "foreign.txt").read_text(encoding="utf-8") == "foreign"
+    assert (displaced_attempt / "input.pt").read_text(encoding="utf-8") == "input-v1"
+    assert not (output_root / "input.pt").exists()
+
+
 def test_pinned_score_cleanup_failure_does_not_mask_original_execution_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     output_root = tmp_path / "scores"
-    original_cleanup = tempfile.TemporaryDirectory.cleanup
+    original_cleanup = pinned_runtime_module._cleanup_private_attempt_directory
     original_run = subprocess.run
 
     def _fail_score_execution(command: object, *args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
@@ -1083,13 +1134,13 @@ def test_pinned_score_cleanup_failure_does_not_mask_original_execution_failure(
             raise subprocess.CalledProcessError(23, command)
         return original_run(command, *args, **kwargs)  # type: ignore[arg-type, return-value]
 
-    def _fail_score_cleanup(directory: tempfile.TemporaryDirectory[str]) -> None:
-        if Path(directory.name).name.startswith(".dnadesign-score-"):
+    def _fail_score_cleanup(path: Path, identity: tuple[int, int], **kwargs: object) -> None:
+        if path.name.startswith(".dnadesign-score-"):
             raise OSError("simulated cleanup failure during execution failure")
-        original_cleanup(directory)
+        original_cleanup(path, identity, **kwargs)  # type: ignore[arg-type]
 
     monkeypatch.setattr(subprocess, "run", _fail_score_execution)
-    monkeypatch.setattr(tempfile.TemporaryDirectory, "cleanup", _fail_score_cleanup)
+    monkeypatch.setattr(pinned_runtime_module, "_cleanup_private_attempt_directory", _fail_score_cleanup)
 
     with pytest.raises(subprocess.CalledProcessError) as captured:
         execute_pinned_entrypoint(
@@ -1371,6 +1422,140 @@ def test_pinned_design_runtime_preserves_empty_directory_created_at_publication_
     observed = output_root.stat()
     assert (observed.st_dev, observed.st_ino) == replacement_identity
     assert not (output_root / "design.txt").exists()
+
+
+def test_pinned_design_runtime_preserves_recreated_attempt_after_successful_publish(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "designs" / "seed_7"
+    completion_path = output_root / ".dnadesign-ligandmpnn-execution.json"
+    original_publish = pinned_runtime_module._publish_design_output_directory
+    recreated_attempt: Path | None = None
+
+    def _publish_then_recreate_attempt(source_path: Path, destination_path: Path) -> None:
+        nonlocal recreated_attempt
+        original_publish(source_path, destination_path)
+        source_path.mkdir()
+        (source_path / "foreign.txt").write_text("foreign", encoding="utf-8")
+        recreated_attempt = source_path
+
+    monkeypatch.setattr(
+        pinned_runtime_module,
+        "_publish_design_output_directory",
+        _publish_then_recreate_attempt,
+    )
+
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnDesignPublicationUncertainError,
+        match="design attempt cleanup target changed",
+    ):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            completion_record_path=completion_path,
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert recreated_attempt is not None
+    assert (recreated_attempt / "foreign.txt").read_text(encoding="utf-8") == "foreign"
+    assert (output_root / "design.txt").read_text(encoding="utf-8") == "input-v1"
+
+
+def test_pinned_design_rollback_collision_never_deletes_foreign_attempt_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "designs" / "seed_7"
+    completion_path = output_root / ".dnadesign-ligandmpnn-execution.json"
+    original_rename = pinned_runtime_module._rename_no_replace
+    original_fsync = os.fsync
+    published = False
+    publication_sync_failed = False
+    foreign_attempt: Path | None = None
+
+    def _rename_with_restore_collision(
+        source_name: str,
+        destination_name: str,
+        *,
+        src_dir_fd: int,
+        dst_dir_fd: int,
+    ) -> None:
+        nonlocal published, foreign_attempt
+        if destination_name == output_root.name:
+            original_rename(
+                source_name,
+                destination_name,
+                src_dir_fd=src_dir_fd,
+                dst_dir_fd=dst_dir_fd,
+            )
+            published = True
+            return
+        if source_name == "publication" and destination_name.startswith(".seed_7.attempt-"):
+            os.mkdir(destination_name, dir_fd=dst_dir_fd)
+            foreign_attempt = output_root.parent / destination_name
+            (foreign_attempt / "foreign.txt").write_text("foreign", encoding="utf-8")
+        original_rename(
+            source_name,
+            destination_name,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+        )
+
+    def _fail_published_parent_sync(descriptor: int) -> None:
+        nonlocal publication_sync_failed
+        if published and not publication_sync_failed and stat.S_ISDIR(os.fstat(descriptor).st_mode):
+            publication_sync_failed = True
+            raise OSError("simulated publication durability failure")
+        original_fsync(descriptor)
+
+    monkeypatch.setattr(pinned_runtime_module, "_rename_no_replace", _rename_with_restore_collision)
+    monkeypatch.setattr(os, "fsync", _fail_published_parent_sync)
+
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnDesignPublicationUncertainError,
+        match="displaced leaf retained",
+    ) as captured:
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            completion_record_path=completion_path,
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert foreign_attempt is not None
+    assert (foreign_attempt / "foreign.txt").read_text(encoding="utf-8") == "foreign"
+    assert any("private design attempt cleanup also failed" in note for note in captured.value.__notes__)
 
 
 def test_pinned_design_runtime_rolls_back_whole_directory_when_parent_fsync_fails_once(
@@ -1827,9 +2012,7 @@ def test_pinned_score_runtime_rolls_back_output_when_completion_directory_fsync_
         nonlocal directory_fsync_count
         if stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
             directory_fsync_count += 1
-            if directory_fsync_count == 2:
-                assert (output_root / "input.pt").is_file()
-                assert completion_path.is_file()
+            if (output_root / "input.pt").is_file() and completion_path.is_file():
                 raise OSError("simulated completion directory fsync failure")
         original_fsync(file_descriptor)
 
@@ -2065,6 +2248,115 @@ def test_directory_no_replace_rename_preserves_existing_empty_destination(
     assert (source / "design.txt").read_text(encoding="utf-8") == "owned"
 
 
+@pytest.mark.parametrize("platform", ["freebsd13", "openbsd7"])
+def test_pinned_runtime_rejects_unsupported_atomic_publish_before_upstream_execution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    platform: str,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "designs" / "seed_7"
+    reference = write_context_inventory(
+        tmp_path,
+        input_path=pdb.relative_to(tmp_path),
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=False,
+        parser_sha256=hashlib.sha256(PINNED_CONTEXT_PARSER_PAYLOAD).hexdigest(),
+    )
+    upstream_called = False
+
+    def _reject_upstream_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        nonlocal upstream_called
+        upstream_called = True
+        raise AssertionError("upstream execution must not start")
+
+    monkeypatch.setattr(sys, "platform", platform)
+    monkeypatch.setattr(subprocess, "run", _reject_upstream_run)
+
+    with pytest.raises(ValueError, match="atomic no-replace publication is unavailable"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            context_inventory_path=reference.path,
+            context_inventory_sha256=reference.sha256,
+            execution_root=tmp_path,
+            entrypoint="run.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert not upstream_called
+    assert not output_root.parent.exists()
+
+
+def test_pinned_runtime_rejects_missing_atomic_publish_symbol_before_upstream_execution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "designs" / "seed_7"
+    reference = write_context_inventory(
+        tmp_path,
+        input_path=pdb.relative_to(tmp_path),
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=False,
+        parser_sha256=hashlib.sha256(PINNED_CONTEXT_PARSER_PAYLOAD).hexdigest(),
+    )
+    upstream_called = False
+
+    def _missing_symbol(*args: object, **kwargs: object) -> object:
+        return object()
+
+    def _reject_upstream_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        nonlocal upstream_called
+        upstream_called = True
+        raise AssertionError("upstream execution must not start")
+
+    monkeypatch.setattr(ctypes, "CDLL", _missing_symbol)
+    monkeypatch.setattr(subprocess, "run", _reject_upstream_run)
+
+    with pytest.raises(ValueError, match="atomic no-replace publication is unavailable"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            context_inventory_path=reference.path,
+            context_inventory_sha256=reference.sha256,
+            execution_root=tmp_path,
+            entrypoint="run.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert not upstream_called
+    assert not output_root.parent.exists()
+
+
 def test_pinned_score_completion_rollback_preserves_in_place_completion_replacement(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2278,12 +2570,14 @@ def test_pinned_score_runtime_reports_uncertainty_when_completion_rollback_fsync
     completion_path = tmp_path / ".test-ligandmpnn-execution.json"
     original_fsync = os.fsync
     directory_fsync_count = 0
+    completion_failure_started = False
 
     def _fail_completion_and_rollback_directory_fsync(file_descriptor: int) -> None:
-        nonlocal directory_fsync_count
+        nonlocal completion_failure_started, directory_fsync_count
         if stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
             directory_fsync_count += 1
-            if directory_fsync_count >= 2:
+            if completion_failure_started or completion_path.is_file():
+                completion_failure_started = True
                 raise OSError("simulated persistent completion directory fsync failure")
         original_fsync(file_descriptor)
 

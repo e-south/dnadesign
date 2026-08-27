@@ -437,6 +437,10 @@ def execute_pinned_entrypoint(
     if os.path.lexists(completion_record_path):
         raise ValueError(f"LigandMPNN completion record already exists: {completion_record_path}")
     _validate_runtime_option_contract(arguments)
+    try:
+        _resolve_rename_no_replace()
+    except OSError as exc:
+        raise ValueError("atomic no-replace publication is unavailable on this platform") from exc
     checkout = checkout_root.expanduser().resolve()
     if not checkout.is_dir():
         raise ValueError("LigandMPNN checkout_root must be an existing directory")
@@ -510,12 +514,14 @@ def execute_pinned_entrypoint(
                 expected_sha256=residue_alphabet_sha256,
                 destination=inputs_root / "residue-alphabet.json",
             )
-        score_temporary: tempfile.TemporaryDirectory[str] | None = None
+        score_attempt_path: Path | None = None
+        score_attempt_identity: tuple[int, int] | None = None
         score_publication: tuple[Path, Path] | None = None
         published_score_path: Path | None = None
         published_score_identity: tuple[int, int] | None = None
         published_score_sha256: str | None = None
-        design_temporary: tempfile.TemporaryDirectory[str] | None = None
+        design_attempt_path: Path | None = None
+        design_attempt_identity: tuple[int, int] | None = None
         design_publication: tuple[Path, Path] | None = None
         if entrypoint == "run.py" and _has_flag(runtime_arguments, _OUTPUT_FOLDER_FLAG):
             output_value_index, output_root = _runtime_output_root(runtime_arguments)
@@ -529,11 +535,11 @@ def execute_pinned_entrypoint(
                 raise ValueError(f"design output parent could not be opened safely: {output_root.parent}") from exc
             else:
                 os.close(output_parent_fd)
-            design_temporary = tempfile.TemporaryDirectory(
+            temporary_output_root, design_attempt_identity = _create_private_attempt_directory(
                 prefix=f".{output_root.name}.attempt-",
-                dir=output_root.parent,
+                parent=output_root.parent,
             )
-            temporary_output_root = Path(design_temporary.name)
+            design_attempt_path = temporary_output_root
             runtime_arguments[output_value_index] = str(temporary_output_root)
             design_publication = (temporary_output_root, output_root)
         if entrypoint == "score.py":
@@ -554,11 +560,11 @@ def execute_pinned_entrypoint(
                 raise ValueError(f"score attempt directory could not be opened safely: {score_attempt_root}") from exc
             else:
                 os.close(score_attempt_root_fd)
-            score_temporary = tempfile.TemporaryDirectory(
+            temporary_output_root, score_attempt_identity = _create_private_attempt_directory(
                 prefix=f".dnadesign-score-{output_root.parent.name}-{output_root.name}-",
-                dir=score_attempt_root,
+                parent=score_attempt_root,
             )
-            temporary_output_root = Path(score_temporary.name)
+            score_attempt_path = temporary_output_root
             runtime_arguments[output_value_index] = str(temporary_output_root)
             score_publication = (temporary_output_root / staged_pdb.with_suffix(".pt").name, expected_output)
         execution_failure: BaseException | None = None
@@ -574,9 +580,15 @@ def execute_pinned_entrypoint(
             execution_failure = error
             raise
         finally:
-            if score_temporary is not None:
+            if score_attempt_path is not None and score_attempt_identity is not None:
                 try:
-                    score_temporary.cleanup()
+                    _cleanup_private_attempt_directory(
+                        score_attempt_path,
+                        score_attempt_identity,
+                        error_type=LigandMpnnScorePublicationUncertainError,
+                        changed_message="LigandMPNN score attempt cleanup target changed",
+                        durability_message="LigandMPNN score attempt cleanup durability is uncertain",
+                    )
                 except BaseException as cleanup_error:
                     if execution_failure is not None:
                         execution_failure.add_note(f"private score attempt cleanup also failed: {cleanup_error}")
@@ -597,6 +609,7 @@ def execute_pinned_entrypoint(
                         raise
         if design_publication is not None:
             temporary_output_root, output_root = design_publication
+            design_failure: BaseException | None = None
             try:
                 _sync_regular_directory_tree(temporary_output_root)
                 design_output_manifest = build_design_output_manifest(temporary_output_root)
@@ -616,9 +629,24 @@ def execute_pinned_entrypoint(
                 if build_design_output_manifest(temporary_output_root) != design_output_manifest:
                     raise ValueError("design output tree changed before atomic publication")
                 _publish_design_output_directory(temporary_output_root, output_root)
+            except BaseException as error:
+                design_failure = error
+                raise
             finally:
-                if design_temporary is not None:
-                    design_temporary.cleanup()
+                if design_attempt_path is not None and design_attempt_identity is not None:
+                    try:
+                        _cleanup_private_attempt_directory(
+                            design_attempt_path,
+                            design_attempt_identity,
+                            error_type=LigandMpnnDesignPublicationUncertainError,
+                            changed_message="LigandMPNN design attempt cleanup target changed",
+                            durability_message="LigandMPNN design attempt cleanup durability is uncertain",
+                        )
+                    except BaseException as cleanup_error:
+                        if design_failure is not None:
+                            design_failure.add_note(f"private design attempt cleanup also failed: {cleanup_error}")
+                        else:
+                            raise
             return
     _write_completion_record(
         completion_record_path,
@@ -864,14 +892,144 @@ def _open_directory_path(path: Path, *, create: bool) -> int:
         raise
 
 
-def _rename_no_replace(
-    source_name: str,
-    destination_name: str,
+def _create_private_attempt_directory(*, parent: Path, prefix: str) -> tuple[Path, tuple[int, int]]:
+    """Create one private attempt without registering path-based cleanup authority."""
+
+    attempt_path = Path(tempfile.mkdtemp(prefix=prefix, dir=parent))
+    parent_fd = _open_directory_path(parent, create=False)
+    try:
+        observed = os.stat(attempt_path.name, dir_fd=parent_fd, follow_symlinks=False)
+        if not stat.S_ISDIR(observed.st_mode):
+            raise OSError("private attempt is not a directory")
+        return attempt_path, (observed.st_dev, observed.st_ino)
+    finally:
+        os.close(parent_fd)
+
+
+def _remove_directory_tree_contents(directory_fd: int) -> None:
+    """Remove one already-quarantined directory tree without following links."""
+
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
+    for name in os.listdir(directory_fd):
+        observed = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        if stat.S_ISDIR(observed.st_mode):
+            child_fd = os.open(name, directory_flags, dir_fd=directory_fd)
+            try:
+                opened = os.fstat(child_fd)
+                if (opened.st_dev, opened.st_ino) != (observed.st_dev, observed.st_ino):
+                    raise OSError("private attempt child changed during cleanup")
+                _remove_directory_tree_contents(child_fd)
+            finally:
+                os.close(child_fd)
+            current = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            if (current.st_dev, current.st_ino) != (observed.st_dev, observed.st_ino):
+                raise OSError("private attempt child changed during cleanup")
+            os.rmdir(name, dir_fd=directory_fd)
+        else:
+            os.unlink(name, dir_fd=directory_fd)
+    os.fsync(directory_fd)
+
+
+def _cleanup_private_attempt_directory(
+    attempt_path: Path,
+    expected_identity: tuple[int, int],
     *,
-    src_dir_fd: int,
-    dst_dir_fd: int,
+    error_type: type[RuntimeError],
+    changed_message: str,
+    durability_message: str,
 ) -> None:
-    """Atomically rename one leaf without replacing any destination type."""
+    """Quarantine and remove only the attempt directory created by this execution."""
+
+    try:
+        parent_fd = _open_directory_path(attempt_path.parent, create=False)
+    except OSError as exc:
+        raise error_type(durability_message) from exc
+    quarantine_name = f".dnadesign-attempt-cleanup-{secrets.token_hex(12)}"
+    quarantine_fd: int | None = None
+    quarantined = False
+    quarantine_leaf = "attempt"
+    try:
+        os.mkdir(quarantine_name, mode=0o700, dir_fd=parent_fd)
+        quarantine_fd = os.open(
+            quarantine_name,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+            dir_fd=parent_fd,
+        )
+        try:
+            os.rename(
+                attempt_path.name,
+                quarantine_leaf,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=quarantine_fd,
+            )
+        except FileNotFoundError:
+            os.rmdir(quarantine_name, dir_fd=parent_fd)
+            os.fsync(parent_fd)
+            return
+        quarantined = True
+        os.fsync(parent_fd)
+        try:
+            observed = os.stat(quarantine_leaf, dir_fd=quarantine_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise error_type(durability_message) from exc
+        if not stat.S_ISDIR(observed.st_mode) or (observed.st_dev, observed.st_ino) != expected_identity:
+            try:
+                _rename_no_replace(
+                    quarantine_leaf,
+                    attempt_path.name,
+                    src_dir_fd=quarantine_fd,
+                    dst_dir_fd=parent_fd,
+                )
+                quarantined = False
+                os.fsync(parent_fd)
+                os.fsync(quarantine_fd)
+                os.rmdir(quarantine_name, dir_fd=parent_fd)
+                os.fsync(parent_fd)
+            except OSError as restore_error:
+                raise error_type(
+                    f"{changed_message}; displaced attempt retained in {quarantine_name}/{quarantine_leaf}"
+                ) from restore_error
+            raise error_type(changed_message)
+        attempt_fd = os.open(
+            quarantine_leaf,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+            dir_fd=quarantine_fd,
+        )
+        try:
+            opened = os.fstat(attempt_fd)
+            if (opened.st_dev, opened.st_ino) != expected_identity:
+                raise error_type(changed_message)
+            _remove_directory_tree_contents(attempt_fd)
+        finally:
+            os.close(attempt_fd)
+        current = os.stat(quarantine_leaf, dir_fd=quarantine_fd, follow_symlinks=False)
+        if (current.st_dev, current.st_ino) != expected_identity:
+            raise error_type(changed_message)
+        os.rmdir(quarantine_leaf, dir_fd=quarantine_fd)
+        quarantined = False
+        os.fsync(quarantine_fd)
+        os.rmdir(quarantine_name, dir_fd=parent_fd)
+        os.fsync(parent_fd)
+        try:
+            os.stat(attempt_path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            raise error_type(durability_message) from exc
+        raise error_type(changed_message)
+    except error_type:
+        raise
+    except OSError as exc:
+        recovery = f"; displaced attempt retained in {quarantine_name}/{quarantine_leaf}" if quarantined else ""
+        raise error_type(f"{durability_message}{recovery}") from exc
+    finally:
+        if quarantine_fd is not None:
+            os.close(quarantine_fd)
+        os.close(parent_fd)
+
+
+def _resolve_rename_no_replace() -> tuple[ctypes._CFuncPtr, int]:
+    """Resolve the platform's native atomic no-replace rename before execution."""
 
     libc = ctypes.CDLL(None, use_errno=True)
     try:
@@ -893,6 +1051,19 @@ def _rename_no_replace(
         ctypes.c_uint,
     )
     rename_function.restype = ctypes.c_int
+    return rename_function, flags
+
+
+def _rename_no_replace(
+    source_name: str,
+    destination_name: str,
+    *,
+    src_dir_fd: int,
+    dst_dir_fd: int,
+) -> None:
+    """Atomically rename one leaf without replacing any destination type."""
+
+    rename_function, flags = _resolve_rename_no_replace()
     result = rename_function(
         src_dir_fd,
         os.fsencode(source_name),
