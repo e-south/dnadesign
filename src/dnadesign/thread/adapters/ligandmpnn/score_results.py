@@ -348,7 +348,14 @@ def parse_ligandmpnn_score_outputs(
         raise ValueError(
             "unexpected LigandMPNN score outputs: " + ", ".join(_display_path(path, root) for path in extra)
         )
-    output_payloads = tuple(path.read_bytes() for path in expected_paths)
+    output_payloads = tuple(
+        _read_descriptor_relative_regular_bytes(
+            root,
+            path.relative_to(root),
+            label="LigandMPNN score output",
+        )
+        for path in expected_paths
+    )
     output_sha256s = tuple(_sha256_bytes(payload) for payload in output_payloads)
     execution_digests = _validate_execution_completions(
         request,

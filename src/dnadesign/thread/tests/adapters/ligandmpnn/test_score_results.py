@@ -17,6 +17,7 @@ import io
 import json
 import os
 import socket
+import threading
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -466,6 +467,76 @@ def test_parser_rejects_extra_nonregular_score_artifacts(
         extra.mkdir()
 
     with pytest.raises(ValueError, match="must be regular files"):
+        _parse(tmp_path, request)
+
+
+def test_parser_rejects_expected_score_replaced_by_fifo_after_discovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    output = _write_output(tmp_path, request, 7)
+    payload = output.read_bytes()
+    original_lstat = Path.lstat
+    target_lstat_calls = 0
+    writer: threading.Thread | None = None
+
+    def swap_after_regular_lstat(path: Path) -> os.stat_result:
+        nonlocal target_lstat_calls, writer
+        status = original_lstat(path)
+        if path == output:
+            target_lstat_calls += 1
+            if target_lstat_calls == 2:
+                path.unlink()
+                os.mkfifo(path)
+
+                def stream_original_bytes() -> None:
+                    descriptor = os.open(path, os.O_WRONLY)
+                    try:
+                        os.write(descriptor, payload)
+                    except OSError:
+                        pass
+                    finally:
+                        os.close(descriptor)
+
+                writer = threading.Thread(target=stream_original_bytes, daemon=True)
+                writer.start()
+        return status
+
+    monkeypatch.setattr(Path, "lstat", swap_after_regular_lstat)
+    try:
+        with pytest.raises(ValueError, match="LigandMPNN score output must be a regular file"):
+            _parse(tmp_path, request)
+    finally:
+        assert writer is not None
+        writer.join(timeout=2)
+        assert not writer.is_alive()
+
+
+def test_parser_rejects_expected_score_replaced_by_symlink_after_discovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    output = _write_output(tmp_path, request, 7)
+    foreign = tmp_path / "foreign-score.pt"
+    foreign.write_bytes(output.read_bytes())
+    original_resolve = Path.resolve
+    target_resolve_calls = 0
+
+    def swap_after_path_resolution(path: Path, *args: object, **kwargs: object) -> Path:
+        nonlocal target_resolve_calls
+        resolved = original_resolve(path, *args, **kwargs)
+        if path == output:
+            target_resolve_calls += 1
+            if target_resolve_calls == 2:
+                path.unlink()
+                path.symlink_to(foreign)
+        return resolved
+
+    monkeypatch.setattr(Path, "resolve", swap_after_path_resolution)
+
+    with pytest.raises(ValueError, match="LigandMPNN score output could not be opened safely"):
         _parse(tmp_path, request)
 
 
