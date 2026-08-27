@@ -12,6 +12,8 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import argparse
+import ctypes
+import errno
 import hashlib
 import json
 import os
@@ -60,6 +62,9 @@ _ALTERNATE_SOURCE_FLAGS = frozenset(
         "--omit_AA_per_residue_multi",
     }
 )
+
+_LINUX_RENAME_NOREPLACE = 1
+_MACOS_RENAME_EXCL = 0x00000004
 _ATTESTATION_SENSITIVE_FLAGS = frozenset(
     {
         _MODEL_TYPE_FLAG,
@@ -859,6 +864,47 @@ def _open_directory_path(path: Path, *, create: bool) -> int:
         raise
 
 
+def _rename_no_replace(
+    source_name: str,
+    destination_name: str,
+    *,
+    src_dir_fd: int,
+    dst_dir_fd: int,
+) -> None:
+    """Atomically rename one leaf without replacing any destination type."""
+
+    libc = ctypes.CDLL(None, use_errno=True)
+    try:
+        if sys.platform.startswith("linux"):
+            rename_function = libc.renameat2
+            flags = _LINUX_RENAME_NOREPLACE
+        elif sys.platform == "darwin":
+            rename_function = libc.renameatx_np
+            flags = _MACOS_RENAME_EXCL
+        else:
+            raise OSError(errno.ENOTSUP, "atomic no-replace rename is not supported on this platform")
+    except AttributeError as error:
+        raise OSError(errno.ENOTSUP, "atomic no-replace rename is unavailable") from error
+    rename_function.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename_function.restype = ctypes.c_int
+    result = rename_function(
+        src_dir_fd,
+        os.fsencode(source_name),
+        dst_dir_fd,
+        os.fsencode(destination_name),
+        flags,
+    )
+    if result != 0:
+        error_number = ctypes.get_errno()
+        raise OSError(error_number, os.strerror(error_number), destination_name)
+
+
 def _rollback_completion_and_output(
     completion_directory_fd: int,
     *,
@@ -1161,6 +1207,7 @@ def _quarantine_and_remove_owned_leaf(
     changed_message: str,
     inspect_message: str,
     durability_message: str,
+    restore_owned_name: str | None = None,
 ) -> bool:
     """Atomically displace, verify, and durably remove only an owned leaf."""
 
@@ -1224,15 +1271,13 @@ def _quarantine_and_remove_owned_leaf(
                 )
         except error_type as ownership_error:
             try:
-                os.link(
+                _rename_no_replace(
                     quarantine_leaf,
                     name,
                     src_dir_fd=quarantine_fd,
                     dst_dir_fd=directory_fd,
-                    follow_symlinks=False,
                 )
                 os.fsync(directory_fd)
-                os.unlink(quarantine_leaf, dir_fd=quarantine_fd)
                 os.fsync(quarantine_fd)
                 os.rmdir(quarantine_name, dir_fd=directory_fd)
                 os.fsync(directory_fd)
@@ -1245,7 +1290,15 @@ def _quarantine_and_remove_owned_leaf(
             os.rmdir(quarantine_name, dir_fd=directory_fd)
             os.fsync(directory_fd)
             return False
-        os.unlink(quarantine_leaf, dir_fd=quarantine_fd)
+        if restore_owned_name is None:
+            os.unlink(quarantine_leaf, dir_fd=quarantine_fd)
+        else:
+            _rename_no_replace(
+                quarantine_leaf,
+                restore_owned_name,
+                src_dir_fd=quarantine_fd,
+                dst_dir_fd=directory_fd,
+            )
         quarantined = False
         os.fsync(quarantine_fd)
         os.rmdir(quarantine_name, dir_fd=directory_fd)
@@ -1356,8 +1409,7 @@ def _publish_design_output_directory(source_path: Path, destination_path: Path) 
         parent_fd = _open_directory_path(destination_path.parent, create=False)
     except OSError as exc:
         raise ValueError(f"design output parent could not be opened safely: {destination_path.parent}") from exc
-    placeholder_identity: tuple[int, int] | None = None
-    published = False
+    source_fd: int | None = None
     source_identity: tuple[int, int] | None = None
     try:
         try:
@@ -1366,75 +1418,38 @@ def _publish_design_output_directory(source_path: Path, destination_path: Path) 
                 os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
                 dir_fd=parent_fd,
             )
+            source_status = os.fstat(source_fd)
+            source_identity = (source_status.st_dev, source_status.st_ino)
         except OSError as exc:
             raise ValueError(f"design output attempt directory is not safe: {source_path}") from exc
-        else:
-            try:
-                source_status = os.fstat(source_fd)
-                source_identity = (source_status.st_dev, source_status.st_ino)
-            except OSError as exc:
-                raise ValueError(f"design output attempt directory is not safe: {source_path}") from exc
-            finally:
-                os.close(source_fd)
         try:
-            os.mkdir(destination_path.name, mode=0o700, dir_fd=parent_fd)
-        except FileExistsError as exc:
-            raise ValueError(f"design output directory already exists: {destination_path}") from exc
-        try:
-            placeholder_status = os.stat(destination_path.name, dir_fd=parent_fd, follow_symlinks=False)
-            placeholder_identity = (placeholder_status.st_dev, placeholder_status.st_ino)
-        except OSError as exc:
-            raise LigandMpnnDesignPublicationUncertainError(
-                "LigandMPNN design placeholder ownership could not be recorded"
-            ) from exc
-        try:
-            if not _owned_leaf_exists(
-                parent_fd,
-                destination_path.name,
-                placeholder_identity,
-                error_type=LigandMpnnDesignPublicationUncertainError,
-                changed_message="LigandMPNN design placeholder changed before publication",
-                inspect_message="LigandMPNN design placeholder could not be inspected before publication",
-            ):
-                raise LigandMpnnDesignPublicationUncertainError(
-                    "LigandMPNN design placeholder disappeared before publication"
-                )
-            os.rename(
+            _rename_no_replace(
                 source_path.name,
                 destination_path.name,
                 src_dir_fd=parent_fd,
                 dst_dir_fd=parent_fd,
             )
-            published = True
+        except FileExistsError as exc:
+            raise ValueError(f"design output directory already exists: {destination_path}") from exc
+        except OSError as exc:
+            raise ValueError(f"design output could not be published atomically: {destination_path}") from exc
+        try:
             os.fsync(parent_fd)
         except OSError as publication_error:
             try:
-                if published:
-                    assert source_identity is not None
-                    if _owned_leaf_exists(
-                        parent_fd,
-                        destination_path.name,
-                        source_identity,
-                        error_type=LigandMpnnDesignPublicationUncertainError,
-                        changed_message="LigandMPNN design publication rollback target changed",
-                        inspect_message="LigandMPNN design publication rollback target could not be inspected",
-                    ):
-                        os.rename(
-                            destination_path.name,
-                            source_path.name,
-                            src_dir_fd=parent_fd,
-                            dst_dir_fd=parent_fd,
-                        )
-                elif placeholder_identity is not None and _owned_leaf_exists(
+                assert source_identity is not None
+                _quarantine_and_remove_owned_leaf(
                     parent_fd,
                     destination_path.name,
-                    placeholder_identity,
+                    source_identity,
+                    expected_bytes=None,
+                    expected_sha256=None,
                     error_type=LigandMpnnDesignPublicationUncertainError,
-                    changed_message="LigandMPNN design placeholder rollback target changed",
-                    inspect_message="LigandMPNN design placeholder rollback target could not be inspected",
-                ):
-                    os.rmdir(destination_path.name, dir_fd=parent_fd)
-                os.fsync(parent_fd)
+                    changed_message="LigandMPNN design publication rollback target changed",
+                    inspect_message="LigandMPNN design publication rollback target could not be inspected",
+                    durability_message="LigandMPNN design publication rollback durability is uncertain",
+                    restore_owned_name=source_path.name,
+                )
             except OSError as rollback_error:
                 raise LigandMpnnDesignPublicationUncertainError(
                     "LigandMPNN design publication rollback durability is uncertain"
@@ -1443,6 +1458,8 @@ def _publish_design_output_directory(source_path: Path, destination_path: Path) 
                 publication_error
             )
     finally:
+        if source_fd is not None:
+            os.close(source_fd)
         os.close(parent_fd)
 
 

@@ -1310,6 +1310,69 @@ def test_pinned_design_runtime_publishes_only_one_concurrent_seed_directory(
     assert completion_path.is_file()
 
 
+def test_pinned_design_runtime_preserves_empty_directory_created_at_publication_race(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "designs" / "seed_7"
+    completion_path = output_root / ".dnadesign-ligandmpnn-execution.json"
+    original_rename_no_replace = pinned_runtime_module._rename_no_replace
+    replacement_identity: tuple[int, int] | None = None
+
+    def _install_empty_replacement_then_publish(
+        source_name: str,
+        destination_name: str,
+        *,
+        src_dir_fd: int,
+        dst_dir_fd: int,
+    ) -> None:
+        nonlocal replacement_identity
+        if destination_name == output_root.name and replacement_identity is None:
+            os.mkdir(destination_name, dir_fd=dst_dir_fd)
+            status = os.stat(destination_name, dir_fd=dst_dir_fd, follow_symlinks=False)
+            replacement_identity = (status.st_dev, status.st_ino)
+        original_rename_no_replace(
+            source_name,
+            destination_name,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+        )
+
+    monkeypatch.setattr(
+        pinned_runtime_module,
+        "_rename_no_replace",
+        _install_empty_replacement_then_publish,
+    )
+
+    with pytest.raises(ValueError, match="design output directory already exists"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            completion_record_path=completion_path,
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert replacement_identity is not None
+    observed = output_root.stat()
+    assert (observed.st_dev, observed.st_ino) == replacement_identity
+    assert not (output_root / "design.txt").exists()
+
+
 def test_pinned_design_runtime_rolls_back_whole_directory_when_parent_fsync_fails_once(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1317,15 +1380,26 @@ def test_pinned_design_runtime_rolls_back_whole_directory_when_parent_fsync_fail
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     output_root = tmp_path / "designs" / "seed_7"
     completion_path = output_root / ".dnadesign-ligandmpnn-execution.json"
-    original_rename = os.rename
+    original_rename_no_replace = pinned_runtime_module._rename_no_replace
     original_fsync = os.fsync
     published = False
     failure_injected = False
 
-    def _record_publication_rename(*args: object, **kwargs: object) -> None:
+    def _record_publication_rename(
+        source_name: str,
+        destination_name: str,
+        *,
+        src_dir_fd: int,
+        dst_dir_fd: int,
+    ) -> None:
         nonlocal published
-        original_rename(*args, **kwargs)  # type: ignore[arg-type]
-        if args[1] == output_root.name:
+        original_rename_no_replace(
+            source_name,
+            destination_name,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+        )
+        if destination_name == output_root.name:
             published = True
 
     def _fail_published_parent_fsync_once(file_descriptor: int) -> None:
@@ -1337,7 +1411,7 @@ def test_pinned_design_runtime_rolls_back_whole_directory_when_parent_fsync_fail
             raise OSError("simulated design parent fsync failure")
         original_fsync(file_descriptor)
 
-    monkeypatch.setattr(os, "rename", _record_publication_rename)
+    monkeypatch.setattr(pinned_runtime_module, "_rename_no_replace", _record_publication_rename)
     monkeypatch.setattr(os, "fsync", _fail_published_parent_fsync_once)
 
     with pytest.raises(ValueError, match="design output publication could not be made durable"):
@@ -1437,14 +1511,25 @@ def test_pinned_design_runtime_reports_uncertainty_when_directory_rollback_fsync
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     output_root = tmp_path / "designs" / "seed_7"
     completion_path = output_root / ".dnadesign-ligandmpnn-execution.json"
-    original_rename = os.rename
+    original_rename_no_replace = pinned_runtime_module._rename_no_replace
     original_fsync = os.fsync
     published = False
 
-    def _record_publication_rename(*args: object, **kwargs: object) -> None:
+    def _record_publication_rename(
+        source_name: str,
+        destination_name: str,
+        *,
+        src_dir_fd: int,
+        dst_dir_fd: int,
+    ) -> None:
         nonlocal published
-        original_rename(*args, **kwargs)  # type: ignore[arg-type]
-        if args[1] == output_root.name:
+        original_rename_no_replace(
+            source_name,
+            destination_name,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+        )
+        if destination_name == output_root.name:
             published = True
 
     def _fail_published_and_rollback_parent_fsync(file_descriptor: int) -> None:
@@ -1452,7 +1537,7 @@ def test_pinned_design_runtime_reports_uncertainty_when_directory_rollback_fsync
             raise OSError("simulated persistent design parent fsync failure")
         original_fsync(file_descriptor)
 
-    monkeypatch.setattr(os, "rename", _record_publication_rename)
+    monkeypatch.setattr(pinned_runtime_module, "_rename_no_replace", _record_publication_rename)
     monkeypatch.setattr(os, "fsync", _fail_published_and_rollback_parent_fsync)
 
     with pytest.raises(
@@ -1852,7 +1937,7 @@ def test_pinned_score_completion_rollback_preserves_concurrent_completion_replac
     def _track_completion_descriptor(
         path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
         flags: int,
-        mode: int = 0o777,
+        mode: int = 0o600,
         *,
         dir_fd: int | None = None,
     ) -> int:
@@ -1915,6 +2000,69 @@ def test_pinned_score_completion_rollback_preserves_concurrent_completion_replac
     assert replacement_installed
     assert completion_path.read_text(encoding="utf-8") == "concurrent completion"
     assert published_score.read_text(encoding="utf-8") == "input-v1"
+
+
+def test_rollback_quarantine_restores_foreign_directory_replacement(
+    tmp_path: Path,
+) -> None:
+    public_path = tmp_path / "publication"
+    public_path.write_bytes(b"owned")
+    public_status = public_path.stat()
+    expected_identity = (public_status.st_dev, public_status.st_ino)
+    public_path.unlink()
+    public_path.mkdir()
+    (public_path / "foreign.txt").write_text("foreign", encoding="utf-8")
+    directory_fd = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        with pytest.raises(
+            pinned_runtime_module.LigandMpnnCompletionPublicationUncertainError,
+            match="rollback target changed",
+        ):
+            pinned_runtime_module._quarantine_and_remove_owned_leaf(
+                directory_fd,
+                public_path.name,
+                expected_identity,
+                expected_bytes=b"owned",
+                expected_sha256=None,
+                error_type=pinned_runtime_module.LigandMpnnCompletionPublicationUncertainError,
+                changed_message="rollback target changed",
+                inspect_message="rollback target could not be inspected",
+                durability_message="rollback durability is uncertain",
+            )
+    finally:
+        os.close(directory_fd)
+
+    assert (public_path / "foreign.txt").read_text(encoding="utf-8") == "foreign"
+    assert not tuple(tmp_path.glob(".dnadesign-rollback-*"))
+
+
+def test_directory_no_replace_rename_preserves_existing_empty_destination(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "attempt"
+    source.mkdir()
+    (source / "design.txt").write_text("owned", encoding="utf-8")
+    destination = tmp_path / "published"
+    destination.mkdir()
+    destination_status = destination.stat()
+    parent_fd = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        with pytest.raises(FileExistsError):
+            pinned_runtime_module._rename_no_replace(
+                source.name,
+                destination.name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
+    finally:
+        os.close(parent_fd)
+
+    observed_destination = destination.stat()
+    assert (observed_destination.st_dev, observed_destination.st_ino) == (
+        destination_status.st_dev,
+        destination_status.st_ino,
+    )
+    assert (source / "design.txt").read_text(encoding="utf-8") == "owned"
 
 
 def test_pinned_score_completion_rollback_preserves_in_place_completion_replacement(
