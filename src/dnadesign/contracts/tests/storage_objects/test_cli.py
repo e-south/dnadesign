@@ -177,6 +177,51 @@ def test_inventory_bootstraps_demo_then_requires_manifest_to_be_tracked(
     assert json.loads(after_add.stdout)["status"] == "verified"
 
 
+def test_demo_validation_requires_empty_lock_to_match_git_index(tmp_path: Path) -> None:
+    checkout = tmp_path / "checkout"
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    root = checkout / "examples" / "pilot"
+    root.mkdir(parents=True)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot/payload.txt"], check=True)
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+        demo=True,
+    )
+    lock_path = root / LOCK_NAME
+    subprocess.run(
+        ["git", "-C", str(checkout), "add", "examples/pilot/storage.object.json"],
+        check=True,
+    )
+
+    with pytest.raises(StorageObjectError, match=r"demo file is not tracked: .*\.storage-object\.lock"):
+        verify_storage_object(root)
+
+    lock_path.write_text("not empty\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "-C", str(checkout), "add", "examples/pilot/.storage-object.lock"],
+        check=True,
+    )
+    lock_path.write_bytes(b"")
+    with pytest.raises(StorageObjectError, match=r"demo file differs from Git index: .*\.storage-object\.lock"):
+        verify_storage_object(root)
+
+    subprocess.run(
+        ["git", "-C", str(checkout), "add", "examples/pilot/.storage-object.lock"],
+        check=True,
+    )
+    assert verify_storage_object(root).summary()["status"] == "verified"
+
+
 def test_inventory_demo_requires_resource_bytes_to_match_git_index(tmp_path: Path) -> None:
     checkout = tmp_path / "checkout"
     subprocess.run(["git", "init", "-q", str(checkout)], check=True)
@@ -245,7 +290,17 @@ def test_refresh_demo_allows_only_manifest_to_enter_pending_git_state(tmp_path: 
         retention_policy="review-before-delete",
         demo=True,
     )
-    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot/storage.object.json"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(checkout),
+            "add",
+            "examples/pilot/storage.object.json",
+            "examples/pilot/.storage-object.lock",
+        ],
+        check=True,
+    )
     manifest_path = root / MANIFEST_NAME
     previous_bytes = manifest_path.read_bytes()
     payload.write_text("second\n", encoding="utf-8")
@@ -317,7 +372,17 @@ def test_refresh_demo_requires_prior_manifest_to_match_git_index(
         demo=True,
     )
     manifest_path = root / MANIFEST_NAME
-    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot/storage.object.json"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(checkout),
+            "add",
+            "examples/pilot/storage.object.json",
+            "examples/pilot/.storage-object.lock",
+        ],
+        check=True,
+    )
     if prior_state in {"dirty", "dirty-demo-flag"}:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if prior_state == "dirty":

@@ -39,7 +39,8 @@ files, and digest mismatches fail validation.
 | `tool-cache` | Rebuildable installations or downloaded model state | `cache` |
 
 `demo: true` is a narrow exception for small tracked examples inside Git. A
-demo is capped at 2 MB, and its manifest and every resource must be tracked.
+demo is capped at 2 MB, and its manifest, empty coordination lock, and every
+resource must be tracked and match their stage-0 Git index bytes.
 Operational objects must set `demo: false` and live outside a Git checkout.
 Place the external root beneath an account-private filesystem boundary. The v1
 manifest verifies routing and bytes; operating-system ACLs remain an explicit
@@ -96,10 +97,10 @@ produced the refreshed bytes, inventories new artifacts, and accepts `--cache`
 for newly created cache files. Input and metadata bytes are protected: removing
 or changing them fails rather than silently authorizing a new input identity.
 For a demo refresh, changed resources must already be staged and match their Git
-index entries, and the existing manifest must already match its indexed blob.
-The refreshed manifest alone enters
-`refreshed-pending-git-add`; add it with the returned command to restore the
-fully `verified` state.
+index entries, while the existing manifest and empty coordination lock must
+already match their indexed blobs. The refreshed manifest alone enters
+`refreshed-pending-git-add`; the returned command stages the manifest and
+re-stages the lock idempotently to restore the fully `verified` state.
 If an initial receipt incorrectly classified a mutable operational ledger as
 metadata, an operator may name that existing path with `--artifact`. This
 one-way, compare-and-swap-protected correction permits only `metadata` to

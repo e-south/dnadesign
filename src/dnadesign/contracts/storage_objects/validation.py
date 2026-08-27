@@ -346,15 +346,19 @@ def _verify_demo(
     verified: VerifiedStorageObject,
     *,
     allow_pending_manifest: bool,
+    allow_pending_lock: bool,
 ) -> None:
     total_bytes = verified.manifest_path.stat().st_size + sum(resource.size_bytes for resource in verified.resources)
     if total_bytes > MAX_DEMO_BYTES:
         raise StorageObjectError(f"demo exceeds {MAX_DEMO_BYTES} bytes: {total_bytes}")
     for path, expected_digest in (
         (verified.manifest_path, verified.manifest_digest),
+        (verified.root / LOCK_NAME, _sha256_bytes(b"")),
         *((resource.path, resource.digest) for resource in verified.resources),
     ):
         if allow_pending_manifest and path == verified.manifest_path:
+            continue
+        if allow_pending_lock and path == verified.root / LOCK_NAME:
             continue
         _verify_demo_git_index_entry(checkout, path, expected_digest)
 
@@ -363,6 +367,7 @@ def verify_storage_object(
     storage_root: Path,
     *,
     _allow_pending_demo_manifest: bool = False,
+    _allow_pending_demo_lock: bool = False,
 ) -> VerifiedStorageObject:
     """Verify one explicit storage object and require exact file closure."""
 
@@ -464,6 +469,7 @@ def verify_storage_object(
             checkout,
             verified,
             allow_pending_manifest=_allow_pending_demo_manifest,
+            allow_pending_lock=_allow_pending_demo_lock,
         )
     elif checkout is not None:
         raise StorageObjectError(

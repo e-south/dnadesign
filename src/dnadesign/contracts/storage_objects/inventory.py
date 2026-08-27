@@ -517,6 +517,7 @@ def _write_manifest(
         summary = verify_storage_object(
             manifest_path.parent,
             _allow_pending_demo_manifest=allow_pending_demo_manifest,
+            _allow_pending_demo_lock=allow_pending_demo_manifest and previous_bytes is None,
         ).summary()
         if allow_pending_demo_manifest:
             summary["status"] = "created-pending-git-add" if previous_bytes is None else "refreshed-pending-git-add"

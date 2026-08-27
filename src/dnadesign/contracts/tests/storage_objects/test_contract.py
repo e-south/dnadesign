@@ -535,6 +535,7 @@ def test_git_resident_demo_treats_resource_paths_literally(tmp_path: Path) -> No
             "examples/pilot/inputs",
             "examples/pilot/outputs",
             "examples/pilot/storage.object.json",
+            "examples/pilot/.storage-object.lock",
             "examples/pilot/foo1.txt",
         ],
         check=True,
