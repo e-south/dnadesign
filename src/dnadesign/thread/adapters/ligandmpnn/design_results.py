@@ -512,7 +512,7 @@ def _validate_pinned_write_full_pdb_atom_inventory(
             continue
         residue_id = f"{line[21:22]}{residue_number}{line[26:27].strip()}"
         if residue_id not in expected_contract:
-            continue
+            raise ValueError(f"official LigandMPNN packed PDB contains an unexpected atom record: {packed_path}")
         if not line.startswith("ATOM  ") or line[16:17].strip():
             raise ValueError(f"official LigandMPNN packed PDB protein record is not canonical: {packed_path}")
         if residue_id not in observed_atoms:

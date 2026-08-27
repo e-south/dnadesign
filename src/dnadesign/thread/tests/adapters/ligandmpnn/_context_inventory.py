@@ -131,12 +131,13 @@ def _parse_packed_pdb(input_path):
         float(line[30:38]); float(line[38:46]); float(line[46:54])
         key = chain, residue_number, insertion_code
         if key not in residue_names:
-            residue_order.append(key)
             residue_names[key] = residue_name
             residue_atoms[key] = set()
         if residue_names[key] != residue_name:
             raise ValueError("inconsistent packed PDB residue name")
         residue_atoms[key].add(atom_name)
+        if atom_name == "CA" and key not in residue_order:
+            residue_order.append(key)
     try:
         native_sequence = [restype_str_to_int[restype_3to1[residue_names[key]]] for key in residue_order]
     except KeyError as error:

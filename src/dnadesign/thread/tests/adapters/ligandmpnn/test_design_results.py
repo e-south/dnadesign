@@ -241,6 +241,8 @@ def test_design_admission_rejects_invalid_or_wrong_identity_packed_pdb(
         "missing-residue-specific-sidechain",
         "duplicate-atom",
         "incomplete-extra-protein-residue",
+        "n-only-extra-protein-residue",
+        "sidechain-only-extra-protein-residue",
         "missing-context-atom",
         "altered-context-atom",
         "extra-ligand",
@@ -268,6 +270,16 @@ def test_design_admission_rejects_packed_pdb_not_emitted_by_pinned_write_full_pd
         lines.insert(
             -1,
             "ATOM  99999  CA  ALA C  99       9.000   0.000   0.000  1.00  0.00           C",
+        )
+    elif mutation == "n-only-extra-protein-residue":
+        lines.insert(
+            -1,
+            "ATOM  99999  N   ALA C  99       9.000   0.000   0.000  1.00  0.00           N",
+        )
+    elif mutation == "sidechain-only-extra-protein-residue":
+        lines.insert(
+            -1,
+            "ATOM  99999  CB  ALA C  99       9.000   0.000   0.000  1.00  0.00           C",
         )
     elif mutation == "missing-context-atom":
         lines.remove(next(line for line in lines if line.startswith("HETATM") and line[12:16].strip() == "P"))
