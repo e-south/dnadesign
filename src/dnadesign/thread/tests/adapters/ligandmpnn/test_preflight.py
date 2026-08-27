@@ -126,6 +126,21 @@ def test_preflight_rejects_dirty_parser_after_context_evidence(tmp_path: Path) -
     ]
 
 
+def test_preflight_rejects_symlinked_parser_even_when_target_matches_pinned_bytes(tmp_path: Path) -> None:
+    root, pin = _pinned_checkout(tmp_path)
+    parser = root / "data_utils.py"
+    target = tmp_path / "matching-data-utils.py"
+    parser.replace(target)
+    parser.symlink_to(target)
+
+    report = preflight_ligandmpnn(root, pin)
+
+    assert not report.ok
+    assert [(issue.check_id, issue.path) for issue in report.issues] == [
+        ("thread.ligandmpnn.parser_module_not_regular", str(parser))
+    ]
+
+
 def test_preflight_rejects_symlinked_checkpoint_before_execution(tmp_path: Path) -> None:
     root, pin = _pinned_checkout(tmp_path)
     checkpoint = root / pin.checkpoint_path

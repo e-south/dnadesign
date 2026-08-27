@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import hashlib
+import stat
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -59,8 +60,17 @@ def preflight_ligandmpnn(
     if not score_entrypoint.is_file():
         issues.append(_issue("missing_score_entrypoint", "checkout is missing official score.py", score_entrypoint))
     parser_module = root / "data_utils.py"
-    if not parser_module.is_file():
+    parser_module_regular = _regular_file_status_no_follow(parser_module)
+    if parser_module_regular is None:
         issues.append(_issue("missing_parser_module", "checkout is missing official data_utils.py", parser_module))
+    elif not parser_module_regular:
+        issues.append(
+            _issue(
+                "parser_module_not_regular",
+                "pinned LigandMPNN data_utils.py must be a regular file",
+                parser_module,
+            )
+        )
 
     observed_commit = _git_commit(root)
     if observed_commit is None:
@@ -76,6 +86,8 @@ def preflight_ligandmpnn(
             (parser_module, "parser module", "unreadable_parser_blob", "dirty_parser_module"),
         )
         for source_path, label, unreadable_issue, dirty_issue in declared_sources:
+            if source_path == parser_module and parser_module_regular is not True:
+                continue
             if not source_path.is_file():
                 continue
             matches_pin = working_tree_path_matches_commit(root, pin.commit, source_path.name)
@@ -127,6 +139,15 @@ def _git_commit(root: Path) -> str | None:
             observed = observed.decode("ascii")
         return observed.strip().lower()
     except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def _regular_file_status_no_follow(path: Path) -> bool | None:
+    """Report a leaf's regular-file status without following a symlink."""
+
+    try:
+        return stat.S_ISREG(path.lstat().st_mode)
+    except FileNotFoundError:
         return None
 
 

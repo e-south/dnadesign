@@ -629,6 +629,25 @@ def test_probe_command_preserves_option_looking_values(
     assert parsed_checkout == Path("-checkout")
 
 
+@pytest.mark.parametrize(
+    ("field_name", "path"),
+    [
+        ("pdb_path", Path("~/target.pdb")),
+        ("output_path", Path("~/context-inventory.json")),
+    ],
+)
+def test_context_probe_request_rejects_tilde_prefixed_paths(
+    tmp_path: Path,
+    field_name: str,
+    path: Path,
+) -> None:
+    checkout, commit = _fake_upstream_checkout(tmp_path)
+    request = _request(tmp_path, checkout, commit)
+
+    with pytest.raises(ValueError, match="safe relative file path"):
+        replace(request, **{field_name: path})
+
+
 def test_reference_rejects_unsafe_paths_and_non_digests() -> None:
     with pytest.raises(ValueError, match="context inventory path"):
         LigandMpnnContextInventoryReference(path=Path("../inventory.json"), sha256=_DIGEST)

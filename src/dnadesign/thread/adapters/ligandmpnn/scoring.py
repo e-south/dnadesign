@@ -62,6 +62,7 @@ class LigandMpnnScoreRequest:
             not isinstance(self.pdb_path, Path)
             or self.pdb_path.is_absolute()
             or ".." in self.pdb_path.parts
+            or str(self.pdb_path).startswith("~")
             or str(self.pdb_path).startswith("-")
             or self.pdb_path.suffix.lower() != ".pdb"
         ):

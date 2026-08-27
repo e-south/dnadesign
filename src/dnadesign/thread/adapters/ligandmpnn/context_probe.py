@@ -598,7 +598,13 @@ def _within_root(root: Path, path: Path, *, field_name: str) -> Path:
 
 
 def _require_relative_file(path: Path, *, field_name: str, suffix: str | None = None) -> None:
-    if not isinstance(path, Path) or path.is_absolute() or not path.name or ".." in path.parts:
+    if (
+        not isinstance(path, Path)
+        or path.is_absolute()
+        or not path.name
+        or ".." in path.parts
+        or str(path).startswith("~")
+    ):
         raise ValueError(f"{field_name} must be a safe relative file path")
     if suffix is not None and path.suffix.lower() != suffix:
         raise ValueError(f"{field_name} must end in {suffix}")

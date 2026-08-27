@@ -53,6 +53,7 @@ def _request(**overrides: object) -> LigandMpnnScoreRequest:
     ("field_name", "value", "message"),
     [
         ("pdb_path", Path("/tmp/target.pdb"), "safe non-option relative"),
+        ("pdb_path", Path("~/target.pdb"), "safe non-option relative"),
         ("pdb_path", Path("-option-like-input.pdb"), "safe non-option relative"),
         ("output_dir", Path("/tmp/scores"), "safe non-option relative"),
         ("output_dir", Path("~/scores"), "safe non-option relative"),
