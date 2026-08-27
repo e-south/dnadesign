@@ -23,6 +23,7 @@ _HEX_40 = re.compile(r"[0-9a-fA-F]{40}")
 _HEX_64 = re.compile(r"[0-9a-fA-F]{64}")
 _REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 CANONICAL_AA_ALPHABET = "ACDEFGHIKLMNPQRSTVWY"
+_MAX_NUMPY_SEED = 2**32 - 1
 
 
 @dataclass(frozen=True, order=True)
@@ -173,14 +174,7 @@ class LigandMpnnRequest:
         _require_unique_residues(self.fixed_residues, field_name="fixed_residues")
         _require_unique_residues(self.redesigned_residues, field_name="redesigned_residues")
         _require_residue_alphabets(self.residue_alphabets, redesigned_residues=self.redesigned_residues)
-        if not isinstance(self.seeds, tuple):
-            raise ValueError("seeds must be a tuple of positive integers")
-        if not self.seeds or any(
-            isinstance(seed, bool) or not isinstance(seed, int) or seed <= 0 for seed in self.seeds
-        ):
-            raise ValueError("seeds must contain positive integers")
-        if len(set(self.seeds)) != len(self.seeds):
-            raise ValueError("seeds must be unique")
+        validate_ligandmpnn_seeds(self.seeds)
         if isinstance(self.temperature, bool) or not isinstance(self.temperature, (float, int)):
             raise ValueError("temperature must be finite and positive")
         if not math.isfinite(self.temperature) or self.temperature <= 0:
@@ -248,6 +242,17 @@ def _require_unique_residues(residues: tuple[LigandMpnnResidue, ...], *, field_n
         if residue.upstream_id in seen:
             raise ValueError(f"{field_name} contains duplicate residue {residue.upstream_id}")
         seen.add(residue.upstream_id)
+
+
+def validate_ligandmpnn_seeds(seeds: object) -> None:
+    """Require the exact integer seed domain accepted by upstream NumPy."""
+
+    if not isinstance(seeds, tuple) or not seeds:
+        raise ValueError("seeds must be a nonempty tuple")
+    if any(isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed <= _MAX_NUMPY_SEED for seed in seeds):
+        raise ValueError(f"seeds must contain integers from 0 through {_MAX_NUMPY_SEED}")
+    if len(set(seeds)) != len(seeds):
+        raise ValueError("seeds must be unique")
 
 
 def _require_residue_alphabets(

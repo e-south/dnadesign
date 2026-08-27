@@ -158,3 +158,25 @@ def test_score_request_enforces_upstream_minimum_batch_policy() -> None:
         _request(upstream="unpinned")
     with pytest.raises(ValueError, match="pdb_sha256"):
         _request(pdb_sha256="not-a-digest")
+
+
+@pytest.mark.parametrize("seeds", [(-1,), (2**32,), (True,), (1.5,)])
+def test_score_request_rejects_seeds_outside_upstream_numpy_domain(seeds: tuple[object, ...]) -> None:
+    with pytest.raises(ValueError, match="integers from 0 through 4294967295"):
+        _request(seeds=seeds)
+
+
+@pytest.mark.parametrize("seeds", [(), [1]])
+def test_score_request_requires_nonempty_seed_tuple(seeds: object) -> None:
+    with pytest.raises(ValueError, match="nonempty tuple"):
+        _request(seeds=seeds)
+
+
+def test_score_request_emits_numpy_seed_boundaries() -> None:
+    commands = build_ligandmpnn_score_commands(
+        _request(seeds=(0, 2**32 - 1)),
+        checkout_root=Path("/opt/LigandMPNN"),
+    )
+
+    assert [command.seed for command in commands] == [0, 4294967295]
+    assert [command.argv[command.argv.index("--seed") + 1] for command in commands] == ["0", "4294967295"]

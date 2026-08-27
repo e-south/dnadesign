@@ -322,7 +322,6 @@ def test_command_preserves_requested_temperature_precision(tmp_path: Path) -> No
 @pytest.mark.parametrize(
     ("overrides", "message"),
     [
-        ({"seeds": (0,)}, "seeds must contain positive integers"),
         ({"temperature": float("nan")}, "temperature must be finite and positive"),
         ({"batch_size": 0}, "batch_size must be positive"),
         (
@@ -338,6 +337,31 @@ def test_command_preserves_requested_temperature_precision(tmp_path: Path) -> No
 def test_request_rejects_ambiguous_or_nondeterministic_inputs(overrides: dict[str, object], message: str) -> None:
     with pytest.raises(ValueError, match=message):
         _request(**overrides)
+
+
+@pytest.mark.parametrize("seeds", [(-1,), (2**32,), (True,), (1.5,)])
+def test_design_request_rejects_seeds_outside_upstream_numpy_domain(seeds: tuple[object, ...]) -> None:
+    with pytest.raises(ValueError, match="integers from 0 through 4294967295"):
+        _request(seeds=seeds)
+
+
+@pytest.mark.parametrize("seeds", [(), [1]])
+def test_design_request_requires_nonempty_seed_tuple(seeds: object) -> None:
+    with pytest.raises(ValueError, match="nonempty tuple"):
+        _request(seeds=seeds)
+
+
+def test_design_request_emits_numpy_seed_boundaries(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(
+        tmp_path,
+        seeds=(0, 2**32 - 1),
+        packing=LigandMpnnPackingConfig(),
+    )
+
+    commands = build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
+
+    assert [command.seed for command in commands] == [0, 4294967295]
+    assert [command.argv[command.argv.index("--seed") + 1] for command in commands] == ["0", "4294967295"]
 
 
 def test_request_rejects_untyped_upstream_even_when_packing_is_disabled() -> None:

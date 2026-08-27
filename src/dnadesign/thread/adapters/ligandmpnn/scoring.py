@@ -21,6 +21,7 @@ from dnadesign.thread.adapters.ligandmpnn.models import (
     LigandMpnnContextInventoryReference,
     LigandMpnnResidue,
     LigandMpnnUpstreamPin,
+    validate_ligandmpnn_seeds,
 )
 from dnadesign.thread.adapters.ligandmpnn.pinned_runtime import build_pinned_runtime_command
 
@@ -86,12 +87,7 @@ class LigandMpnnScoreRequest:
             raise ValueError("fixed_residues and redesigned_residues are mutually exclusive")
         _validate_residues(self.fixed_residues, field_name="fixed_residues")
         _validate_residues(self.redesigned_residues, field_name="redesigned_residues")
-        if not isinstance(self.seeds, tuple) or not self.seeds:
-            raise ValueError("seeds must be a nonempty tuple")
-        if any(isinstance(seed, bool) or not isinstance(seed, int) or seed <= 0 for seed in self.seeds):
-            raise ValueError("seeds must contain positive integers")
-        if len(set(self.seeds)) != len(self.seeds):
-            raise ValueError("seeds must be unique")
+        validate_ligandmpnn_seeds(self.seeds)
         if isinstance(self.batch_size, bool) or not isinstance(self.batch_size, int) or self.batch_size <= 0:
             raise ValueError("batch_size must be positive")
         if (
