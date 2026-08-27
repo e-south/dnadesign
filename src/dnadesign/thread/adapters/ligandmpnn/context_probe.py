@@ -266,16 +266,12 @@ def _publish_context_inventory(execution_root: Path, output_path: Path, payload:
     """Publish one receipt without overwriting a concurrent materializer."""
 
     temporary_name = f".{output_path.name}.{uuid.uuid4().hex}.tmp"
-    try:
-        directory_fd = _open_output_directory(execution_root, output_path.parent)
-    except OSError as error:
-        raise ValueError("context probe output directory could not be opened safely") from error
+    directory_fd = _open_verified_output_directory(execution_root, output_path.parent)
     lock_fd: int | None = None
     claim: _ClaimedReceipt | None = None
     prior_snapshot: _ReceiptSnapshot | None = None
     written_receipt: _WrittenReceipt | None = None
     try:
-        _resolve_rename_no_replace()
         lock_fd = _lock_context_receipt(directory_fd, output_path.name)
         prior_snapshot = _read_prior_receipt(directory_fd, output_path.name)
         written_receipt = _write_temporary_receipt(directory_fd, temporary_name, payload)
@@ -295,6 +291,12 @@ def _publish_context_inventory(execution_root: Path, output_path: Path, payload:
             raise LigandMpnnContextPublicationUncertainError(
                 "context probe receipt changed before publication" + recovery
             ) from error
+        except OSError as publication_error:
+            if claim is not None:
+                _restore_claimed_prior_receipt(directory_fd, output_path.name, claim)
+                os.close(claim.quarantine_fd)
+                claim = None
+            raise ValueError("context probe output could not be published atomically") from publication_error
         try:
             os.fsync(directory_fd)
         except OSError as durability_error:
@@ -653,6 +655,11 @@ def _restore_claimed_prior_receipt(
             f"context probe receipt changed before publication recovery; prior receipt retained in "
             f"{claim.quarantine_name}/{claim.leaf_name}"
         ) from error
+    except OSError as error:
+        raise LigandMpnnContextPublicationUncertainError(
+            f"context probe receipt restoration could not use atomic no-replace; prior receipt retained in "
+            f"{claim.quarantine_name}/{claim.leaf_name}"
+        ) from error
     try:
         os.fsync(claim.quarantine_fd)
         os.fsync(directory_fd)
@@ -734,6 +741,165 @@ def _rename_no_replace(
     if result != 0:
         error_number = ctypes.get_errno()
         raise OSError(error_number, os.strerror(error_number), destination_name)
+
+
+def _open_verified_output_directory(execution_root: Path, relative_parent: Path) -> int:
+    """Prove no-replace support before creating or mutating the output tree."""
+
+    try:
+        preflight_fd, target_exists = _open_nearest_existing_output_directory(execution_root, relative_parent)
+    except OSError as error:
+        raise ValueError("context probe output directory could not be opened safely") from error
+    try:
+        _probe_atomic_no_replace(preflight_fd)
+    except OSError as error:
+        os.close(preflight_fd)
+        raise ValueError("context probe output could not be published atomically") from error
+    if target_exists:
+        return preflight_fd
+    os.close(preflight_fd)
+
+    try:
+        directory_fd = _open_output_directory(execution_root, relative_parent)
+    except OSError as error:
+        raise ValueError("context probe output directory could not be opened safely") from error
+    try:
+        _probe_atomic_no_replace(directory_fd)
+        return directory_fd
+    except OSError as error:
+        os.close(directory_fd)
+        raise ValueError("context probe output could not be published atomically") from error
+
+
+def _probe_atomic_no_replace(directory_fd: int) -> None:
+    """Exercise collision and round-trip semantics in the target filesystem."""
+
+    _resolve_rename_no_replace()
+    probe_id = uuid.uuid4().hex
+    source_name = f".dnadesign-context-noreplace-{probe_id}.source"
+    destination_name = f".dnadesign-context-noreplace-{probe_id}.destination"
+    source_payload = b"dnadesign no-replace source\n"
+    destination_payload = b"dnadesign no-replace destination\n"
+    source_receipt: _WrittenReceipt | None = None
+    destination_receipt: _WrittenReceipt | None = None
+    try:
+        source_receipt = _write_temporary_receipt(directory_fd, source_name, source_payload)
+        destination_receipt = _write_temporary_receipt(directory_fd, destination_name, destination_payload)
+        try:
+            _rename_no_replace(
+                source_name,
+                destination_name,
+                src_dir_fd=directory_fd,
+                dst_dir_fd=directory_fd,
+            )
+        except FileExistsError:
+            pass
+        else:
+            raise OSError(errno.EIO, "atomic no-replace probe overwrote an existing destination")
+        _require_probe_leaf(
+            directory_fd,
+            source_name,
+            expected_identity=source_receipt.identity,
+            expected_payload=source_payload,
+        )
+        _require_probe_leaf(
+            directory_fd,
+            destination_name,
+            expected_identity=destination_receipt.identity,
+            expected_payload=destination_payload,
+        )
+
+        os.unlink(destination_name, dir_fd=directory_fd)
+        os.fsync(directory_fd)
+        _rename_no_replace(
+            source_name,
+            destination_name,
+            src_dir_fd=directory_fd,
+            dst_dir_fd=directory_fd,
+        )
+        _require_probe_leaf(
+            directory_fd,
+            destination_name,
+            expected_identity=source_receipt.identity,
+            expected_payload=source_payload,
+        )
+        _rename_no_replace(
+            destination_name,
+            source_name,
+            src_dir_fd=directory_fd,
+            dst_dir_fd=directory_fd,
+        )
+        _require_probe_leaf(
+            directory_fd,
+            source_name,
+            expected_identity=source_receipt.identity,
+            expected_payload=source_payload,
+        )
+    except BaseException:
+        _cleanup_no_replace_probe(directory_fd, source_name, destination_name)
+        raise
+    else:
+        _cleanup_no_replace_probe(directory_fd, source_name, destination_name)
+    finally:
+        if source_receipt is not None:
+            os.close(source_receipt.descriptor)
+        if destination_receipt is not None:
+            os.close(destination_receipt.descriptor)
+
+
+def _require_probe_leaf(
+    directory_fd: int,
+    name: str,
+    *,
+    expected_identity: _ReceiptIdentity,
+    expected_payload: bytes,
+) -> None:
+    observed_identity, observed_payload = _read_quarantined_receipt(directory_fd, name)
+    if observed_identity != expected_identity or observed_payload != expected_payload:
+        raise OSError(errno.EIO, "atomic no-replace probe changed a scratch leaf")
+
+
+def _cleanup_no_replace_probe(directory_fd: int, *names: str) -> None:
+    changed = False
+    for name in names:
+        try:
+            os.unlink(name, dir_fd=directory_fd)
+            changed = True
+        except FileNotFoundError:
+            pass
+    if changed:
+        os.fsync(directory_fd)
+
+
+def _open_nearest_existing_output_directory(
+    execution_root: Path,
+    relative_parent: Path,
+) -> tuple[int, bool]:
+    """Open the nearest existing output ancestor without creating components."""
+
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
+    root_parts = execution_root.parts
+    if not execution_root.is_absolute() or not root_parts:
+        raise OSError("execution_root must be absolute")
+    current_fd = os.open(execution_root.anchor, directory_flags)
+    try:
+        for component in root_parts[1:]:
+            next_fd = os.open(component, directory_flags, dir_fd=current_fd)
+            os.close(current_fd)
+            current_fd = next_fd
+        for component in relative_parent.parts:
+            if component in {"", "."}:
+                continue
+            try:
+                next_fd = os.open(component, directory_flags, dir_fd=current_fd)
+            except FileNotFoundError:
+                return current_fd, False
+            os.close(current_fd)
+            current_fd = next_fd
+        return current_fd, True
+    except BaseException:
+        os.close(current_fd)
+        raise
 
 
 def _open_output_directory(execution_root: Path, relative_parent: Path) -> int:

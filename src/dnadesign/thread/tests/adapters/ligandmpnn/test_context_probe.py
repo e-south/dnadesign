@@ -859,6 +859,152 @@ def test_probe_rejects_unavailable_atomic_no_replace_before_receipt_mutation(
     assert not list(output_path.parent.glob(f".{output_path.name}.*.recovery"))
 
 
+@pytest.mark.parametrize("error_number", (errno.ENOTSUP, errno.ENOSYS, errno.EINVAL))
+@pytest.mark.parametrize("prior_payload", (None, b"prior receipt bytes\n"))
+def test_probe_verifies_target_filesystem_no_replace_before_output_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    error_number: int,
+    prior_payload: bytes | None,
+) -> None:
+    relative_output = Path("new-evidence/nested/context-inventory.json")
+    output_path = tmp_path / relative_output
+    if prior_payload is not None:
+        output_path.parent.mkdir(parents=True)
+        output_path.write_bytes(prior_payload)
+    original_rename_no_replace = context_probe_module._rename_no_replace
+    operation_attempted = False
+
+    def _unsupported_on_target_filesystem(
+        source: str,
+        destination: str,
+        *,
+        src_dir_fd: int,
+        dst_dir_fd: int,
+    ) -> None:
+        nonlocal operation_attempted
+        if not operation_attempted:
+            operation_attempted = True
+            raise OSError(error_number, "target filesystem does not support atomic no-replace")
+        original_rename_no_replace(
+            source,
+            destination,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+        )
+
+    monkeypatch.setattr(context_probe_module, "_rename_no_replace", _unsupported_on_target_filesystem)
+
+    with pytest.raises(ValueError, match="context probe output could not be published atomically"):
+        context_probe_module._publish_context_inventory(
+            tmp_path,
+            relative_output,
+            b"receipt that cannot use no-replace on this filesystem\n",
+        )
+
+    assert operation_attempted
+    if prior_payload is None:
+        assert not output_path.parent.exists()
+    else:
+        assert output_path.read_bytes() == prior_payload
+        assert not list(output_path.parent.glob(f".{output_path.name}.*.recovery"))
+    assert not list(tmp_path.rglob(".dnadesign-context-noreplace-*"))
+
+
+def test_probe_restores_claimed_prior_when_publication_no_replace_fails_after_probe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    relative_output = Path("evidence/context-inventory.json")
+    output_path = tmp_path / relative_output
+    output_path.parent.mkdir(parents=True)
+    prior_payload = b"prior receipt bytes\n"
+    output_path.write_bytes(prior_payload)
+    original_rename_no_replace = context_probe_module._rename_no_replace
+    publication_attempted = False
+
+    def _fail_only_publication(
+        source: str,
+        destination: str,
+        *,
+        src_dir_fd: int,
+        dst_dir_fd: int,
+    ) -> None:
+        nonlocal publication_attempted
+        if destination == output_path.name and source.endswith(".tmp"):
+            publication_attempted = True
+            raise OSError(errno.ENOTSUP, "publication no-replace operation became unsupported")
+        original_rename_no_replace(
+            source,
+            destination,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+        )
+
+    monkeypatch.setattr(context_probe_module, "_rename_no_replace", _fail_only_publication)
+
+    with pytest.raises(ValueError, match="context probe output could not be published atomically"):
+        context_probe_module._publish_context_inventory(
+            tmp_path,
+            relative_output,
+            b"receipt whose final no-replace operation fails\n",
+        )
+
+    assert publication_attempted
+    assert output_path.read_bytes() == prior_payload
+    assert not list(output_path.parent.glob(f".{output_path.name}.*.recovery"))
+
+
+def test_probe_retains_claimed_prior_when_no_replace_fails_during_publication_and_recovery(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    relative_output = Path("evidence/context-inventory.json")
+    output_path = tmp_path / relative_output
+    output_path.parent.mkdir(parents=True)
+    prior_payload = b"prior receipt bytes\n"
+    output_path.write_bytes(prior_payload)
+    original_rename_no_replace = context_probe_module._rename_no_replace
+    filesystem_failure_started = False
+
+    def _fail_publication_and_recovery(
+        source: str,
+        destination: str,
+        *,
+        src_dir_fd: int,
+        dst_dir_fd: int,
+    ) -> None:
+        nonlocal filesystem_failure_started
+        if destination == output_path.name and source.endswith(".tmp"):
+            filesystem_failure_started = True
+        if filesystem_failure_started:
+            raise OSError(errno.ENOTSUP, "target filesystem stopped supporting atomic no-replace")
+        original_rename_no_replace(
+            source,
+            destination,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+        )
+
+    monkeypatch.setattr(context_probe_module, "_rename_no_replace", _fail_publication_and_recovery)
+
+    with pytest.raises(
+        LigandMpnnContextPublicationUncertainError,
+        match="prior receipt retained",
+    ):
+        context_probe_module._publish_context_inventory(
+            tmp_path,
+            relative_output,
+            b"receipt whose publication and recovery operations fail\n",
+        )
+
+    assert filesystem_failure_started
+    assert not output_path.exists()
+    recoveries = list(output_path.parent.glob(f".{output_path.name}.*.recovery"))
+    assert len(recoveries) == 1
+    assert (recoveries[0] / "prior").read_bytes() == prior_payload
+
+
 @pytest.mark.parametrize("prior_payload", (None, b"prior receipt bytes\n"))
 def test_probe_restoration_never_overwrites_replacement_after_ownership_check(
     tmp_path: Path,
@@ -989,8 +1135,7 @@ def test_probe_removes_new_receipt_when_post_replace_directory_fsync_fails_witho
 
     def _fail_post_replace_directory_fsync(file_descriptor: int) -> None:
         nonlocal failed
-        if not failed and stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
-            assert output_path.is_file()
+        if not failed and stat.S_ISDIR(os.fstat(file_descriptor).st_mode) and output_path.is_file():
             failed = True
             raise OSError("simulated directory fsync failure")
         original_fsync(file_descriptor)
