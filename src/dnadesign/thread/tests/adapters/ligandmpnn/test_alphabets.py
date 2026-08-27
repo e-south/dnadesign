@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import replace
 from pathlib import Path
 
@@ -23,6 +24,7 @@ from dnadesign.thread.adapters.ligandmpnn import (
     LigandMpnnRequest,
     LigandMpnnResidue,
     LigandMpnnResidueAlphabet,
+    LigandMpnnResidueAlphabetSidecar,
     LigandMpnnUpstreamPin,
     build_ligandmpnn_commands,
     build_planned_receipt,
@@ -93,6 +95,90 @@ def test_sidecar_materializes_official_omit_json_deterministically(tmp_path: Pat
     }
     assert sidecar.sha256.startswith("sha256:")
     assert materialize_residue_alphabet_sidecar(request, path) == sidecar
+
+
+def test_sidecar_materialization_rejects_dangling_symlink_target(tmp_path: Path) -> None:
+    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    outside = tmp_path / "outside/omit.json"
+    outside.parent.mkdir()
+    target = tmp_path / "omit.json"
+    target.symlink_to(outside)
+
+    with pytest.raises(ValueError, match="sidecar target must be a regular file"):
+        materialize_residue_alphabet_sidecar(request, target)
+
+    assert target.is_symlink()
+    assert not outside.exists()
+
+
+def test_sidecar_materialization_rejects_nonregular_existing_target(tmp_path: Path) -> None:
+    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    target = tmp_path / "omit.json"
+    target.mkdir()
+
+    with pytest.raises(ValueError, match="sidecar target must be a regular file"):
+        materialize_residue_alphabet_sidecar(request, target)
+
+
+def test_sidecar_materialization_rejects_fifo_target_without_blocking(tmp_path: Path) -> None:
+    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    target = tmp_path / "omit.json"
+    os.mkfifo(target)
+
+    with pytest.raises(ValueError, match="sidecar target must be a regular file"):
+        materialize_residue_alphabet_sidecar(request, target)
+
+
+def test_sidecar_validation_rejects_symlink_replacement(tmp_path: Path) -> None:
+    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    target = tmp_path / "omit.json"
+    sidecar = materialize_residue_alphabet_sidecar(request, target)
+    outside = tmp_path / "outside.json"
+    target.replace(outside)
+    target.symlink_to(outside)
+
+    with pytest.raises(ValueError, match="residue alphabet sidecar must be a regular file"):
+        sidecar.validate_for(request)
+
+
+@pytest.mark.parametrize(
+    ("path", "materialized_path"),
+    [
+        (Path("~/omit.json"), None),
+        (Path("final/omit.json"), Path("~/staged.json")),
+    ],
+)
+def test_sidecar_receipt_rejects_tilde_prefixed_paths(path: Path, materialized_path: Path | None) -> None:
+    with pytest.raises(ValueError, match="must not begin with '~'"):
+        LigandMpnnResidueAlphabetSidecar(
+            request_id="generic_restricted_design",
+            path=path,
+            sha256=f"sha256:{_DIGEST}",
+            residue_count=1,
+            materialized_path=materialized_path,
+        )
+
+
+@pytest.mark.parametrize(
+    ("path", "write_path"),
+    [
+        (Path("~/omit.json"), None),
+        (Path("final/omit.json"), Path("~/staged.json")),
+    ],
+)
+def test_sidecar_materialization_rejects_tilde_prefixed_paths_before_writing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    path: Path,
+    write_path: Path | None,
+) -> None:
+    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(ValueError, match="must not begin with '~'"):
+        materialize_residue_alphabet_sidecar(request, path, write_path=write_path)
+
+    assert not (tmp_path / "~").exists()
 
 
 def test_command_requires_and_verifies_typed_sidecar(tmp_path: Path) -> None:

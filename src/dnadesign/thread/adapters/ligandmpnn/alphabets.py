@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import stat
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -32,12 +34,9 @@ class LigandMpnnResidueAlphabetSidecar:
     def __post_init__(self) -> None:
         if not self.sha256.startswith("sha256:") or len(self.sha256) != 71:
             raise ValueError("sha256 must be a prefixed SHA256 digest")
-        if not isinstance(self.path, Path) or self.path.suffix.lower() != ".json":
-            raise ValueError("path must be a Path ending in .json")
-        if self.materialized_path is not None and (
-            not isinstance(self.materialized_path, Path) or self.materialized_path.suffix.lower() != ".json"
-        ):
-            raise ValueError("materialized_path must be a Path ending in .json")
+        _require_json_path(self.path, field_name="path")
+        if self.materialized_path is not None:
+            _require_json_path(self.materialized_path, field_name="materialized_path")
         if isinstance(self.residue_count, bool) or self.residue_count <= 0:
             raise ValueError("residue_count must be positive")
 
@@ -56,14 +55,16 @@ class LigandMpnnResidueAlphabetSidecar:
 
         self._validate_request_binding(request)
         materialized_path = self.materialized_path or self.path
-        if not materialized_path.is_file() or _digest(materialized_path.read_bytes()) != self.sha256:
+        materialized_bytes = _read_regular_file_bytes(materialized_path, label="residue alphabet sidecar")
+        if materialized_bytes is None or _digest(materialized_bytes) != self.sha256:
             raise ValueError("residue alphabet sidecar file SHA256 does not match receipt")
 
     def validate_execution_file(self, request: LigandMpnnRequest) -> None:
         """Validate the final command-bound file after staging is promoted."""
 
         self._validate_request_binding(request)
-        if not self.path.is_file() or _digest(self.path.read_bytes()) != self.sha256:
+        execution_bytes = _read_regular_file_bytes(self.path, label="execution residue alphabet sidecar")
+        if execution_bytes is None or _digest(execution_bytes) != self.sha256:
             raise ValueError("execution residue alphabet sidecar SHA256 does not match receipt")
 
     def _validate_request_binding(self, request: LigandMpnnRequest) -> None:
@@ -86,16 +87,12 @@ def materialize_residue_alphabet_sidecar(
 
     if not request.residue_alphabets:
         raise ValueError("request has no residue alphabets to materialize")
-    if not isinstance(path, Path) or path.suffix.lower() != ".json":
-        raise ValueError("path must be a Path ending in .json")
+    _require_json_path(path, field_name="path")
     target = write_path or path
-    if not isinstance(target, Path) or target.suffix.lower() != ".json":
-        raise ValueError("write_path must be a Path ending in .json")
+    _require_json_path(target, field_name="write_path")
     content = _canonical_bytes(request)
-    if target.exists() and target.read_bytes() != content:
-        raise FileExistsError(f"refusing to overwrite different residue alphabet sidecar: {target}")
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(content)
+    _write_new_regular_file_or_validate_existing(target, content)
     return LigandMpnnResidueAlphabetSidecar(
         request_id=request.request_id,
         path=path,
@@ -115,3 +112,54 @@ def _canonical_bytes(request: LigandMpnnRequest) -> bytes:
 
 def _digest(content: bytes) -> str:
     return "sha256:" + hashlib.sha256(content).hexdigest()
+
+
+def _require_json_path(path: object, *, field_name: str) -> None:
+    if not isinstance(path, Path) or path.suffix.lower() != ".json":
+        raise ValueError(f"{field_name} must be a Path ending in .json")
+    if str(path).startswith("~"):
+        raise ValueError(f"{field_name} must not begin with '~'")
+
+
+def _write_new_regular_file_or_validate_existing(target: Path, content: bytes) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(target, flags, 0o644)
+    except FileExistsError:
+        existing = _read_regular_file_bytes(target, label="sidecar target")
+        if existing is None:
+            raise ValueError("sidecar target changed during materialization")
+        if existing != content:
+            raise FileExistsError(f"refusing to overwrite different residue alphabet sidecar: {target}")
+        return
+    except OSError as error:
+        raise ValueError("sidecar target must be a regular file") from error
+    try:
+        remaining = memoryview(content)
+        while remaining:
+            written = os.write(descriptor, remaining)
+            if written <= 0:
+                raise OSError("sidecar write made no progress")
+            remaining = remaining[written:]
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _read_regular_file_bytes(path: Path, *, label: str) -> bytes | None:
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise ValueError(f"{label} must be a regular file") from error
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise ValueError(f"{label} must be a regular file")
+        chunks: list[bytes] = []
+        while chunk := os.read(descriptor, 1024 * 1024):
+            chunks.append(chunk)
+        return b"".join(chunks)
+    finally:
+        os.close(descriptor)

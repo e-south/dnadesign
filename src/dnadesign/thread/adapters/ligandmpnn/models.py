@@ -164,6 +164,8 @@ class LigandMpnnRequest:
     def __post_init__(self) -> None:
         if _REQUEST_ID.fullmatch(self.request_id) is None:
             raise ValueError("request_id must contain only letters, numbers, dots, underscores, or hyphens")
+        if not isinstance(self.upstream, LigandMpnnUpstreamPin):
+            raise ValueError("upstream must be a LigandMpnnUpstreamPin")
         if self.fixed_residues and self.redesigned_residues:
             raise ValueError("fixed_residues and redesigned_residues are mutually exclusive")
         if not isinstance(self.fixed_residues, tuple) or not isinstance(self.redesigned_residues, tuple):

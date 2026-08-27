@@ -269,6 +269,11 @@ def test_request_rejects_ambiguous_or_nondeterministic_inputs(overrides: dict[st
         _request(**overrides)
 
 
+def test_request_rejects_untyped_upstream_even_when_packing_is_disabled() -> None:
+    with pytest.raises(ValueError, match="upstream must be a LigandMpnnUpstreamPin"):
+        _request(upstream="unpinned", packing=LigandMpnnPackingConfig())
+
+
 def test_residue_identifier_rejects_non_pdb_chain_or_insertion_codes() -> None:
     with pytest.raises(ValueError, match="chain_id must be one ASCII alphanumeric character"):
         LigandMpnnResidue(chain_id="AA", residue_number=1)
