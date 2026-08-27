@@ -11,9 +11,13 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
+import socket
+import stat
+import tempfile
 from dataclasses import replace
 from pathlib import Path
 
@@ -30,6 +34,7 @@ from dnadesign.thread.adapters.ligandmpnn import (
     build_planned_receipt,
     materialize_residue_alphabet_sidecar,
 )
+from dnadesign.thread.adapters.ligandmpnn import alphabets as alphabets_module
 from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import (
     create_pinned_context_checkout,
     write_context_inventory,
@@ -129,6 +134,174 @@ def test_sidecar_materialization_rejects_fifo_target_without_blocking(tmp_path: 
         materialize_residue_alphabet_sidecar(request, target)
 
 
+def test_sidecar_materialization_rejects_socket_target_without_blocking() -> None:
+    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    with tempfile.TemporaryDirectory(prefix="lm-", dir="/private/tmp") as directory:
+        target = Path(directory) / "omit.json"
+        with socket.socket(socket.AF_UNIX) as server:
+            server.bind(str(target))
+
+            with pytest.raises(ValueError, match="sidecar target must be a regular file"):
+                materialize_residue_alphabet_sidecar(request, target)
+
+
+def test_sidecar_materialization_rejects_symlinked_ancestor_without_writing_outside(tmp_path: Path) -> None:
+    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    alias = tmp_path / "alias"
+    alias.symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="sidecar target directory could not be opened safely"):
+        materialize_residue_alphabet_sidecar(request, alias / "omit.json")
+
+    assert not (outside / "omit.json").exists()
+
+
+def test_sidecar_validation_rejects_symlinked_ancestor(tmp_path: Path) -> None:
+    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    real_parent = tmp_path / "real"
+    target = real_parent / "omit.json"
+    sidecar = materialize_residue_alphabet_sidecar(request, target)
+    moved_parent = tmp_path / "moved"
+    real_parent.replace(moved_parent)
+    real_parent.symlink_to(moved_parent, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="residue alphabet sidecar directory could not be opened safely"):
+        sidecar.validate_for(request)
+
+
+def test_sidecar_partial_private_write_never_exposes_public_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    target = tmp_path / "omit.json"
+    real_write = os.write
+    calls = 0
+
+    def _partial_then_fail(descriptor: int, payload: bytes | memoryview) -> int:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return real_write(descriptor, bytes(payload[:1]))
+        raise OSError("injected partial write failure")
+
+    monkeypatch.setattr(os, "write", _partial_then_fail)
+
+    with pytest.raises(ValueError, match="sidecar could not be written completely"):
+        materialize_residue_alphabet_sidecar(request, target)
+
+    assert not target.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("existing_matches", [True, False])
+def test_sidecar_concurrent_publication_validates_existing_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    existing_matches: bool,
+) -> None:
+    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    target = tmp_path / "omit.json"
+    canonical = alphabets_module._canonical_bytes(request)
+    real_link = os.link
+    attempted = False
+
+    def _race_link(
+        source: str,
+        destination: str,
+        *,
+        src_dir_fd: int,
+        dst_dir_fd: int,
+        follow_symlinks: bool,
+    ) -> None:
+        nonlocal attempted
+        attempted = True
+        payload = canonical if existing_matches else b"{}\n"
+        descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=dst_dir_fd)
+        try:
+            real_write = os.write
+            real_write(descriptor, payload)
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        os.fsync(dst_dir_fd)
+        real_link(
+            source,
+            destination,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+            follow_symlinks=follow_symlinks,
+        )
+
+    monkeypatch.setattr(os, "link", _race_link)
+
+    if existing_matches:
+        materialize_residue_alphabet_sidecar(request, target)
+        assert target.read_bytes() == canonical
+    else:
+        with pytest.raises(FileExistsError, match="refusing to overwrite different"):
+            materialize_residue_alphabet_sidecar(request, target)
+        assert target.read_bytes() == b"{}\n"
+    assert attempted
+    assert not any(path.name.startswith(".omit.json.") for path in tmp_path.iterdir())
+
+
+def test_sidecar_parent_fsync_failure_rolls_back_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    target = tmp_path / "omit.json"
+    real_fsync = os.fsync
+    failed = False
+
+    def _fail_first_directory_fsync(descriptor: int) -> None:
+        nonlocal failed
+        if stat.S_ISDIR(os.fstat(descriptor).st_mode) and target.exists() and not failed:
+            failed = True
+            raise OSError("injected publication directory fsync failure")
+        real_fsync(descriptor)
+
+    monkeypatch.setattr(os, "fsync", _fail_first_directory_fsync)
+
+    with pytest.raises(ValueError, match="sidecar publication could not be made durable"):
+        materialize_residue_alphabet_sidecar(request, target)
+
+    assert failed
+    assert not target.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_sidecar_persistent_parent_fsync_failure_is_typed_uncertain(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    target = tmp_path / "omit.json"
+    real_fsync = os.fsync
+    publication_observed = False
+
+    def _fail_directory_fsync_after_publication(descriptor: int) -> None:
+        nonlocal publication_observed
+        if target.exists():
+            publication_observed = True
+        if stat.S_ISDIR(os.fstat(descriptor).st_mode) and publication_observed:
+            raise OSError("injected persistent directory fsync failure")
+        real_fsync(descriptor)
+
+    monkeypatch.setattr(os, "fsync", _fail_directory_fsync_after_publication)
+
+    with pytest.raises(
+        alphabets_module.LigandMpnnSidecarPublicationUncertainError,
+        match="rollback durability is uncertain",
+    ):
+        materialize_residue_alphabet_sidecar(request, target)
+
+    assert not target.exists()
+
+
 def test_sidecar_validation_rejects_symlink_replacement(tmp_path: Path) -> None:
     request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
     target = tmp_path / "omit.json"
@@ -179,6 +352,71 @@ def test_sidecar_materialization_rejects_tilde_prefixed_paths_before_writing(
         materialize_residue_alphabet_sidecar(request, path, write_path=write_path)
 
     assert not (tmp_path / "~").exists()
+
+
+@pytest.mark.parametrize(
+    ("path", "materialized_path"),
+    [
+        (Path("-omit.json"), None),
+        (Path("final/omit.json"), Path("-staged.json")),
+    ],
+)
+def test_sidecar_receipt_rejects_option_looking_relative_paths(
+    path: Path,
+    materialized_path: Path | None,
+) -> None:
+    with pytest.raises(ValueError, match="must not begin with '-'"):
+        LigandMpnnResidueAlphabetSidecar(
+            request_id="generic_restricted_design",
+            path=path,
+            sha256=f"sha256:{_DIGEST}",
+            residue_count=1,
+            materialized_path=materialized_path,
+        )
+
+
+@pytest.mark.parametrize(
+    ("path", "write_path"),
+    [
+        (Path("-omit.json"), None),
+        (Path("final/omit.json"), Path("-staged.json")),
+    ],
+)
+def test_sidecar_materialization_rejects_option_looking_paths_before_writing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    path: Path,
+    write_path: Path | None,
+) -> None:
+    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(ValueError, match="must not begin with '-'"):
+        materialize_residue_alphabet_sidecar(request, path, write_path=write_path)
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_valid_relative_sidecar_path_emits_argparse_safe_command(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
+    monkeypatch.chdir(tmp_path)
+    sidecar = materialize_residue_alphabet_sidecar(request, Path("inputs/omit.json"))
+    argv = build_ligandmpnn_commands(
+        request,
+        checkout_root=Path("tool"),
+        residue_alphabet_sidecar=sidecar,
+    )[0].argv
+    option_index = argv.index("--omit_AA_per_residue")
+    emitted_pair = argv[option_index : option_index + 2]
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--omit_AA_per_residue", required=True)
+
+    parsed = parser.parse_args(emitted_pair)
+
+    assert parsed.omit_AA_per_residue == "inputs/omit.json"
 
 
 def test_command_requires_and_verifies_typed_sidecar(tmp_path: Path) -> None:

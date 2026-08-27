@@ -13,6 +13,7 @@ from importlib import import_module
 
 from dnadesign.thread.adapters.ligandmpnn.alphabets import (
     LigandMpnnResidueAlphabetSidecar,
+    LigandMpnnSidecarPublicationUncertainError,
     materialize_residue_alphabet_sidecar,
 )
 from dnadesign.thread.adapters.ligandmpnn.commands import build_ligandmpnn_commands
@@ -91,6 +92,7 @@ __all__ = [
     "LigandMpnnUpstreamPin",
     "LigandMpnnScoreMode",
     "LigandMpnnScorePublicationUncertainError",
+    "LigandMpnnSidecarPublicationUncertainError",
     "LigandMpnnCanonical20Policy",
     "LigandMpnnScoreOutput",
     "LigandMpnnScoreOutputTrust",
