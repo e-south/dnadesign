@@ -273,7 +273,7 @@ def _require_residue_alphabets(
 def _require_relative_file(path: Path, *, field_name: str) -> None:
     if not isinstance(path, Path):
         raise ValueError(f"{field_name} must be a Path")
-    if path.is_absolute() or not path.name or ".." in path.parts:
+    if path.is_absolute() or not path.name or ".." in path.parts or str(path).startswith("~"):
         raise ValueError(f"{field_name} must be a checkout-relative file path")
 
 

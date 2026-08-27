@@ -274,6 +274,20 @@ def test_request_rejects_untyped_upstream_even_when_packing_is_disabled() -> Non
         _request(upstream="unpinned", packing=LigandMpnnPackingConfig())
 
 
+@pytest.mark.parametrize("field_name", ["checkpoint_path", "packing_checkpoint_path"])
+def test_upstream_pin_rejects_tilde_prefixed_checkpoint_paths(field_name: str) -> None:
+    values = {
+        "commit": _COMMIT,
+        "checkpoint_sha256": _DIGEST,
+        "checkpoint_path": Path("model_params/design.pt"),
+        "packing_checkpoint_path": Path("model_params/packing.pt"),
+    }
+    values[field_name] = Path("~/weights.pt")
+
+    with pytest.raises(ValueError, match=rf"{field_name} must be a checkout-relative file path"):
+        LigandMpnnUpstreamPin(**values)
+
+
 def test_residue_identifier_rejects_non_pdb_chain_or_insertion_codes() -> None:
     with pytest.raises(ValueError, match="chain_id must be one ASCII alphanumeric character"):
         LigandMpnnResidue(chain_id="AA", residue_number=1)
