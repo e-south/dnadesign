@@ -11,11 +11,20 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import os
 import stat
 import subprocess
+import time
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - exercised on non-POSIX platforms
+    fcntl = None  # type: ignore[assignment]
 
 from .loading import load_storage_object_manifest_bytes
 from .models import (
@@ -38,12 +47,13 @@ _SHELF_KINDS = {
 _ALLOWED_ROOT_FILES = {"AGENTS.md"}
 _GitIndexEntry = tuple[bytes, bytes, bytes]
 _GitIndexSnapshot = tuple[bytes, dict[str, tuple[_GitIndexEntry, ...]]]
-_StorageTreeEntryState = tuple[str, int, int, int, int, int, int]
+_StorageTreeEntryState = tuple[str, int, int, int, int, int, int, int, int, int]
 _CoordinationState = tuple[
     tuple[int, int, int, int, int, int],
     tuple[int, int, int, int],
     tuple[int, int, int, int, int],
 ]
+_RoutedObject = tuple[Path, ObjectKind, str, tuple[_StorageTreeEntryState, ...]]
 
 
 def resolve_storage_path(path: Path, *, label: str, strict: bool = False) -> Path:
@@ -103,6 +113,41 @@ def _recheck_verified_manifest(verified: VerifiedStorageObject) -> None:
         raise StorageObjectError(
             "storage object manifest changed during root validation; retry while producers are quiescent"
         )
+
+
+def _rebind_verified_storage_object(verified: VerifiedStorageObject) -> VerifiedStorageObject:
+    """Reapply the full object contract before returning root-level evidence."""
+
+    observed = verify_storage_object(verified.root)
+    if observed.manifest_digest != verified.manifest_digest:
+        raise StorageObjectError(
+            "storage object manifest changed during root validation; retry while producers are quiescent"
+        )
+    expected_state = tuple(
+        (
+            resource.relative_path,
+            resource.digest,
+            resource.size_bytes,
+            resource.device_id,
+            resource.inode,
+        )
+        for resource in verified.resources
+    )
+    rebound_state = tuple(
+        (
+            resource.relative_path,
+            resource.digest,
+            resource.size_bytes,
+            resource.device_id,
+            resource.inode,
+        )
+        for resource in observed.resources
+    )
+    if rebound_state != expected_state:
+        raise StorageObjectError(
+            "storage object resources changed during root validation; retry while producers are quiescent"
+        )
+    return observed
 
 
 def _storage_tree_paths(root: Path) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
@@ -165,6 +210,7 @@ def _storage_tree_state(
             entry_stat = path.stat(follow_symlinks=False)
         except OSError as exc:
             raise StorageObjectError(f"cannot inspect storage entry: {relative}: {exc}") from exc
+        is_coordination_lock = path.parent == root and path.name == LOCK_NAME
         state.append(
             (
                 relative,
@@ -174,6 +220,9 @@ def _storage_tree_state(
                 stat.S_IMODE(entry_stat.st_mode),
                 entry_stat.st_uid,
                 entry_stat.st_gid,
+                entry_stat.st_size,
+                0 if is_coordination_lock else entry_stat.st_mtime_ns,
+                0 if is_coordination_lock else entry_stat.st_ctime_ns,
             )
         )
     return tuple(state)
@@ -357,6 +406,171 @@ def _verify_coordination_posture(
         (manifest_mode, manifest_stat.st_gid, manifest_stat.st_dev, manifest_stat.st_ino),
         lock_state,
     )
+
+
+@contextmanager
+def _validation_manifest_lock(root: Path) -> Iterator[None]:
+    """Hold one existing writer lock while proving its pathname stays bound."""
+
+    manifest_path = root / MANIFEST_NAME
+    lock_path = root / LOCK_NAME
+    root_state, _manifest_state, lock_state = _verify_coordination_posture(root, manifest_path, lock_path)
+    root_identity = root_state[-2:]
+    lock_mode, lock_gid, lock_size, lock_device, lock_inode = lock_state
+    lock_identity = (lock_device, lock_inode)
+    lock_descriptor = _acquire_existing_validation_lock(
+        lock_path,
+        expected_identity=lock_identity,
+        expected_mode=lock_mode,
+        expected_gid=lock_gid,
+        expected_size=lock_size,
+    )
+    try:
+        acquired_root = root.stat(follow_symlinks=False)
+        acquired_named = lock_path.stat(follow_symlinks=False)
+        acquired_held = os.fstat(lock_descriptor)
+        if (acquired_root.st_dev, acquired_root.st_ino) != root_identity:
+            raise StorageObjectError(f"storage object root changed before lock acquisition completed: {root}")
+        if (acquired_named.st_dev, acquired_named.st_ino) != lock_identity or (
+            acquired_held.st_dev,
+            acquired_held.st_ino,
+        ) != lock_identity:
+            raise StorageObjectError(f"storage object lock changed before acquisition completed: {lock_path}")
+        if (
+            not stat.S_ISREG(acquired_named.st_mode)
+            or not stat.S_ISREG(acquired_held.st_mode)
+            or acquired_named.st_size != lock_size
+            or acquired_held.st_size != lock_size
+            or stat.S_IMODE(acquired_named.st_mode) != lock_mode
+            or stat.S_IMODE(acquired_held.st_mode) != lock_mode
+            or acquired_named.st_gid != lock_gid
+            or acquired_held.st_gid != lock_gid
+        ):
+            raise StorageObjectError(f"storage object lock posture changed before acquisition completed: {lock_path}")
+    except (OSError, StorageObjectError) as inspection_error:
+        try:
+            _release_validation_lock(lock_descriptor)
+        except OSError as release_error:
+            raise StorageObjectError(
+                f"cannot inspect acquired storage object lock and release failed {lock_path}: {release_error}"
+            ) from inspection_error
+        if isinstance(inspection_error, StorageObjectError):
+            raise
+        raise StorageObjectError(f"cannot inspect acquired storage object lock {lock_path}: {inspection_error}") from (
+            inspection_error
+        )
+
+    body_error: BaseException | None = None
+    try:
+        yield
+    except BaseException as exc:
+        body_error = exc
+    completion_error: StorageObjectError | None = None
+    try:
+        final_root = root.stat(follow_symlinks=False)
+        before = lock_path.stat(follow_symlinks=False)
+        held = os.fstat(lock_descriptor)
+        after = lock_path.stat(follow_symlinks=False)
+        if (final_root.st_dev, final_root.st_ino) != root_identity:
+            raise StorageObjectError(f"storage object root changed while holding its manifest lock: {root}")
+        if (
+            (before.st_dev, before.st_ino) != lock_identity
+            or (held.st_dev, held.st_ino) != lock_identity
+            or (after.st_dev, after.st_ino) != lock_identity
+        ):
+            raise StorageObjectError(f"storage object lock changed before validation completion: {lock_path}")
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or not stat.S_ISREG(held.st_mode)
+            or not stat.S_ISREG(after.st_mode)
+            or before.st_size != lock_size
+            or held.st_size != lock_size
+            or after.st_size != lock_size
+            or stat.S_IMODE(before.st_mode) != lock_mode
+            or stat.S_IMODE(held.st_mode) != lock_mode
+            or stat.S_IMODE(after.st_mode) != lock_mode
+            or before.st_gid != lock_gid
+            or held.st_gid != lock_gid
+            or after.st_gid != lock_gid
+        ):
+            raise StorageObjectError(f"storage object lock posture changed before validation completion: {lock_path}")
+    except OSError as exc:
+        completion_error = StorageObjectError(f"cannot inspect storage object lock at completion {lock_path}: {exc}")
+    except StorageObjectError as exc:
+        completion_error = exc
+    try:
+        _release_validation_lock(lock_descriptor)
+    except OSError as release_error:
+        raise StorageObjectError(f"cannot release storage object validation lock {lock_path}: {release_error}") from (
+            body_error or completion_error
+        )
+    if body_error is not None:
+        raise body_error
+    if completion_error is not None:
+        raise completion_error
+
+
+def _acquire_existing_validation_lock(
+    lock_path: Path,
+    *,
+    expected_identity: tuple[int, int],
+    expected_mode: int,
+    expected_gid: int,
+    expected_size: int,
+    timeout_seconds: float = 30.0,
+) -> int:
+    """Lock an existing no-follow descriptor without creating or truncating its path."""
+
+    if fcntl is None or not hasattr(os, "O_NOFOLLOW"):
+        raise StorageObjectError(
+            "storage-root validation requires POSIX no-follow advisory locking; "
+            f"cannot acquire existing coordination lock: {lock_path}"
+        )
+    flags = os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0)
+    try:
+        descriptor = os.open(lock_path, flags)
+    except OSError as exc:
+        raise StorageObjectError(f"cannot open existing storage object lock {lock_path}: {exc}") from exc
+    deadline = time.monotonic() + timeout_seconds
+    try:
+        opened = os.fstat(descriptor)
+        if (opened.st_dev, opened.st_ino) != expected_identity:
+            raise StorageObjectError(f"storage object lock changed before acquisition completed: {lock_path}")
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or stat.S_IMODE(opened.st_mode) != expected_mode
+            or opened.st_gid != expected_gid
+            or opened.st_size != expected_size
+        ):
+            raise StorageObjectError(f"storage object lock posture changed before acquisition completed: {lock_path}")
+        while True:
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return descriptor
+            except OSError as exc:
+                if exc.errno == errno.EINTR:
+                    continue
+                if exc.errno not in {errno.EACCES, errno.EAGAIN}:
+                    raise StorageObjectError(f"cannot acquire storage object manifest lock {lock_path}: {exc}") from exc
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise StorageObjectError(f"timed out waiting for storage object manifest lock: {lock_path.parent}")
+                time.sleep(min(0.05, remaining))
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _release_validation_lock(descriptor: int) -> None:
+    """Release and close one validation-owned advisory-lock descriptor."""
+
+    if fcntl is None:  # pragma: no cover - acquisition rejects this platform
+        os.close(descriptor)
+        return
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+    finally:
+        os.close(descriptor)
 
 
 def _git_authority_environment() -> dict[str, str]:
@@ -754,27 +968,9 @@ def verify_storage_object(
     return verified
 
 
-def _routed_directory_state(path: Path) -> tuple[int, int, int, int, int]:
-    """Fingerprint one routed directory identity and permission posture."""
-
-    try:
-        directory_stat = path.stat(follow_symlinks=False)
-    except OSError as exc:
-        raise StorageObjectError(f"cannot inspect routed storage directory {path}: {exc}") from exc
-    if not stat.S_ISDIR(directory_stat.st_mode):
-        raise StorageObjectError(f"routed storage path must be a directory: {path}")
-    return (
-        stat.S_IMODE(directory_stat.st_mode),
-        directory_stat.st_uid,
-        directory_stat.st_gid,
-        directory_stat.st_dev,
-        directory_stat.st_ino,
-    )
-
-
 def _routed_object_directories(
     root: Path,
-) -> tuple[tuple[Path, ObjectKind, str, tuple[int, int, int, int, int]], ...]:
+) -> tuple[_RoutedObject, ...]:
     """Enumerate one exact routed-root snapshot without verifying object bytes."""
 
     allowed_shelves = set(_SHELF_KINDS) | _ALLOWED_ROOT_FILES
@@ -787,7 +983,7 @@ def _routed_object_directories(
         raise StorageObjectError(f"storage root routing file must not be a symlink: {routing_file}")
     if routing_file.exists() and not routing_file.is_file():
         raise StorageObjectError(f"storage root routing file must be a regular file: {routing_file}")
-    routes: list[tuple[Path, ObjectKind, str, tuple[int, int, int, int, int]]] = []
+    routes: list[_RoutedObject] = []
     for shelf_name, expected_kind in _SHELF_KINDS.items():
         shelf = root / shelf_name
         if shelf.is_symlink():
@@ -813,27 +1009,36 @@ def _routed_object_directories(
             for object_directory in sorted(path for path in owner_entries if path.is_dir()):
                 if object_directory.is_symlink():
                     raise StorageObjectError(f"storage object directory must not be a symlink: {object_directory}")
+                object_files, object_directories = _storage_tree_paths(object_directory)
                 routes.append(
                     (
                         object_directory,
                         expected_kind,
                         owner_directory.name,
-                        _routed_directory_state(object_directory),
+                        _storage_tree_state(object_directory, object_files, object_directories),
                     )
                 )
     return tuple(routes)
 
 
-def verify_storage_root(storage_root: Path) -> VerifiedStorageRoot:
-    """Verify routed storage shelves and every contained object."""
+def _route_coordination_identity(routes: tuple[_RoutedObject, ...]) -> tuple[tuple[object, ...], ...]:
+    """Compare discovered route ownership without lock-acquisition timestamp noise."""
 
-    requested_root = Path(storage_root).expanduser()
-    if requested_root.is_symlink():
-        raise StorageObjectError(f"storage root must not be a symlink: {requested_root}")
-    root = resolve_storage_path(requested_root, label="storage root")
-    if not root.is_dir():
-        raise StorageObjectError(f"storage root is not a directory: {root}")
-    routes = _routed_object_directories(root)
+    return tuple(
+        (
+            object_root,
+            object_kind,
+            owner_name,
+            tree_state[0][:7],
+            next((entry[:8] for entry in tree_state if entry[0] == LOCK_NAME), None),
+        )
+        for object_root, object_kind, owner_name, tree_state in routes
+    )
+
+
+def _verify_locked_storage_root(root: Path, routes: tuple[_RoutedObject, ...]) -> VerifiedStorageRoot:
+    """Verify all routes while every discovered object writer lock is held."""
+
     objects: list[VerifiedStorageObject] = []
     identities: set[tuple[str, str, str]] = set()
     for object_directory, expected_kind, owner_name, _directory_state in routes:
@@ -868,4 +1073,30 @@ def verify_storage_root(storage_root: Path) -> VerifiedStorageRoot:
         revalidated_objects.append(revalidated)
     if routes != _routed_object_directories(root):
         raise StorageObjectError("storage root changed during validation; retry while object routing is quiescent")
-    return VerifiedStorageRoot(root=root, objects=tuple(revalidated_objects))
+    final_objects = tuple(_rebind_verified_storage_object(verified) for verified in revalidated_objects)
+    if routes != _routed_object_directories(root):
+        raise StorageObjectError("storage root changed during validation; retry while object routing is quiescent")
+    return VerifiedStorageRoot(root=root, objects=final_objects)
+
+
+def verify_storage_root(storage_root: Path) -> VerifiedStorageRoot:
+    """Verify routed storage shelves and every contained object."""
+
+    requested_root = Path(storage_root).expanduser()
+    if requested_root.is_symlink():
+        raise StorageObjectError(f"storage root must not be a symlink: {requested_root}")
+    root = resolve_storage_path(requested_root, label="storage root")
+    if not root.is_dir():
+        raise StorageObjectError(f"storage root is not a directory: {root}")
+    discovered_routes = _routed_object_directories(root)
+    ordered_roots = sorted((route[0] for route in discovered_routes), key=lambda path: path.as_posix())
+    with ExitStack() as locks:
+        for object_root in ordered_roots:
+            locks.enter_context(_validation_manifest_lock(object_root))
+        locked_routes = _routed_object_directories(root)
+        if _route_coordination_identity(locked_routes) != _route_coordination_identity(discovered_routes):
+            raise StorageObjectError(
+                "storage root changed during validation while acquiring object locks; "
+                "retry while object routing is quiescent"
+            )
+        return _verify_locked_storage_root(root, locked_routes)

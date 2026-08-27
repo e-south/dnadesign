@@ -1188,7 +1188,10 @@ def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]
                 )
     except OSError as exc:
         raise StorageObjectError(f"cannot inspect storage object lock {lock_path}: {exc}") from exc
-    lock_mode = 0o664 if root_mode & stat.S_IWGRP else 0o644
+    if inspected_lock_identity is None:
+        lock_mode = 0o664 if root_mode & stat.S_IWGRP else 0o644
+    else:
+        lock_mode = stat.S_IMODE(inspected_lock_stat.st_mode)
     lock = FileLock(lock_path, timeout=30, mode=lock_mode)
     try:
         lock.acquire()

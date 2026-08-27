@@ -14,8 +14,13 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import stat
 import subprocess
+import sys
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from pathlib import Path
+from threading import Event
 
 import pytest
 
@@ -649,6 +654,226 @@ def test_verify_storage_root_enforces_shelf_owner_and_identity(tmp_path: Path) -
         verify_storage_root(storage_root)
 
 
+def test_verify_storage_root_holds_all_object_locks_against_concurrent_writer(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+    earlier = storage_root / "workspaces" / "cruncher" / "earlier"
+    later = storage_root / "workspaces" / "cruncher" / "later"
+    _write_object(earlier, storage_id="earlier")
+    _write_object(later, storage_id="later")
+    expected_digest = _digest((earlier / MANIFEST_NAME).read_bytes())
+    original_routes = storage_validation._routed_object_directories
+    locks_held = Event()
+    continue_validation = Event()
+    route_calls = 0
+
+    def _routes(root: Path):
+        nonlocal route_calls
+        routes = original_routes(root)
+        route_calls += 1
+        if route_calls == 2:
+            locks_held.set()
+            assert continue_validation.wait(timeout=10)
+        return routes
+
+    monkeypatch.setattr(storage_validation, "_routed_object_directories", _routes)
+
+    writer_script = """
+import json
+import sys
+from pathlib import Path
+from dnadesign.contracts.storage_objects import refresh_storage_object
+
+summary = refresh_storage_object(
+    Path(sys.argv[1]),
+    expected_manifest_digest=sys.argv[2],
+    producer_revision="test-revision-2",
+)
+print(json.dumps(summary))
+"""
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        validation_future = executor.submit(verify_storage_root, storage_root)
+        assert locks_held.wait(timeout=10)
+        writer = subprocess.Popen(
+            [sys.executable, "-c", writer_script, str(earlier), expected_digest],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            with pytest.raises(subprocess.TimeoutExpired):
+                writer.wait(timeout=0.5)
+            continue_validation.set()
+            assert validation_future.result(timeout=10).summary()["status"] == "verified"
+            stdout, stderr = writer.communicate(timeout=10)
+        finally:
+            continue_validation.set()
+            if writer.poll() is None:
+                writer.kill()
+                writer.communicate()
+        assert writer.returncode == 0, stderr
+        assert json.loads(stdout)["status"] == "verified"
+
+    assert json.loads((earlier / MANIFEST_NAME).read_text(encoding="utf-8"))["producer_revision"] == "test-revision-2"
+    assert stat.S_IMODE((earlier / LOCK_NAME).stat().st_mode) == 0o664
+
+
+def test_verify_storage_root_acquires_object_locks_in_path_order(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+    for storage_id in ("zebra", "alpha"):
+        _write_object(storage_root / "workspaces" / "cruncher" / storage_id, storage_id=storage_id)
+    original_acquire = storage_validation._acquire_existing_validation_lock
+    acquired: list[Path] = []
+
+    def _acquire(lock_path: Path, *args: object, **kwargs: object):
+        acquired.append(lock_path)
+        return original_acquire(lock_path, *args, **kwargs)
+
+    monkeypatch.setattr(storage_validation, "_acquire_existing_validation_lock", _acquire)
+
+    assert verify_storage_root(storage_root).summary()["status"] == "verified"
+    assert acquired == sorted(acquired, key=lambda path: path.as_posix())
+    assert [path.parent.name for path in acquired] == ["alpha", "zebra"]
+
+
+def test_verify_storage_root_rejects_missing_object_lock_before_validation(tmp_path: Path) -> None:
+    storage_root = tmp_path / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+    object_root = storage_root / "workspaces" / "cruncher" / "pilot"
+    _write_object(object_root)
+    (object_root / LOCK_NAME).unlink()
+
+    with pytest.raises(StorageObjectError, match="storage object lock is missing"):
+        verify_storage_root(storage_root)
+
+
+def test_verify_storage_root_rejects_lock_replaced_during_acquisition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+    object_root = storage_root / "workspaces" / "cruncher" / "pilot"
+    _write_object(object_root)
+    lock_path = object_root / LOCK_NAME
+    original_identity = (lock_path.stat().st_dev, lock_path.stat().st_ino)
+    original_acquire = storage_validation._acquire_existing_validation_lock
+    replacement_identity: tuple[int, int] | None = None
+
+    def _acquire(lock: Path, *args: object, **kwargs: object):
+        nonlocal replacement_identity
+        replacement = lock_path.with_name(f".{LOCK_NAME}.replacement")
+        replacement.touch(mode=0o664)
+        replacement.replace(lock_path)
+        replacement_identity = (lock_path.stat().st_dev, lock_path.stat().st_ino)
+        return original_acquire(lock, *args, **kwargs)
+
+    monkeypatch.setattr(storage_validation, "_acquire_existing_validation_lock", _acquire)
+
+    with pytest.raises(StorageObjectError, match="lock changed before acquisition completed"):
+        verify_storage_root(storage_root)
+
+    assert replacement_identity is not None
+    assert replacement_identity != original_identity
+
+
+def test_verify_storage_root_does_not_recreate_lock_unlinked_during_acquisition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+    object_root = storage_root / "workspaces" / "cruncher" / "pilot"
+    _write_object(object_root)
+    lock_path = object_root / LOCK_NAME
+    original_acquire = storage_validation._acquire_existing_validation_lock
+
+    def _acquire(lock: Path, *args: object, **kwargs: object):
+        lock_path.unlink()
+        return original_acquire(lock, *args, **kwargs)
+
+    monkeypatch.setattr(storage_validation, "_acquire_existing_validation_lock", _acquire)
+
+    with pytest.raises(StorageObjectError, match="cannot open existing storage object lock"):
+        verify_storage_root(storage_root)
+
+    assert not lock_path.exists()
+
+
+def test_verify_storage_root_rejects_lock_replaced_before_acquisition_inspection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+    object_root = storage_root / "workspaces" / "cruncher" / "pilot"
+    _write_object(object_root)
+    lock_path = object_root / LOCK_NAME
+    original_identity = (lock_path.stat().st_dev, lock_path.stat().st_ino)
+    original_lock = storage_validation._validation_manifest_lock
+    replaced = False
+
+    @contextmanager
+    def _lock(root: Path):
+        nonlocal replaced
+        if not replaced:
+            replacement = lock_path.with_name(f".{LOCK_NAME}.replacement")
+            replacement.touch(mode=0o664)
+            replacement.replace(lock_path)
+            replaced = True
+        with original_lock(root):
+            yield
+
+    monkeypatch.setattr(storage_validation, "_validation_manifest_lock", _lock)
+
+    with pytest.raises(StorageObjectError, match="changed during validation while acquiring object locks"):
+        verify_storage_root(storage_root)
+
+    assert replaced
+    assert (lock_path.stat().st_dev, lock_path.stat().st_ino) != original_identity
+
+
+def test_verify_storage_root_rejects_lock_replaced_before_validation_completion(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+    object_root = storage_root / "workspaces" / "cruncher" / "pilot"
+    _write_object(object_root)
+    lock_path = object_root / LOCK_NAME
+    original_identity = (lock_path.stat().st_dev, lock_path.stat().st_ino)
+    original_verify = storage_validation._verify_locked_storage_root
+
+    def _verify(root: Path, routes: object):
+        verified = original_verify(root, routes)
+        replacement = lock_path.with_name(f".{LOCK_NAME}.replacement")
+        replacement.touch(mode=0o664)
+        replacement.replace(lock_path)
+        return verified
+
+    monkeypatch.setattr(storage_validation, "_verify_locked_storage_root", _verify)
+
+    with pytest.raises(StorageObjectError, match="lock changed before validation completion"):
+        verify_storage_root(storage_root)
+
+    assert (lock_path.stat().st_dev, lock_path.stat().st_ino) != original_identity
+
+
 @pytest.mark.parametrize(
     ("relative_path", "message"),
     [
@@ -750,6 +975,37 @@ def test_verify_storage_root_rejects_object_created_during_validation(
         verify_storage_root(storage_root)
 
 
+def test_verify_storage_root_rechecks_routes_after_final_object_rebind(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+    pilot = storage_root / "workspaces" / "cruncher" / "pilot"
+    _write_object(pilot)
+    original_verify = storage_validation.verify_storage_object
+    calls = 0
+    created = False
+
+    def _verify(object_root: Path):
+        nonlocal calls, created
+        verified = original_verify(object_root)
+        calls += 1
+        if calls == 3:
+            _write_object(storage_root / "workspaces" / "cruncher" / "late", storage_id="late")
+            created = True
+        return verified
+
+    monkeypatch.setattr(storage_validation, "verify_storage_object", _verify)
+
+    with pytest.raises(StorageObjectError, match="storage root changed during validation"):
+        verify_storage_root(storage_root)
+
+    assert created
+    assert calls == 3
+
+
 def test_verify_storage_root_rejects_earlier_manifest_refreshed_during_validation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -809,6 +1065,140 @@ def test_verify_storage_root_revalidates_earlier_resource_bytes(
 
     with pytest.raises(StorageObjectError, match="digest mismatch"):
         verify_storage_root(storage_root)
+
+
+def test_verify_storage_root_rechecks_earlier_resource_after_final_sequential_pass(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+    earlier = storage_root / "workspaces" / "cruncher" / "earlier"
+    later = storage_root / "workspaces" / "cruncher" / "later"
+    _write_object(earlier, storage_id="earlier")
+    _write_object(later, storage_id="later")
+    original_verify = storage_validation.verify_storage_object
+    later_calls = 0
+    changed = False
+
+    def _verify(object_root: Path):
+        nonlocal changed, later_calls
+        verified = original_verify(object_root)
+        if object_root == later:
+            later_calls += 1
+            if later_calls == 2:
+                (earlier / "outputs" / "result.json").write_text(
+                    '{"status":"changed-after-earlier-final-pass"}\n',
+                    encoding="utf-8",
+                )
+                changed = True
+        return verified
+
+    monkeypatch.setattr(storage_validation, "verify_storage_object", _verify)
+
+    with pytest.raises(StorageObjectError, match="storage root changed"):
+        verify_storage_root(storage_root)
+
+    assert changed
+    assert later_calls == 2
+
+
+def test_verify_storage_root_rechecks_earlier_shared_access_after_final_sequential_pass(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+    earlier = storage_root / "workspaces" / "cruncher" / "earlier"
+    later = storage_root / "workspaces" / "cruncher" / "later"
+    _write_object(earlier, storage_id="earlier")
+    _write_object(later, storage_id="later")
+    for object_root in (earlier, later):
+        object_root.chmod(0o2770)
+        for directory in (object_root / "inputs", object_root / "outputs"):
+            directory.chmod(0o750)
+        for path in (
+            object_root / MANIFEST_NAME,
+            object_root / LOCK_NAME,
+            object_root / "inputs" / "payload.txt",
+            object_root / "outputs" / "result.json",
+        ):
+            path.chmod(0o664 if path.name in {MANIFEST_NAME, LOCK_NAME} else 0o640)
+    original_verify = storage_validation.verify_storage_object
+    later_calls = 0
+    changed = False
+
+    def _verify(object_root: Path):
+        nonlocal changed, later_calls
+        verified = original_verify(object_root)
+        if object_root == later:
+            later_calls += 1
+            if later_calls == 2:
+                (earlier / "outputs" / "result.json").chmod(0o600)
+                changed = True
+        return verified
+
+    monkeypatch.setattr(storage_validation, "verify_storage_object", _verify)
+
+    with pytest.raises(StorageObjectError, match="storage root changed"):
+        verify_storage_root(storage_root)
+
+    assert changed
+    assert later_calls == 2
+
+
+@pytest.mark.parametrize("drift_kind", ["bytes", "mode"])
+def test_verify_storage_root_rechecks_earlier_object_after_later_final_rebind(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    drift_kind: str,
+) -> None:
+    storage_root = tmp_path / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+    earlier = storage_root / "workspaces" / "cruncher" / "earlier"
+    later = storage_root / "workspaces" / "cruncher" / "later"
+    _write_object(earlier, storage_id="earlier")
+    _write_object(later, storage_id="later")
+    if drift_kind == "mode":
+        for object_root in (earlier, later):
+            object_root.chmod(0o2770)
+            for directory in (object_root / "inputs", object_root / "outputs"):
+                directory.chmod(0o750)
+            for path in (
+                object_root / MANIFEST_NAME,
+                object_root / LOCK_NAME,
+                object_root / "inputs" / "payload.txt",
+                object_root / "outputs" / "result.json",
+            ):
+                path.chmod(0o664 if path.name in {MANIFEST_NAME, LOCK_NAME} else 0o640)
+    original_verify = storage_validation.verify_storage_object
+    later_calls = 0
+    changed = False
+
+    def _verify(object_root: Path):
+        nonlocal changed, later_calls
+        verified = original_verify(object_root)
+        if object_root == later:
+            later_calls += 1
+            if later_calls == 3:
+                resource = earlier / "outputs" / "result.json"
+                if drift_kind == "bytes":
+                    resource.write_text('{"status":"changed-during-final-rebind"}\n', encoding="utf-8")
+                else:
+                    resource.chmod(0o600)
+                changed = True
+        return verified
+
+    monkeypatch.setattr(storage_validation, "verify_storage_object", _verify)
+
+    with pytest.raises(StorageObjectError, match="storage root changed during validation"):
+        verify_storage_root(storage_root)
+
+    assert changed
+    assert later_calls == 3
 
 
 def test_verify_storage_root_rejects_object_directory_replaced_after_revalidation(

@@ -523,6 +523,55 @@ def test_demo_validation_rejects_same_path_directory_replacement_after_git_reads
     assert changed
 
 
+@pytest.mark.parametrize("target_kind", ["resource", "directory"])
+def test_shared_demo_rejects_access_posture_drift_after_git_reads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target_kind: str,
+) -> None:
+    root, manifest_path = _seed_tracked_demo(tmp_path)
+    checkout = root.parents[1]
+    payload = root / "payload.txt"
+    if target_kind == "directory":
+        nested = root / "nested"
+        nested.mkdir()
+        payload.replace(nested / payload.name)
+        payload = nested / payload.name
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["resources"][0]["path"] = "nested/payload.txt"
+        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        subprocess.run(
+            ["git", "-C", str(checkout), "add", "-A", "--", root.relative_to(checkout).as_posix()],
+            check=True,
+        )
+        nested.chmod(0o750)
+    root.chmod(0o2770)
+    manifest_path.chmod(0o664)
+    (root / LOCK_NAME).chmod(0o664)
+    payload.chmod(0o640)
+    (root / f".{MANIFEST_NAME}.cleanup-owner-{os.geteuid()}").chmod(0o750)
+    assert verify_storage_object(root).summary()["status"] == "verified"
+    original_run = storage_validation.subprocess.run
+    changed = False
+
+    def _run(*args: object, **kwargs: object):
+        nonlocal changed
+        completed = original_run(*args, **kwargs)
+        command = args[0]
+        if isinstance(command, list) and "cat-file" in command and not changed:
+            target = payload if target_kind == "resource" else payload.parent
+            target.chmod(0o600 if target_kind == "resource" else 0o740)
+            changed = True
+        return completed
+
+    monkeypatch.setattr(storage_validation.subprocess, "run", _run)
+
+    with pytest.raises(StorageObjectError, match="changed during Git index validation"):
+        verify_storage_object(root)
+
+    assert changed
+
+
 def test_demo_validation_rejects_index_change_after_checked_entry(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

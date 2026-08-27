@@ -2,13 +2,13 @@
 doc_id: documentation-index
 surface: docs-router
 owner: dnadesign-maintainers
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 ---
 
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-26
+**Last verified:** 2026-08-27
 
 Find the next task, command, or reference doc from the routes below.
 
