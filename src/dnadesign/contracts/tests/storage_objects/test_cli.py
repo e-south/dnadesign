@@ -345,6 +345,105 @@ def test_demo_validation_reads_original_index_blob_despite_git_replace_ref(tmp_p
         verify_storage_object(root)
 
 
+@pytest.mark.parametrize("override_kind", ["index", "repository"])
+def test_demo_validation_clears_repository_local_git_environment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    override_kind: str,
+) -> None:
+    root, manifest_path = _seed_tracked_demo(tmp_path)
+    checkout = root.parents[1]
+    replacement_bytes = b"alternate authority payload\n"
+    (root / "payload.txt").write_bytes(replacement_bytes)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["resources"][0]["digest"] = f"sha256:{hashlib.sha256(replacement_bytes).hexdigest()}"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    relative_root = root.relative_to(checkout).as_posix()
+
+    if override_kind == "index":
+        alternate_index = tmp_path / "alternate.index"
+        alternate_index.write_bytes((checkout / ".git" / "index").read_bytes())
+        alternate_env = {**os.environ, "GIT_INDEX_FILE": str(alternate_index)}
+        subprocess.run(
+            ["git", "-C", str(checkout), "add", "--", relative_root],
+            env=alternate_env,
+            check=True,
+        )
+        monkeypatch.setenv("GIT_INDEX_FILE", str(alternate_index))
+    else:
+        alternate_git_dir = tmp_path / "alternate.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(alternate_git_dir)], check=True)
+        subprocess.run(
+            [
+                "git",
+                f"--git-dir={alternate_git_dir}",
+                f"--work-tree={checkout}",
+                "add",
+                "--",
+                relative_root,
+            ],
+            check=True,
+        )
+        monkeypatch.setenv("GIT_DIR", str(alternate_git_dir))
+        monkeypatch.setenv("GIT_WORK_TREE", str(checkout))
+
+    with pytest.raises(StorageObjectError, match="demo file differs from Git index"):
+        verify_storage_object(root)
+
+
+@pytest.mark.parametrize(
+    ("target_kind", "error"),
+    [
+        ("manifest", "demo manifest changed during Git index validation"),
+        ("resource", "digest mismatch"),
+        ("manifest_identity", "demo storage object changed during Git index validation"),
+        ("resource_identity", "demo storage object changed during Git index validation"),
+    ],
+)
+def test_demo_validation_rechecks_filesystem_bytes_after_git_index_reads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target_kind: str,
+    error: str,
+) -> None:
+    root, manifest_path = _seed_tracked_demo(tmp_path)
+    checkout = root.parents[1]
+    payload_path = root / "payload.txt"
+    target_path = manifest_path if target_kind.startswith("manifest") else payload_path
+    relative_target = target_path.relative_to(checkout).as_posix()
+    target_blob = subprocess.run(
+        ["git", "-C", str(checkout), "ls-files", "--stage", "--", relative_target],
+        check=True,
+        capture_output=True,
+    ).stdout.split()[1]
+    original_run = storage_validation.subprocess.run
+    changed = False
+
+    def _run(*args: object, **kwargs: object):
+        nonlocal changed
+        completed = original_run(*args, **kwargs)
+        command = args[0]
+        if isinstance(command, list) and "cat-file" in command and command[-1] == target_blob and not changed:
+            if target_kind.endswith("_identity"):
+                replacement = target_path.with_name(f".{target_path.name}.same-bytes")
+                replacement.write_bytes(target_path.read_bytes())
+                replacement.chmod(stat.S_IMODE(target_path.stat().st_mode))
+                os.replace(replacement, target_path)
+            elif target_kind == "manifest":
+                manifest_path.write_bytes(manifest_path.read_bytes() + b" ")
+            else:
+                payload_path.write_text("changed after Git validation\n", encoding="utf-8")
+            changed = True
+        return completed
+
+    monkeypatch.setattr(storage_validation.subprocess, "run", _run)
+
+    with pytest.raises(StorageObjectError, match=error):
+        verify_storage_object(root)
+
+    assert changed
+
+
 def test_demo_validation_normalizes_late_manifest_stat_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1810,13 +1909,14 @@ def test_inventory_release_error_reports_committed_manifest_digest(
     root.mkdir()
     (root / "payload.txt").write_text("payload\n", encoding="utf-8")
     manifest_path = root / MANIFEST_NAME
+    lock_path = root / LOCK_NAME
     original_release = storage_inventory.FileLock.release
     injected = False
 
     def _release_then_fail(lock, *args: object, **kwargs: object) -> None:
         nonlocal injected
         original_release(lock, *args, **kwargs)
-        if manifest_path.exists() and not injected:
+        if Path(lock.lock_file) == lock_path and manifest_path.exists() and not injected:
             injected = True
             raise OSError("injected post-commit lock release failure")
 
@@ -1865,6 +1965,7 @@ def test_refresh_release_error_reports_new_committed_manifest_digest(
         retention_policy="review-before-delete",
     )
     manifest_path = root / MANIFEST_NAME
+    lock_path = root / LOCK_NAME
     prior_digest = _digest(manifest_path)
     original_release = storage_inventory.FileLock.release
     injected = False
@@ -1873,7 +1974,8 @@ def test_refresh_release_error_reports_new_committed_manifest_digest(
         nonlocal injected
         original_release(lock, *args, **kwargs)
         if (
-            json.loads(manifest_path.read_text(encoding="utf-8"))["producer_revision"] == "test-revision-2"
+            Path(lock.lock_file) == lock_path
+            and json.loads(manifest_path.read_text(encoding="utf-8"))["producer_revision"] == "test-revision-2"
             and not injected
         ):
             injected = True

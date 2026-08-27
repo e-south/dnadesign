@@ -102,6 +102,8 @@ class VerifiedStoredResource:
     digest: str
     role: ResourceRole
     size_bytes: int
+    device_id: int
+    inode: int
 
 
 @dataclass(frozen=True, slots=True)

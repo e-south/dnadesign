@@ -809,3 +809,38 @@ def test_verify_storage_root_revalidates_earlier_resource_bytes(
 
     with pytest.raises(StorageObjectError, match="digest mismatch"):
         verify_storage_root(storage_root)
+
+
+def test_verify_storage_root_rejects_object_directory_replaced_after_revalidation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_root = tmp_path / "storage"
+    for shelf in ("workspaces", "stores", "tool-cache"):
+        (storage_root / shelf).mkdir(parents=True)
+    object_root = storage_root / "workspaces" / "cruncher" / "pilot"
+    _write_object(object_root)
+    replacement = tmp_path / "replacement"
+    _write_object(replacement)
+    displaced = tmp_path / "displaced"
+    original_identity = (object_root.stat().st_dev, object_root.stat().st_ino)
+    replacement_identity = (replacement.stat().st_dev, replacement.stat().st_ino)
+    original_verify = storage_validation.verify_storage_object
+    calls = 0
+
+    def _verify(root: Path):
+        nonlocal calls
+        verified = original_verify(root)
+        calls += 1
+        if calls == 2:
+            object_root.rename(displaced)
+            replacement.rename(object_root)
+        return verified
+
+    monkeypatch.setattr(storage_validation, "verify_storage_object", _verify)
+
+    with pytest.raises(StorageObjectError, match="storage root changed during validation"):
+        verify_storage_root(storage_root)
+
+    assert original_identity != replacement_identity
+    assert (object_root.stat().st_dev, object_root.stat().st_ino) == replacement_identity

@@ -156,7 +156,11 @@ def _verify_resource(root: Path, resource: StoredResource) -> VerifiedStoredReso
         resolved.relative_to(root)
     except ValueError as exc:
         raise StorageObjectError(f"declared resource escapes storage root: {resource.relative_path}") from exc
-    if not resolved.is_file():
+    try:
+        initial_stat = resolved.stat(follow_symlinks=False)
+    except OSError as exc:
+        raise StorageObjectError(f"cannot inspect storage resource {resource.relative_path}: {exc}") from exc
+    if not stat.S_ISREG(initial_stat.st_mode):
         raise StorageObjectError(f"declared resource is not a file: {resource.relative_path}")
     observed_digest = _sha256(resolved)
     if observed_digest != resource.digest:
@@ -165,15 +169,34 @@ def _verify_resource(root: Path, resource: StoredResource) -> VerifiedStoredReso
             f"expected {resource.digest}, observed {observed_digest}"
         )
     try:
-        size_bytes = resolved.stat().st_size
+        final_stat = resolved.stat(follow_symlinks=False)
     except OSError as exc:
         raise StorageObjectError(f"cannot inspect storage resource {resource.relative_path}: {exc}") from exc
+    initial_identity = (
+        initial_stat.st_dev,
+        initial_stat.st_ino,
+        initial_stat.st_size,
+        initial_stat.st_mode,
+    )
+    final_identity = (
+        final_stat.st_dev,
+        final_stat.st_ino,
+        final_stat.st_size,
+        final_stat.st_mode,
+    )
+    if initial_identity != final_identity:
+        raise StorageObjectError(
+            f"declared resource changed during validation: {resource.relative_path}; "
+            "retry while the producer is quiescent"
+        )
     return VerifiedStoredResource(
         relative_path=resource.relative_path,
         path=resolved,
         digest=observed_digest,
         role=resource.role,
-        size_bytes=size_bytes,
+        size_bytes=final_stat.st_size,
+        device_id=final_stat.st_dev,
+        inode=final_stat.st_ino,
     )
 
 
@@ -214,7 +237,7 @@ def _verify_coordination_posture(
     root: Path,
     manifest_path: Path,
     lock_path: Path,
-) -> tuple[tuple[int, int], tuple[int, int], tuple[int, int, int, int, int]]:
+) -> tuple[tuple[int, int], tuple[int, int, int, int], tuple[int, int, int, int, int]]:
     """Validate and fingerprint root, manifest, and lock coordination state."""
 
     try:
@@ -286,12 +309,45 @@ def _verify_coordination_posture(
         raise StorageObjectError(f"cannot inspect storage object lock {lock_path}: {exc}") from exc
     return (
         (root_mode, root_stat.st_gid),
-        (manifest_mode, manifest_stat.st_gid),
+        (manifest_mode, manifest_stat.st_gid, manifest_stat.st_dev, manifest_stat.st_ino),
         lock_state,
     )
 
 
-def _verify_demo_git_index_entry(checkout: Path, path: Path, expected_digest: str) -> None:
+def _git_authority_environment() -> dict[str, str]:
+    """Remove caller-provided repository selection from demo Git reads."""
+
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "--local-env-vars"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        raise StorageObjectError(
+            f"cannot verify demo Git tracking because repository-local environment cannot be enumerated: {exc}"
+        ) from exc
+    if completed.returncode != 0:
+        detail = completed.stderr.strip()
+        raise StorageObjectError(
+            "cannot verify demo Git tracking because repository-local environment cannot be enumerated: "
+            f"{detail or 'git rev-parse failed'}"
+        )
+    environment = os.environ.copy()
+    for variable in completed.stdout.splitlines():
+        environment.pop(variable, None)
+    environment["GIT_NO_REPLACE_OBJECTS"] = "1"
+    return environment
+
+
+def _verify_demo_git_index_entry(
+    checkout: Path,
+    path: Path,
+    expected_digest: str,
+    *,
+    git_environment: dict[str, str],
+) -> None:
     """Bind one verified demo file snapshot to its stage-0 Git index blob."""
 
     relative = path.relative_to(checkout).as_posix()
@@ -311,6 +367,7 @@ def _verify_demo_git_index_entry(checkout: Path, path: Path, expected_digest: st
             ],
             check=False,
             capture_output=True,
+            env=git_environment,
         )
     except OSError as exc:
         raise StorageObjectError(f"cannot verify demo Git tracking for {relative}: {exc}") from exc
@@ -336,6 +393,7 @@ def _verify_demo_git_index_entry(checkout: Path, path: Path, expected_digest: st
             ["git", "--no-replace-objects", "-C", str(checkout), "cat-file", "blob", object_id],
             check=False,
             capture_output=True,
+            env=git_environment,
         )
     except OSError as exc:
         raise StorageObjectError(f"cannot verify demo Git index bytes for {relative}: {exc}") from exc
@@ -354,7 +412,12 @@ def verify_manifest_index_if_git_resident(root: Path, manifest_path: Path, expec
     checkout = _git_checkout_ancestor(root, include_root=True)
     if checkout is None:
         return False
-    _verify_demo_git_index_entry(checkout, manifest_path, expected_digest)
+    _verify_demo_git_index_entry(
+        checkout,
+        manifest_path,
+        expected_digest,
+        git_environment=_git_authority_environment(),
+    )
     return True
 
 
@@ -365,6 +428,7 @@ def _verify_demo(
     allow_pending_manifest: bool,
     allow_pending_lock: bool,
 ) -> None:
+    git_environment = _git_authority_environment()
     try:
         manifest_size = verified.manifest_path.stat(follow_symlinks=False).st_size
     except OSError as exc:
@@ -383,7 +447,64 @@ def _verify_demo(
             continue
         if allow_pending_lock and path == verified.root / LOCK_NAME:
             continue
-        _verify_demo_git_index_entry(checkout, path, expected_digest)
+        _verify_demo_git_index_entry(
+            checkout,
+            path,
+            expected_digest,
+            git_environment=git_environment,
+        )
+
+
+def _recheck_verified_demo_snapshot(
+    verified: VerifiedStorageObject,
+    expected_coordination_state: tuple[
+        tuple[int, int],
+        tuple[int, int, int, int],
+        tuple[int, int, int, int, int],
+    ],
+) -> None:
+    """Rebind verified demo bytes and coordination after Git authority reads."""
+
+    try:
+        manifest_bytes = verified.manifest_path.read_bytes()
+    except OSError as exc:
+        raise StorageObjectError(
+            f"cannot reread demo manifest after Git index validation {verified.manifest_path}: {exc}"
+        ) from exc
+    if _sha256_bytes(manifest_bytes) != verified.manifest_digest:
+        raise StorageObjectError(
+            "demo manifest changed during Git index validation; retry while the producer is quiescent"
+        )
+    resources = tuple(_verify_resource(verified.root, resource) for resource in verified.manifest.resources)
+    expected_resources = tuple(
+        (
+            resource.relative_path,
+            resource.digest,
+            resource.size_bytes,
+            resource.device_id,
+            resource.inode,
+        )
+        for resource in verified.resources
+    )
+    observed_resources = tuple(
+        (
+            resource.relative_path,
+            resource.digest,
+            resource.size_bytes,
+            resource.device_id,
+            resource.inode,
+        )
+        for resource in resources
+    )
+    coordination_state = _verify_coordination_posture(
+        verified.root,
+        verified.manifest_path,
+        verified.root / LOCK_NAME,
+    )
+    if observed_resources != expected_resources or coordination_state != expected_coordination_state:
+        raise StorageObjectError(
+            "demo storage object changed during Git index validation; retry while the producer is quiescent"
+        )
 
 
 def verify_storage_object(
@@ -449,8 +570,12 @@ def verify_storage_object(
         for path in second_file_paths
         if path.name not in {MANIFEST_NAME, LOCK_NAME} or path.parent != root
     }
-    first_state = tuple((item.relative_path, item.digest, item.size_bytes) for item in resources)
-    second_state = tuple((item.relative_path, item.digest, item.size_bytes) for item in second_resources)
+    first_state = tuple(
+        (item.relative_path, item.digest, item.size_bytes, item.device_id, item.inode) for item in resources
+    )
+    second_state = tuple(
+        (item.relative_path, item.digest, item.size_bytes, item.device_id, item.inode) for item in second_resources
+    )
     try:
         second_manifest_bytes = manifest_path.read_bytes()
     except OSError as exc:
@@ -494,6 +619,7 @@ def verify_storage_object(
             allow_pending_manifest=_allow_pending_demo_manifest,
             allow_pending_lock=_allow_pending_demo_lock,
         )
+        _recheck_verified_demo_snapshot(verified, second_coordination_state)
     elif checkout is not None:
         raise StorageObjectError(
             f"non-demo storage object cannot live inside a Git checkout: object={root}, checkout={checkout}"
@@ -501,7 +627,27 @@ def verify_storage_object(
     return verified
 
 
-def _routed_object_directories(root: Path) -> tuple[tuple[Path, ObjectKind, str], ...]:
+def _routed_directory_state(path: Path) -> tuple[int, int, int, int, int]:
+    """Fingerprint one routed directory identity and permission posture."""
+
+    try:
+        directory_stat = path.stat(follow_symlinks=False)
+    except OSError as exc:
+        raise StorageObjectError(f"cannot inspect routed storage directory {path}: {exc}") from exc
+    if not stat.S_ISDIR(directory_stat.st_mode):
+        raise StorageObjectError(f"routed storage path must be a directory: {path}")
+    return (
+        stat.S_IMODE(directory_stat.st_mode),
+        directory_stat.st_uid,
+        directory_stat.st_gid,
+        directory_stat.st_dev,
+        directory_stat.st_ino,
+    )
+
+
+def _routed_object_directories(
+    root: Path,
+) -> tuple[tuple[Path, ObjectKind, str, tuple[int, int, int, int, int]], ...]:
     """Enumerate one exact routed-root snapshot without verifying object bytes."""
 
     allowed_shelves = set(_SHELF_KINDS) | _ALLOWED_ROOT_FILES
@@ -514,7 +660,7 @@ def _routed_object_directories(root: Path) -> tuple[tuple[Path, ObjectKind, str]
         raise StorageObjectError(f"storage root routing file must not be a symlink: {routing_file}")
     if routing_file.exists() and not routing_file.is_file():
         raise StorageObjectError(f"storage root routing file must be a regular file: {routing_file}")
-    routes: list[tuple[Path, ObjectKind, str]] = []
+    routes: list[tuple[Path, ObjectKind, str, tuple[int, int, int, int, int]]] = []
     for shelf_name, expected_kind in _SHELF_KINDS.items():
         shelf = root / shelf_name
         if shelf.is_symlink():
@@ -540,7 +686,14 @@ def _routed_object_directories(root: Path) -> tuple[tuple[Path, ObjectKind, str]
             for object_directory in sorted(path for path in owner_entries if path.is_dir()):
                 if object_directory.is_symlink():
                     raise StorageObjectError(f"storage object directory must not be a symlink: {object_directory}")
-                routes.append((object_directory, expected_kind, owner_directory.name))
+                routes.append(
+                    (
+                        object_directory,
+                        expected_kind,
+                        owner_directory.name,
+                        _routed_directory_state(object_directory),
+                    )
+                )
     return tuple(routes)
 
 
@@ -556,7 +709,7 @@ def verify_storage_root(storage_root: Path) -> VerifiedStorageRoot:
     routes = _routed_object_directories(root)
     objects: list[VerifiedStorageObject] = []
     identities: set[tuple[str, str, str]] = set()
-    for object_directory, expected_kind, owner_name in routes:
+    for object_directory, expected_kind, owner_name, _directory_state in routes:
         verified = verify_storage_object(object_directory)
         manifest = verified.manifest
         if manifest.object_kind is not expected_kind:
