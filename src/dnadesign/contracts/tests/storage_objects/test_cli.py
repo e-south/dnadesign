@@ -14,6 +14,7 @@ from __future__ import annotations
 import errno
 import hashlib
 import json
+import os
 import stat
 import subprocess
 import sys
@@ -690,6 +691,87 @@ def test_inventory_creates_group_writable_lock_for_shared_object(tmp_path: Path)
     assert stat.S_IMODE((root / MANIFEST_NAME).stat().st_mode) == 0o664
     assert (root / LOCK_NAME).stat().st_gid == root.stat().st_gid
     assert (root / MANIFEST_NAME).stat().st_gid == root.stat().st_gid
+
+
+def test_inventory_normalizes_shared_cleanup_boundary_under_restrictive_umask(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(0o2770)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    previous_umask = os.umask(0o077)
+    try:
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+    finally:
+        os.umask(previous_umask)
+
+    cleanup_directory = root / f".{MANIFEST_NAME}.cleanup-owner-{os.geteuid()}"
+    assert stat.S_IMODE(cleanup_directory.stat().st_mode) & 0o777 == 0o750
+    assert cleanup_directory.stat().st_gid == root.stat().st_gid
+    assert not tuple(cleanup_directory.iterdir())
+
+
+def test_inventory_repairs_safe_existing_shared_cleanup_boundary(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(0o2770)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    cleanup_directory = root / f".{MANIFEST_NAME}.cleanup-owner-{os.geteuid()}"
+    cleanup_directory.mkdir(mode=0o700)
+    cleanup_directory.chmod(0o700)
+
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+
+    assert stat.S_IMODE(cleanup_directory.stat().st_mode) & 0o777 == 0o750
+    assert (root / MANIFEST_NAME).exists()
+
+
+def test_inventory_rejects_unsafe_shared_cleanup_boundary_before_publication(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(0o2770)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    cleanup_directory = root / f".{MANIFEST_NAME}.cleanup-owner-{os.geteuid()}"
+    cleanup_directory.mkdir(mode=0o770)
+    cleanup_directory.chmod(0o770)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="not an owner-write-private.*boundary"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert not (root / MANIFEST_NAME).exists()
+    assert not tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
 
 
 def test_inventory_rejects_other_writable_object_root_before_locking(tmp_path: Path) -> None:
@@ -2099,8 +2181,8 @@ def test_refresh_reports_typed_unsupported_platform_without_mutation(
     monkeypatch.setattr(storage_inventory.sys, "platform", "unsupported")
 
     with pytest.raises(
-        StorageObjectPublicationUnsupported,
-        match="does not support atomic storage manifest exchange",
+        StorageObjectPublicationUncertain,
+        match="safe manifest staging cleanup is unsupported.*retained",
     ):
         refresh_storage_object(
             root,
@@ -2109,7 +2191,8 @@ def test_refresh_reports_typed_unsupported_platform_without_mutation(
         )
 
     assert manifest_path.read_bytes() == previous_bytes
-    assert not tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    retained = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert len(retained) == 1
 
 
 def test_inventory_reports_typed_unsupported_hard_link_without_mutation(
@@ -2283,6 +2366,123 @@ def test_refresh_restores_manifest_when_verification_is_interrupted(
     assert manifest_path.read_bytes() == previous_bytes
 
 
+def test_refresh_validation_rollback_rejects_same_byte_canonical_replacement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    previous_bytes = manifest_path.read_bytes()
+    original_publish = storage_inventory._publish_refresh_manifest
+    publish_calls = 0
+    replacement_identity: tuple[int, int] | None = None
+
+    def _publish_after_same_byte_replacement(*args: object, **kwargs: object) -> object:
+        nonlocal publish_calls, replacement_identity
+        publish_calls += 1
+        if publish_calls == 2:
+            replacement = manifest_path.with_name(f".{MANIFEST_NAME}.competitor")
+            replacement.write_bytes(manifest_path.read_bytes())
+            replacement.chmod(manifest_path.stat(follow_symlinks=False).st_mode & 0o777)
+            replacement.replace(manifest_path)
+            replacement_stat = manifest_path.stat(follow_symlinks=False)
+            replacement_identity = (replacement_stat.st_dev, replacement_stat.st_ino)
+        return original_publish(*args, **kwargs)
+
+    def _fail_verification(*_args: object, **_kwargs: object) -> None:
+        raise StorageObjectError("injected validation failure")
+
+    monkeypatch.setattr(storage_inventory, "_publish_refresh_manifest", _publish_after_same_byte_replacement)
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _fail_verification)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="displaced receipt changed.*retained"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert publish_calls == 2
+    assert replacement_identity is not None
+    assert manifest_path.read_bytes() == previous_bytes
+    recovery = tuple(root.glob(f".{MANIFEST_NAME}.restore-*"))
+    assert len(recovery) == 1
+    recovery_stat = recovery[0].stat(follow_symlinks=False)
+    assert (recovery_stat.st_dev, recovery_stat.st_ino) == replacement_identity
+    assert json.loads(recovery[0].read_bytes())["producer_revision"] == "test-revision-2"
+
+
+def test_refresh_validation_rollback_rejects_replaced_restore_staging(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    original_publish = storage_inventory._publish_refresh_manifest
+    publish_calls = 0
+    attacker_bytes: bytes | None = None
+
+    def _publish_after_restore_replacement(temporary: Path, *args: object, **kwargs: object) -> object:
+        nonlocal attacker_bytes, publish_calls
+        publish_calls += 1
+        if publish_calls == 2:
+            attacker = json.loads(temporary.read_bytes())
+            attacker["producer_revision"] = "attacker-restore-revision"
+            attacker_bytes = (json.dumps(attacker, indent=2, sort_keys=True) + "\n").encode()
+            replacement = temporary.with_name(f"{temporary.name}.competitor")
+            replacement.write_bytes(attacker_bytes)
+            replacement.replace(temporary)
+        return original_publish(temporary, *args, **kwargs)
+
+    def _fail_verification(*_args: object, **_kwargs: object) -> None:
+        raise StorageObjectError("injected validation failure")
+
+    monkeypatch.setattr(storage_inventory, "_publish_refresh_manifest", _publish_after_restore_replacement)
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _fail_verification)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="staging entry changed before refresh publication"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert publish_calls == 2
+    assert attacker_bytes is not None
+    assert json.loads(manifest_path.read_bytes())["producer_revision"] == "test-revision-2"
+    recovery = tuple(root.glob(f".{MANIFEST_NAME}.restore-*"))
+    assert len(recovery) == 1
+    assert recovery[0].read_bytes() == attacker_bytes
+
+
 def test_inventory_removes_manifest_when_verification_is_interrupted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2348,6 +2548,268 @@ def test_inventory_rolls_back_when_atomic_link_publication_is_interrupted(
         )
 
     assert not (root / MANIFEST_NAME).exists()
+
+
+def test_inventory_retains_staging_entry_replaced_before_publication_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    foreign_bytes = b"foreign staging bytes\n"
+    foreign_identity: tuple[int, int] | None = None
+    original_fsync = storage_inventory._fsync_directory
+    injected = False
+
+    def _replace_staging_after_publication_fsync(directory: Path) -> None:
+        nonlocal foreign_identity, injected
+        original_fsync(directory)
+        staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+        if manifest_path.exists() and staging and not injected:
+            replacement = staging[0].with_name(f"{staging[0].name}.competitor")
+            replacement.write_bytes(foreign_bytes)
+            replacement.replace(staging[0])
+            replacement_stat = staging[0].stat(follow_symlinks=False)
+            foreign_identity = (replacement_stat.st_dev, replacement_stat.st_ino)
+            injected = True
+
+    monkeypatch.setattr(storage_inventory, "_fsync_directory", _replace_staging_after_publication_fsync)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="staging entry.*changed.*(restored|retained)"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert injected
+    assert foreign_identity is not None
+    assert not manifest_path.exists()
+    staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert len(staging) == 1
+    staging_stat = staging[0].stat(follow_symlinks=False)
+    assert (staging_stat.st_dev, staging_stat.st_ino) == foreign_identity
+    assert staging[0].read_bytes() == foreign_bytes
+
+
+def test_inventory_retains_replaced_staging_entry_during_failed_write_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    foreign_bytes = b"foreign failed-write staging bytes\n"
+
+    def _replace_staging_then_fail(source: Path, _destination: Path, **_kwargs: object) -> None:
+        replacement = source.with_name(f"{source.name}.competitor")
+        replacement.write_bytes(foreign_bytes)
+        replacement.replace(source)
+        raise FileExistsError("injected publication collision")
+
+    monkeypatch.setattr(storage_inventory.os, "link", _replace_staging_then_fail)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="staging entry.*changed.*(restored|retained)"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert not manifest_path.exists()
+    staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert len(staging) == 1
+    assert staging[0].read_bytes() == foreign_bytes
+
+
+def test_owned_cleanup_atomically_restores_replacement_at_displacement_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    staging = tmp_path / f".{MANIFEST_NAME}.tmp-owned"
+    staging.write_bytes(b"owned staging bytes\n")
+    staging_stat = staging.stat(follow_symlinks=False)
+    owned_identity = (staging_stat.st_dev, staging_stat.st_ino)
+    foreign_bytes = b"foreign staging bytes\n"
+    original_move = storage_inventory._atomic_move_no_replace_into_directory
+    injected = False
+
+    def _replace_at_atomic_cleanup_boundary(source: Path, destination_directory: int, destination_name: str) -> None:
+        nonlocal injected
+        if not injected:
+            replacement = source.with_name(f"{source.name}.competitor")
+            replacement.write_bytes(foreign_bytes)
+            replacement.replace(source)
+            injected = True
+        original_move(source, destination_directory, destination_name)
+        if injected:
+            raise FileNotFoundError("injected error after cleanup displacement")
+
+    monkeypatch.setattr(
+        storage_inventory,
+        "_atomic_move_no_replace_into_directory",
+        _replace_at_atomic_cleanup_boundary,
+    )
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="foreign entry restored"):
+        storage_inventory._unlink_owned_entry(
+            staging,
+            expected_identity=owned_identity,
+            context="manifest staging entry",
+        )
+
+    assert injected
+    assert staging.read_bytes() == foreign_bytes
+    cleanup_directories = tuple(tmp_path.glob(f".{MANIFEST_NAME}.cleanup-owner-*"))
+    assert len(cleanup_directories) == 1
+    assert not tuple(cleanup_directories[0].iterdir())
+
+
+def test_owned_cleanup_classifies_error_after_successful_displacement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    staging = tmp_path / f".{MANIFEST_NAME}.tmp-owned"
+    staging.write_bytes(b"owned staging bytes\n")
+    staging_stat = staging.stat(follow_symlinks=False)
+    owned_identity = (staging_stat.st_dev, staging_stat.st_ino)
+    original_move = storage_inventory._atomic_move_no_replace_into_directory
+
+    def _move_then_raise(source: Path, destination_directory: int, destination_name: str) -> None:
+        original_move(source, destination_directory, destination_name)
+        raise FileNotFoundError("injected error after cleanup displacement")
+
+    monkeypatch.setattr(storage_inventory, "_atomic_move_no_replace_into_directory", _move_then_raise)
+
+    storage_inventory._unlink_owned_entry(
+        staging,
+        expected_identity=owned_identity,
+        context="manifest staging entry",
+    )
+
+    assert not staging.exists()
+    cleanup_directories = tuple(tmp_path.glob(f".{MANIFEST_NAME}.cleanup-owner-*"))
+    assert len(cleanup_directories) == 1
+    assert not tuple(cleanup_directories[0].iterdir())
+
+
+def test_owned_cleanup_private_quarantine_cannot_delete_shared_replacement_after_verification(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    staging = tmp_path / f".{MANIFEST_NAME}.tmp-owned"
+    staging.write_bytes(b"owned staging bytes\n")
+    staging_stat = staging.stat(follow_symlinks=False)
+    owned_identity = (staging_stat.st_dev, staging_stat.st_ino)
+    foreign_bytes = b"foreign staging bytes\n"
+    original_identity = storage_inventory._directory_entry_identity
+    injected = False
+
+    def _replace_shared_path_after_private_verification(directory_descriptor: int, name: str) -> tuple[int, int]:
+        nonlocal injected
+        identity = original_identity(directory_descriptor, name)
+        staging.write_bytes(foreign_bytes)
+        injected = True
+        return identity
+
+    def _forbid_path_unlink(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("cleanup must not unlink a shared pathname")
+
+    monkeypatch.setattr(storage_inventory, "_directory_entry_identity", _replace_shared_path_after_private_verification)
+    monkeypatch.setattr(Path, "unlink", _forbid_path_unlink)
+
+    storage_inventory._unlink_owned_entry(
+        staging,
+        expected_identity=owned_identity,
+        context="manifest staging entry",
+    )
+
+    assert injected
+    assert staging.read_bytes() == foreign_bytes
+    cleanup_directories = tuple(tmp_path.glob(f".{MANIFEST_NAME}.cleanup-owner-*"))
+    assert len(cleanup_directories) == 1
+    assert not tuple(cleanup_directories[0].iterdir())
+
+
+def test_owned_cleanup_rejects_group_writable_cleanup_boundary(tmp_path: Path) -> None:
+    staging = tmp_path / f".{MANIFEST_NAME}.tmp-owned"
+    staging.write_bytes(b"owned staging bytes\n")
+    staging_stat = staging.stat(follow_symlinks=False)
+    owned_identity = (staging_stat.st_dev, staging_stat.st_ino)
+    cleanup_directory = tmp_path / f".{MANIFEST_NAME}.cleanup-owner-{os.geteuid()}"
+    cleanup_directory.mkdir(mode=0o770)
+    cleanup_directory.chmod(0o770)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="not an owner-write-private.*boundary"):
+        storage_inventory._unlink_owned_entry(
+            staging,
+            expected_identity=owned_identity,
+            context="manifest staging entry",
+        )
+
+    assert staging.read_bytes() == b"owned staging bytes\n"
+    assert not tuple(cleanup_directory.iterdir())
+
+
+def test_inventory_rejects_staging_replaced_before_create_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    original_publish = storage_inventory._publish_create_only_manifest
+    attacker_bytes: bytes | None = None
+
+    def _publish_after_staging_replacement(temporary: Path, *args: object, **kwargs: object) -> object:
+        nonlocal attacker_bytes
+        attacker = json.loads(temporary.read_bytes())
+        attacker["producer_revision"] = "attacker-revision"
+        attacker_bytes = (json.dumps(attacker, indent=2, sort_keys=True) + "\n").encode()
+        replacement = temporary.with_name(f"{temporary.name}.competitor")
+        replacement.write_bytes(attacker_bytes)
+        replacement.replace(temporary)
+        return original_publish(temporary, *args, **kwargs)
+
+    monkeypatch.setattr(storage_inventory, "_publish_create_only_manifest", _publish_after_staging_replacement)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="staging entry changed before create-only publication"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert attacker_bytes is not None
+    assert not manifest_path.exists()
+    staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert len(staging) == 1
+    assert staging[0].read_bytes() == attacker_bytes
 
 
 def test_inventory_rollback_retains_receipt_replaced_at_commit_boundary(
@@ -2586,6 +3048,116 @@ def test_inventory_rollback_retains_quarantine_replaced_after_move(
     assert not manifest_path.exists()
 
 
+@pytest.mark.parametrize(
+    ("cleanup_context", "manifest_remains"),
+    [
+        ("create-only rollback quarantine placeholder", True),
+        ("create-only rollback quarantine entry", False),
+    ],
+)
+def test_inventory_rollback_retains_quarantine_replaced_at_cleanup_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cleanup_context: str,
+    manifest_remains: bool,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    original_unlink_owned = storage_inventory._unlink_owned_entry
+    injected = False
+    replacement_bytes: bytes | None = None
+
+    def _replace_before_owned_cleanup(
+        path: Path,
+        *,
+        expected_identity: tuple[int, int],
+        context: str,
+        missing_ok: bool = False,
+    ) -> None:
+        nonlocal injected, replacement_bytes
+        if context == cleanup_context and not injected:
+            replacement_bytes = path.read_bytes()
+            replacement = path.with_name(f"{path.name}.competitor")
+            replacement.write_bytes(replacement_bytes)
+            replacement.replace(path)
+            injected = True
+        original_unlink_owned(
+            path,
+            expected_identity=expected_identity,
+            context=context,
+            missing_ok=missing_ok,
+        )
+
+    def _fail_verification(*_args: object, **_kwargs: object) -> None:
+        raise StorageObjectError("injected validation failure")
+
+    monkeypatch.setattr(storage_inventory, "_unlink_owned_entry", _replace_before_owned_cleanup)
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _fail_verification)
+
+    with pytest.raises(
+        StorageObjectPublicationUncertain,
+        match="quarantine.*changed.*(restored|retained)|rollback cleanup is uncertain",
+    ):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert injected
+    assert replacement_bytes is not None
+    assert manifest_path.exists() is manifest_remains
+    quarantine = tuple(root.glob(f".{MANIFEST_NAME}.rollback-*"))
+    assert len(quarantine) == 1
+    assert quarantine[0].read_bytes() == replacement_bytes
+
+
+def test_create_preflight_retains_staging_replaced_at_cleanup_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_unlink_owned = storage_inventory._unlink_owned_entry
+    injected = False
+
+    def _replace_before_preflight_cleanup(
+        path: Path,
+        *,
+        expected_identity: tuple[int, int],
+        context: str,
+        missing_ok: bool = False,
+    ) -> None:
+        nonlocal injected
+        if context == "create-only rollback preflight staging entry" and path.exists() and not injected:
+            replacement = path.with_name(f"{path.name}.competitor")
+            replacement.write_bytes(path.read_bytes())
+            replacement.replace(path)
+            injected = True
+        original_unlink_owned(
+            path,
+            expected_identity=expected_identity,
+            context=context,
+            missing_ok=missing_ok,
+        )
+
+    monkeypatch.setattr(storage_inventory, "_unlink_owned_entry", _replace_before_preflight_cleanup)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="preflight cleanup is uncertain"):
+        storage_inventory._preflight_create_only_rollback(tmp_path)
+
+    assert injected
+    retained = tuple(tmp_path.glob(f".{MANIFEST_NAME}.tmp-preflight-*"))
+    assert len(retained) == 1
+
+
 def test_refresh_swaps_back_when_atomic_exchange_is_interrupted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2628,6 +3200,210 @@ def test_refresh_swaps_back_when_atomic_exchange_is_interrupted(
 
     assert manifest_path.read_bytes() == previous_bytes
     assert exchange_calls == 2
+
+
+def test_refresh_retains_candidate_when_initial_exchange_changes_canonical_then_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    foreign_bytes = b"foreign canonical receipt\n"
+
+    def _replace_canonical_then_fail(_source: Path, destination: Path) -> None:
+        replacement = destination.with_name(f".{MANIFEST_NAME}.competitor")
+        replacement.write_bytes(foreign_bytes)
+        replacement.replace(destination)
+        raise OSError("injected exchange failure after canonical replacement")
+
+    monkeypatch.setattr(storage_inventory, "_atomic_exchange", _replace_canonical_then_fail)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="initial refresh exchange.*retained"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert manifest_path.read_bytes() == foreign_bytes
+    staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert len(staging) == 1
+    assert json.loads(staging[0].read_bytes())["producer_revision"] == "test-revision-2"
+
+
+def test_refresh_rejects_staging_replaced_before_initial_exchange(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    previous_bytes = manifest_path.read_bytes()
+    original_publish = storage_inventory._publish_refresh_manifest
+    attacker_bytes: bytes | None = None
+
+    def _publish_after_staging_replacement(temporary: Path, *args: object, **kwargs: object) -> object:
+        nonlocal attacker_bytes
+        attacker = json.loads(temporary.read_bytes())
+        attacker["producer_revision"] = "attacker-revision"
+        attacker_bytes = (json.dumps(attacker, indent=2, sort_keys=True) + "\n").encode()
+        replacement = temporary.with_name(f"{temporary.name}.competitor")
+        replacement.write_bytes(attacker_bytes)
+        replacement.replace(temporary)
+        return original_publish(temporary, *args, **kwargs)
+
+    monkeypatch.setattr(storage_inventory, "_publish_refresh_manifest", _publish_after_staging_replacement)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="staging entry changed before refresh publication"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert attacker_bytes is not None
+    assert manifest_path.read_bytes() == previous_bytes
+    staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert len(staging) == 1
+    assert staging[0].read_bytes() == attacker_bytes
+
+
+def test_refresh_retains_staging_entry_replaced_before_success_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    foreign_bytes = b"foreign refresh staging bytes\n"
+    original_fsync = storage_inventory._fsync_directory
+    injected = False
+
+    def _replace_staging_after_publication_fsync(directory: Path) -> None:
+        nonlocal injected
+        original_fsync(directory)
+        staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+        if staging and not injected:
+            replacement = staging[0].with_name(f"{staging[0].name}.competitor")
+            replacement.write_bytes(foreign_bytes)
+            replacement.replace(staging[0])
+            injected = True
+
+    monkeypatch.setattr(storage_inventory, "_fsync_directory", _replace_staging_after_publication_fsync)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="staging entry changed.*(restored|retained)"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert injected
+    assert json.loads(manifest_path.read_bytes())["producer_revision"] == "test-revision-2"
+    staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert len(staging) == 1
+    assert staging[0].read_bytes() == foreign_bytes
+
+
+def test_refresh_retains_staging_entry_replaced_before_rollback_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    previous_bytes = manifest_path.read_bytes()
+    foreign_bytes = b"foreign rollback staging bytes\n"
+    original_exchange = storage_inventory._atomic_exchange
+    original_fsync = storage_inventory._fsync_directory
+    exchange_calls = 0
+    injected = False
+
+    def _interrupt_after_initial_exchange(source: Path, destination: Path) -> None:
+        nonlocal exchange_calls
+        exchange_calls += 1
+        original_exchange(source, destination)
+        if exchange_calls == 1:
+            raise OSError("injected exchange completion error")
+
+    def _replace_staging_after_rollback_fsync(directory: Path) -> None:
+        nonlocal injected
+        original_fsync(directory)
+        staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+        if exchange_calls == 2 and staging and not injected:
+            replacement = staging[0].with_name(f"{staging[0].name}.competitor")
+            replacement.write_bytes(foreign_bytes)
+            replacement.replace(staging[0])
+            injected = True
+
+    monkeypatch.setattr(storage_inventory, "_atomic_exchange", _interrupt_after_initial_exchange)
+    monkeypatch.setattr(storage_inventory, "_fsync_directory", _replace_staging_after_rollback_fsync)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="staging entry changed.*(restored|retained)"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert injected
+    assert manifest_path.read_bytes() == previous_bytes
+    staging = tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert len(staging) == 1
+    assert staging[0].read_bytes() == foreign_bytes
 
 
 def test_refresh_retains_candidate_when_displaced_receipt_is_replaced_before_inspection(
@@ -2862,6 +3638,8 @@ def test_refresh_rollback_retains_both_receipts_when_displaced_receipt_changes(
     published_bytes = b"published receipt\n"
     competitor_bytes = b"competing receipt\n"
     manifest_path.write_bytes(published_bytes)
+    manifest_stat = manifest_path.stat(follow_symlinks=False)
+    published_identity = (manifest_stat.st_dev, manifest_stat.st_ino)
     original_exchange = storage_inventory._atomic_exchange
     original_replace = storage_inventory.os.replace
     exchange_calls = 0
@@ -2889,6 +3667,7 @@ def test_refresh_rollback_retains_both_receipts_when_displaced_receipt_changes(
             previous_bytes=previous_bytes,
             previous_mode=0o644,
             operation_error=StorageObjectError("injected validation failure"),
+            published_identity=published_identity,
         )
 
     assert exchange_calls == 1
@@ -2905,6 +3684,8 @@ def test_refresh_rollback_fails_typed_unsupported_without_mutation(
     manifest_path = tmp_path / MANIFEST_NAME
     published_bytes = b"published receipt\n"
     manifest_path.write_bytes(published_bytes)
+    manifest_stat = manifest_path.stat(follow_symlinks=False)
+    published_identity = (manifest_stat.st_dev, manifest_stat.st_ino)
 
     def _unsupported_exchange(*_args: object, **_kwargs: object) -> None:
         raise StorageObjectPublicationUnsupported("injected unsupported exchange")
@@ -2918,10 +3699,54 @@ def test_refresh_rollback_fails_typed_unsupported_without_mutation(
             previous_bytes=b"previous receipt\n",
             previous_mode=0o644,
             operation_error=StorageObjectError("injected validation failure"),
+            published_identity=published_identity,
         )
 
     assert manifest_path.read_bytes() == published_bytes
     assert not tuple(tmp_path.glob(f".{MANIFEST_NAME}.restore-*"))
+
+
+def test_refresh_rollback_reports_uncertain_when_recovery_cleanup_is_unsupported(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path = tmp_path / MANIFEST_NAME
+    published_bytes = b"published receipt\n"
+    previous_bytes = b"previous receipt\n"
+    manifest_path.write_bytes(published_bytes)
+    manifest_stat = manifest_path.stat(follow_symlinks=False)
+    published_identity = (manifest_stat.st_dev, manifest_stat.st_ino)
+
+    def _unsupported_exchange(*_args: object, **_kwargs: object) -> None:
+        raise StorageObjectPublicationUnsupported("injected unsupported exchange")
+
+    def _unsupported_cleanup(*_args: object, **_kwargs: object) -> None:
+        raise StorageObjectPublicationUnsupported("injected unsupported cleanup")
+
+    monkeypatch.setattr(storage_inventory, "_atomic_exchange", _unsupported_exchange)
+    monkeypatch.setattr(
+        storage_inventory,
+        "_atomic_move_no_replace_into_directory",
+        _unsupported_cleanup,
+    )
+
+    with pytest.raises(
+        StorageObjectPublicationUncertain,
+        match="rollback failed.*cleanup is uncertain.*inspect",
+    ):
+        storage_inventory._rollback_manifest(
+            manifest_path,
+            published_bytes=published_bytes,
+            previous_bytes=previous_bytes,
+            previous_mode=0o644,
+            operation_error=StorageObjectError("injected validation failure"),
+            published_identity=published_identity,
+        )
+
+    assert manifest_path.read_bytes() == published_bytes
+    recovery_paths = tuple(tmp_path.glob(f".{MANIFEST_NAME}.restore-*"))
+    assert len(recovery_paths) == 1
+    assert recovery_paths[0].read_bytes() == previous_bytes
 
 
 def test_refresh_rejects_duplicate_resource_paths_before_collapsing_roles(tmp_path: Path) -> None:

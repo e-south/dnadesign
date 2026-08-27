@@ -16,6 +16,7 @@ import errno
 import hashlib
 import json
 import os
+import secrets
 import shlex
 import stat
 import sys
@@ -79,6 +80,7 @@ def _rollback_manifest(
     """Undo only the manifest snapshot published by the failed operation."""
 
     restore_path: Path | None = None
+    restore_identity: tuple[int, int] | None = None
     try:
         if manifest_path.is_symlink():
             raise StorageObjectError(f"cannot roll back a symlinked storage object manifest: {manifest_path}")
@@ -105,11 +107,16 @@ def _rollback_manifest(
                 operation_error=operation_error,
             )
             return
+        if published_identity is None:
+            raise StorageObjectPublicationUncertain(
+                "cannot identify the refresh receipt published by the failed operation; rollback is unsafe"
+            )
         descriptor, restore_name = tempfile.mkstemp(
             dir=manifest_path.parent,
             prefix=f".{MANIFEST_NAME}.restore-",
         )
         restore_path = Path(restore_name)
+        restore_identity = _entry_identity(restore_path)
         with os.fdopen(descriptor, "wb") as handle:
             handle.write(previous_bytes)
             handle.flush()
@@ -120,12 +127,32 @@ def _rollback_manifest(
                 restore_path,
                 manifest_path,
                 previous_bytes=published_bytes,
+                expected_previous_identity=published_identity,
+                expected_staged_identity=restore_identity,
+                expected_staged_bytes=previous_bytes,
             )
         except StorageObjectPublicationUncertain:
             restore_path = None
             raise
         except BaseException as restore_error:
-            restore_path.unlink(missing_ok=True)
+            if restore_identity is not None:
+                try:
+                    _unlink_owned_entry(
+                        restore_path,
+                        expected_identity=restore_identity,
+                        context="refresh restore staging entry",
+                        missing_ok=True,
+                    )
+                except StorageObjectPublicationUncertain:
+                    restore_path = None
+                    raise
+                except BaseException as cleanup_error:
+                    retained_restore_path = restore_path
+                    restore_path = None
+                    raise StorageObjectPublicationUncertain(
+                        "refresh rollback failed and recovery staging cleanup is uncertain; "
+                        f"inspect {manifest_path} and {retained_restore_path}"
+                    ) from cleanup_error
             restore_path = None
             if isinstance(restore_error, StorageObjectPublicationUnsupported):
                 raise
@@ -134,8 +161,13 @@ def _rollback_manifest(
             ) from operation_error
         restore_path = None
     except OSError as restore_error:
-        if restore_path is not None:
-            restore_path.unlink(missing_ok=True)
+        if restore_path is not None and restore_identity is not None:
+            _unlink_owned_entry(
+                restore_path,
+                expected_identity=restore_identity,
+                context="refresh restore staging entry",
+                missing_ok=True,
+            )
         raise StorageObjectError(
             f"storage object operation failed and manifest rollback failed: {restore_error}"
         ) from operation_error
@@ -144,6 +176,191 @@ def _rollback_manifest(
 def _entry_identity(path: Path) -> tuple[int, int]:
     entry_stat = path.lstat()
     return entry_stat.st_dev, entry_stat.st_ino
+
+
+def _open_owner_cleanup_directory(parent: Path) -> tuple[Path, int]:
+    """Open this OS owner's persistent private cleanup namespace."""
+
+    cleanup_directory = parent / f".{MANIFEST_NAME}.cleanup-owner-{os.geteuid()}"
+    try:
+        cleanup_directory.mkdir(mode=0o750)
+    except FileExistsError:
+        pass
+    except OSError as creation_error:
+        raise StorageObjectPublicationUncertain(
+            f"cannot create owner-private storage cleanup directory: {cleanup_directory}"
+        ) from creation_error
+    descriptor: int | None = None
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(cleanup_directory, flags)
+        opened = os.fstat(descriptor)
+        named = cleanup_directory.lstat()
+        parent_stat = parent.stat(follow_symlinks=False)
+    except OSError as inspection_error:
+        if descriptor is not None:
+            os.close(descriptor)
+        raise StorageObjectPublicationUncertain(
+            f"cannot open owner-private storage cleanup directory: {cleanup_directory}"
+        ) from inspection_error
+    mode = stat.S_IMODE(opened.st_mode)
+    structurally_trusted = (
+        stat.S_ISDIR(opened.st_mode)
+        and (opened.st_dev, opened.st_ino) == (named.st_dev, named.st_ino)
+        and opened.st_uid == os.geteuid()
+        and mode & 0o700 == 0o700
+        and mode & 0o022 == 0
+    )
+    shared_root = bool(stat.S_IMODE(parent_stat.st_mode) & stat.S_IWGRP)
+    if not structurally_trusted or (shared_root and opened.st_gid != parent_stat.st_gid):
+        os.close(descriptor)
+        raise StorageObjectPublicationUncertain(
+            f"storage cleanup directory is not an owner-write-private boundary: {cleanup_directory}"
+        )
+    expected_mode = 0o750 if shared_root else 0o700
+    try:
+        os.fchmod(descriptor, expected_mode)
+        opened = os.fstat(descriptor)
+        named = cleanup_directory.lstat()
+    except OSError as posture_error:
+        os.close(descriptor)
+        raise StorageObjectPublicationUncertain(
+            f"cannot set storage cleanup directory posture to {expected_mode:04o}: {cleanup_directory}"
+        ) from posture_error
+    if (opened.st_dev, opened.st_ino) != (named.st_dev, named.st_ino) or stat.S_IMODE(
+        opened.st_mode
+    ) & 0o777 != expected_mode:
+        os.close(descriptor)
+        raise StorageObjectPublicationUncertain(
+            f"storage cleanup directory posture changed before use: {cleanup_directory}"
+        )
+    return cleanup_directory, descriptor
+
+
+def _preflight_owner_cleanup_directory(parent: Path) -> None:
+    _cleanup_directory, descriptor = _open_owner_cleanup_directory(parent)
+    os.close(descriptor)
+
+
+def _directory_entry_identity(directory_descriptor: int, name: str) -> tuple[int, int]:
+    entry_stat = os.stat(name, dir_fd=directory_descriptor, follow_symlinks=False)
+    return entry_stat.st_dev, entry_stat.st_ino
+
+
+def _directory_entry_present(directory_descriptor: int, name: str) -> bool:
+    try:
+        os.stat(name, dir_fd=directory_descriptor, follow_symlinks=False)
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def _atomic_move_no_replace_into_directory(source: Path, destination_directory: int, destination_name: str) -> None:
+    source_directory = os.open(source.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        _atomic_rename_at(
+            source_directory,
+            source.name,
+            destination_directory,
+            destination_name,
+            darwin_flags=_DARWIN_RENAME_EXCL,
+            linux_flags=_LINUX_RENAME_NOREPLACE,
+            operation="no-replace cleanup move",
+        )
+    finally:
+        os.close(source_directory)
+
+
+def _atomic_move_no_replace_from_directory(source_directory: int, source_name: str, destination: Path) -> None:
+    destination_directory = os.open(destination.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        _atomic_rename_at(
+            source_directory,
+            source_name,
+            destination_directory,
+            destination.name,
+            darwin_flags=_DARWIN_RENAME_EXCL,
+            linux_flags=_LINUX_RENAME_NOREPLACE,
+            operation="no-replace cleanup restore",
+        )
+    finally:
+        os.close(destination_directory)
+
+
+def _unlink_owned_entry(
+    path: Path,
+    *,
+    expected_identity: tuple[int, int],
+    context: str,
+    missing_ok: bool = False,
+) -> None:
+    """Delete only after atomically displacing an entry into an owner-private directory."""
+
+    cleanup_directory, cleanup_descriptor = _open_owner_cleanup_directory(path.parent)
+    try:
+        candidate_name: str | None = None
+        move_error: BaseException | None = None
+        for _attempt in range(16):
+            candidate = f"entry-{secrets.token_hex(16)}"
+            try:
+                _atomic_move_no_replace_into_directory(path, cleanup_descriptor, candidate)
+            except BaseException as exc:
+                move_error = exc
+                source_present = path.exists() or path.is_symlink()
+                candidate_present = _directory_entry_present(cleanup_descriptor, candidate)
+                if not source_present and candidate_present:
+                    candidate_name = candidate
+                    break
+                if isinstance(exc, FileExistsError) and source_present:
+                    continue
+                if isinstance(exc, FileNotFoundError) and not source_present and not candidate_present:
+                    if missing_ok:
+                        return
+                    raise StorageObjectPublicationUncertain(
+                        f"{context} disappeared before cleanup; outcome is uncertain"
+                    )
+                if isinstance(exc, StorageObjectPublicationUnsupported):
+                    raise
+                raise StorageObjectPublicationUncertain(
+                    f"cannot atomically quarantine {context} before cleanup; outcome is uncertain"
+                ) from exc
+            else:
+                candidate_name = candidate
+                break
+        if candidate_name is None:
+            raise StorageObjectPublicationUncertain(
+                f"cannot reserve a collision-free quarantine for {context}; outcome is uncertain"
+            ) from move_error
+
+        try:
+            observed_identity = _directory_entry_identity(cleanup_descriptor, candidate_name)
+        except OSError as inspection_error:
+            raise StorageObjectPublicationUncertain(
+                f"cannot identify quarantined {context}; retained in {cleanup_directory}"
+            ) from inspection_error
+        if observed_identity != expected_identity:
+            try:
+                _atomic_move_no_replace_from_directory(cleanup_descriptor, candidate_name, path)
+            except BaseException:
+                restored = _entry_has_identity(path, observed_identity) and not _directory_entry_present(
+                    cleanup_descriptor, candidate_name
+                )
+            else:
+                restored = _entry_has_identity(path, observed_identity)
+            disposition = (
+                "restored to its original path" if restored else f"retained at {cleanup_directory / candidate_name}"
+            )
+            raise StorageObjectPublicationUncertain(
+                f"{context} changed at the cleanup boundary; foreign entry {disposition}"
+            )
+        try:
+            os.unlink(candidate_name, dir_fd=cleanup_descriptor)
+        except OSError as cleanup_error:
+            raise StorageObjectPublicationUncertain(
+                f"cannot remove quarantined owned {context}; retained in {cleanup_directory}"
+            ) from cleanup_error
+    finally:
+        os.close(cleanup_descriptor)
 
 
 def _entry_matches_regular_bytes(
@@ -221,38 +438,57 @@ def _atomic_rename(
         raise StorageObjectError(f"atomic manifest {operation} requires same-directory entries")
     parent_descriptor = os.open(source.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
     try:
-        libc = ctypes.CDLL(None, use_errno=True)
-        source_bytes = os.fsencode(source.name)
-        destination_bytes = os.fsencode(destination.name)
-        if sys.platform == "darwin" and hasattr(libc, "renameatx_np"):
-            rename = libc.renameatx_np
-            flags = darwin_flags
-        elif sys.platform.startswith("linux") and hasattr(libc, "renameat2"):
-            rename = libc.renameat2
-            flags = linux_flags
-        else:
-            raise StorageObjectPublicationUnsupported(
-                f"this platform does not support atomic storage manifest {operation}"
-            )
-        rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
-        rename.restype = ctypes.c_int
-        result = rename(
+        _atomic_rename_at(
             parent_descriptor,
-            source_bytes,
+            source.name,
             parent_descriptor,
-            destination_bytes,
-            flags,
+            destination.name,
+            darwin_flags=darwin_flags,
+            linux_flags=linux_flags,
+            operation=operation,
         )
-        if result == 0:
-            return
-        error = ctypes.get_errno()
-        if error in {errno.ENOSYS, errno.EOPNOTSUPP, errno.ENOTSUP, errno.EINVAL}:
-            raise StorageObjectPublicationUnsupported(
-                f"this filesystem does not support atomic storage manifest {operation}"
-            )
-        raise OSError(error, os.strerror(error), destination)
     finally:
         os.close(parent_descriptor)
+
+
+def _atomic_rename_at(
+    source_directory: int,
+    source_name: str,
+    destination_directory: int,
+    destination_name: str,
+    *,
+    darwin_flags: int,
+    linux_flags: int,
+    operation: str,
+) -> None:
+    """Invoke one supported native rename transaction between open directories."""
+
+    libc = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == "darwin" and hasattr(libc, "renameatx_np"):
+        rename = libc.renameatx_np
+        flags = darwin_flags
+    elif sys.platform.startswith("linux") and hasattr(libc, "renameat2"):
+        rename = libc.renameat2
+        flags = linux_flags
+    else:
+        raise StorageObjectPublicationUnsupported(f"this platform does not support atomic storage manifest {operation}")
+    rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+    rename.restype = ctypes.c_int
+    result = rename(
+        source_directory,
+        os.fsencode(source_name),
+        destination_directory,
+        os.fsencode(destination_name),
+        flags,
+    )
+    if result == 0:
+        return
+    error = ctypes.get_errno()
+    if error in {errno.ENOSYS, errno.EOPNOTSUPP, errno.ENOTSUP, errno.EINVAL}:
+        raise StorageObjectPublicationUnsupported(
+            f"this filesystem does not support atomic storage manifest {operation}"
+        )
+    raise OSError(error, os.strerror(error), destination_name)
 
 
 def _rollback_create_only_manifest(
@@ -270,7 +506,12 @@ def _rollback_create_only_manifest(
     )
     os.close(descriptor)
     quarantine = Path(quarantine_name)
-    quarantine.unlink()
+    quarantine_placeholder_identity = _entry_identity(quarantine)
+    _unlink_owned_entry(
+        quarantine,
+        expected_identity=quarantine_placeholder_identity,
+        context="create-only rollback quarantine placeholder",
+    )
     try:
         _atomic_move_no_replace(manifest_path, quarantine)
     except FileNotFoundError:
@@ -288,7 +529,11 @@ def _rollback_create_only_manifest(
         else:
             owns_quarantine = False
         if owns_quarantine:
-            quarantine.unlink()
+            _unlink_owned_entry(
+                quarantine,
+                expected_identity=published_identity,
+                context="create-only rollback quarantine entry",
+            )
             _fsync_directory(manifest_path.parent)
         raise
 
@@ -307,7 +552,11 @@ def _rollback_create_only_manifest(
         ) from inspection_error
     if owns_receipt:
         try:
-            quarantine.unlink()
+            _unlink_owned_entry(
+                quarantine,
+                expected_identity=published_identity,
+                context="create-only rollback quarantine entry",
+            )
             _fsync_directory(manifest_path.parent)
         except BaseException as cleanup_error:
             raise StorageObjectPublicationUncertain(
@@ -348,12 +597,12 @@ def _preflight_create_only_rollback(directory: Path) -> None:
         cleanup_errors: list[BaseException] = []
         for candidate in (source, destination):
             try:
-                if _entry_identity(candidate) != source_identity:
-                    cleanup_errors.append(
-                        StorageObjectError(f"create-only rollback preflight path changed unexpectedly: {candidate}")
-                    )
-                    continue
-                candidate.unlink()
+                _unlink_owned_entry(
+                    candidate,
+                    expected_identity=source_identity,
+                    context="create-only rollback preflight staging entry",
+                    missing_ok=True,
+                )
             except FileNotFoundError:
                 continue
             except BaseException as exc:
@@ -370,11 +619,20 @@ def _publish_create_only_manifest(
     *,
     manifest_bytes: bytes,
     manifest_mode: int,
+    expected_staged_identity: tuple[int, int],
 ) -> tuple[int, int]:
     """Publish one staged regular file without any replacement window."""
 
-    published_identity = _entry_identity(temporary)
+    published_identity = expected_staged_identity
     _preflight_create_only_rollback(manifest_path.parent)
+    if not _entry_matches_regular_bytes(
+        temporary,
+        expected_identity=published_identity,
+        expected_bytes=manifest_bytes,
+    ):
+        raise StorageObjectPublicationUncertain(
+            "manifest staging entry changed before create-only publication; retained for explicit recovery"
+        )
     try:
         os.link(temporary, manifest_path, follow_symlinks=False)
     except FileExistsError as exc:
@@ -423,7 +681,19 @@ def _publish_create_only_manifest(
                 "storage object manifest changed after create-only publication; outcome is uncertain"
             )
         _fsync_directory(manifest_path.parent)
-        temporary.unlink()
+        if not _entry_matches_regular_bytes(
+            temporary,
+            expected_identity=published_identity,
+            expected_bytes=manifest_bytes,
+        ):
+            raise StorageObjectPublicationUncertain(
+                "create-only manifest staging entry changed before cleanup; retained for explicit recovery"
+            )
+        _unlink_owned_entry(
+            temporary,
+            expected_identity=published_identity,
+            context="create-only manifest staging entry",
+        )
         _fsync_directory(manifest_path.parent)
     except BaseException as publication_error:
         _rollback_manifest(
@@ -496,12 +766,23 @@ def _publish_refresh_manifest(
     manifest_path: Path,
     *,
     previous_bytes: bytes,
-) -> None:
+    expected_previous_identity: tuple[int, int] | None = None,
+    expected_staged_identity: tuple[int, int],
+    expected_staged_bytes: bytes,
+) -> tuple[int, int]:
     """Exchange the staged receipt, validate the displaced receipt, and commit or swap back."""
 
-    staged_identity = _entry_identity(temporary)
-    staged_bytes = temporary.read_bytes()
-    previous_identity = _entry_identity(manifest_path)
+    staged_identity = expected_staged_identity
+    staged_bytes = expected_staged_bytes
+    previous_identity = expected_previous_identity or _entry_identity(manifest_path)
+    if not _entry_matches_regular_bytes(
+        temporary,
+        expected_identity=staged_identity,
+        expected_bytes=staged_bytes,
+    ):
+        raise StorageObjectPublicationUncertain(
+            "manifest staging entry changed before refresh publication; retained for explicit recovery"
+        )
     exchange_error: BaseException | None = None
     try:
         _atomic_exchange(temporary, manifest_path)
@@ -514,7 +795,20 @@ def _publish_refresh_manifest(
                 "atomic storage manifest exchange failed with an uncertain publication outcome"
             ) from identity_error
         if not exchanged:
-            raise
+            unchanged = _entry_matches_regular_bytes(
+                manifest_path,
+                expected_identity=previous_identity,
+                expected_bytes=previous_bytes,
+            ) and _entry_matches_regular_bytes(
+                temporary,
+                expected_identity=staged_identity,
+                expected_bytes=staged_bytes,
+            )
+            if unchanged:
+                raise
+            raise StorageObjectPublicationUncertain(
+                "initial refresh exchange changed publication entries; retained candidate and recovery state"
+            ) from exc
 
     if not _entry_matches_regular_bytes(
         temporary,
@@ -537,10 +831,20 @@ def _publish_refresh_manifest(
         if exchange_error is not None:
             raise exchange_error
         _fsync_directory(manifest_path.parent)
-        temporary.unlink()
+        _unlink_owned_entry(
+            temporary,
+            expected_identity=previous_identity,
+            context="refresh manifest staging entry",
+        )
         _fsync_directory(manifest_path.parent)
-        return
+        return staged_identity
     except BaseException as publication_error:
+        if isinstance(publication_error, StorageObjectPublicationUncertain) and not _entry_matches_regular_bytes(
+            temporary,
+            expected_identity=previous_identity,
+            expected_bytes=previous_bytes,
+        ):
+            raise
         if not _entry_matches_regular_bytes(
             temporary,
             expected_identity=previous_identity,
@@ -591,7 +895,11 @@ def _publish_refresh_manifest(
             )
         try:
             _fsync_directory(manifest_path.parent)
-            temporary.unlink()
+            _unlink_owned_entry(
+                temporary,
+                expected_identity=staged_identity,
+                context="refresh rollback staging entry",
+            )
             _fsync_directory(manifest_path.parent)
         except StorageObjectPublicationUncertain:
             raise
@@ -613,11 +921,13 @@ def _write_manifest(
     manifest_bytes = manifest_text.encode("utf-8")
     descriptor = -1
     temporary: Path | None = None
+    temporary_identity: tuple[int, int] | None = None
     temporary_created = False
     preserve_temporary = False
     published_identity: tuple[int, int] | None = None
     previous_mode: int
     try:
+        _preflight_owner_cleanup_directory(manifest_path.parent)
         if previous_bytes is not None:
             previous_mode = stat.S_IMODE(manifest_path.stat(follow_symlinks=False).st_mode)
         else:
@@ -628,6 +938,7 @@ def _write_manifest(
             prefix=f".{MANIFEST_NAME}.tmp-",
         )
         temporary = Path(temporary_name)
+        temporary_identity = _entry_identity(temporary)
         temporary_created = True
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             descriptor = -1
@@ -637,18 +948,25 @@ def _write_manifest(
         if previous_mode is not None:
             temporary.chmod(previous_mode, follow_symlinks=False)
         if previous_bytes is None:
-            published_identity = _publish_create_only_manifest(
-                temporary,
-                manifest_path,
-                manifest_bytes=manifest_bytes,
-                manifest_mode=previous_mode,
-            )
+            try:
+                published_identity = _publish_create_only_manifest(
+                    temporary,
+                    manifest_path,
+                    manifest_bytes=manifest_bytes,
+                    manifest_mode=previous_mode,
+                    expected_staged_identity=temporary_identity,
+                )
+            except StorageObjectPublicationUncertain:
+                preserve_temporary = True
+                raise
         else:
             try:
-                _publish_refresh_manifest(
+                published_identity = _publish_refresh_manifest(
                     temporary,
                     manifest_path,
                     previous_bytes=previous_bytes,
+                    expected_staged_identity=temporary_identity,
+                    expected_staged_bytes=manifest_bytes,
                 )
             except StorageObjectPublicationUncertain:
                 preserve_temporary = True
@@ -656,8 +974,19 @@ def _write_manifest(
     except BaseException as write_error:
         if descriptor >= 0:
             os.close(descriptor)
-        if temporary_created and temporary is not None and not preserve_temporary:
-            temporary.unlink(missing_ok=True)
+        if temporary_created and temporary is not None and temporary_identity is not None and not preserve_temporary:
+            try:
+                _unlink_owned_entry(
+                    temporary,
+                    expected_identity=temporary_identity,
+                    context="manifest staging entry during failed-write cleanup",
+                    missing_ok=True,
+                )
+            except StorageObjectPublicationUnsupported:
+                raise StorageObjectPublicationUncertain(
+                    "publication failed and safe manifest staging cleanup is unsupported; "
+                    "retained staging state for explicit recovery"
+                ) from write_error
         if isinstance(write_error, OSError):
             raise StorageObjectError(f"cannot write storage object manifest: {write_error}") from write_error
         raise
@@ -820,6 +1149,21 @@ def _assert_no_ambiguous_manifest_staging(root: Path) -> None:
     candidates.update(root.glob(f".{MANIFEST_NAME}.tmp-*"))
     candidates.update(root.glob(f".{MANIFEST_NAME}.restore-*"))
     candidates.update(root.glob(f".{MANIFEST_NAME}.rollback-*"))
+    candidates.update(
+        candidate
+        for candidate in root.glob(f".*{MANIFEST_NAME}*.cleanup-*")
+        if not candidate.name.startswith(f".{MANIFEST_NAME}.cleanup-owner-")
+    )
+    for cleanup_directory in root.glob(f".{MANIFEST_NAME}.cleanup-owner-*"):
+        if cleanup_directory.is_symlink() or not cleanup_directory.is_dir():
+            candidates.add(cleanup_directory)
+            continue
+        try:
+            candidates.update(cleanup_directory.iterdir())
+        except OSError as inspection_error:
+            raise StorageObjectError(
+                f"cannot inspect storage cleanup recovery state: {cleanup_directory}"
+            ) from inspection_error
     present = sorted(path.name for path in candidates if path.exists() or path.is_symlink())
     if present:
         raise StorageObjectError(

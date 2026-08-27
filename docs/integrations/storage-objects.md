@@ -139,7 +139,10 @@ pathname changes, the published candidate and changed entry are retained for
 explicit recovery. If a last-boundary race exchanges an unverified entry, the
 verified candidate is restored before the operation reports uncertainty. A
 platform or filesystem without the required primitive fails closed as
-`StorageObjectPublicationUnsupported`. If an exchange cannot prove that its
+`StorageObjectPublicationUnsupported`. If a failed publication also cannot use
+the no-replace primitive required for ownership-safe staging cleanup, it raises
+`StorageObjectPublicationUncertain` and retains the staging entry for explicit
+recovery. If an exchange cannot prove that its
 swap-back completed, it raises `StorageObjectPublicationUncertain` and retains
 both named files for explicit recovery rather than guessing which receipt may
 be deleted. Rollback uses the same conditional primitives: refresh restores the
@@ -148,7 +151,15 @@ published, while failed create-only inventory quarantines and identifies the
 current receipt before removing it. A competing receipt is restored or retained
 for recovery; it is never silently overwritten or deleted. A pre-existing
 staging-shaped name fails closed for explicit operator inspection; the tool
-never guesses that such bytes are safe to delete. Independently synced replicas,
+never guesses that such bytes are safe to delete. Automatic cleanup first
+atomically displaces an entry through open directory descriptors into a
+per-OS-owner cleanup directory that only that owner can modify. It verifies the
+moved inode and deletes it only inside that protected namespace; a shared-path
+replacement is restored or retained instead of being unlinked. Empty cleanup
+directories are persistent coordination boundaries. Shared roots normalize
+them to mode `0750` even under a restrictive umask so the owning group can
+inspect recovery state without gaining write access; private roots use `0700`.
+Independently synced replicas,
 including separate Dropbox clients, are not one shared
 filesystem; keep one writer or provide an external coordination service for
 those replicas.
