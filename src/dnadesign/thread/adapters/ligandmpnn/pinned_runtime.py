@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import json
 import os
+import secrets
 import stat
 import subprocess
 import sys
@@ -574,10 +575,15 @@ def execute_pinned_entrypoint(
                 except BaseException as cleanup_error:
                     if execution_failure is not None:
                         execution_failure.add_note(f"private score attempt cleanup also failed: {cleanup_error}")
-                    elif published_score_path is not None and published_score_identity is not None:
+                    elif (
+                        published_score_path is not None
+                        and published_score_identity is not None
+                        and published_score_sha256 is not None
+                    ):
                         _rollback_score_after_cleanup_failure(
                             published_score_path,
                             published_identity=published_score_identity,
+                            published_sha256=published_score_sha256,
                         )
                         if not isinstance(cleanup_error, Exception):
                             raise
@@ -599,6 +605,7 @@ def execute_pinned_entrypoint(
                     ),
                     rollback_output_path=None,
                     rollback_output_identity=None,
+                    rollback_output_sha256=None,
                 )
                 _sync_regular_directory_tree(temporary_output_root)
                 if build_design_output_manifest(temporary_output_root) != design_output_manifest:
@@ -618,6 +625,7 @@ def execute_pinned_entrypoint(
         ),
         rollback_output_path=published_score_path,
         rollback_output_identity=published_score_identity,
+        rollback_output_sha256=published_score_sha256,
     )
 
 
@@ -743,13 +751,15 @@ def _write_completion_record(
     *,
     rollback_output_path: Path | None,
     rollback_output_identity: tuple[int, int] | None,
+    rollback_output_sha256: str | None,
 ) -> None:
     if not isinstance(path, Path):
         raise ValueError("completion record path must be a Path")
     if not path.name or ".." in path.parts:
         raise ValueError("completion record path must not contain traversal")
-    if (rollback_output_path is None) != (rollback_output_identity is None):
-        raise ValueError("completion rollback output path and identity must be supplied together")
+    rollback_output_fields = (rollback_output_path, rollback_output_identity, rollback_output_sha256)
+    if sum(value is not None for value in rollback_output_fields) not in {0, len(rollback_output_fields)}:
+        raise ValueError("completion rollback output path, identity, and digest must be supplied together")
     encoded = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
     try:
         directory_fd = _open_directory_path(path.parent, create=True)
@@ -757,27 +767,27 @@ def _write_completion_record(
         _rollback_output_after_completion_failure(
             rollback_output_path,
             rollback_output_identity=rollback_output_identity,
+            rollback_output_sha256=rollback_output_sha256,
         )
         raise ValueError(f"LigandMPNN completion record directory could not be opened safely: {path}") from exc
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
     completion_created = False
     completion_identity: tuple[int, int] | None = None
+    completion_descriptor: int | None = None
+    completion_fully_written = False
     durability_failure = False
     try:
         try:
-            file_descriptor = os.open(path.name, flags, 0o600, dir_fd=directory_fd)
+            completion_descriptor = os.open(path.name, flags, 0o600, dir_fd=directory_fd)
             completion_created = True
-            completion_status = os.fstat(file_descriptor)
+            completion_status = os.fstat(completion_descriptor)
             completion_identity = (completion_status.st_dev, completion_status.st_ino)
-            try:
-                handle = os.fdopen(file_descriptor, "wb")
-            except BaseException:
-                os.close(file_descriptor)
-                raise
+            handle = os.fdopen(completion_descriptor, "wb", closefd=False)
             with handle:
                 handle.write(encoded)
                 handle.flush()
                 os.fsync(handle.fileno())
+            completion_fully_written = True
             try:
                 os.fsync(directory_fd)
             except OSError:
@@ -790,8 +800,10 @@ def _write_completion_record(
                     completion_name=path.name,
                     completion_created=completion_created,
                     completion_identity=completion_identity,
+                    completion_expected_bytes=encoded if completion_fully_written else None,
                     rollback_output_path=rollback_output_path,
                     rollback_output_identity=rollback_output_identity,
+                    rollback_output_sha256=rollback_output_sha256,
                 )
             except OSError as rollback_error:
                 raise LigandMpnnCompletionPublicationUncertainError(
@@ -806,6 +818,8 @@ def _write_completion_record(
                 raise ValueError(f"{message}: {path}") from publication_error
             raise
     finally:
+        if completion_descriptor is not None:
+            os.close(completion_descriptor)
         os.close(directory_fd)
 
 
@@ -851,8 +865,10 @@ def _rollback_completion_and_output(
     completion_name: str,
     completion_created: bool,
     completion_identity: tuple[int, int] | None,
+    completion_expected_bytes: bytes | None,
     rollback_output_path: Path | None,
     rollback_output_identity: tuple[int, int] | None,
+    rollback_output_sha256: str | None,
 ) -> None:
     """Remove incomplete lifecycle entries and make their absence durable."""
 
@@ -860,48 +876,38 @@ def _rollback_completion_and_output(
     if rollback_output_path is not None:
         output_directory_fd = _open_directory_path(rollback_output_path.parent, create=False)
     try:
-        completion_owned = False
         if completion_created:
             if completion_identity is None:
                 raise LigandMpnnCompletionPublicationUncertainError(
                     "LigandMPNN completion publication ownership was not recorded"
                 )
-            completion_owned = _owned_leaf_exists(
+            _quarantine_and_remove_owned_leaf(
                 completion_directory_fd,
                 completion_name,
                 completion_identity,
+                expected_bytes=completion_expected_bytes,
+                expected_sha256=None,
                 error_type=LigandMpnnCompletionPublicationUncertainError,
                 changed_message="LigandMPNN completion publication rollback target changed",
                 inspect_message="LigandMPNN completion publication rollback target could not be inspected",
+                durability_message="LigandMPNN completion publication rollback durability is uncertain",
             )
-        output_owned = False
         if output_directory_fd is not None and rollback_output_path is not None:
-            if rollback_output_identity is None:
+            if rollback_output_identity is None or rollback_output_sha256 is None:
                 raise LigandMpnnCompletionPublicationUncertainError(
                     "LigandMPNN completion publication output ownership was not recorded"
                 )
-            try:
-                output_owned = _owned_leaf_exists(
-                    output_directory_fd,
-                    rollback_output_path.name,
-                    rollback_output_identity,
-                    error_type=LigandMpnnCompletionPublicationUncertainError,
-                    changed_message="LigandMPNN completion publication output rollback target changed",
-                    inspect_message="LigandMPNN completion publication output rollback target could not be inspected",
-                )
-            except LigandMpnnCompletionPublicationUncertainError:
-                if completion_owned:
-                    os.unlink(completion_name, dir_fd=completion_directory_fd)
-                    os.fsync(completion_directory_fd)
-                raise
-        if completion_owned:
-            os.unlink(completion_name, dir_fd=completion_directory_fd)
-        if output_owned and output_directory_fd is not None and rollback_output_path is not None:
-            os.unlink(rollback_output_path.name, dir_fd=output_directory_fd)
-        if completion_created:
-            os.fsync(completion_directory_fd)
-        if output_directory_fd is not None:
-            os.fsync(output_directory_fd)
+            _quarantine_and_remove_owned_leaf(
+                output_directory_fd,
+                rollback_output_path.name,
+                rollback_output_identity,
+                expected_bytes=None,
+                expected_sha256=rollback_output_sha256,
+                error_type=LigandMpnnCompletionPublicationUncertainError,
+                changed_message="LigandMPNN completion publication output rollback target changed",
+                inspect_message="LigandMPNN completion publication output rollback target could not be inspected",
+                durability_message="LigandMPNN completion publication rollback durability is uncertain",
+            )
     finally:
         if output_directory_fd is not None:
             os.close(output_directory_fd)
@@ -911,28 +917,30 @@ def _rollback_output_after_completion_failure(
     rollback_output_path: Path | None,
     *,
     rollback_output_identity: tuple[int, int] | None,
+    rollback_output_sha256: str | None,
 ) -> None:
     """Roll back a score if its completion directory cannot be opened safely."""
 
     if rollback_output_path is None:
         return
-    if rollback_output_identity is None:
+    if rollback_output_identity is None or rollback_output_sha256 is None:
         raise LigandMpnnCompletionPublicationUncertainError(
             "LigandMPNN completion publication output ownership was not recorded"
         )
     try:
         output_directory_fd = _open_directory_path(rollback_output_path.parent, create=False)
         try:
-            if _owned_leaf_exists(
+            _quarantine_and_remove_owned_leaf(
                 output_directory_fd,
                 rollback_output_path.name,
                 rollback_output_identity,
+                expected_bytes=None,
+                expected_sha256=rollback_output_sha256,
                 error_type=LigandMpnnCompletionPublicationUncertainError,
                 changed_message="LigandMPNN completion publication output rollback target changed",
                 inspect_message="LigandMPNN completion publication output rollback target could not be inspected",
-            ):
-                os.unlink(rollback_output_path.name, dir_fd=output_directory_fd)
-            os.fsync(output_directory_fd)
+                durability_message="LigandMPNN completion publication rollback durability is uncertain",
+            )
         finally:
             os.close(output_directory_fd)
     except OSError as rollback_error:
@@ -1142,6 +1150,203 @@ def _owned_leaf_exists(
     return True
 
 
+def _quarantine_and_remove_owned_leaf(
+    directory_fd: int,
+    name: str,
+    expected_identity: tuple[int, int],
+    *,
+    expected_bytes: bytes | None,
+    expected_sha256: str | None,
+    error_type: type[RuntimeError],
+    changed_message: str,
+    inspect_message: str,
+    durability_message: str,
+) -> bool:
+    """Atomically displace, verify, and durably remove only an owned leaf."""
+
+    if expected_bytes is not None and expected_sha256 is not None:
+        raise ValueError("rollback leaf cannot use both byte and digest evidence")
+    quarantine_name = f".dnadesign-rollback-{secrets.token_hex(12)}"
+    try:
+        os.mkdir(quarantine_name, mode=0o700, dir_fd=directory_fd)
+        quarantine_fd = os.open(
+            quarantine_name,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+            dir_fd=directory_fd,
+        )
+    except OSError as exc:
+        raise error_type(durability_message) from exc
+    quarantined = False
+    quarantine_leaf = "publication"
+    try:
+        try:
+            os.rename(
+                name,
+                quarantine_leaf,
+                src_dir_fd=directory_fd,
+                dst_dir_fd=quarantine_fd,
+            )
+        except FileNotFoundError:
+            os.rmdir(quarantine_name, dir_fd=directory_fd)
+            os.fsync(directory_fd)
+            return False
+        quarantined = True
+        os.fsync(directory_fd)
+        try:
+            if expected_bytes is not None:
+                owned = _owned_regular_leaf_matches_bytes(
+                    quarantine_fd,
+                    quarantine_leaf,
+                    expected_identity,
+                    expected_bytes,
+                    error_type=error_type,
+                    changed_message=changed_message,
+                    inspect_message=inspect_message,
+                )
+            elif expected_sha256 is not None:
+                owned = _owned_regular_leaf_matches_sha256(
+                    quarantine_fd,
+                    quarantine_leaf,
+                    expected_identity,
+                    expected_sha256,
+                    error_type=error_type,
+                    changed_message=changed_message,
+                    inspect_message=inspect_message,
+                )
+            else:
+                owned = _owned_leaf_exists(
+                    quarantine_fd,
+                    quarantine_leaf,
+                    expected_identity,
+                    error_type=error_type,
+                    changed_message=changed_message,
+                    inspect_message=inspect_message,
+                )
+        except error_type as ownership_error:
+            try:
+                os.link(
+                    quarantine_leaf,
+                    name,
+                    src_dir_fd=quarantine_fd,
+                    dst_dir_fd=directory_fd,
+                    follow_symlinks=False,
+                )
+                os.fsync(directory_fd)
+                os.unlink(quarantine_leaf, dir_fd=quarantine_fd)
+                os.fsync(quarantine_fd)
+                os.rmdir(quarantine_name, dir_fd=directory_fd)
+                os.fsync(directory_fd)
+            except OSError as restore_error:
+                raise error_type(
+                    f"{changed_message}; displaced leaf retained in {quarantine_name}/{quarantine_leaf}"
+                ) from restore_error
+            raise ownership_error
+        if not owned:
+            os.rmdir(quarantine_name, dir_fd=directory_fd)
+            os.fsync(directory_fd)
+            return False
+        os.unlink(quarantine_leaf, dir_fd=quarantine_fd)
+        quarantined = False
+        os.fsync(quarantine_fd)
+        os.rmdir(quarantine_name, dir_fd=directory_fd)
+        os.fsync(directory_fd)
+        try:
+            os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return True
+        except OSError as exc:
+            raise error_type(inspect_message) from exc
+        raise error_type(changed_message)
+    except error_type:
+        raise
+    except OSError as exc:
+        recovery = f"; displaced leaf retained in {quarantine_name}/{quarantine_leaf}" if quarantined else ""
+        raise error_type(f"{durability_message}{recovery}") from exc
+    finally:
+        os.close(quarantine_fd)
+
+
+def _owned_regular_leaf_matches_bytes(
+    directory_fd: int,
+    name: str,
+    expected_identity: tuple[int, int],
+    expected_bytes: bytes,
+    *,
+    error_type: type[RuntimeError],
+    changed_message: str,
+    inspect_message: str,
+) -> bool:
+    """Return whether one no-follow regular leaf is the exact publication."""
+
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+    try:
+        file_descriptor = os.open(name, flags, dir_fd=directory_fd)
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        raise error_type(inspect_message) from exc
+    try:
+        observed = os.fstat(file_descriptor)
+        if not stat.S_ISREG(observed.st_mode):
+            raise error_type(changed_message)
+        if (observed.st_dev, observed.st_ino) != expected_identity:
+            raise error_type(changed_message)
+        if observed.st_size != len(expected_bytes):
+            raise error_type(changed_message)
+        observed_bytes = bytearray()
+        while chunk := os.read(file_descriptor, 65536):
+            observed_bytes.extend(chunk)
+        if bytes(observed_bytes) != expected_bytes:
+            raise error_type(changed_message)
+    except error_type:
+        raise
+    except OSError as exc:
+        raise error_type(inspect_message) from exc
+    finally:
+        os.close(file_descriptor)
+    return True
+
+
+def _owned_regular_leaf_matches_sha256(
+    directory_fd: int,
+    name: str,
+    expected_identity: tuple[int, int],
+    expected_sha256: str,
+    *,
+    error_type: type[RuntimeError],
+    changed_message: str,
+    inspect_message: str,
+) -> bool:
+    """Return whether one no-follow regular leaf is the exact digest-bound publication."""
+
+    expected_digest = expected_sha256.removeprefix("sha256:")
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+    try:
+        file_descriptor = os.open(name, flags, dir_fd=directory_fd)
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        raise error_type(inspect_message) from exc
+    try:
+        observed = os.fstat(file_descriptor)
+        if not stat.S_ISREG(observed.st_mode):
+            raise error_type(changed_message)
+        if (observed.st_dev, observed.st_ino) != expected_identity:
+            raise error_type(changed_message)
+        digest = hashlib.sha256()
+        while chunk := os.read(file_descriptor, 1024 * 1024):
+            digest.update(chunk)
+        if digest.hexdigest() != expected_digest:
+            raise error_type(changed_message)
+    except error_type:
+        raise
+    except OSError as exc:
+        raise error_type(inspect_message) from exc
+    finally:
+        os.close(file_descriptor)
+    return True
+
+
 def _publish_design_output_directory(source_path: Path, destination_path: Path) -> None:
     """Publish one complete private output tree through an exclusive reservation."""
 
@@ -1258,6 +1463,7 @@ def _publish_score_output(source_path: Path, destination_path: Path) -> tuple[st
             while payload := os.read(source_fd, 1024 * 1024):
                 digest.update(payload)
             os.fsync(source_fd)
+            source_sha256 = f"sha256:{digest.hexdigest()}"
         finally:
             os.close(source_fd)
     except OSError as exc:
@@ -1282,16 +1488,17 @@ def _publish_score_output(source_path: Path, destination_path: Path) -> tuple[st
             os.fsync(directory_fd)
         except OSError as publication_error:
             try:
-                if _owned_leaf_exists(
+                _quarantine_and_remove_owned_leaf(
                     directory_fd,
                     destination_path.name,
                     source_identity,
+                    expected_bytes=None,
+                    expected_sha256=source_sha256,
                     error_type=LigandMpnnScorePublicationUncertainError,
                     changed_message="LigandMPNN score publication rollback target changed",
                     inspect_message="LigandMPNN score publication rollback target could not be inspected",
-                ):
-                    os.unlink(destination_path.name, dir_fd=directory_fd)
-                os.fsync(directory_fd)
+                    durability_message="LigandMPNN score publication rollback durability is uncertain",
+                )
             except OSError as rollback_error:
                 raise LigandMpnnScorePublicationUncertainError(
                     "LigandMPNN score publication rollback durability is uncertain"
@@ -1299,7 +1506,7 @@ def _publish_score_output(source_path: Path, destination_path: Path) -> tuple[st
             raise ValueError(f"score output publication could not be made durable: {destination_path}") from (
                 publication_error
             )
-        return f"sha256:{digest.hexdigest()}", source_identity
+        return source_sha256, source_identity
     finally:
         os.close(directory_fd)
 
@@ -1308,6 +1515,7 @@ def _rollback_score_after_cleanup_failure(
     published_path: Path,
     *,
     published_identity: tuple[int, int],
+    published_sha256: str,
 ) -> None:
     """Remove only this attempt's score after private cleanup fails."""
 
@@ -1319,24 +1527,17 @@ def _rollback_score_after_cleanup_failure(
         ) from exc
     try:
         try:
-            published_status = os.stat(published_path.name, dir_fd=directory_fd, follow_symlinks=False)
-        except FileNotFoundError:
-            published_status = None
-        except OSError as exc:
-            raise LigandMpnnScorePublicationUncertainError(
-                "LigandMPNN score cleanup rollback durability is uncertain"
-            ) from exc
-        if published_status is not None and (published_status.st_dev, published_status.st_ino) != published_identity:
-            raise LigandMpnnScorePublicationUncertainError("LigandMPNN score cleanup rollback target changed")
-        if published_status is not None:
-            try:
-                os.unlink(published_path.name, dir_fd=directory_fd)
-            except OSError as exc:
-                raise LigandMpnnScorePublicationUncertainError(
-                    "LigandMPNN score cleanup rollback durability is uncertain"
-                ) from exc
-        try:
-            os.fsync(directory_fd)
+            _quarantine_and_remove_owned_leaf(
+                directory_fd,
+                published_path.name,
+                published_identity,
+                expected_bytes=None,
+                expected_sha256=published_sha256,
+                error_type=LigandMpnnScorePublicationUncertainError,
+                changed_message="LigandMPNN score cleanup rollback target changed",
+                inspect_message="LigandMPNN score cleanup rollback target could not be inspected",
+                durability_message="LigandMPNN score cleanup rollback durability is uncertain",
+            )
         except OSError as exc:
             raise LigandMpnnScorePublicationUncertainError(
                 "LigandMPNN score cleanup rollback durability is uncertain"

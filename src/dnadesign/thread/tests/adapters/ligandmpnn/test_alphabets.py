@@ -17,7 +17,6 @@ import json
 import os
 import socket
 import stat
-import tempfile
 from dataclasses import replace
 from pathlib import Path
 
@@ -163,15 +162,18 @@ def test_sidecar_materialization_rejects_fifo_target_without_blocking(tmp_path: 
         materialize_residue_alphabet_sidecar(request, target)
 
 
-def test_sidecar_materialization_rejects_socket_target_without_blocking() -> None:
+def test_sidecar_materialization_rejects_socket_target_without_blocking(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     request = _request(LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")))
-    with tempfile.TemporaryDirectory(prefix="lm-", dir="/private/tmp") as directory:
-        target = Path(directory) / "omit.json"
-        with socket.socket(socket.AF_UNIX) as server:
-            server.bind(str(target))
+    target = tmp_path / "omit.json"
+    monkeypatch.chdir(tmp_path)
+    with socket.socket(socket.AF_UNIX) as server:
+        server.bind(target.name)
 
-            with pytest.raises(ValueError, match="sidecar target must be a regular file"):
-                materialize_residue_alphabet_sidecar(request, target)
+        with pytest.raises(ValueError, match="sidecar target must be a regular file"):
+            materialize_residue_alphabet_sidecar(request, target)
 
 
 def test_sidecar_materialization_rejects_symlinked_ancestor_without_writing_outside(tmp_path: Path) -> None:
