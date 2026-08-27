@@ -387,6 +387,8 @@ def _verify_coordination_posture(
             )
         manifest_stat = manifest_path.stat(follow_symlinks=False)
         manifest_mode = stat.S_IMODE(manifest_stat.st_mode)
+        if manifest_mode & stat.S_IWOTH:
+            raise StorageObjectError(f"storage object manifest must not be other-writable: {manifest_path}")
         if root_mode & stat.S_IWGRP and manifest_stat.st_gid != root_stat.st_gid:
             raise StorageObjectError(
                 f"storage object manifest does not inherit the shared object group: {manifest_path}"

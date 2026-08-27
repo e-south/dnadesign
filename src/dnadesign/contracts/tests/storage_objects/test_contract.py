@@ -339,6 +339,22 @@ def test_verify_storage_object_rejects_private_manifest_in_shared_root(tmp_path:
         verify_storage_object(root)
 
 
+@pytest.mark.parametrize(("root_mode", "manifest_mode"), [(0o700, 0o606), (0o2770, 0o666)])
+def test_verify_storage_object_rejects_other_writable_manifest(
+    tmp_path: Path,
+    root_mode: int,
+    manifest_mode: int,
+) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    root.chmod(root_mode)
+    manifest_path = root / MANIFEST_NAME
+    manifest_path.chmod(manifest_mode)
+
+    with pytest.raises(StorageObjectError, match="manifest must not be other-writable"):
+        verify_storage_object(root)
+
+
 def test_verify_storage_object_wraps_resource_read_failures(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

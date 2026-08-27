@@ -993,12 +993,14 @@ def _write_manifest(
     published_identity: tuple[int, int] | None = None
     previous_mode: int
     try:
-        _preflight_owner_cleanup_directory(manifest_path.parent)
         if previous_bytes is not None:
             previous_mode = stat.S_IMODE(manifest_path.stat(follow_symlinks=False).st_mode)
+            if previous_mode & stat.S_IWOTH:
+                raise StorageObjectError(f"storage object manifest must not be other-writable: {manifest_path}")
         else:
             root_mode = stat.S_IMODE(manifest_path.parent.stat(follow_symlinks=False).st_mode)
             previous_mode = 0o664 if root_mode & stat.S_IWGRP else 0o644
+        _preflight_owner_cleanup_directory(manifest_path.parent)
         descriptor, temporary_name = tempfile.mkstemp(
             dir=manifest_path.parent,
             prefix=f".{MANIFEST_NAME}.tmp-",
@@ -1135,6 +1137,20 @@ def _assert_held_manifest_lock_binding(
         raise StorageObjectError(f"storage object lock shared-group posture changed before completion: {lock_path}")
 
 
+def _assert_manifest_not_other_writable(root: Path) -> None:
+    """Reject a regular receipt writable outside the trusted owner/group boundary."""
+
+    manifest_path = root / MANIFEST_NAME
+    try:
+        manifest_stat = manifest_path.stat(follow_symlinks=False)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise StorageObjectError(f"cannot inspect storage object manifest {manifest_path}: {exc}") from exc
+    if stat.S_ISREG(manifest_stat.st_mode) and stat.S_IMODE(manifest_stat.st_mode) & stat.S_IWOTH:
+        raise StorageObjectError(f"storage object manifest must not be other-writable: {manifest_path}")
+
+
 @contextmanager
 def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]:
     lock_path = root / LOCK_NAME
@@ -1166,6 +1182,7 @@ def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]
                 "group-writable storage object roots must be group-readable "
                 "so collaborators can enumerate declared content"
             )
+        _assert_manifest_not_other_writable(root)
         if lock_path.is_symlink():
             raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
         try:
@@ -1245,6 +1262,7 @@ def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]
             raise StorageObjectError(f"storage object lock must be group-writable in a shared object root: {lock_path}")
         if root_mode & stat.S_IWGRP and not lock_stat.st_mode & stat.S_IRGRP:
             raise StorageObjectError(f"storage object lock must be group-readable in a shared object root: {lock_path}")
+        _assert_manifest_not_other_writable(root)
     except (OSError, StorageObjectError) as inspection_error:
         try:
             _release_manifest_lock(lock_descriptor)
@@ -1287,6 +1305,7 @@ def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]
                 lock_identity=acquired_lock_identity,
                 lock_mode=lock_mode,
             )
+            _assert_manifest_not_other_writable(root)
         except StorageObjectError as inspection_error:
             completion_error = inspection_error
         committed_manifest_digest = "unavailable"

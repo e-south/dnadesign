@@ -1501,6 +1501,126 @@ def test_writers_reject_other_writable_coordination_lock(
         assert manifest_path.read_bytes() == prior_manifest
 
 
+@pytest.mark.parametrize("operation", ["inventory", "refresh"])
+@pytest.mark.parametrize(("root_mode", "manifest_mode"), [(0o700, 0o606), (0o2770, 0o666)])
+def test_writers_reject_other_writable_manifest_without_mutation(
+    tmp_path: Path,
+    operation: str,
+    root_mode: int,
+    manifest_mode: int,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(root_mode)
+    payload_path = root / "payload.txt"
+    payload_path.write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    manifest_path.chmod(manifest_mode)
+    prior_manifest = manifest_path.read_bytes()
+    prior_payload = payload_path.read_bytes()
+    prior_lock = (root / LOCK_NAME).read_bytes()
+
+    with pytest.raises(StorageObjectError, match="manifest must not be other-writable"):
+        if operation == "inventory":
+            inventory_storage_object(
+                root,
+                storage_id="pilot",
+                owner_repository="dnadesign",
+                owner_tool="cruncher",
+                object_kind="workspace",
+                content_schema="cruncher.workspace",
+                content_schema_version="1",
+                producer_revision="test-revision-2",
+                storage_class="reproducible",
+                retention_policy="review-before-delete",
+            )
+        else:
+            refresh_storage_object(
+                root,
+                expected_manifest_digest=_digest(manifest_path),
+                producer_revision="test-revision-2",
+            )
+
+    assert manifest_path.read_bytes() == prior_manifest
+    assert stat.S_IMODE(manifest_path.stat().st_mode) == manifest_mode
+    assert payload_path.read_bytes() == prior_payload
+    assert (root / LOCK_NAME).read_bytes() == prior_lock
+    assert not tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+    assert not tuple(root.glob(f".{MANIFEST_NAME}.restore-*"))
+    assert not tuple(root.glob(f".{MANIFEST_NAME}.rollback-*"))
+
+
+@pytest.mark.parametrize("operation", ["inventory", "refresh"])
+def test_writers_report_manifest_posture_drift_at_completion(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    expected_digest: str | None = None
+    if operation == "refresh":
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+        expected_digest = _digest(manifest_path)
+    original_binding_check = storage_inventory._assert_held_manifest_lock_binding
+
+    def _change_manifest_after_lock_binding(*args: object, **kwargs: object) -> None:
+        original_binding_check(*args, **kwargs)
+        manifest_path.chmod(0o666)
+
+    monkeypatch.setattr(storage_inventory, "_assert_held_manifest_lock_binding", _change_manifest_after_lock_binding)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="coordination.*changed.*revalidate"):
+        if operation == "inventory":
+            inventory_storage_object(
+                root,
+                storage_id="pilot",
+                owner_repository="dnadesign",
+                owner_tool="cruncher",
+                object_kind="workspace",
+                content_schema="cruncher.workspace",
+                content_schema_version="1",
+                producer_revision="test-revision-1",
+                storage_class="reproducible",
+                retention_policy="review-before-delete",
+            )
+        else:
+            assert expected_digest is not None
+            refresh_storage_object(
+                root,
+                expected_manifest_digest=expected_digest,
+                producer_revision="test-revision-2",
+            )
+
+    assert stat.S_IMODE(manifest_path.stat().st_mode) == 0o666
+    assert not tuple(root.glob(f".{MANIFEST_NAME}.tmp-*"))
+
+
 @pytest.mark.parametrize("mode", [0o200, 0o400])
 def test_inventory_rejects_owner_inaccessible_lock(tmp_path: Path, mode: int) -> None:
     root = tmp_path / "pilot"
