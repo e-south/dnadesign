@@ -523,7 +523,7 @@ def _write_manifest(
             object_root = shlex.quote(str(manifest_path.parent))
             python_executable = shlex.quote(sys.executable)
             summary["next_step"] = (
-                f"git -C {object_root} add -- {MANIFEST_NAME} "
+                f"git -C {object_root} add -- {MANIFEST_NAME} {LOCK_NAME} "
                 f"&& {python_executable} -m dnadesign.contracts.storage_objects validate {object_root}"
             )
         return summary
@@ -539,7 +539,7 @@ def _write_manifest(
 
 
 @contextmanager
-def _manifest_lock(root: Path) -> Iterator[None]:
+def _manifest_lock(root: Path, *, allow_missing: bool = False) -> Iterator[None]:
     lock_path = root / LOCK_NAME
     try:
         root_stat = root.stat(follow_symlinks=False)
@@ -569,33 +569,39 @@ def _manifest_lock(root: Path) -> Iterator[None]:
                 "group-writable storage object roots must be group-readable "
                 "so collaborators can enumerate declared content"
             )
-        if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
+        if lock_path.is_symlink():
             raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
-        if lock_path.exists() and lock_path.stat(follow_symlinks=False).st_size != 0:
-            raise StorageObjectError(f"storage object lock must be an empty coordination file: {lock_path}")
-        if lock_path.exists():
-            lock_mode = stat.S_IMODE(lock_path.stat(follow_symlinks=False).st_mode)
+        try:
+            inspected_lock_stat = lock_path.stat(follow_symlinks=False)
+        except FileNotFoundError as exc:
+            if not allow_missing:
+                raise StorageObjectError(f"storage object lock is missing: {lock_path}") from exc
+            manifest_path = root / MANIFEST_NAME
+            if manifest_path.exists() or manifest_path.is_symlink():
+                raise StorageObjectError(
+                    f"cannot bootstrap a missing storage object lock beside an existing manifest: {manifest_path}"
+                ) from exc
+            inspected_lock_identity: tuple[int, int] | None = None
+        else:
+            if not stat.S_ISREG(inspected_lock_stat.st_mode):
+                raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
+            inspected_lock_identity = (inspected_lock_stat.st_dev, inspected_lock_stat.st_ino)
+            if inspected_lock_stat.st_size != 0:
+                raise StorageObjectError(f"storage object lock must be an empty coordination file: {lock_path}")
+            lock_mode = stat.S_IMODE(inspected_lock_stat.st_mode)
             owner_required = stat.S_IRUSR | stat.S_IWUSR
             if lock_mode & owner_required != owner_required:
                 raise StorageObjectError(f"storage object lock must be owner-readable and owner-writable: {lock_path}")
-        if (
-            root_mode & stat.S_IWGRP
-            and lock_path.exists()
-            and lock_path.stat(follow_symlinks=False).st_gid != root_stat.st_gid
-        ):
-            raise StorageObjectError(f"storage object lock does not inherit the shared object group: {lock_path}")
-        if (
-            root_mode & stat.S_IWGRP
-            and lock_path.exists()
-            and not lock_path.stat(follow_symlinks=False).st_mode & stat.S_IWGRP
-        ):
-            raise StorageObjectError(f"storage object lock must be group-writable in a shared object root: {lock_path}")
-        if (
-            root_mode & stat.S_IWGRP
-            and lock_path.exists()
-            and not lock_path.stat(follow_symlinks=False).st_mode & stat.S_IRGRP
-        ):
-            raise StorageObjectError(f"storage object lock must be group-readable in a shared object root: {lock_path}")
+            if root_mode & stat.S_IWGRP and inspected_lock_stat.st_gid != root_stat.st_gid:
+                raise StorageObjectError(f"storage object lock does not inherit the shared object group: {lock_path}")
+            if root_mode & stat.S_IWGRP and not inspected_lock_stat.st_mode & stat.S_IWGRP:
+                raise StorageObjectError(
+                    f"storage object lock must be group-writable in a shared object root: {lock_path}"
+                )
+            if root_mode & stat.S_IWGRP and not inspected_lock_stat.st_mode & stat.S_IRGRP:
+                raise StorageObjectError(
+                    f"storage object lock must be group-readable in a shared object root: {lock_path}"
+                )
     except OSError as exc:
         raise StorageObjectError(f"cannot inspect storage object lock {lock_path}: {exc}") from exc
     lock_mode = 0o664 if root_mode & stat.S_IWGRP else 0o644
@@ -608,6 +614,15 @@ def _manifest_lock(root: Path) -> Iterator[None]:
         raise StorageObjectError(f"cannot acquire storage object manifest lock {lock_path}: {exc}") from exc
     try:
         lock_stat = lock_path.stat(follow_symlinks=False)
+        acquired_lock_identity = (lock_stat.st_dev, lock_stat.st_ino)
+        if inspected_lock_identity is not None and acquired_lock_identity != inspected_lock_identity:
+            raise StorageObjectError(f"storage object lock changed before acquisition completed: {lock_path}")
+        lock_context = getattr(lock, "_context", None)
+        lock_descriptor = getattr(lock_context, "lock_file_fd", None)
+        if isinstance(lock_descriptor, int):
+            held_stat = os.fstat(lock_descriptor)
+            if (held_stat.st_dev, held_stat.st_ino) != acquired_lock_identity:
+                raise StorageObjectError(f"storage object lock changed before acquisition completed: {lock_path}")
         lock_mode = stat.S_IMODE(lock_stat.st_mode)
         owner_required = stat.S_IRUSR | stat.S_IWUSR
         if lock_mode & owner_required != owner_required:
@@ -706,7 +721,7 @@ def inventory_storage_object(
     )
     if duplicate_roles:
         raise StorageObjectError(f"inventory paths have multiple roles: {', '.join(duplicate_roles)}")
-    with _manifest_lock(root):
+    with _manifest_lock(root, allow_missing=True):
         _assert_no_ambiguous_manifest_staging(root)
         manifest_path = root / MANIFEST_NAME
         if manifest_path.exists() or manifest_path.is_symlink():

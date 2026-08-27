@@ -1101,7 +1101,7 @@ def test_manifest_lock_releases_after_post_acquisition_inspection_failure(
     monkeypatch.setattr(Path, "stat", _stat)
 
     with pytest.raises(StorageObjectError, match="cannot inspect storage object lock after acquisition"):
-        with storage_inventory._manifest_lock(root):
+        with storage_inventory._manifest_lock(root, allow_missing=True):
             raise AssertionError("lock body must not run")
 
     assert acquired is True
@@ -1140,6 +1140,132 @@ def test_refresh_wraps_lock_acquisition_failures(
             expected_manifest_digest=expected_digest,
             producer_revision="test-revision-2",
         )
+
+
+def test_refresh_rejects_missing_lock_while_an_unlinked_inode_is_held(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    payload = root / "payload.txt"
+    payload.write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    prior_manifest = manifest_path.read_bytes()
+    lock_path = root / LOCK_NAME
+    held_lock = storage_inventory.FileLock(lock_path)
+    held_lock.acquire()
+    lock_path.unlink()
+    try:
+        with pytest.raises(StorageObjectError, match="storage object lock is missing"):
+            refresh_storage_object(
+                root,
+                expected_manifest_digest=_digest(manifest_path),
+                producer_revision="test-revision-2",
+            )
+    finally:
+        held_lock.release()
+
+    assert not lock_path.exists()
+    assert manifest_path.read_bytes() == prior_manifest
+    assert payload.read_text(encoding="utf-8") == "payload\n"
+
+
+def test_inventory_does_not_bootstrap_missing_lock_beside_existing_manifest(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    prior_manifest = manifest_path.read_bytes()
+    lock_path = root / LOCK_NAME
+    lock_path.unlink()
+
+    with pytest.raises(StorageObjectError, match="cannot bootstrap a missing storage object lock"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-2",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert not lock_path.exists()
+    assert manifest_path.read_bytes() == prior_manifest
+
+
+def test_refresh_rejects_lock_replaced_between_inspection_and_acquisition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    payload = root / "payload.txt"
+    payload.write_text("payload\n", encoding="utf-8")
+    inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision-1",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+    )
+    manifest_path = root / MANIFEST_NAME
+    prior_manifest = manifest_path.read_bytes()
+    lock_path = root / LOCK_NAME
+    initial_identity = (lock_path.stat().st_dev, lock_path.stat().st_ino)
+    original_acquire = storage_inventory.FileLock.acquire
+    replaced = False
+
+    def _acquire_after_replacement(lock, *args: object, **kwargs: object):
+        nonlocal replaced
+        if not replaced:
+            lock_path.unlink()
+            replaced = True
+        return original_acquire(lock, *args, **kwargs)
+
+    monkeypatch.setattr(storage_inventory.FileLock, "acquire", _acquire_after_replacement)
+
+    with pytest.raises(StorageObjectError, match="lock changed before acquisition completed"):
+        refresh_storage_object(
+            root,
+            expected_manifest_digest=_digest(manifest_path),
+            producer_revision="test-revision-2",
+        )
+
+    assert replaced
+    assert (lock_path.stat().st_dev, lock_path.stat().st_ino) != initial_identity
+    assert manifest_path.read_bytes() == prior_manifest
+    assert payload.read_text(encoding="utf-8") == "payload\n"
 
 
 def test_inventory_fails_closed_on_preexisting_manifest_temp(tmp_path: Path) -> None:

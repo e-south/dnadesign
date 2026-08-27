@@ -74,10 +74,11 @@ tool-cache files are cache material.
 
 For `--demo`, existing resources must already be small, tracked, and byte-for-byte
 identical to their Git index entries. Inventory creates the new manifest with
-status `created-pending-git-add`; add that manifest to Git, then run
-`dnadesign-storage validate` to reach `verified`. Unstaged demo edits fail so a
-manifest-only commit cannot describe bytes absent from a clean checkout.
-Operational objects never use this two-step exception.
+status `created-pending-git-add`; use the returned command to stage the manifest
+and persistent coordination lock, then run `dnadesign-storage validate` to
+reach `verified`. Unstaged demo edits fail so a manifest-only commit cannot
+describe bytes absent from a clean checkout. Operational objects never use
+this two-step exception.
 
 An active workspace or durable store may change only through its owning tool.
 After a successful run or store transaction, refresh its receipt with the
@@ -111,7 +112,10 @@ Refresh uses the expected digest as a compare-and-swap guard against concurrent
 receipt changes. Writers lock
 `<object>/.storage-object.lock`, so processes and compute nodes that see the
 same POSIX filesystem serialize receipt updates. The lock is contract-owned
-coordination state and is excluded from the content manifest. Group-writable
+coordination state, is excluded from the content manifest, and must remain at a
+stable pathname and inode for the lifetime of an object. Inventory alone may
+bootstrap it before the first receipt; refresh and validation reject absence.
+Group-writable
 object roots must also be group-traversable, set the POSIX setgid bit, and not
 set the sticky bit. Other-writable object roots are rejected because unrelated
 accounts cannot participate in a trusted shared coordination boundary. These

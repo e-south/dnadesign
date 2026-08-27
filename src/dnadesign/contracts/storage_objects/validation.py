@@ -214,7 +214,7 @@ def _verify_coordination_posture(
     root: Path,
     manifest_path: Path,
     lock_path: Path,
-) -> tuple[tuple[int, int], tuple[int, int], tuple[bool, int, int, int]]:
+) -> tuple[tuple[int, int], tuple[int, int], tuple[int, int, int, int, int]]:
     """Validate and fingerprint root, manifest, and lock coordination state."""
 
     try:
@@ -255,30 +255,33 @@ def _verify_coordination_posture(
             raise StorageObjectError(
                 f"storage object manifest must be group-readable in a shared object root: {manifest_path}"
             )
-        if lock_path.is_symlink() or (lock_path.exists() and not lock_path.is_file()):
+        if lock_path.is_symlink():
             raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
-        lock_exists = lock_path.exists()
-        if lock_exists:
+        try:
             lock_stat = lock_path.stat(follow_symlinks=False)
-            lock_mode = stat.S_IMODE(lock_stat.st_mode)
-            if lock_stat.st_size != 0:
-                raise StorageObjectError(f"storage object lock must be an empty coordination file: {lock_path}")
-            owner_required = stat.S_IRUSR | stat.S_IWUSR
-            if lock_mode & owner_required != owner_required:
-                raise StorageObjectError(f"storage object lock must be owner-readable and owner-writable: {lock_path}")
-            if root_mode & stat.S_IWGRP and lock_stat.st_gid != root_stat.st_gid:
-                raise StorageObjectError(f"storage object lock does not inherit the shared object group: {lock_path}")
-            if root_mode & stat.S_IWGRP and not lock_mode & stat.S_IWGRP:
-                raise StorageObjectError(
-                    f"storage object lock must be group-writable in a shared object root: {lock_path}"
-                )
-            if root_mode & stat.S_IWGRP and not lock_mode & stat.S_IRGRP:
-                raise StorageObjectError(
-                    f"storage object lock must be group-readable in a shared object root: {lock_path}"
-                )
-            lock_state = (True, lock_mode, lock_stat.st_gid, lock_stat.st_size)
-        else:
-            lock_state = (False, 0, 0, 0)
+        except FileNotFoundError as exc:
+            raise StorageObjectError(f"storage object lock is missing: {lock_path}") from exc
+        if not stat.S_ISREG(lock_stat.st_mode):
+            raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
+        lock_mode = stat.S_IMODE(lock_stat.st_mode)
+        if lock_stat.st_size != 0:
+            raise StorageObjectError(f"storage object lock must be an empty coordination file: {lock_path}")
+        owner_required = stat.S_IRUSR | stat.S_IWUSR
+        if lock_mode & owner_required != owner_required:
+            raise StorageObjectError(f"storage object lock must be owner-readable and owner-writable: {lock_path}")
+        if root_mode & stat.S_IWGRP and lock_stat.st_gid != root_stat.st_gid:
+            raise StorageObjectError(f"storage object lock does not inherit the shared object group: {lock_path}")
+        if root_mode & stat.S_IWGRP and not lock_mode & stat.S_IWGRP:
+            raise StorageObjectError(f"storage object lock must be group-writable in a shared object root: {lock_path}")
+        if root_mode & stat.S_IWGRP and not lock_mode & stat.S_IRGRP:
+            raise StorageObjectError(f"storage object lock must be group-readable in a shared object root: {lock_path}")
+        lock_state = (
+            lock_mode,
+            lock_stat.st_gid,
+            lock_stat.st_size,
+            lock_stat.st_dev,
+            lock_stat.st_ino,
+        )
     except OSError as exc:
         raise StorageObjectError(f"cannot inspect storage object lock {lock_path}: {exc}") from exc
     return (

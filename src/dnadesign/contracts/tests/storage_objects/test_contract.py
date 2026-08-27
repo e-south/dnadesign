@@ -69,6 +69,9 @@ def _write_object(
         ],
     }
     (root / MANIFEST_NAME).write_text(json.dumps(manifest), encoding="utf-8")
+    lock_path = root / LOCK_NAME
+    lock_path.touch()
+    lock_path.chmod(0o664)
 
 
 def test_verify_storage_object_requires_exact_file_closure(tmp_path: Path) -> None:
@@ -134,6 +137,15 @@ def test_storage_object_lock_is_shared_state_not_content(tmp_path: Path) -> None
     assert verified.summary()["resource_count"] == 2
 
 
+def test_verify_storage_object_requires_coordination_lock(tmp_path: Path) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    (root / LOCK_NAME).unlink()
+
+    with pytest.raises(StorageObjectError, match="storage object lock is missing"):
+        verify_storage_object(root)
+
+
 def test_verify_storage_object_rejects_nonempty_shared_lock(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     _write_object(root)
@@ -151,7 +163,7 @@ def test_verify_storage_object_rejects_invalid_shared_lock_posture(tmp_path: Pat
     _write_object(root)
     root.chmod(0o2770)
     lock_path = root / LOCK_NAME
-    lock_path.touch(mode=0o644)
+    lock_path.chmod(0o644)
 
     with pytest.raises(StorageObjectError, match="lock must be group-writable"):
         verify_storage_object(root)
@@ -381,6 +393,35 @@ def test_verify_storage_object_rechecks_coordination_posture_on_second_pass(
 
     with pytest.raises(StorageObjectError, match="manifest must be group-readable"):
         verify_storage_object(root)
+
+
+def test_verify_storage_object_rejects_lock_replaced_between_snapshots(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    lock_path = root / LOCK_NAME
+    initial_identity = (lock_path.stat().st_dev, lock_path.stat().st_ino)
+    original_tree_paths = storage_validation._storage_tree_paths
+    calls = 0
+
+    def _tree_paths(root_path: Path):
+        nonlocal calls
+        paths = original_tree_paths(root_path)
+        calls += 1
+        if calls == 2:
+            lock_path.unlink()
+            lock_path.touch()
+            lock_path.chmod(0o664)
+        return paths
+
+    monkeypatch.setattr(storage_validation, "_storage_tree_paths", _tree_paths)
+
+    with pytest.raises(StorageObjectError, match="storage object changed during validation"):
+        verify_storage_object(root)
+
+    assert (lock_path.stat().st_dev, lock_path.stat().st_ino) != initial_identity
 
 
 def test_verify_storage_object_rejects_root_made_other_writable_during_validation(
