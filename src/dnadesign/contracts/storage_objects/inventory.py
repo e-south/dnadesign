@@ -73,6 +73,7 @@ def _rollback_manifest(
     previous_bytes: bytes | None,
     previous_mode: int,
     operation_error: BaseException,
+    published_identity: tuple[int, int] | None = None,
 ) -> None:
     """Undo only the manifest snapshot published by the failed operation."""
 
@@ -92,9 +93,14 @@ def _rollback_manifest(
                 "storage object manifest changed after publication; refusing to overwrite unrelated receipt bytes"
             )
         if previous_bytes is None:
+            if published_identity is None:
+                raise StorageObjectPublicationUncertain(
+                    "cannot identify the receipt created by the failed operation; rollback is unsafe"
+                )
             _rollback_create_only_manifest(
                 manifest_path,
                 published_bytes=published_bytes,
+                published_identity=published_identity,
                 operation_error=operation_error,
             )
             return
@@ -224,6 +230,7 @@ def _rollback_create_only_manifest(
     manifest_path: Path,
     *,
     published_bytes: bytes,
+    published_identity: tuple[int, int],
     operation_error: BaseException,
 ) -> None:
     """Remove only the create-only receipt owned by the failed operation."""
@@ -235,7 +242,6 @@ def _rollback_create_only_manifest(
     os.close(descriptor)
     quarantine = Path(quarantine_name)
     quarantine.unlink()
-    published_identity = _entry_identity(manifest_path)
     try:
         _atomic_move_no_replace(manifest_path, quarantine)
     except FileNotFoundError:
@@ -335,9 +341,10 @@ def _publish_create_only_manifest(
     *,
     manifest_bytes: bytes,
     manifest_mode: int,
-) -> None:
+) -> tuple[int, int]:
     """Publish one staged regular file without any replacement window."""
 
+    published_identity = _entry_identity(temporary)
     _preflight_create_only_rollback(manifest_path.parent)
     try:
         os.link(temporary, manifest_path, follow_symlinks=False)
@@ -352,6 +359,7 @@ def _publish_create_only_manifest(
             previous_bytes=None,
             previous_mode=manifest_mode,
             operation_error=publication_error,
+            published_identity=published_identity,
         )
         raise StorageObjectPublicationUnsupported(
             "this platform does not support atomic create-only manifest publication"
@@ -363,6 +371,7 @@ def _publish_create_only_manifest(
             previous_bytes=None,
             previous_mode=manifest_mode,
             operation_error=publication_error,
+            published_identity=published_identity,
         )
         if publication_error.errno in {errno.ENOSYS, errno.EOPNOTSUPP, errno.ENOTSUP, errno.EPERM}:
             raise StorageObjectPublicationUnsupported(
@@ -376,9 +385,14 @@ def _publish_create_only_manifest(
             previous_bytes=None,
             previous_mode=manifest_mode,
             operation_error=publication_error,
+            published_identity=published_identity,
         )
         raise
     try:
+        if _entry_identity(manifest_path) != published_identity:
+            raise StorageObjectPublicationUncertain(
+                "storage object manifest changed after create-only publication; outcome is uncertain"
+            )
         _fsync_directory(manifest_path.parent)
         temporary.unlink()
         _fsync_directory(manifest_path.parent)
@@ -389,8 +403,10 @@ def _publish_create_only_manifest(
             previous_bytes=None,
             previous_mode=manifest_mode,
             operation_error=publication_error,
+            published_identity=published_identity,
         )
         raise
+    return published_identity
 
 
 def _publish_refresh_manifest(
@@ -488,6 +504,7 @@ def _write_manifest(
     temporary: Path | None = None
     temporary_created = False
     preserve_temporary = False
+    published_identity: tuple[int, int] | None = None
     previous_mode: int
     try:
         if previous_bytes is not None:
@@ -509,7 +526,7 @@ def _write_manifest(
         if previous_mode is not None:
             temporary.chmod(previous_mode, follow_symlinks=False)
         if previous_bytes is None:
-            _publish_create_only_manifest(
+            published_identity = _publish_create_only_manifest(
                 temporary,
                 manifest_path,
                 manifest_bytes=manifest_bytes,
@@ -555,6 +572,7 @@ def _write_manifest(
             previous_bytes=previous_bytes,
             previous_mode=previous_mode,
             operation_error=validation_error,
+            published_identity=published_identity,
         )
         raise
 

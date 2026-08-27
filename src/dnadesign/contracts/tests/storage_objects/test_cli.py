@@ -2306,6 +2306,72 @@ def test_inventory_rollback_retains_receipt_replaced_at_commit_boundary(
     assert recovery_paths[0].read_bytes() == competitor_bytes
 
 
+def test_inventory_rollback_retains_same_byte_receipt_replaced_after_content_check(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    published_identity: tuple[int, int] | None = None
+    replacement_identity: tuple[int, int] | None = None
+    original_link = storage_inventory.os.link
+    original_rollback = storage_inventory._rollback_create_only_manifest
+
+    def _capture_publication_identity(
+        source: Path,
+        destination: Path,
+        *,
+        follow_symlinks: bool = True,
+    ) -> None:
+        nonlocal published_identity
+        original_link(source, destination, follow_symlinks=follow_symlinks)
+        published_stat = destination.stat(follow_symlinks=False)
+        published_identity = (published_stat.st_dev, published_stat.st_ino)
+
+    def _rollback_after_same_byte_replacement(path: Path, **kwargs: object) -> None:
+        nonlocal replacement_identity
+        assert kwargs["published_identity"] == published_identity
+        replacement = path.with_name(f".{MANIFEST_NAME}.competitor")
+        replacement.write_bytes(path.read_bytes())
+        replacement.chmod(path.stat(follow_symlinks=False).st_mode & 0o777)
+        replacement.replace(path)
+        replacement_stat = path.stat(follow_symlinks=False)
+        replacement_identity = (replacement_stat.st_dev, replacement_stat.st_ino)
+        original_rollback(path, **kwargs)
+
+    def _fail_verification(*_args: object, **_kwargs: object) -> None:
+        raise StorageObjectError("injected validation failure")
+
+    monkeypatch.setattr(storage_inventory.os, "link", _capture_publication_identity)
+    monkeypatch.setattr(storage_inventory, "_rollback_create_only_manifest", _rollback_after_same_byte_replacement)
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _fail_verification)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="cannot identify the receipt moved"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert published_identity is not None
+    assert replacement_identity is not None
+    assert replacement_identity != published_identity
+    assert not manifest_path.exists()
+    recovery_paths = tuple(root.glob(f".{MANIFEST_NAME}.rollback-*"))
+    assert len(recovery_paths) == 1
+    recovery_stat = recovery_paths[0].stat(follow_symlinks=False)
+    assert (recovery_stat.st_dev, recovery_stat.st_ino) == replacement_identity
+
+
 def test_inventory_rollback_preserves_quarantine_name_collision(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
