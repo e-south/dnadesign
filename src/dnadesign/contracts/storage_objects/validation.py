@@ -374,6 +374,8 @@ def _verify_coordination_posture(
         owner_required = stat.S_IRUSR | stat.S_IWUSR
         if lock_mode & owner_required != owner_required:
             raise StorageObjectError(f"storage object lock must be owner-readable and owner-writable: {lock_path}")
+        if lock_mode & stat.S_IWOTH:
+            raise StorageObjectError(f"storage object lock must not be other-writable: {lock_path}")
         if root_mode & stat.S_IWGRP and lock_stat.st_gid != root_stat.st_gid:
             raise StorageObjectError(f"storage object lock does not inherit the shared object group: {lock_path}")
         if root_mode & stat.S_IWGRP and not lock_mode & stat.S_IWGRP:

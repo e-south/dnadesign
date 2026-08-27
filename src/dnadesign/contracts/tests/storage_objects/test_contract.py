@@ -174,6 +174,22 @@ def test_verify_storage_object_rejects_invalid_shared_lock_posture(tmp_path: Pat
         verify_storage_object(root)
 
 
+@pytest.mark.parametrize(("root_mode", "lock_mode"), [(0o700, 0o606), (0o2770, 0o666)])
+def test_verify_storage_object_rejects_other_writable_lock(
+    tmp_path: Path,
+    root_mode: int,
+    lock_mode: int,
+) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    root.chmod(root_mode)
+    lock_path = root / LOCK_NAME
+    lock_path.chmod(lock_mode)
+
+    with pytest.raises(StorageObjectError, match="lock must not be other-writable"):
+        verify_storage_object(root)
+
+
 def test_verify_storage_object_rejects_group_unreadable_shared_lock(tmp_path: Path) -> None:
     root = tmp_path / "pilot"
     _write_object(root)

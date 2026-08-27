@@ -128,7 +128,8 @@ If another entry wins either race, the writer preserves that entry and fails.
 New private locks use mode `0600`; new group-shared locks use `0660` and are
 opened as `0600` before descriptor-only permission expansion. Existing valid
 `0644` and `0664` locks remain accepted, including regular `100644` Git index
-entries materialized by a clean demo checkout.
+entries materialized by a clean demo checkout. Other-writable lock modes are
+rejected for both private and shared objects.
 Before a writer reports success, it rechecks the lock pathname, mode, and shared
 posture against the inode held by its open lock descriptor. If that binding
 changes after a receipt commits, the call raises

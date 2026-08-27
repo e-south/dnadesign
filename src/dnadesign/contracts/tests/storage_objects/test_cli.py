@@ -1255,7 +1255,7 @@ def test_shared_lock_bootstrap_opens_owner_only_before_descriptor_chmod(
     def _open(
         path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
         flags: int,
-        mode: int = 0o777,
+        mode: int = 0,
         *,
         dir_fd: int | None = None,
     ) -> int:
@@ -1438,6 +1438,67 @@ def test_inventory_rejects_group_unreadable_lock_in_shared_object(tmp_path: Path
 
     assert stat.S_IMODE(lock_path.stat().st_mode) == 0o620
     assert not (root / MANIFEST_NAME).exists()
+
+
+@pytest.mark.parametrize("operation", ["inventory", "refresh"])
+@pytest.mark.parametrize(("root_mode", "lock_mode"), [(0o700, 0o606), (0o2770, 0o666)])
+def test_writers_reject_other_writable_coordination_lock(
+    tmp_path: Path,
+    operation: str,
+    root_mode: int,
+    lock_mode: int,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(root_mode)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    if operation == "refresh":
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+        prior_manifest = manifest_path.read_bytes()
+    else:
+        (root / LOCK_NAME).touch(mode=0o600)
+        prior_manifest = None
+    lock_path = root / LOCK_NAME
+    lock_path.chmod(lock_mode)
+
+    with pytest.raises(StorageObjectError, match="lock must not be other-writable"):
+        if operation == "inventory":
+            inventory_storage_object(
+                root,
+                storage_id="pilot",
+                owner_repository="dnadesign",
+                owner_tool="cruncher",
+                object_kind="workspace",
+                content_schema="cruncher.workspace",
+                content_schema_version="1",
+                producer_revision="test-revision-1",
+                storage_class="reproducible",
+                retention_policy="review-before-delete",
+            )
+        else:
+            refresh_storage_object(
+                root,
+                expected_manifest_digest=_digest(manifest_path),
+                producer_revision="test-revision-2",
+            )
+
+    assert stat.S_IMODE(lock_path.stat().st_mode) == lock_mode
+    if prior_manifest is None:
+        assert not manifest_path.exists()
+    else:
+        assert manifest_path.read_bytes() == prior_manifest
 
 
 @pytest.mark.parametrize("mode", [0o200, 0o400])
