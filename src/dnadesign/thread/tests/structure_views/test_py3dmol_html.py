@@ -166,6 +166,25 @@ ATOM 8 N N9 . DG B 2 1 4.900 0.900 0.000 D 1 ? 1.00 80.00 1
 #
 """
 
+_DNA_ONLY_MMCIF = "\n".join(line for line in _SIDECHAIN_MMCIF.splitlines() if not line.startswith("ATOM "))
+_PROTEIN_ONLY_MMCIF = "\n".join(line for line in _SIDECHAIN_MMCIF.splitlines() if not line.startswith("HETATM "))
+_LIGAND_ONLY_MMCIF = _DNA_ONLY_MMCIF.replace(" DA D 2 1 ", " HEM L 2 1 ").replace(
+    " D 1 ? 1.00 80.00 1",
+    " L 1 ? 1.00 80.00 1",
+)
+_DNA_ONLY_MMCIF_WITH_ENTITY_CATEGORY = _DNA_ONLY_MMCIF.replace(
+    "loop_\n_atom_site.group_PDB",
+    "loop_\n_entity.id\n_entity.type\n1 polymer\n#\nloop_\n_atom_site.group_PDB",
+)
+_DNA_ONLY_MULTIMODEL_MMCIF = _DNA_ONLY_MMCIF.replace(
+    "HETATM 6 P P . DA D 2 1 4.000 0.000 0.000 D 1 ? 1.00 80.00 1",
+    "HETATM 6 P P . DA D 2 1 4.000 0.000 0.000 D 1 ? 1.00 80.00 1\n"
+    "HETATM 7 P P . DA D 2 1 5.000 0.000 0.000 D 1 ? 1.00 80.00 2",
+)
+_EMPTY_ATOM_SITE_MMCIF = "\n".join(
+    line for line in _SIDECHAIN_MMCIF.splitlines() if not line.startswith(("ATOM ", "HETATM "))
+)
+
 _DNA_RESIDUE_SELECTION = '"resn":["DA","DC","DG","DT"]'
 _RNA_RESIDUE_SELECTION = '"resn":["A","C","G","I","U"]'
 
@@ -749,6 +768,144 @@ def test_py3dmol_backend_serializes_mmcif_for_3dmol_without_prime_token_ambiguit
     assert "data_mixed_polymer" not in unescaped_html
     assert '","cif");' in unescaped_html
     assert '","mmcif");' not in unescaped_html
+
+
+@pytest.mark.parametrize(
+    ("structure_text", "hidden_molecule_classes"),
+    (
+        (_DNA_ONLY_MMCIF, ("dna",)),
+        (_PROTEIN_ONLY_MMCIF, ("protein",)),
+        (_SIDECHAIN_MMCIF, ("protein", "dna", "rna")),
+        (_DNA_ONLY_MMCIF_WITH_ENTITY_CATEGORY, ("dna",)),
+        (_DNA_ONLY_MULTIMODEL_MMCIF, ("dna",)),
+    ),
+)
+def test_py3dmol_backend_renders_empty_mmcif_model_when_filters_hide_every_atom(
+    structure_text: str,
+    hidden_molecule_classes: tuple[str, ...],
+) -> None:
+    rendered = render_structure_view_html(
+        StructureViewSpec(
+            title="Hidden mmCIF model",
+            models=(
+                StructureViewModel(
+                    "reference",
+                    structure_text,
+                    structure_format="mmcif",
+                    label="Reference",
+                ),
+            ),
+            hidden_molecule_classes=hidden_molecule_classes,
+        )
+    )
+
+    unescaped_html = html_lib.unescape(rendered)
+    assert unescaped_html.count("addModel(") == 1
+    assert 'addModel("data_dnadesign_browser\\nloop_\\n_atom_site.group_pdb' in unescaped_html
+    assert "ATOM 1" not in unescaped_html
+    assert "HETATM 6" not in unescaped_html
+    assert "_entity.type" not in unescaped_html
+    assert '","cif");' in unescaped_html
+
+
+def test_py3dmol_backend_preserves_unclassified_ligand_when_all_known_classes_are_hidden() -> None:
+    rendered = render_structure_view_html(
+        StructureViewSpec(
+            title="Visible ligand",
+            models=(
+                StructureViewModel(
+                    "reference",
+                    _LIGAND_ONLY_MMCIF,
+                    structure_format="mmcif",
+                    label="Reference",
+                ),
+            ),
+            hidden_molecule_classes=("protein", "dna", "rna"),
+        )
+    )
+
+    assert "HEM" in html_lib.unescape(rendered)
+
+
+def test_py3dmol_backend_preserves_model_indices_when_one_mmcif_model_is_filtered_empty() -> None:
+    rendered = render_structure_view_html(
+        StructureViewSpec(
+            title="Mixed empty and visible models",
+            models=(
+                StructureViewModel(
+                    "hidden_dna",
+                    _DNA_ONLY_MMCIF,
+                    structure_format="mmcif",
+                    label="Hidden DNA",
+                ),
+                StructureViewModel(
+                    "visible_protein",
+                    _PROTEIN_ONLY_MMCIF,
+                    structure_format="mmcif",
+                    label="Visible protein",
+                ),
+            ),
+            hidden_molecule_classes=("dna",),
+        )
+    )
+
+    unescaped_html = html_lib.unescape(rendered)
+    assert unescaped_html.count("addModel(") == 2
+    assert "HETATM 6" not in unescaped_html
+    assert "ATOM 1" in unescaped_html
+    assert '"model":1' in unescaped_html.replace(" ", "")
+
+
+def test_py3dmol_backend_empty_filter_matches_pdb_behavior() -> None:
+    dna_only_pdb = """\
+HETATM    1  P    DA A   1       0.000   0.000   0.000  1.00 80.00           P
+END
+"""
+
+    for structure_text, structure_format in (
+        (dna_only_pdb, "pdb"),
+        (_DNA_ONLY_MMCIF, "mmcif"),
+    ):
+        rendered = render_structure_view_html(
+            StructureViewSpec(
+                title=f"Hidden {structure_format} model",
+                models=(
+                    StructureViewModel(
+                        "reference",
+                        structure_text,
+                        structure_format=structure_format,
+                        label="Reference",
+                    ),
+                ),
+                hidden_molecule_classes=("dna",),
+            )
+        )
+        assert html_lib.unescape(rendered).count("addModel(") == 1
+
+
+def test_mmcif_serializer_still_rejects_source_with_native_zero_row_coordinate_loop() -> None:
+    with pytest.raises(ValueError, match="requires at least one atom-site record"):
+        serialize_mmcif_atom_sites_for_3dmol(_EMPTY_ATOM_SITE_MMCIF)
+
+
+def test_py3dmol_backend_does_not_let_empty_filter_hide_malformed_mmcif_columns() -> None:
+    malformed = _DNA_ONLY_MMCIF.replace("_atom_site.Cartn_z\n", "")
+
+    with pytest.raises(ValueError, match="_atom_site.cartn_z"):
+        render_structure_view_html(
+            StructureViewSpec(
+                title="Malformed hidden mmCIF model",
+                models=(
+                    StructureViewModel(
+                        "reference",
+                        malformed,
+                        structure_format="mmcif",
+                        label="Reference",
+                    ),
+                ),
+                hidden_molecule_classes=("dna",),
+            )
+        )
 
 
 def test_py3dmol_backend_uses_single_quotes_for_double_quote_atom_identifiers() -> None:

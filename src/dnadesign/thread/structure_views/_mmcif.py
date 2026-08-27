@@ -107,7 +107,11 @@ class _SourceAwareMMCIF2Dict(MMCIF2Dict):
             raise ValueError(f"mmCIF line ended with an open quote: {line}")
 
 
-def serialize_mmcif_atom_sites_for_3dmol(structure_text: str) -> str:
+def serialize_mmcif_atom_sites_for_3dmol(
+    structure_text: str,
+    *,
+    allow_filtered_empty: bool = False,
+) -> str:
     """Return a coordinate-only mmCIF payload safe for 3Dmol's CIF tokenizer.
 
     3Dmol 2.5.5 treats apostrophes inside otherwise valid unquoted CIF tokens as
@@ -116,7 +120,9 @@ def serialize_mmcif_atom_sites_for_3dmol(structure_text: str) -> str:
     loop and quotes every atom name with an available delimiter that 3Dmol
     explicitly unquotes. It also retains source quote provenance so unquoted
     CIF null markers remain null while quoted ``'.'`` and ``'?'`` values remain
-    literal strings.
+    literal strings. ``allow_filtered_empty`` is reserved for the renderer's
+    proven nonempty-source-to-empty-filter transition; native empty inputs remain
+    invalid by default.
     """
 
     raw = _SourceAwareMMCIF2Dict(StringIO(structure_text))
@@ -124,7 +130,7 @@ def serialize_mmcif_atom_sites_for_3dmol(structure_text: str) -> str:
     source_quote_statuses = {str(key).lower(): _as_mmcif_quote_statuses(value) for key, value in raw.items()}
     columns = _browser_atom_site_columns(source, source_quote_statuses=source_quote_statuses)
     row_count = len(columns["_atom_site.group_pdb"].values)
-    if row_count == 0:
+    if row_count == 0 and not allow_filtered_empty:
         raise ValueError("mmCIF browser serialization requires at least one atom-site record")
     inconsistent = {field: len(column.values) for field, column in columns.items() if len(column.values) != row_count}
     if inconsistent:

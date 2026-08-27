@@ -15,7 +15,10 @@ import hashlib
 import html
 import json
 
-from dnadesign.thread.structure_views._mmcif import serialize_mmcif_atom_sites_for_3dmol
+from dnadesign.thread.structure_views._mmcif import (
+    iter_mmcif_atom_site_records,
+    serialize_mmcif_atom_sites_for_3dmol,
+)
 from dnadesign.thread.structure_views.models import (
     DNA_RESIDUE_NAMES,
     PROTEIN_BACKBONE_ATOM_NAMES,
@@ -120,7 +123,15 @@ def render_py3dmol_structure_view(spec: StructureViewSpec) -> str:
             {(model.model_id, molecule_class): geometry for molecule_class, geometry in model_nucleic_geometry.items()}
         )
         view.addModel(
-            _py3dmol_model_payload(structure_text, structure_format=model.structure_format),
+            _py3dmol_model_payload(
+                structure_text,
+                structure_format=model.structure_format,
+                allow_filtered_empty_mmcif=(
+                    model.structure_format == "mmcif"
+                    and next(iter_mmcif_atom_site_records(model.structure_text), None) is not None
+                    and next(iter_mmcif_atom_site_records(structure_text), None) is None
+                ),
+            ),
             _py3dmol_model_format(model.structure_format),
         )
         if "protein" in visible_molecule_classes:
@@ -210,9 +221,17 @@ def _py3dmol_model_format(structure_format: str) -> str:
     return structure_format
 
 
-def _py3dmol_model_payload(structure_text: str, *, structure_format: str) -> str:
+def _py3dmol_model_payload(
+    structure_text: str,
+    *,
+    structure_format: str,
+    allow_filtered_empty_mmcif: bool = False,
+) -> str:
     if structure_format == "mmcif":
-        return serialize_mmcif_atom_sites_for_3dmol(structure_text)
+        return serialize_mmcif_atom_sites_for_3dmol(
+            structure_text,
+            allow_filtered_empty=allow_filtered_empty_mmcif,
+        )
     return structure_text
 
 
