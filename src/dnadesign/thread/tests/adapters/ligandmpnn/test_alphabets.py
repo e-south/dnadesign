@@ -554,6 +554,101 @@ def test_valid_relative_sidecar_path_emits_argparse_safe_command(
     assert parsed.omit_AA_per_residue == "inputs/omit.json"
 
 
+@pytest.mark.parametrize(
+    ("authoritative_sidecar", "foreign_sidecar", "succeeds"),
+    [
+        ("matching", "missing", True),
+        ("matching", "tampered", True),
+        ("missing", "matching", False),
+        ("tampered", "matching", False),
+    ],
+)
+def test_unstaged_relative_sidecar_validation_uses_execution_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    authoritative_sidecar: str,
+    foreign_sidecar: str,
+    succeeds: bool,
+) -> None:
+    request, checkout_root = _validated_request(
+        tmp_path,
+        LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")),
+    )
+    relative_path = Path("inputs/omit.json")
+    materialized = materialize_residue_alphabet_sidecar(
+        request,
+        relative_path,
+        write_path=tmp_path / relative_path,
+    )
+    sidecar = replace(materialized, materialized_path=None)
+    canonical_bytes = (tmp_path / relative_path).read_bytes()
+    if authoritative_sidecar == "missing":
+        (tmp_path / relative_path).unlink()
+    elif authoritative_sidecar == "tampered":
+        (tmp_path / relative_path).write_text("{}\n", encoding="utf-8")
+
+    foreign_cwd = tmp_path / "foreign-cwd"
+    foreign_cwd.mkdir()
+    if foreign_sidecar != "missing":
+        foreign_path = foreign_cwd / relative_path
+        foreign_path.parent.mkdir(parents=True)
+        foreign_path.write_bytes(canonical_bytes if foreign_sidecar == "matching" else b"{}\n")
+    monkeypatch.chdir(foreign_cwd)
+
+    if succeeds:
+        commands = build_ligandmpnn_commands(
+            request,
+            checkout_root=checkout_root,
+            execution_root=tmp_path,
+            residue_alphabet_sidecar=sidecar,
+        )
+        receipt = build_planned_receipt(
+            request,
+            commands,
+            execution_root=tmp_path,
+            checkout_root=checkout_root,
+            residue_alphabet_sidecar=sidecar,
+        )
+        assert receipt.residue_alphabet_sidecar == sidecar
+    else:
+        with pytest.raises(ValueError, match="sidecar file SHA256 does not match receipt"):
+            build_ligandmpnn_commands(
+                request,
+                checkout_root=checkout_root,
+                execution_root=tmp_path,
+                residue_alphabet_sidecar=sidecar,
+            )
+
+
+def test_staged_relative_sidecar_validation_preserves_materialized_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request, checkout_root = _validated_request(
+        tmp_path,
+        LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")),
+    )
+    foreign_cwd = tmp_path / "foreign-cwd"
+    foreign_cwd.mkdir()
+    monkeypatch.chdir(foreign_cwd)
+    sidecar = materialize_residue_alphabet_sidecar(
+        request,
+        Path("inputs/omit.json"),
+        write_path=Path("staging/omit.json"),
+    )
+
+    commands = build_ligandmpnn_commands(
+        request,
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
+        residue_alphabet_sidecar=sidecar,
+    )
+
+    assert (foreign_cwd / "staging/omit.json").is_file()
+    assert not (tmp_path / "inputs/omit.json").exists()
+    assert commands[0].argv[commands[0].argv.index("--omit_AA_per_residue") + 1] == "inputs/omit.json"
+
+
 def test_command_requires_and_verifies_typed_sidecar(tmp_path: Path) -> None:
     request, checkout_root = _validated_request(
         tmp_path,

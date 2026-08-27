@@ -55,11 +55,11 @@ class LigandMpnnResidueAlphabetSidecar:
             "residue_count": self.residue_count,
         }
 
-    def validate_for(self, request: LigandMpnnRequest) -> None:
+    def validate_for(self, request: LigandMpnnRequest, *, execution_root: Path | None = None) -> None:
         """Fail if this receipt is not the exact sidecar for ``request``."""
 
         self._validate_request_binding(request)
-        materialized_path = self.materialized_path or self.path
+        materialized_path = self._validation_path(execution_root=execution_root)
         materialized_bytes = _read_regular_file_bytes(materialized_path, label="residue alphabet sidecar")
         if materialized_bytes is None or _digest(materialized_bytes) != self.sha256:
             raise ValueError("residue alphabet sidecar file SHA256 does not match receipt")
@@ -71,6 +71,11 @@ class LigandMpnnResidueAlphabetSidecar:
         execution_bytes = _read_regular_file_bytes(self.path, label="execution residue alphabet sidecar")
         if execution_bytes is None or _digest(execution_bytes) != self.sha256:
             raise ValueError("execution residue alphabet sidecar SHA256 does not match receipt")
+
+    def _validation_path(self, *, execution_root: Path | None) -> Path:
+        if self.materialized_path is not None:
+            return self.materialized_path
+        return _anchor_relative_path(self.path, execution_root=execution_root)
 
     def _validate_request_binding(self, request: LigandMpnnRequest) -> None:
         if self.request_id != request.request_id:
@@ -127,6 +132,14 @@ def _require_json_path(path: object, *, field_name: str) -> None:
         raise ValueError(f"{field_name} must not begin with '~'")
     if str(path).startswith("-"):
         raise ValueError(f"{field_name} must not begin with '-'")
+
+
+def _anchor_relative_path(path: Path, *, execution_root: Path | None) -> Path:
+    if path.is_absolute() or execution_root is None:
+        return path
+    if not isinstance(execution_root, Path) or not execution_root.is_absolute():
+        raise ValueError("execution_root must be an absolute Path")
+    return execution_root / path
 
 
 def _write_new_regular_file_or_validate_existing(target: Path, content: bytes) -> None:

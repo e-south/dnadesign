@@ -126,7 +126,7 @@ def build_planned_receipt(
     if request.residue_alphabets and residue_alphabet_sidecar is None:
         raise ValueError("residue alphabets require a typed residue alphabet sidecar")
     if residue_alphabet_sidecar is not None:
-        residue_alphabet_sidecar.validate_for(request)
+        residue_alphabet_sidecar.validate_for(request, execution_root=execution_root)
     expected_commands = build_ligandmpnn_commands(
         request,
         checkout_root=checkout_root,

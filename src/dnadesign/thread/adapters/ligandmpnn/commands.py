@@ -47,7 +47,11 @@ def build_ligandmpnn_commands(
         checkout_root=checkout_root,
         execution_root=execution_root,
     )
-    _validate_alphabet_sidecar(request, residue_alphabet_sidecar)
+    _validate_alphabet_sidecar(
+        request,
+        residue_alphabet_sidecar,
+        execution_root=execution_root,
+    )
     commands: list[LigandMpnnCommand] = []
     for seed in request.seeds:
         output_dir = request.output_dir / f"seed_{seed}"
@@ -144,13 +148,15 @@ def resolve_execution_root_for_execution(execution_root: Path) -> Path:
 def _validate_alphabet_sidecar(
     request: LigandMpnnRequest,
     sidecar: LigandMpnnResidueAlphabetSidecar | None,
+    *,
+    execution_root: Path,
 ) -> None:
     if request.residue_alphabets and sidecar is None:
         raise ValueError("residue alphabets require a typed residue alphabet sidecar")
     if not request.residue_alphabets and sidecar is not None:
         raise ValueError("typed residue alphabet sidecar requires residue alphabets")
     if sidecar is not None:
-        sidecar.validate_for(request)
+        sidecar.validate_for(request, execution_root=execution_root)
 
 
 def _append_residue_selection(argv: list[str], request: LigandMpnnRequest) -> None:

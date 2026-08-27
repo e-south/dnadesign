@@ -29,7 +29,10 @@ from pathlib import Path
 import pytest
 
 import dnadesign.thread.adapters.ligandmpnn.pinned_runtime as pinned_runtime_module
-from dnadesign.thread.adapters.ligandmpnn.alphabets import materialize_residue_alphabet_sidecar
+from dnadesign.thread.adapters.ligandmpnn.alphabets import (
+    LigandMpnnResidueAlphabetSidecar,
+    materialize_residue_alphabet_sidecar,
+)
 from dnadesign.thread.adapters.ligandmpnn.commands import build_ligandmpnn_commands
 from dnadesign.thread.adapters.ligandmpnn.design_results import parse_ligandmpnn_design_outputs
 from dnadesign.thread.adapters.ligandmpnn.models import (
@@ -385,6 +388,67 @@ def test_public_design_runtime_ignores_non_authoritative_foreign_relative_sideca
 
     assert (tmp_path / command.output_dir / ".dnadesign-ligandmpnn-execution.json").is_file()
     assert not (foreign_cwd / command.output_dir).exists()
+
+
+@pytest.mark.parametrize(
+    ("authoritative_sidecar", "foreign_sidecar", "succeeds"),
+    [
+        ("matching", "missing", True),
+        ("matching", "tampered", True),
+        ("missing", "matching", False),
+        ("tampered", "matching", False),
+    ],
+)
+def test_design_admission_validates_unstaged_relative_sidecar_at_execution_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    authoritative_sidecar: str,
+    foreign_sidecar: str,
+    succeeds: bool,
+) -> None:
+    request, command, _pdb = _public_runtime_command(
+        tmp_path,
+        entrypoint="run.py",
+        with_residue_sidecar=True,
+    )
+    subprocess.run(command.argv, cwd=tmp_path, check=True)
+    relative_path = Path(command.argv[command.argv.index("--omit_AA_per_residue") + 1])
+    canonical_bytes = (tmp_path / relative_path).read_bytes()
+    sidecar = LigandMpnnResidueAlphabetSidecar(
+        request_id=request.request_id,
+        path=relative_path,
+        sha256=f"sha256:{command.argv[command.argv.index('--residue-alphabet-sha256') + 1]}",
+        residue_count=1,
+    )
+    if authoritative_sidecar == "missing":
+        (tmp_path / relative_path).unlink()
+    elif authoritative_sidecar == "tampered":
+        (tmp_path / relative_path).write_text("{}\n", encoding="utf-8")
+
+    foreign_cwd = tmp_path / "foreign-cwd"
+    foreign_cwd.mkdir()
+    if foreign_sidecar != "missing":
+        foreign_path = foreign_cwd / relative_path
+        foreign_path.parent.mkdir(parents=True)
+        foreign_path.write_bytes(canonical_bytes if foreign_sidecar == "matching" else b"{}\n")
+    monkeypatch.chdir(foreign_cwd)
+
+    if succeeds:
+        result = parse_ligandmpnn_design_outputs(
+            request,
+            (command,),
+            execution_root=tmp_path,
+            residue_alphabet_sidecar=sidecar,
+        )
+        assert result.sequence_count == request.expected_sequence_count
+    else:
+        with pytest.raises(ValueError, match="sidecar file SHA256 does not match receipt"):
+            parse_ligandmpnn_design_outputs(
+                request,
+                (command,),
+                execution_root=tmp_path,
+                residue_alphabet_sidecar=sidecar,
+            )
 
 
 @pytest.mark.parametrize("entrypoint", ["run.py", "score.py"])
