@@ -51,6 +51,55 @@ class MmcifAtomSiteRecord:
     source_line_indices: tuple[int, ...]
 
 
+@dataclass(frozen=True)
+class _BrowserAtomSiteColumn:
+    values: tuple[str, ...]
+    source_quoted: tuple[bool | None, ...]
+
+
+class _CifSourceToken(str):
+    """String token carrying whether its CIF source spelling used quotes."""
+
+    quoted: bool
+
+    def __new__(cls, value: str, *, quoted: bool) -> _CifSourceToken:
+        token = super().__new__(cls, value)
+        token.quoted = quoted
+        return token
+
+
+class _SourceAwareMMCIF2Dict(MMCIF2Dict):
+    """Retain the quote bit discarded by Biopython's public dictionary values."""
+
+    def _splitline(self, line: str) -> Iterator[str]:
+        in_token = False
+        quote_open: str | None = None
+        start_index = 0
+        for index, character in enumerate(line):
+            if character in self.whitespace_chars:
+                if in_token and quote_open is None:
+                    in_token = False
+                    yield _CifSourceToken(line[start_index:index], quoted=False)
+            elif character in self.quote_chars:
+                if quote_open is None and not in_token:
+                    quote_open = character
+                    in_token = True
+                    start_index = index + 1
+                elif character == quote_open and (index + 1 == len(line) or line[index + 1] in self.whitespace_chars):
+                    quote_open = None
+                    in_token = False
+                    yield _CifSourceToken(line[start_index:index], quoted=True)
+            elif character == "#" and not in_token:
+                return
+            elif not in_token:
+                in_token = True
+                start_index = index
+        if in_token:
+            yield _CifSourceToken(line[start_index:], quoted=False)
+        if quote_open is not None:
+            raise ValueError(f"mmCIF line ended with an open quote: {line}")
+
+
 def serialize_mmcif_atom_sites_for_3dmol(structure_text: str) -> str:
     """Return a coordinate-only mmCIF payload safe for 3Dmol's CIF tokenizer.
 
@@ -58,16 +107,19 @@ def serialize_mmcif_atom_sites_for_3dmol(structure_text: str) -> str:
     quote delimiters. Nucleic-acid atom names such as ``O5'`` then shift the
     remaining atom-site columns. This adapter emits one canonical coordinate
     loop and quotes every atom name with an available delimiter that 3Dmol
-    explicitly unquotes.
+    explicitly unquotes. It also retains source quote provenance so unquoted
+    CIF null markers remain null while quoted ``'.'`` and ``'?'`` values remain
+    literal strings.
     """
 
-    raw = MMCIF2Dict(StringIO(structure_text))
+    raw = _SourceAwareMMCIF2Dict(StringIO(structure_text))
     source = {str(key).lower(): _as_mmcif_values(value) for key, value in raw.items()}
-    fields = _browser_atom_site_values(source)
-    row_count = len(fields["_atom_site.group_pdb"])
+    source_quote_statuses = {str(key).lower(): _as_mmcif_quote_statuses(value) for key, value in raw.items()}
+    columns = _browser_atom_site_columns(source, source_quote_statuses=source_quote_statuses)
+    row_count = len(columns["_atom_site.group_pdb"].values)
     if row_count == 0:
         raise ValueError("mmCIF browser serialization requires at least one atom-site record")
-    inconsistent = {field: len(values) for field, values in fields.items() if len(values) != row_count}
+    inconsistent = {field: len(column.values) for field, column in columns.items() if len(column.values) != row_count}
     if inconsistent:
         raise ValueError(
             "mmCIF browser serialization received inconsistent atom-site column lengths: "
@@ -76,11 +128,17 @@ def serialize_mmcif_atom_sites_for_3dmol(structure_text: str) -> str:
 
     lines = ["data_dnadesign_browser", "loop_", *_BROWSER_ATOM_SITE_FIELDS]
     for row_index in range(row_count):
-        row = [fields[field][row_index] for field in _BROWSER_ATOM_SITE_FIELDS]
+        row = [columns[field].values[row_index] for field in _BROWSER_ATOM_SITE_FIELDS]
+        source_quoted = [columns[field].source_quoted[row_index] for field in _BROWSER_ATOM_SITE_FIELDS]
         row[3] = _quote_3dmol_atom_name(row[3])
         lines.append(
             " ".join(
-                _browser_cif_token(value, field=_BROWSER_ATOM_SITE_FIELDS[index]) for index, value in enumerate(row)
+                _browser_cif_token(
+                    value,
+                    field=_BROWSER_ATOM_SITE_FIELDS[index],
+                    source_quoted=source_quoted[index],
+                )
+                for index, value in enumerate(row)
             )
         )
     lines.append("#")
@@ -93,7 +151,16 @@ def _as_mmcif_values(value: object) -> tuple[str, ...]:
     return (str(value),)
 
 
-def _browser_atom_site_values(source: dict[str, tuple[str, ...]]) -> dict[str, tuple[str, ...]]:
+def _as_mmcif_quote_statuses(value: object) -> tuple[bool | None, ...]:
+    items = value if isinstance(value, list) else [value]
+    return tuple(item.quoted if isinstance(item, _CifSourceToken) else None for item in items)
+
+
+def _browser_atom_site_columns(
+    source: dict[str, tuple[str, ...]],
+    *,
+    source_quote_statuses: dict[str, tuple[bool | None, ...]],
+) -> dict[str, _BrowserAtomSiteColumn]:
     group = _required_atom_site_column(source, "_atom_site.group_pdb")
     row_count = len(group)
 
@@ -101,19 +168,32 @@ def _browser_atom_site_values(source: dict[str, tuple[str, ...]]) -> dict[str, t
         name: str,
         *fallback_names: str,
         default: str | None = None,
-    ) -> tuple[str, ...]:
+    ) -> _BrowserAtomSiteColumn:
         for candidate in (name, *fallback_names):
             values = source.get(candidate)
             if values is not None:
-                return values
+                quoted = source_quote_statuses.get(candidate, (None,) * len(values))
+                if len(quoted) != len(values):
+                    raise ValueError(f"mmCIF source quote provenance does not align for {candidate}")
+                return _BrowserAtomSiteColumn(values=values, source_quoted=quoted)
         if default is not None:
-            return (default,) * row_count
+            return _BrowserAtomSiteColumn(
+                values=(default,) * row_count,
+                source_quoted=(False,) * row_count,
+            )
         joined = ", ".join((name, *fallback_names))
         raise ValueError(f"mmCIF browser serialization requires one of these atom-site columns: {joined}")
 
     return {
-        "_atom_site.group_pdb": group,
-        "_atom_site.id": source.get("_atom_site.id", tuple(str(index + 1) for index in range(row_count))),
+        "_atom_site.group_pdb": column("_atom_site.group_pdb"),
+        "_atom_site.id": (
+            column("_atom_site.id")
+            if "_atom_site.id" in source
+            else _BrowserAtomSiteColumn(
+                values=tuple(str(index + 1) for index in range(row_count)),
+                source_quoted=(False,) * row_count,
+            )
+        ),
         "_atom_site.type_symbol": column("_atom_site.type_symbol"),
         "_atom_site.label_atom_id": column("_atom_site.label_atom_id", "_atom_site.auth_atom_id"),
         "_atom_site.label_alt_id": column("_atom_site.label_alt_id", default="."),
@@ -152,11 +232,13 @@ def _quote_3dmol_atom_name(value: str) -> str:
     raise ValueError(f"mmCIF atom name cannot be serialized safely for 3Dmol: {value!r}")
 
 
-def _browser_cif_token(value: str, *, field: str) -> str:
+def _browser_cif_token(value: str, *, field: str, source_quoted: bool | None = None) -> str:
     if field == "_atom_site.label_atom_id" and len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
         return value
     if not value or any(character in value for character in ("\n", "\r")):
         raise ValueError(f"mmCIF value cannot be serialized safely for 3Dmol at {field}: {value!r}")
+    if value in {".", "?"} and source_quoted is False:
+        return value
     lowered = value.casefold()
     requires_quotes = (
         any(character.isspace() for character in value)

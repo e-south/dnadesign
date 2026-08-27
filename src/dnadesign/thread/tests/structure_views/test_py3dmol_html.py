@@ -732,6 +732,26 @@ def test_py3dmol_backend_uses_single_quotes_for_double_quote_atom_identifiers() 
     assert "'C\"1'" in serialized
 
 
+def test_py3dmol_backend_preserves_unquoted_atom_site_null_markers() -> None:
+    serialized = serialize_mmcif_atom_sites_for_3dmol(_SIDECHAIN_MMCIF)
+
+    assert 'ATOM 1 N "N" . SER A 3 0.000 0.000 0.000 A 3 ? 1.00 80.00 1' in serialized
+    assert '"."' not in serialized
+    assert '"?"' not in serialized
+
+
+def test_py3dmol_backend_preserves_quoted_literal_atom_site_null_tokens() -> None:
+    structure = _SIDECHAIN_MMCIF.replace("ATOM 1 N N . SER", "ATOM 1 N N '.' SER", 1).replace(
+        "A 3 ? 1.00 80.00 1",
+        "A 3 '?' 1.00 80.00 1",
+        1,
+    )
+
+    serialized = serialize_mmcif_atom_sites_for_3dmol(structure)
+
+    assert 'ATOM 1 N "N" "." SER A 3 0.000 0.000 0.000 A 3 "?" 1.00 80.00 1' in serialized
+
+
 def test_py3dmol_backend_rejects_atom_identifiers_with_both_quote_delimiters() -> None:
     with pytest.raises(ValueError, match="atom name cannot be serialized safely"):
         _quote_3dmol_atom_name("C'\"1")
