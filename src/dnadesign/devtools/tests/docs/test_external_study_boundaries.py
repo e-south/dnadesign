@@ -52,3 +52,21 @@ def test_public_ops_docs_do_not_advertise_external_study_registry_ids() -> None:
     ]
 
     assert violations == []
+
+
+def test_generic_test_fixtures_do_not_reuse_external_study_identity() -> None:
+    root = _repo_root()
+    paths = [
+        *(root / "src" / "dnadesign" / "ops" / "tests").rglob("*.py"),
+        *(root / "src" / "dnadesign" / "devtools" / "tests" / "docs").rglob("*.py"),
+    ]
+    forbidden = ("stress-ethanol-cipro-growth", "study_stress_ethanol_cipro")
+    violations = [
+        f"{path.relative_to(root)}: {token}"
+        for path in paths
+        if path != Path(__file__)
+        for token in forbidden
+        if token in path.read_text(encoding="utf-8")
+    ]
+
+    assert violations == []
