@@ -328,17 +328,25 @@ def parse_ligandmpnn_score_outputs(
         raise ValueError(
             "unexpected LigandMPNN score outputs: " + ", ".join(_display_path(path, root) for path in extra)
         )
-    execution_digests = _validate_execution_completions(request, commands, root=root)
+    output_payloads = tuple(path.read_bytes() for path in expected_paths)
+    output_sha256s = tuple(_sha256_bytes(payload) for payload in output_payloads)
+    execution_digests = _validate_execution_completions(
+        request,
+        commands,
+        root=root,
+        score_output_sha256s=output_sha256s,
+    )
 
     outputs: list[LigandMpnnScoreOutput] = []
-    for command, command_sha256, execution_sha256, output_path in zip(
+    for command, command_sha256, execution_sha256, output_path, payload_bytes, output_sha256 in zip(
         commands,
         command_digests,
         execution_digests,
         expected_paths,
+        output_payloads,
+        output_sha256s,
         strict=True,
     ):
-        payload_bytes = output_path.read_bytes()
         payload = _load_weights_only_payload(payload_bytes, artifact_path=output_path.relative_to(root))
         residue_names, raw_probabilities = _validate_payload(
             payload,
@@ -350,7 +358,7 @@ def parse_ligandmpnn_score_outputs(
             LigandMpnnScoreOutput(
                 seed=command.seed,
                 artifact_path=output_path.relative_to(root),
-                output_sha256=_sha256_bytes(payload_bytes),
+                output_sha256=output_sha256,
                 command_sha256=command_sha256,
                 execution_sha256=execution_sha256,
                 residue_names=residue_names,
@@ -416,9 +424,10 @@ def _validate_execution_completions(
     commands: tuple[LigandMpnnCommand, ...],
     *,
     root: Path,
+    score_output_sha256s: tuple[str, ...],
 ) -> tuple[str, ...]:
     digests: list[str] = []
-    for command in commands:
+    for command, score_output_sha256 in zip(commands, score_output_sha256s, strict=True):
         completion_path, expected = pinned_runtime_completion_contract(
             command.argv,
             upstream_commit=request.upstream.commit,
@@ -427,6 +436,7 @@ def _validate_execution_completions(
             packing_checkpoint_sha256=None,
             residue_alphabet_sha256=None,
             entrypoint="score.py",
+            score_output_sha256=score_output_sha256,
         )
         relative_path = _lexical_relative_path_within_root(
             root,
@@ -442,6 +452,8 @@ def _validate_execution_completions(
             observed = json.loads(payload_bytes.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ValueError(f"LigandMPNN execution completion record is not valid JSON: {relative_path}") from exc
+        if not isinstance(observed, dict) or observed.get("score_output_sha256") != score_output_sha256:
+            raise ValueError(f"score output SHA256 does not match execution completion: {relative_path}")
         if observed != expected:
             raise ValueError(f"LigandMPNN execution completion does not match planned command: {relative_path}")
         digest = expected.get("execution_sha256")

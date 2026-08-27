@@ -43,7 +43,11 @@ def execute_pinned_entrypoint(**kwargs: object) -> None:
     assert isinstance(arguments, tuple)
     checkout_root = kwargs["checkout_root"]
     assert isinstance(checkout_root, Path)
-    completion_record_path = checkout_root.parent / ".test-ligandmpnn-execution.json"
+    completion_record_path = kwargs.pop(
+        "completion_record_path",
+        checkout_root.parent / ".test-ligandmpnn-execution.json",
+    )
+    assert isinstance(completion_record_path, Path)
     planned_arguments = kwargs.pop("planned_arguments", arguments)
     assert isinstance(planned_arguments, tuple)
     planned_execution_sha256 = pinned_execution_sha256(
@@ -82,7 +86,8 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
         "parser.add_argument('--fixed_residues')\n"
         "parser.add_argument('--redesigned_residues')\n"
         "parser.add_argument('--ligand_mpnn_use_atom_context')\n"
-        "parser.add_argument('--output', required=True)\n"
+        "parser.add_argument('--output')\n"
+        "parser.add_argument('--out_folder')\n"
         "args = parser.parse_args()\n"
         "checkpoint = Path(args.checkpoint_ligand_mpnn).read_text(encoding='utf-8')\n"
         "pdb = Path(args.pdb_path).read_text(encoding='utf-8')\n"
@@ -91,9 +96,14 @@ def _checkout(tmp_path: Path) -> tuple[Path, str, Path, str, Path, str]:
         "    if args.omit_AA_per_residue\n"
         "    else 'no-sidecar'\n"
         ")\n"
-        "Path(args.output).write_text(\n"
-        "    f'{VALUE}:{HELPER}:{checkpoint}:{pdb}:{sidecar}', encoding='utf-8'\n"
-        ")\n",
+        "if args.output:\n"
+        "    Path(args.output).write_text(\n"
+        "        f'{VALUE}:{HELPER}:{checkpoint}:{pdb}:{sidecar}', encoding='utf-8'\n"
+        "    )\n"
+        "if args.out_folder:\n"
+        "    output_root = Path(args.out_folder)\n"
+        "    output_root.mkdir(parents=True, exist_ok=True)\n"
+        "    (output_root / 'design.txt').write_text(pdb, encoding='utf-8')\n",
         encoding="utf-8",
     )
     (root / "score.py").write_text(
@@ -492,7 +502,282 @@ def test_pinned_runtime_preserves_pdb_basename_for_upstream_score_output(tmp_pat
         ),
     )
 
-    assert (output_root / "target-complex.pt").read_text(encoding="utf-8") == "input-v1"
+    published_score = output_root / "target-complex.pt"
+    assert published_score.read_text(encoding="utf-8") == "input-v1"
+    completion = json.loads((tmp_path / ".test-ligandmpnn-execution.json").read_text(encoding="utf-8"))
+    assert completion["score_output_sha256"] == f"sha256:{hashlib.sha256(published_score.read_bytes()).hexdigest()}"
+
+
+def test_pinned_design_runtime_rejects_preexisting_seed_output_lifecycle(tmp_path: Path) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "designs" / "seed_7"
+    output_root.mkdir(parents=True)
+    stale_output = output_root / "stale-design.fa"
+    stale_output.write_text("failed-attempt", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="design output directory already exists"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            completion_record_path=output_root / ".dnadesign-ligandmpnn-execution.json",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert stale_output.read_text(encoding="utf-8") == "failed-attempt"
+    assert not (output_root / "design.txt").exists()
+    assert not (output_root / ".dnadesign-ligandmpnn-execution.json").exists()
+
+
+def test_pinned_design_runtime_publishes_one_complete_attempt_owned_seed_directory(tmp_path: Path) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "designs" / "seed_7"
+    completion_path = output_root / ".dnadesign-ligandmpnn-execution.json"
+    arguments = (
+        "--model_type",
+        "ligand_mpnn",
+        "--checkpoint_ligand_mpnn",
+        str(checkpoint),
+        "--pdb_path",
+        str(pdb),
+        "--out_folder",
+        str(output_root),
+    )
+
+    execute_pinned_entrypoint(
+        checkout_root=checkout,
+        upstream_commit=commit,
+        checkpoint_sha256=checkpoint_sha256,
+        pdb_sha256=pdb_sha256,
+        packing_checkpoint_sha256=None,
+        residue_alphabet_sha256=None,
+        entrypoint="run.py",
+        completion_record_path=completion_path,
+        arguments=arguments,
+    )
+
+    assert (output_root / "design.txt").read_text(encoding="utf-8") == "input-v1"
+    completion = json.loads(completion_path.read_text(encoding="utf-8"))
+    assert completion["execution"]["arguments"] == list(arguments)
+    assert completion["score_output_sha256"] is None
+    assert not tuple(output_root.parent.glob(".seed_7.attempt-*"))
+
+
+def test_pinned_design_runtime_publishes_relative_generated_output_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    output_root = Path("designs/seed_7")
+    completion_path = output_root / ".dnadesign-ligandmpnn-execution.json"
+
+    execute_pinned_entrypoint(
+        checkout_root=checkout,
+        upstream_commit=commit,
+        checkpoint_sha256=checkpoint_sha256,
+        pdb_sha256=pdb_sha256,
+        packing_checkpoint_sha256=None,
+        residue_alphabet_sha256=None,
+        entrypoint="run.py",
+        completion_record_path=completion_path,
+        arguments=(
+            "--model_type",
+            "ligand_mpnn",
+            "--checkpoint_ligand_mpnn",
+            str(checkpoint),
+            "--pdb_path",
+            str(pdb),
+            "--out_folder",
+            str(output_root),
+        ),
+    )
+
+    assert (tmp_path / output_root / "design.txt").is_file()
+    assert (tmp_path / completion_path).is_file()
+
+
+def test_pinned_design_runtime_publishes_only_one_concurrent_seed_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, first_pdb, _pdb_sha256 = _checkout(tmp_path)
+    second_pdb = tmp_path / "second-input.pdb"
+    first_pdb.write_text("first", encoding="utf-8")
+    second_pdb.write_text("second", encoding="utf-8")
+    output_root = tmp_path / "designs" / "seed_7"
+    completion_path = output_root / ".dnadesign-ligandmpnn-execution.json"
+    barrier = threading.Barrier(2)
+    original_publish = pinned_runtime_module._publish_design_output_directory
+
+    def _synchronize_publish(source_path: Path, destination_path: Path) -> None:
+        barrier.wait(timeout=5)
+        original_publish(source_path, destination_path)
+
+    monkeypatch.setattr(pinned_runtime_module, "_publish_design_output_directory", _synchronize_publish)
+
+    def _execute(label: str, input_path: Path) -> tuple[str, str]:
+        try:
+            execute_pinned_entrypoint(
+                checkout_root=checkout,
+                upstream_commit=commit,
+                checkpoint_sha256=checkpoint_sha256,
+                pdb_sha256=hashlib.sha256(input_path.read_bytes()).hexdigest(),
+                packing_checkpoint_sha256=None,
+                residue_alphabet_sha256=None,
+                entrypoint="run.py",
+                completion_record_path=completion_path,
+                arguments=(
+                    "--model_type",
+                    "ligand_mpnn",
+                    "--checkpoint_ligand_mpnn",
+                    str(checkpoint),
+                    "--pdb_path",
+                    str(input_path),
+                    "--out_folder",
+                    str(output_root),
+                ),
+            )
+        except ValueError:
+            return label, "rejected"
+        return label, "completed"
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        outcomes = list(
+            executor.map(
+                lambda item: _execute(*item),
+                (("first", first_pdb), ("second", second_pdb)),
+            )
+        )
+
+    completed = [label for label, status in outcomes if status == "completed"]
+    assert len(completed) == 1
+    assert (output_root / "design.txt").read_text(encoding="utf-8") == completed[0]
+    assert completion_path.is_file()
+
+
+def test_pinned_design_runtime_rolls_back_whole_directory_when_parent_fsync_fails_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "designs" / "seed_7"
+    completion_path = output_root / ".dnadesign-ligandmpnn-execution.json"
+    original_rename = os.rename
+    original_fsync = os.fsync
+    published = False
+    failure_injected = False
+
+    def _record_publication_rename(*args: object, **kwargs: object) -> None:
+        nonlocal published
+        original_rename(*args, **kwargs)  # type: ignore[arg-type]
+        if args[1] == output_root.name:
+            published = True
+
+    def _fail_published_parent_fsync_once(file_descriptor: int) -> None:
+        nonlocal failure_injected
+        if published and not failure_injected and stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
+            failure_injected = True
+            assert (output_root / "design.txt").is_file()
+            assert completion_path.is_file()
+            raise OSError("simulated design parent fsync failure")
+        original_fsync(file_descriptor)
+
+    monkeypatch.setattr(os, "rename", _record_publication_rename)
+    monkeypatch.setattr(os, "fsync", _fail_published_parent_fsync_once)
+
+    with pytest.raises(ValueError, match="design output publication could not be made durable"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            completion_record_path=completion_path,
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert failure_injected
+    assert not output_root.exists()
+    assert not tuple(output_root.parent.glob(".seed_7.attempt-*"))
+
+
+def test_pinned_design_runtime_reports_uncertainty_when_directory_rollback_fsync_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "designs" / "seed_7"
+    completion_path = output_root / ".dnadesign-ligandmpnn-execution.json"
+    original_rename = os.rename
+    original_fsync = os.fsync
+    published = False
+
+    def _record_publication_rename(*args: object, **kwargs: object) -> None:
+        nonlocal published
+        original_rename(*args, **kwargs)  # type: ignore[arg-type]
+        if args[1] == output_root.name:
+            published = True
+
+    def _fail_published_and_rollback_parent_fsync(file_descriptor: int) -> None:
+        if published and stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
+            raise OSError("simulated persistent design parent fsync failure")
+        original_fsync(file_descriptor)
+
+    monkeypatch.setattr(os, "rename", _record_publication_rename)
+    monkeypatch.setattr(os, "fsync", _fail_published_and_rollback_parent_fsync)
+
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnDesignPublicationUncertainError,
+        match="design publication rollback durability is uncertain",
+    ):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            completion_record_path=completion_path,
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert not output_root.exists()
+    assert not tuple(output_root.parent.glob(".seed_7.attempt-*"))
 
 
 def test_pinned_score_runtime_rolls_back_link_when_score_directory_fsync_fails_once(

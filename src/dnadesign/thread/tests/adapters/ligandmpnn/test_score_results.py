@@ -154,6 +154,7 @@ def _write_output(
         packing_checkpoint_sha256=None,
         residue_alphabet_sha256=None,
         entrypoint="score.py",
+        score_output_sha256=f"sha256:{_sha256(path.read_bytes())}",
     )
     absolute_completion_path = completion_path if completion_path.is_absolute() else root / completion_path
     absolute_completion_path.write_text(json.dumps(completion, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -230,6 +231,7 @@ def test_parser_requires_exact_actual_execution_completion(tmp_path: Path) -> No
         packing_checkpoint_sha256=None,
         residue_alphabet_sha256=None,
         entrypoint="score.py",
+        score_output_sha256=f"sha256:{_sha256((tmp_path / request.output_dir / 'seed_7/target.pt').read_bytes())}",
     )
     absolute_completion_path = tmp_path / completion_path
     absolute_completion_path.unlink()
@@ -244,6 +246,19 @@ def test_parser_requires_exact_actual_execution_completion(tmp_path: Path) -> No
     payload["execution"]["arguments"].extend(["--unplanned_unique_override", "1"])
     absolute_completion_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(ValueError, match="execution completion does not match planned command"):
+        _parse(tmp_path, request)
+
+
+def test_parser_rejects_valid_score_replaced_after_execution_completion(tmp_path: Path) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    output_path = _write_output(tmp_path, request, 7)
+    original_sha256 = _sha256(output_path.read_bytes())
+    foreign_payload = _score_payload(7, mode=request.mode)
+    foreign_payload["chain_mask"] = np.asarray([0, 1, 0], dtype=np.int64)
+    torch.save(foreign_payload, output_path)
+    assert _sha256(output_path.read_bytes()) != original_sha256
+
+    with pytest.raises(ValueError, match="score output SHA256 does not match execution completion"):
         _parse(tmp_path, request)
 
 
@@ -463,6 +478,20 @@ def test_parser_requires_explicit_trust_and_still_uses_weights_only_loading(tmp_
     payload["untrusted_global"] = Path("not-allowlisted")
     output_path = tmp_path / request.output_dir / "seed_7/target.pt"
     torch.save(payload, output_path)
+    completion_path, completion = pinned_runtime_completion_contract(
+        commands[0].argv,
+        upstream_commit=request.upstream.commit,
+        checkpoint_sha256=request.upstream.checkpoint_sha256,
+        pdb_sha256=request.pdb_sha256,
+        packing_checkpoint_sha256=None,
+        residue_alphabet_sha256=None,
+        entrypoint="score.py",
+        score_output_sha256=f"sha256:{_sha256(output_path.read_bytes())}",
+    )
+    (tmp_path / completion_path).write_text(
+        json.dumps(completion, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     with pytest.raises(ValueError, match="weights-only loader rejected"):
         parse_ligandmpnn_score_outputs(
             request,

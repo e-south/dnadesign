@@ -94,6 +94,19 @@ publication syncs the destination directory; if that sync fails, the runtime
 removes and syncs the score before reporting ordinary failure. An unsuccessful
 score rollback raises `LigandMpnnScorePublicationUncertainError`, and no
 completion record is published for either failure state.
+The score completion record also binds the SHA-256 of the exact synced bytes
+published by the runtime. Result admission reads each artifact once, retains
+those bytes for restricted loading, and requires their digest to match the
+durable completion before interpreting the payload.
+
+Design execution uses one private attempt directory beside the requested seed
+directory. Runtime output files and the completion record are synced inside
+that attempt before an exclusive destination reservation and single-directory
+rename publish the whole lifecycle without replacement. A prior seed directory
+therefore fails closed instead of mixing stale and current artifacts. If the
+receiving-parent sync fails, the whole directory is renamed back and removed;
+an unsuccessful rollback raises the public
+`LigandMpnnDesignPublicationUncertainError`.
 
 Probability probes use the official `score.py` single-AA or autoregressive
 mode with explicit sequence, atom-context, and fixed-side-chain-context flags.

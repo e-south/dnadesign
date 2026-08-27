@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import json
 import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -95,6 +96,10 @@ class LigandMpnnCompletionPublicationUncertainError(RuntimeError):
 
 class LigandMpnnScorePublicationUncertainError(RuntimeError):
     """Score rollback could not establish a durable absent artifact."""
+
+
+class LigandMpnnDesignPublicationUncertainError(RuntimeError):
+    """Design-directory rollback could not establish a durable absence."""
 
 
 def pinned_runtime_prefix(
@@ -273,6 +278,7 @@ def pinned_runtime_completion_contract(
     packing_checkpoint_sha256: str | None,
     residue_alphabet_sha256: str | None,
     entrypoint: str,
+    score_output_sha256: str | None = None,
 ) -> tuple[Path, dict[str, object]]:
     """Return the exact completion record required for one planned command."""
 
@@ -297,7 +303,11 @@ def pinned_runtime_completion_contract(
         completion_record_path=completion_record_path,
         arguments=arguments,
     )
-    return completion_record_path, _completion_record(execution, execution_sha256)
+    return completion_record_path, _completion_record(
+        execution,
+        execution_sha256,
+        score_output_sha256=score_output_sha256,
+    )
 
 
 def execute_pinned_entrypoint(
@@ -390,6 +400,28 @@ def execute_pinned_entrypoint(
         score_temporary: tempfile.TemporaryDirectory[str] | None = None
         score_publication: tuple[Path, Path] | None = None
         published_score_path: Path | None = None
+        published_score_sha256: str | None = None
+        design_temporary: tempfile.TemporaryDirectory[str] | None = None
+        design_publication: tuple[Path, Path] | None = None
+        if entrypoint == "run.py" and _has_flag(runtime_arguments, _OUTPUT_FOLDER_FLAG):
+            output_value_index, output_root = _runtime_output_root(runtime_arguments)
+            if _lexical_absolute_path(completion_record_path) != output_root / _COMPLETION_RECORD_NAME:
+                raise ValueError("design completion record must be inside its per-seed output directory")
+            if os.path.lexists(output_root):
+                raise ValueError(f"design output directory already exists: {output_root}")
+            try:
+                output_parent_fd = _open_directory_path(output_root.parent, create=True)
+            except OSError as exc:
+                raise ValueError(f"design output parent could not be opened safely: {output_root.parent}") from exc
+            else:
+                os.close(output_parent_fd)
+            design_temporary = tempfile.TemporaryDirectory(
+                prefix=f".{output_root.name}.attempt-",
+                dir=output_root.parent,
+            )
+            temporary_output_root = Path(design_temporary.name)
+            runtime_arguments[output_value_index] = str(temporary_output_root)
+            design_publication = (temporary_output_root, output_root)
         if entrypoint == "score.py":
             output_value_index, output_root, expected_output = _reject_existing_score_output(
                 runtime_arguments,
@@ -411,14 +443,36 @@ def execute_pinned_entrypoint(
                 check=True,
             )
             if score_publication is not None:
-                _publish_score_output(*score_publication)
+                published_score_sha256 = _publish_score_output(*score_publication)
                 published_score_path = score_publication[1]
         finally:
             if score_temporary is not None:
                 score_temporary.cleanup()
+        if design_publication is not None:
+            temporary_output_root, output_root = design_publication
+            try:
+                _write_completion_record(
+                    temporary_output_root / _COMPLETION_RECORD_NAME,
+                    _completion_record(
+                        execution,
+                        observed_execution_sha256,
+                        score_output_sha256=None,
+                    ),
+                    rollback_output_path=None,
+                )
+                _sync_regular_directory_tree(temporary_output_root)
+                _publish_design_output_directory(temporary_output_root, output_root)
+            finally:
+                if design_temporary is not None:
+                    design_temporary.cleanup()
+            return
     _write_completion_record(
         completion_record_path,
-        _completion_record(execution, observed_execution_sha256),
+        _completion_record(
+            execution,
+            observed_execution_sha256,
+            score_output_sha256=published_score_sha256,
+        ),
         rollback_output_path=published_score_path,
     )
 
@@ -450,12 +504,18 @@ def _pinned_execution_payload(
     }
 
 
-def _completion_record(execution: dict[str, object], execution_sha256: str) -> dict[str, object]:
+def _completion_record(
+    execution: dict[str, object],
+    execution_sha256: str,
+    *,
+    score_output_sha256: str | None,
+) -> dict[str, object]:
     return {
         "schema_id": "thread.ligandmpnn.execution_completion",
-        "schema_version": 1,
+        "schema_version": 2,
         "status": "completed",
         "execution_sha256": f"sha256:{execution_sha256}",
+        "score_output_sha256": score_output_sha256,
         "execution": execution,
     }
 
@@ -681,25 +741,139 @@ def _validate_runtime_option_contract(arguments: tuple[str, ...]) -> None:
 
 
 def _reject_existing_score_output(arguments: list[str], *, pdb_path: Path) -> tuple[int, Path, Path]:
-    output_flag = "--out_folder"
-    attached_prefix = f"{output_flag}="
-    if any(value.startswith(attached_prefix) for value in arguments):
-        raise ValueError(f"runtime arguments must use the split form of {output_flag} exactly once")
-    positions = [index for index, value in enumerate(arguments) if value == output_flag]
-    if len(positions) != 1 or positions[0] + 1 >= len(arguments):
-        raise ValueError(f"runtime arguments must contain exactly one {output_flag}")
-    output_root = Path(arguments[positions[0] + 1]).expanduser()
+    output_value_index, output_root = _runtime_output_root(arguments)
     expected_output = output_root / f"{pdb_path.stem}.pt"
     if expected_output.exists() or expected_output.is_symlink():
         raise ValueError(f"score output already exists; refuse stale or ambiguous result: {expected_output}")
-    return positions[0] + 1, output_root, expected_output
+    return output_value_index, output_root, expected_output
 
 
-def _publish_score_output(source_path: Path, destination_path: Path) -> None:
+def _runtime_output_root(arguments: list[str]) -> tuple[int, Path]:
+    attached_prefix = f"{_OUTPUT_FOLDER_FLAG}="
+    if any(value.startswith(attached_prefix) for value in arguments):
+        raise ValueError(f"runtime arguments must use the split form of {_OUTPUT_FOLDER_FLAG} exactly once")
+    positions = [index for index, value in enumerate(arguments) if value == _OUTPUT_FOLDER_FLAG]
+    if len(positions) != 1 or positions[0] + 1 >= len(arguments):
+        raise ValueError(f"runtime arguments must contain exactly one {_OUTPUT_FOLDER_FLAG}")
+    output_root = _lexical_absolute_path(Path(arguments[positions[0] + 1]).expanduser())
+    return positions[0] + 1, output_root
+
+
+def _lexical_absolute_path(path: Path) -> Path:
+    """Anchor a relative path without resolving away symlink evidence."""
+
+    return path if path.is_absolute() else Path.cwd() / path
+
+
+def _sync_regular_directory_tree(root: Path) -> None:
+    """Make one private output tree durable before its directory publication."""
+
+    file_flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+    directory_flags = file_flags | os.O_DIRECTORY
+    for directory, child_directories, filenames in os.walk(root, topdown=False, followlinks=False):
+        directory_path = Path(directory)
+        if any((directory_path / name).is_symlink() for name in child_directories):
+            raise ValueError("design output tree must not contain symlinked directories")
+        for filename in filenames:
+            path = directory_path / filename
+            try:
+                file_descriptor = os.open(path, file_flags)
+                try:
+                    if not stat.S_ISREG(os.fstat(file_descriptor).st_mode):
+                        raise OSError("design output is not regular")
+                    os.fsync(file_descriptor)
+                finally:
+                    os.close(file_descriptor)
+            except OSError as exc:
+                raise ValueError(f"design output could not be synced safely: {path}") from exc
+        try:
+            directory_fd = os.open(directory_path, directory_flags)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        except OSError as exc:
+            raise ValueError(f"design output directory could not be synced safely: {directory_path}") from exc
+
+
+def _publish_design_output_directory(source_path: Path, destination_path: Path) -> None:
+    """Publish one complete private output tree through an exclusive reservation."""
+
+    if source_path.parent != destination_path.parent:
+        raise ValueError("design output publication requires one parent directory")
+    try:
+        parent_fd = _open_directory_path(destination_path.parent, create=False)
+    except OSError as exc:
+        raise ValueError(f"design output parent could not be opened safely: {destination_path.parent}") from exc
+    placeholder_created = False
+    published = False
+    try:
+        try:
+            source_fd = os.open(
+                source_path.name,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                dir_fd=parent_fd,
+            )
+        except OSError as exc:
+            raise ValueError(f"design output attempt directory is not safe: {source_path}") from exc
+        else:
+            os.close(source_fd)
+        try:
+            os.mkdir(destination_path.name, mode=0o700, dir_fd=parent_fd)
+            placeholder_created = True
+        except FileExistsError as exc:
+            raise ValueError(f"design output directory already exists: {destination_path}") from exc
+        try:
+            os.rename(
+                source_path.name,
+                destination_path.name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
+            published = True
+            os.fsync(parent_fd)
+        except OSError as publication_error:
+            try:
+                if published:
+                    os.rename(
+                        destination_path.name,
+                        source_path.name,
+                        src_dir_fd=parent_fd,
+                        dst_dir_fd=parent_fd,
+                    )
+                elif placeholder_created:
+                    os.rmdir(destination_path.name, dir_fd=parent_fd)
+                os.fsync(parent_fd)
+            except OSError as rollback_error:
+                raise LigandMpnnDesignPublicationUncertainError(
+                    "LigandMPNN design publication rollback durability is uncertain"
+                ) from rollback_error
+            raise ValueError(f"design output publication could not be made durable: {destination_path}") from (
+                publication_error
+            )
+    finally:
+        os.close(parent_fd)
+
+
+def _publish_score_output(source_path: Path, destination_path: Path) -> str:
     """Publish and durably commit one score without concurrent replacement."""
 
     if source_path.is_symlink() or not source_path.is_file():
         raise ValueError(f"pinned score execution did not produce a regular output: {source_path}")
+    source_flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+    try:
+        source_fd = os.open(source_path, source_flags)
+        try:
+            if not stat.S_ISREG(os.fstat(source_fd).st_mode):
+                raise OSError("score output is not regular")
+            digest = hashlib.sha256()
+            while payload := os.read(source_fd, 1024 * 1024):
+                digest.update(payload)
+            os.fsync(source_fd)
+        finally:
+            os.close(source_fd)
+    except OSError as exc:
+        raise ValueError(f"score output could not be read durably: {source_path}") from exc
     try:
         directory_fd = _open_directory_path(destination_path.parent, create=False)
     except OSError as exc:
@@ -732,6 +906,7 @@ def _publish_score_output(source_path: Path, destination_path: Path) -> None:
             raise ValueError(f"score output publication could not be made durable: {destination_path}") from (
                 publication_error
             )
+        return f"sha256:{digest.hexdigest()}"
     finally:
         os.close(directory_fd)
 
