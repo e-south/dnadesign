@@ -303,17 +303,18 @@ def parse_ligandmpnn_score_outputs(
     command_digests = tuple(_command_sha256(command) for command in commands)
     command_set_sha256 = _sha256_bytes(json.dumps(command_digests, separators=(",", ":")).encode("utf-8"))
 
-    output_root = _within_root(root, request.output_dir, field_name="output_dir")
+    command_output_roots = tuple(
+        _within_root(root, command.output_dir, field_name="score output directory") for command in commands
+    )
     expected_paths = tuple(
         _within_root(root, command.output_dir / f"{request.pdb_path.stem}.pt", field_name="score output")
         for command in commands
     )
-    discovered_paths = (
-        tuple(
-            path for path in output_root.rglob("*.pt") if not _is_private_score_attempt(path, output_root=output_root)
-        )
-        if output_root.is_dir()
-        else ()
+    discovered_paths = tuple(
+        path
+        for command_output_root in command_output_roots
+        if command_output_root.is_dir()
+        for path in command_output_root.rglob("*.pt")
     )
     symlink_outputs = tuple(path for path in discovered_paths if path.is_symlink())
     if symlink_outputs:
@@ -416,13 +417,6 @@ def parse_ligandmpnn_score_outputs(
         number_of_batches=request.number_of_batches,
         outputs=tuple(outputs),
     )
-
-
-def _is_private_score_attempt(path: Path, *, output_root: Path) -> bool:
-    """Exclude runtime-private attempt namespaces from public admission."""
-
-    relative = path.relative_to(output_root)
-    return any(part.startswith(".dnadesign-score-") for part in relative.parts[:-1])
 
 
 def _validate_commands(

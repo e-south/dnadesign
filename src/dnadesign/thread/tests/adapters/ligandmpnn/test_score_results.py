@@ -17,6 +17,8 @@ import io
 import json
 import os
 import socket
+import subprocess
+import sys
 import threading
 from dataclasses import replace
 from pathlib import Path
@@ -78,6 +80,77 @@ def _prepare_request(root: Path, *, seeds: tuple[int, ...] = (7, 11)) -> LigandM
         use_sequence=False,
         use_atom_context=True,
         use_side_chain_context=False,
+    )
+
+
+def _prepare_executable_dot_output_request(root: Path) -> tuple[LigandMpnnScoreRequest, Path]:
+    vendor_root = root / "vendor"
+    vendor_root.mkdir()
+    checkout, _initial_commit, parser_sha256 = create_pinned_context_checkout(vendor_root)
+    checkpoint = checkout / "model_params/ligandmpnn_v_32_010_25.pt"
+    checkpoint.parent.mkdir()
+    checkpoint.write_text("checkpoint-v1", encoding="utf-8")
+    (checkout / "score.py").write_text(
+        "import argparse\n"
+        "import shutil\n"
+        "from pathlib import Path\n"
+        "parser = argparse.ArgumentParser()\n"
+        "parser.add_argument('--pdb_path', required=True)\n"
+        "parser.add_argument('--out_folder', required=True)\n"
+        "args, _ = parser.parse_known_args()\n"
+        "output = Path(args.out_folder) / f'{Path(args.pdb_path).stem}.pt'\n"
+        "output.parent.mkdir(parents=True, exist_ok=True)\n"
+        "shutil.copyfile(args.pdb_path, output)\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "-C", str(checkout), "add", "score.py", checkpoint.relative_to(checkout)], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(checkout),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-qm",
+            "score fixture",
+        ],
+        check=True,
+    )
+    commit = subprocess.check_output(["git", "-C", str(checkout), "rev-parse", "HEAD"], text=True).strip()
+    pdb_path = root / "inputs/target.pdb"
+    pdb_path.parent.mkdir(parents=True)
+    torch.save(_score_payload(7), pdb_path)
+    pdb_sha256 = _sha256(pdb_path.read_bytes())
+    context_inventory = _write_context_inventory(
+        root,
+        pdb_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parser_sha256=parser_sha256,
+    )
+    return (
+        LigandMpnnScoreRequest(
+            request_id="dot_output_score",
+            pdb_path=pdb_path.relative_to(root),
+            pdb_sha256=pdb_sha256,
+            output_dir=Path("."),
+            upstream=LigandMpnnUpstreamPin(
+                commit=commit,
+                checkpoint_sha256=_sha256(checkpoint.read_bytes()),
+                checkpoint_path=checkpoint.relative_to(checkout),
+            ),
+            context_inventory=context_inventory,
+            seeds=(7,),
+            batch_size=2,
+            number_of_batches=10,
+            mode=LigandMpnnScoreMode.SINGLE_AA,
+            use_sequence=False,
+            use_atom_context=True,
+            use_side_chain_context=False,
+        ),
+        checkout,
     )
 
 
@@ -241,6 +314,44 @@ def test_score_relative_checkout_is_anchored_for_foreign_cwd_admission(
 
     assert result.outputs[0].seed == 7
     assert commands[0].argv[commands[0].argv.index("--checkout-root") + 1] == str(tmp_path / "LigandMPNN")
+
+
+@pytest.mark.parametrize("checkout_form", ["relative", "absolute"])
+@pytest.mark.parametrize("caller_cwd", ["execution-root", "foreign"])
+@pytest.mark.parametrize("workspace_artifact", ["checkout-checkpoint", "regular", "fifo"])
+def test_dot_output_admission_ignores_workspace_pt_outside_command_seed_directories(
+    tmp_path: Path,
+    checkout_form: str,
+    caller_cwd: str,
+    workspace_artifact: str,
+) -> None:
+    request, checkout = _prepare_executable_dot_output_request(tmp_path)
+    checkout_root = checkout.relative_to(tmp_path) if checkout_form == "relative" else checkout
+    commands = build_ligandmpnn_score_commands(
+        request,
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
+        python_executable=sys.executable,
+    )
+    assert (checkout / request.upstream.checkpoint_path).is_file()
+    if workspace_artifact == "regular":
+        (tmp_path / "unrelated-workspace.pt").write_text("not a score", encoding="utf-8")
+    elif workspace_artifact == "fifo":
+        os.mkfifo(tmp_path / "unrelated-workspace-fifo.pt")
+    cwd = tmp_path
+    if caller_cwd == "foreign":
+        cwd = tmp_path / "foreign-cwd"
+        cwd.mkdir()
+
+    subprocess.run(commands[0].argv, cwd=cwd, check=True)
+    result = parse_ligandmpnn_score_outputs(
+        request,
+        commands,
+        execution_root=tmp_path,
+        trust=LigandMpnnScoreOutputTrust.PINNED_LOCAL_EXECUTION,
+    )
+
+    assert [output.artifact_path for output in result.outputs] == [Path("seed_7/target.pt")]
 
 
 def test_parser_binds_exact_request_commands_inputs_and_raw_probabilities(tmp_path: Path) -> None:
@@ -442,17 +553,27 @@ def test_parser_fails_closed_on_missing_and_extra_output_files(tmp_path: Path) -
         _parse(tmp_path, request)
 
     _write_output(tmp_path, request, 11)
-    extra = tmp_path / request.output_dir / "seed_99/target.pt"
-    extra.parent.mkdir(parents=True)
+    extra = tmp_path / request.output_dir / "seed_7/extra.pt"
     torch.save(_score_payload(99), extra)
     with pytest.raises(ValueError, match="unexpected LigandMPNN score outputs"):
         _parse(tmp_path, request)
 
 
-def test_parser_ignores_abandoned_private_score_attempts(tmp_path: Path) -> None:
+def test_parser_rejects_private_named_artifact_inside_owned_seed_directory(tmp_path: Path) -> None:
     request = _prepare_request(tmp_path, seeds=(7,))
     _write_output(tmp_path, request, 7)
     abandoned = tmp_path / request.output_dir / "seed_7/.dnadesign-score-killed/partial.pt"
+    abandoned.parent.mkdir(parents=True)
+    abandoned.write_bytes(b"killed-attempt")
+
+    with pytest.raises(ValueError, match="unexpected LigandMPNN score outputs"):
+        _parse(tmp_path, request)
+
+
+def test_parser_ignores_sibling_abandoned_private_score_attempt(tmp_path: Path) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    _write_output(tmp_path, request, 7)
+    abandoned = tmp_path / request.output_dir / ".dnadesign-score-killed/partial.pt"
     abandoned.parent.mkdir(parents=True)
     abandoned.write_bytes(b"killed-attempt")
 
