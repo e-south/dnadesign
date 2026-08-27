@@ -36,6 +36,14 @@ _SHELF_KINDS = {
     "tool-cache": ObjectKind.TOOL_CACHE,
 }
 _ALLOWED_ROOT_FILES = {"AGENTS.md"}
+_GitIndexEntry = tuple[bytes, bytes, bytes]
+_GitIndexSnapshot = tuple[bytes, dict[str, tuple[_GitIndexEntry, ...]]]
+_StorageTreeEntryState = tuple[str, int, int, int, int, int, int]
+_CoordinationState = tuple[
+    tuple[int, int, int, int, int, int],
+    tuple[int, int, int, int],
+    tuple[int, int, int, int, int],
+]
 
 
 def resolve_storage_path(path: Path, *, label: str, strict: bool = False) -> Path:
@@ -143,6 +151,34 @@ def storage_file_paths(root: Path) -> tuple[Path, ...]:
     return files
 
 
+def _storage_tree_state(
+    root: Path,
+    files: tuple[Path, ...],
+    directories: tuple[Path, ...],
+) -> tuple[_StorageTreeEntryState, ...]:
+    """Fingerprint the identity, type, and ownership posture of one exact tree."""
+
+    state: list[_StorageTreeEntryState] = []
+    for path in (root, *directories, *files):
+        relative = "." if path == root else path.relative_to(root).as_posix()
+        try:
+            entry_stat = path.stat(follow_symlinks=False)
+        except OSError as exc:
+            raise StorageObjectError(f"cannot inspect storage entry: {relative}: {exc}") from exc
+        state.append(
+            (
+                relative,
+                entry_stat.st_dev,
+                entry_stat.st_ino,
+                stat.S_IFMT(entry_stat.st_mode),
+                stat.S_IMODE(entry_stat.st_mode),
+                entry_stat.st_uid,
+                entry_stat.st_gid,
+            )
+        )
+    return tuple(state)
+
+
 def _verify_resource(root: Path, resource: StoredResource) -> VerifiedStoredResource:
     source_path = root / resource.relative_path
     if source_path.is_symlink():
@@ -237,11 +273,13 @@ def _verify_coordination_posture(
     root: Path,
     manifest_path: Path,
     lock_path: Path,
-) -> tuple[tuple[int, int], tuple[int, int, int, int], tuple[int, int, int, int, int]]:
+) -> _CoordinationState:
     """Validate and fingerprint root, manifest, and lock coordination state."""
 
     try:
         root_stat = root.stat(follow_symlinks=False)
+        if not stat.S_ISDIR(root_stat.st_mode):
+            raise StorageObjectError(f"storage object root must remain a directory: {root}")
         root_mode = stat.S_IMODE(root_stat.st_mode)
         if root_mode & stat.S_IWOTH:
             raise StorageObjectError(
@@ -308,7 +346,14 @@ def _verify_coordination_posture(
     except OSError as exc:
         raise StorageObjectError(f"cannot inspect storage object lock {lock_path}: {exc}") from exc
     return (
-        (root_mode, root_stat.st_gid),
+        (
+            stat.S_IFMT(root_stat.st_mode),
+            root_mode,
+            root_stat.st_uid,
+            root_stat.st_gid,
+            root_stat.st_dev,
+            root_stat.st_ino,
+        ),
         (manifest_mode, manifest_stat.st_gid, manifest_stat.st_dev, manifest_stat.st_ino),
         lock_state,
     )
@@ -341,16 +386,13 @@ def _git_authority_environment() -> dict[str, str]:
     return environment
 
 
-def _verify_demo_git_index_entry(
+def _read_demo_git_index_snapshot(
     checkout: Path,
-    path: Path,
-    expected_digest: str,
     *,
     git_environment: dict[str, str],
-) -> None:
-    """Bind one verified demo file snapshot to its stage-0 Git index blob."""
+) -> _GitIndexSnapshot:
+    """Read one exact stage-entry snapshot from the repository's real index."""
 
-    relative = path.relative_to(checkout).as_posix()
     try:
         completed = subprocess.run(
             [
@@ -361,28 +403,41 @@ def _verify_demo_git_index_entry(
                 "ls-files",
                 "--stage",
                 "-z",
-                "--error-unmatch",
-                "--",
-                f":(literal){relative}",
             ],
             check=False,
             capture_output=True,
             env=git_environment,
         )
     except OSError as exc:
-        raise StorageObjectError(f"cannot verify demo Git tracking for {relative}: {exc}") from exc
+        raise StorageObjectError(f"cannot read demo Git index snapshot: {exc}") from exc
     if completed.returncode != 0:
-        raise StorageObjectError(f"demo file is not tracked: {relative}")
+        detail = completed.stderr.decode(errors="replace").strip()
+        raise StorageObjectError(f"cannot read demo Git index snapshot: {detail or 'git ls-files failed'}")
+    parsed: dict[str, list[_GitIndexEntry]] = {}
     records = completed.stdout.removesuffix(b"\0").split(b"\0") if completed.stdout else []
-    if len(records) != 1:
+    for record in records:
+        header, separator, indexed_path = record.partition(b"\t")
+        fields = header.split()
+        if not separator or len(fields) != 3:
+            raise StorageObjectError("cannot parse demo Git index snapshot")
+        relative = indexed_path.decode(errors="surrogateescape")
+        parsed.setdefault(relative, []).append((fields[0], fields[1], fields[2]))
+    return completed.stdout, {relative: tuple(entries) for relative, entries in parsed.items()}
+
+
+def _verify_demo_git_index_entry(
+    checkout: Path,
+    relative: str,
+    entries: tuple[_GitIndexEntry, ...],
+    expected_digest: str | None,
+    *,
+    git_environment: dict[str, str],
+) -> None:
+    """Bind one verified demo file snapshot to one captured stage-0 blob."""
+
+    if len(entries) != 1 or entries[0][2] != b"0":
         raise StorageObjectError(f"demo Git index entry must have exactly one stage-0 record: {relative}")
-    header, separator, indexed_path = records[0].partition(b"\t")
-    fields = header.split()
-    if not separator or len(fields) != 3 or indexed_path.decode(errors="surrogateescape") != relative:
-        raise StorageObjectError(f"cannot parse demo Git index entry for {relative}")
-    index_mode, object_id, index_stage = fields
-    if index_stage != b"0":
-        raise StorageObjectError(f"demo Git index entry must be stage 0: {relative}")
+    index_mode, object_id, _index_stage = entries[0]
     if index_mode not in {b"100644", b"100755"}:
         mode_label = index_mode.decode(errors="replace")
         raise StorageObjectError(
@@ -402,8 +457,26 @@ def _verify_demo_git_index_entry(
         raise StorageObjectError(
             f"cannot verify demo Git index bytes for {relative}: {detail or 'git cat-file failed'}"
         )
-    if _sha256_bytes(indexed.stdout) != expected_digest:
+    if expected_digest is not None and _sha256_bytes(indexed.stdout) != expected_digest:
         raise StorageObjectError(f"demo file differs from Git index: {relative}")
+
+
+def _assert_demo_git_index_stable(
+    checkout: Path,
+    expected_snapshot: bytes,
+    *,
+    git_environment: dict[str, str],
+) -> None:
+    """Reject authority assembled across more than one Git index state."""
+
+    observed_snapshot, _entries = _read_demo_git_index_snapshot(
+        checkout,
+        git_environment=git_environment,
+    )
+    if observed_snapshot != expected_snapshot:
+        raise StorageObjectError(
+            "demo Git index changed during validation; retry while repository staging is quiescent"
+        )
 
 
 def verify_manifest_index_if_git_resident(root: Path, manifest_path: Path, expected_digest: str) -> bool:
@@ -412,11 +485,26 @@ def verify_manifest_index_if_git_resident(root: Path, manifest_path: Path, expec
     checkout = _git_checkout_ancestor(root, include_root=True)
     if checkout is None:
         return False
+    git_environment = _git_authority_environment()
+    snapshot, index_entries = _read_demo_git_index_snapshot(
+        checkout,
+        git_environment=git_environment,
+    )
+    relative = manifest_path.relative_to(checkout).as_posix()
+    entries = index_entries.get(relative)
+    if entries is None:
+        raise StorageObjectError(f"demo file is not tracked: {relative}")
     _verify_demo_git_index_entry(
         checkout,
-        manifest_path,
+        relative,
+        entries,
         expected_digest,
-        git_environment=_git_authority_environment(),
+        git_environment=git_environment,
+    )
+    _assert_demo_git_index_stable(
+        checkout,
+        snapshot,
+        git_environment=git_environment,
     )
     return True
 
@@ -427,8 +515,12 @@ def _verify_demo(
     *,
     allow_pending_manifest: bool,
     allow_pending_lock: bool,
-) -> None:
+) -> tuple[dict[str, str], bytes]:
     git_environment = _git_authority_environment()
+    snapshot, index_entries = _read_demo_git_index_snapshot(
+        checkout,
+        git_environment=git_environment,
+    )
     try:
         manifest_size = verified.manifest_path.stat(follow_symlinks=False).st_size
     except OSError as exc:
@@ -438,30 +530,47 @@ def _verify_demo(
     total_bytes = manifest_size + sum(resource.size_bytes for resource in verified.resources)
     if total_bytes > MAX_DEMO_BYTES:
         raise StorageObjectError(f"demo exceeds {MAX_DEMO_BYTES} bytes: {total_bytes}")
-    for path, expected_digest in (
+    expected_files = (
         (verified.manifest_path, verified.manifest_digest),
         (verified.root / LOCK_NAME, _sha256_bytes(b"")),
         *((resource.path, resource.digest) for resource in verified.resources),
-    ):
-        if allow_pending_manifest and path == verified.manifest_path:
-            continue
-        if allow_pending_lock and path == verified.root / LOCK_NAME:
-            continue
+    )
+    expected_by_relative = {
+        path.relative_to(checkout).as_posix(): (path, expected_digest) for path, expected_digest in expected_files
+    }
+    root_relative = verified.root.relative_to(checkout).as_posix()
+    indexed_root_paths = (
+        set(index_entries)
+        if root_relative == "."
+        else {relative for relative in index_entries if relative.startswith(f"{root_relative}/")}
+    )
+    extra = sorted(indexed_root_paths - set(expected_by_relative))
+    if extra:
+        raise StorageObjectError(f"demo Git index has undeclared entries: {', '.join(extra)}")
+
+    for relative, (path, expected_digest) in expected_by_relative.items():
+        pending = (allow_pending_manifest and path == verified.manifest_path) or (
+            allow_pending_lock and path == verified.root / LOCK_NAME
+        )
+        entries = index_entries.get(relative)
+        if entries is None:
+            if pending:
+                continue
+            raise StorageObjectError(f"demo file is not tracked: {relative}")
         _verify_demo_git_index_entry(
             checkout,
-            path,
-            expected_digest,
+            relative,
+            entries,
+            None if pending else expected_digest,
             git_environment=git_environment,
         )
+    return git_environment, snapshot
 
 
 def _recheck_verified_demo_snapshot(
     verified: VerifiedStorageObject,
-    expected_coordination_state: tuple[
-        tuple[int, int],
-        tuple[int, int, int, int],
-        tuple[int, int, int, int, int],
-    ],
+    expected_coordination_state: _CoordinationState,
+    expected_tree_state: tuple[_StorageTreeEntryState, ...],
 ) -> None:
     """Rebind verified demo bytes and coordination after Git authority reads."""
 
@@ -501,7 +610,13 @@ def _recheck_verified_demo_snapshot(
         verified.manifest_path,
         verified.root / LOCK_NAME,
     )
-    if observed_resources != expected_resources or coordination_state != expected_coordination_state:
+    final_file_paths, final_directory_paths = _storage_tree_paths(verified.root)
+    observed_tree_state = _storage_tree_state(verified.root, final_file_paths, final_directory_paths)
+    if (
+        observed_resources != expected_resources
+        or coordination_state != expected_coordination_state
+        or observed_tree_state != expected_tree_state
+    ):
         raise StorageObjectError(
             "demo storage object changed during Git index validation; retry while the producer is quiescent"
         )
@@ -528,7 +643,9 @@ def verify_storage_object(
         raise StorageObjectError(f"storage object root is missing {MANIFEST_NAME}: {root}")
     lock_path = root / LOCK_NAME
     coordination_state = _verify_coordination_posture(root, manifest_path, lock_path)
-    (root_mode, shared_group), _manifest_state, _lock_state = coordination_state
+    (_root_type, root_mode, _root_owner, shared_group, _root_device, _root_inode), _manifest_state, _lock_state = (
+        coordination_state
+    )
     try:
         manifest_bytes = manifest_path.read_bytes()
     except OSError as exc:
@@ -565,6 +682,7 @@ def verify_storage_object(
         raise StorageObjectError(f"declared files are missing: {', '.join(missing)}")
     second_resources = tuple(_verify_resource(root, resource) for resource in manifest.resources)
     second_file_paths, second_directory_paths = _storage_tree_paths(root)
+    second_tree_state = _storage_tree_state(root, second_file_paths, second_directory_paths)
     second_actual_paths = {
         path.relative_to(root).as_posix()
         for path in second_file_paths
@@ -613,13 +731,22 @@ def verify_storage_object(
     if manifest.demo:
         if checkout is None:
             raise StorageObjectError(f"demo storage object must live inside a Git checkout: {root}")
-        _verify_demo(
+        git_environment, git_index_snapshot = _verify_demo(
             checkout,
             verified,
             allow_pending_manifest=_allow_pending_demo_manifest,
             allow_pending_lock=_allow_pending_demo_lock,
         )
-        _recheck_verified_demo_snapshot(verified, second_coordination_state)
+        _recheck_verified_demo_snapshot(
+            verified,
+            second_coordination_state,
+            second_tree_state,
+        )
+        _assert_demo_git_index_stable(
+            checkout,
+            git_index_snapshot,
+            git_environment=git_environment,
+        )
     elif checkout is not None:
         raise StorageObjectError(
             f"non-demo storage object cannot live inside a Git checkout: object={root}, checkout={checkout}"

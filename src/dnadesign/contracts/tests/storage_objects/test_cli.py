@@ -444,6 +444,213 @@ def test_demo_validation_rechecks_filesystem_bytes_after_git_index_reads(
     assert changed
 
 
+@pytest.mark.parametrize("entry_kind", ["file", "directory"])
+def test_demo_validation_rechecks_exact_closure_after_git_index_reads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    entry_kind: str,
+) -> None:
+    root, _manifest_path = _seed_tracked_demo(tmp_path)
+    original_run = storage_validation.subprocess.run
+    changed = False
+
+    def _run(*args: object, **kwargs: object):
+        nonlocal changed
+        completed = original_run(*args, **kwargs)
+        command = args[0]
+        if isinstance(command, list) and "cat-file" in command and not changed:
+            undeclared = root / "undeclared"
+            if entry_kind == "file":
+                undeclared.write_text("created during Git validation\n", encoding="utf-8")
+            else:
+                undeclared.mkdir()
+            changed = True
+        return completed
+
+    monkeypatch.setattr(storage_validation.subprocess, "run", _run)
+
+    with pytest.raises(StorageObjectError, match="changed during Git index validation"):
+        verify_storage_object(root)
+
+    assert changed
+
+
+@pytest.mark.parametrize("replacement_kind", ["root", "nested_directory"])
+def test_demo_validation_rejects_same_path_directory_replacement_after_git_reads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    replacement_kind: str,
+) -> None:
+    root, manifest_path = _seed_tracked_demo(tmp_path)
+    checkout = root.parents[1]
+    if replacement_kind == "nested_directory":
+        nested = root / "nested"
+        nested.mkdir()
+        (root / "payload.txt").replace(nested / "payload.txt")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["resources"][0]["path"] = "nested/payload.txt"
+        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        subprocess.run(
+            ["git", "-C", str(checkout), "add", "-A", "--", root.relative_to(checkout).as_posix()],
+            check=True,
+        )
+        assert verify_storage_object(root).summary()["status"] == "verified"
+    original_run = storage_validation.subprocess.run
+    changed = False
+
+    def _run(*args: object, **kwargs: object):
+        nonlocal changed
+        completed = original_run(*args, **kwargs)
+        command = args[0]
+        if isinstance(command, list) and "cat-file" in command and not changed:
+            target = root if replacement_kind == "root" else root / "nested"
+            displaced = target.with_name(f".{target.name}.displaced")
+            target_mode = stat.S_IMODE(target.stat(follow_symlinks=False).st_mode)
+            os.replace(target, displaced)
+            target.mkdir()
+            target.chmod(target_mode)
+            for entry in tuple(displaced.iterdir()):
+                os.replace(entry, target / entry.name)
+            displaced.rmdir()
+            changed = True
+        return completed
+
+    monkeypatch.setattr(storage_validation.subprocess, "run", _run)
+
+    with pytest.raises(StorageObjectError, match="changed during Git index validation"):
+        verify_storage_object(root)
+
+    assert changed
+
+
+def test_demo_validation_rejects_index_change_after_checked_entry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, manifest_path = _seed_tracked_demo(tmp_path)
+    checkout = root.parents[1]
+    relative_manifest = manifest_path.relative_to(checkout).as_posix()
+    manifest_blob = subprocess.run(
+        ["git", "-C", str(checkout), "ls-files", "--stage", "--", relative_manifest],
+        check=True,
+        capture_output=True,
+    ).stdout.split()[1]
+    original_run = storage_validation.subprocess.run
+    changed = False
+
+    def _run(*args: object, **kwargs: object):
+        nonlocal changed
+        completed = original_run(*args, **kwargs)
+        command = args[0]
+        if isinstance(command, list) and "cat-file" in command and command[-1] == manifest_blob and not changed:
+            original_run(
+                ["git", "-C", str(checkout), "rm", "--cached", "--", relative_manifest],
+                check=True,
+                capture_output=True,
+            )
+            changed = True
+        return completed
+
+    monkeypatch.setattr(storage_validation.subprocess, "run", _run)
+
+    with pytest.raises(StorageObjectError, match="demo Git index changed during validation"):
+        verify_storage_object(root)
+
+    assert changed
+
+
+def test_demo_validation_rejects_index_change_during_final_filesystem_recheck(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, manifest_path = _seed_tracked_demo(tmp_path)
+    checkout = root.parents[1]
+    relative_manifest = manifest_path.relative_to(checkout).as_posix()
+    original_storage_tree_paths = storage_validation._storage_tree_paths
+    scan_count = 0
+
+    def _storage_tree_paths(path: Path) -> tuple[tuple[Path, ...], tuple[Path, ...]]:
+        nonlocal scan_count
+        snapshot = original_storage_tree_paths(path)
+        scan_count += 1
+        if scan_count == 3:
+            subprocess.run(
+                ["git", "-C", str(checkout), "rm", "--cached", "--", relative_manifest],
+                check=True,
+                capture_output=True,
+            )
+        return snapshot
+
+    monkeypatch.setattr(storage_validation, "_storage_tree_paths", _storage_tree_paths)
+
+    with pytest.raises(StorageObjectError, match="demo Git index changed during validation"):
+        verify_storage_object(root)
+
+    assert scan_count == 3
+
+
+def test_demo_validation_rejects_extra_index_entry_inside_object_root(tmp_path: Path) -> None:
+    root, _manifest_path = _seed_tracked_demo(tmp_path)
+    checkout = root.parents[1]
+    relative_extra = (root / "checkout-only.txt").relative_to(checkout).as_posix()
+    extra_blob = (
+        subprocess.run(
+            ["git", "-C", str(checkout), "hash-object", "-w", "--stdin"],
+            input=b"present only in the index\n",
+            check=True,
+            capture_output=True,
+        )
+        .stdout.decode()
+        .strip()
+    )
+    subprocess.run(
+        ["git", "-C", str(checkout), "update-index", "--add", "--cacheinfo", f"100644,{extra_blob},{relative_extra}"],
+        check=True,
+    )
+
+    assert not (root / "checkout-only.txt").exists()
+    with pytest.raises(StorageObjectError, match=f"demo Git index has undeclared entries: {relative_extra}"):
+        verify_storage_object(root)
+
+
+def test_demo_validation_rejects_unmerged_declared_index_entry(tmp_path: Path) -> None:
+    root, _manifest_path = _seed_tracked_demo(tmp_path)
+    checkout = root.parents[1]
+    payload = root / "payload.txt"
+    relative_payload = payload.relative_to(checkout).as_posix()
+    payload_blob = subprocess.run(
+        ["git", "-C", str(checkout), "hash-object", "-w", "--stdin"],
+        input=payload.read_bytes(),
+        check=True,
+        capture_output=True,
+    ).stdout.strip()
+    subprocess.run(
+        ["git", "-C", str(checkout), "update-index", "--index-info"],
+        input=b"0 "
+        + (b"0" * 40)
+        + b"\t"
+        + relative_payload.encode()
+        + b"\n"
+        + b"100644 "
+        + payload_blob
+        + b" 1\t"
+        + relative_payload.encode()
+        + b"\n"
+        + b"100644 "
+        + payload_blob
+        + b" 2\t"
+        + relative_payload.encode()
+        + b"\n",
+        check=True,
+    )
+
+    with pytest.raises(
+        StorageObjectError,
+        match=f"demo Git index entry must have exactly one stage-0 record: {relative_payload}",
+    ):
+        verify_storage_object(root)
+
+
 def test_demo_validation_normalizes_late_manifest_stat_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
