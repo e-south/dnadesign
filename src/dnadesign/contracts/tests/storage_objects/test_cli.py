@@ -2230,7 +2230,7 @@ def test_inventory_rolls_back_when_atomic_link_publication_is_interrupted(
     assert not (root / MANIFEST_NAME).exists()
 
 
-def test_inventory_rollback_preserves_receipt_replaced_at_commit_boundary(
+def test_inventory_rollback_retains_receipt_replaced_at_commit_boundary(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2285,7 +2285,7 @@ def test_inventory_rollback_preserves_receipt_replaced_at_commit_boundary(
 
     monkeypatch.setattr(storage_inventory, "verify_storage_object", _fail_verification)
 
-    with pytest.raises(StorageObjectError):
+    with pytest.raises(StorageObjectPublicationUncertain, match="cannot identify the receipt moved"):
         inventory_storage_object(
             root,
             storage_id="pilot",
@@ -2300,8 +2300,10 @@ def test_inventory_rollback_preserves_receipt_replaced_at_commit_boundary(
         )
 
     assert injected
-    assert manifest_path.read_bytes() == competitor_bytes
-    assert not tuple(root.glob(f".{MANIFEST_NAME}.rollback-*"))
+    assert not manifest_path.exists()
+    recovery_paths = tuple(root.glob(f".{MANIFEST_NAME}.rollback-*"))
+    assert len(recovery_paths) == 1
+    assert recovery_paths[0].read_bytes() == competitor_bytes
 
 
 def test_inventory_rollback_preserves_quarantine_name_collision(
@@ -2346,6 +2348,56 @@ def test_inventory_rollback_preserves_quarantine_name_collision(
     assert collision_path is not None
     assert collision_path.read_bytes() == collision_bytes
     assert manifest_path.is_file()
+
+
+def test_inventory_rollback_retains_quarantine_replaced_after_move(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    collision_path: Path | None = None
+    replacement_identity: tuple[int, int] | None = None
+    original_move = storage_inventory._atomic_move_no_replace
+
+    def _move_then_replace(source: Path, destination: Path) -> None:
+        nonlocal collision_path, replacement_identity
+        original_move(source, destination)
+        if source == manifest_path and destination.name.startswith(f".{MANIFEST_NAME}.rollback-"):
+            replacement = destination.with_name(f"{destination.name}.competitor")
+            replacement.write_bytes(destination.read_bytes())
+            replacement.chmod(destination.stat(follow_symlinks=False).st_mode & 0o777)
+            replacement.replace(destination)
+            replacement_stat = destination.stat(follow_symlinks=False)
+            replacement_identity = (replacement_stat.st_dev, replacement_stat.st_ino)
+            collision_path = destination
+
+    def _fail_verification(*_args: object, **_kwargs: object) -> None:
+        raise StorageObjectError("injected validation failure")
+
+    monkeypatch.setattr(storage_inventory, "_atomic_move_no_replace", _move_then_replace)
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _fail_verification)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="cannot identify the receipt moved"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="cruncher",
+            object_kind="workspace",
+            content_schema="cruncher.workspace",
+            content_schema_version="1",
+            producer_revision="test-revision-1",
+            storage_class="reproducible",
+            retention_policy="review-before-delete",
+        )
+
+    assert collision_path is not None
+    assert replacement_identity is not None
+    assert (collision_path.stat().st_dev, collision_path.stat().st_ino) == replacement_identity
+    assert not manifest_path.exists()
 
 
 def test_refresh_swaps_back_when_atomic_exchange_is_interrupted(

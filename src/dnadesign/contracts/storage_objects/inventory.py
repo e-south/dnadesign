@@ -259,7 +259,13 @@ def _rollback_create_only_manifest(
 
     try:
         quarantine_stat = quarantine.lstat()
+        if (quarantine_stat.st_dev, quarantine_stat.st_ino) != published_identity:
+            raise StorageObjectPublicationUncertain(
+                f"cannot identify the receipt moved during create-only rollback; retained at {quarantine}"
+            )
         owns_receipt = stat.S_ISREG(quarantine_stat.st_mode) and quarantine.read_bytes() == published_bytes
+    except StorageObjectPublicationUncertain:
+        raise
     except BaseException as inspection_error:
         raise StorageObjectPublicationUncertain(
             f"cannot identify the receipt moved during create-only rollback; retained at {quarantine}"
