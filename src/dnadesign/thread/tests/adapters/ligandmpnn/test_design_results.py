@@ -105,6 +105,19 @@ def test_design_admission_binds_exact_published_tree(tmp_path: Path) -> None:
     assert any(entry["path"] == "seqs/input.fa" for entry in result.outputs[0].manifest["entries"])
 
 
+def test_design_builder_and_admission_normalize_symlinked_execution_root(tmp_path: Path) -> None:
+    real_root = tmp_path / "real-workspace"
+    real_root.mkdir()
+    linked_root = tmp_path / "linked-workspace"
+    linked_root.symlink_to(real_root, target_is_directory=True)
+
+    request, commands, _output_root = _execute_design(linked_root)
+    result = parse_ligandmpnn_design_outputs(request, commands, execution_root=linked_root)
+
+    assert commands[0].argv[commands[0].argv.index("--execution-root") + 1] == str(real_root)
+    assert result.sequence_count == request.expected_sequence_count == 1
+
+
 def test_design_admission_preserves_uppercase_pdb_extension_in_official_fasta_name(tmp_path: Path) -> None:
     request, commands, _output_root = _execute_design(tmp_path, pdb_name="input.PDB")
 

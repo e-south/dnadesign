@@ -17,7 +17,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dnadesign.thread.adapters.ligandmpnn.alphabets import LigandMpnnResidueAlphabetSidecar
-from dnadesign.thread.adapters.ligandmpnn.commands import build_ligandmpnn_commands
+from dnadesign.thread.adapters.ligandmpnn.commands import (
+    build_ligandmpnn_commands,
+    resolve_execution_root_for_execution,
+)
 from dnadesign.thread.adapters.ligandmpnn.context_inventory import _read_descriptor_relative_regular_bytes
 from dnadesign.thread.adapters.ligandmpnn.design_fasta import parse_official_design_fasta
 from dnadesign.thread.adapters.ligandmpnn.design_manifest import build_design_output_manifest
@@ -85,9 +88,7 @@ def parse_ligandmpnn_design_outputs(
 
     if not isinstance(commands, tuple) or not commands:
         raise ValueError("commands must be a nonempty tuple")
-    root = execution_root
-    if not root.is_absolute():
-        raise ValueError("execution_root must be an absolute directory")
+    root = resolve_execution_root_for_execution(execution_root)
     first = commands[0]
     checkout_root, python_executable, _completion_path, _execution_sha256 = parse_pinned_runtime_prefix(
         first.argv,
@@ -96,7 +97,7 @@ def parse_ligandmpnn_design_outputs(
         pdb_sha256=request.pdb_sha256,
         context_inventory_path=request.context_inventory.path,
         context_inventory_sha256=request.context_inventory.sha256,
-        execution_root=execution_root,
+        execution_root=root,
         packing_checkpoint_sha256=(request.upstream.packing_checkpoint_sha256 if request.packing.enabled else None),
         residue_alphabet_sha256=(
             residue_alphabet_sidecar.sha256.removeprefix("sha256:") if residue_alphabet_sidecar is not None else None
@@ -106,7 +107,7 @@ def parse_ligandmpnn_design_outputs(
     expected_commands = build_ligandmpnn_commands(
         request,
         checkout_root=checkout_root,
-        execution_root=execution_root,
+        execution_root=root,
         python_executable=python_executable,
         residue_alphabet_sidecar=residue_alphabet_sidecar,
     )
@@ -138,7 +139,7 @@ def parse_ligandmpnn_design_outputs(
             pdb_sha256=request.pdb_sha256,
             context_inventory_path=request.context_inventory.path,
             context_inventory_sha256=request.context_inventory.sha256,
-            execution_root=execution_root,
+            execution_root=root,
             packing_checkpoint_sha256=(request.upstream.packing_checkpoint_sha256 if request.packing.enabled else None),
             residue_alphabet_sha256=(
                 residue_alphabet_sidecar.sha256.removeprefix("sha256:")

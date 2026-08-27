@@ -20,6 +20,7 @@ from dnadesign.thread.adapters.ligandmpnn.alphabets import LigandMpnnResidueAlph
 from dnadesign.thread.adapters.ligandmpnn.commands import (
     build_ligandmpnn_commands,
     resolve_checkout_root_for_execution,
+    resolve_execution_root_for_execution,
 )
 from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
     load_ligandmpnn_context_inventory,
@@ -107,6 +108,7 @@ def build_planned_receipt(
 ) -> LigandMpnnRunReceipt:
     """Normalize a validated request and its deterministic commands."""
 
+    execution_root = resolve_execution_root_for_execution(execution_root)
     checkout_root = resolve_checkout_root_for_execution(checkout_root, execution_root=execution_root)
     context_inventory = load_ligandmpnn_context_inventory(
         request.context_inventory,

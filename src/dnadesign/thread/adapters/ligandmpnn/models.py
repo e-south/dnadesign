@@ -23,7 +23,8 @@ _HEX_40 = re.compile(r"[0-9a-fA-F]{40}")
 _HEX_64 = re.compile(r"[0-9a-fA-F]{64}")
 _REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 CANONICAL_AA_ALPHABET = "ACDEFGHIKLMNPQRSTVWY"
-_MAX_NUMPY_SEED = 2**32 - 1
+MIN_LIGANDMPNN_SEED = 1
+MAX_LIGANDMPNN_SEED = 2**32 - 1
 
 
 @dataclass(frozen=True, order=True)
@@ -245,12 +246,15 @@ def _require_unique_residues(residues: tuple[LigandMpnnResidue, ...], *, field_n
 
 
 def validate_ligandmpnn_seeds(seeds: object) -> None:
-    """Require the exact integer seed domain accepted by upstream NumPy."""
+    """Require explicit seeds that upstream will use without random fallback."""
 
     if not isinstance(seeds, tuple) or not seeds:
         raise ValueError("seeds must be a nonempty tuple")
-    if any(isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed <= _MAX_NUMPY_SEED for seed in seeds):
-        raise ValueError(f"seeds must contain integers from 0 through {_MAX_NUMPY_SEED}")
+    if any(
+        isinstance(seed, bool) or not isinstance(seed, int) or not MIN_LIGANDMPNN_SEED <= seed <= MAX_LIGANDMPNN_SEED
+        for seed in seeds
+    ):
+        raise ValueError(f"seeds must contain integers from {MIN_LIGANDMPNN_SEED} through {MAX_LIGANDMPNN_SEED}")
     if len(set(seeds)) != len(seeds):
         raise ValueError("seeds must be unique")
 

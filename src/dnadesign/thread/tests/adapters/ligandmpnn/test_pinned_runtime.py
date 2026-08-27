@@ -53,6 +53,9 @@ def execute_pinned_entrypoint(**kwargs: object) -> None:
 
     arguments = kwargs["arguments"]
     assert isinstance(arguments, tuple)
+    if "--seed" not in arguments and not any(value.startswith("--seed=") for value in arguments):
+        arguments = (*arguments, "--seed", "1")
+        kwargs["arguments"] = arguments
     checkout_root = kwargs["checkout_root"]
     assert isinstance(checkout_root, Path)
     completion_record_path = kwargs.pop(
@@ -62,6 +65,8 @@ def execute_pinned_entrypoint(**kwargs: object) -> None:
     assert isinstance(completion_record_path, Path)
     planned_arguments = kwargs.pop("planned_arguments", arguments)
     assert isinstance(planned_arguments, tuple)
+    if "--seed" not in planned_arguments and not any(value.startswith("--seed=") for value in planned_arguments):
+        planned_arguments = (*planned_arguments, "--seed", "1")
     entrypoint = str(kwargs["entrypoint"])
     context_inventory_path = kwargs.pop("context_inventory_path", None)
     context_inventory_sha256 = kwargs.pop("context_inventory_sha256", None)
@@ -317,6 +322,8 @@ def test_pinned_runtime_ignores_timestamp_valid_poisoned_parser_bytecode(tmp_pat
             str(checkpoint),
             "--pdb_path",
             str(pdb),
+            "--seed",
+            "1",
             "--output",
             str(attested_output),
         ),
@@ -408,6 +415,8 @@ def test_generated_runtime_command_executes_and_records_complete_cli_arguments(t
         str(checkpoint),
         "--pdb_path",
         str(pdb),
+        "--seed",
+        "1",
         "--output",
         str(output),
     )
@@ -1183,6 +1192,8 @@ def test_pinned_design_runtime_publishes_one_complete_attempt_owned_seed_directo
         str(checkpoint),
         "--pdb_path",
         str(pdb),
+        "--seed",
+        "7",
         "--out_folder",
         str(output_root),
     )
@@ -2090,6 +2101,37 @@ def test_pinned_runtime_rejects_duplicate_semantic_flags(
                 *duplicate_arguments,
                 "--output",
                 str(tmp_path / "output.txt"),
+            ),
+        )
+
+
+@pytest.mark.parametrize("entrypoint", ["run.py", "score.py"])
+def test_pinned_runtime_rejects_zero_seed_before_upstream_random_fallback(
+    tmp_path: Path,
+    entrypoint: str,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+
+    with pytest.raises(ValueError, match="--seed must be an integer from 1 through 4294967295"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint=entrypoint,
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--seed",
+                "0",
+                "--out_folder",
+                str(tmp_path / "outputs"),
             ),
         )
 

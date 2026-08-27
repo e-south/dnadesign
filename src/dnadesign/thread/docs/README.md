@@ -2,7 +2,7 @@
 doc_id: dnadesign-thread-docs
 surface: tool-docs
 owner: dnadesign-maintainers
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 ---
 
 # Thread
@@ -37,9 +37,12 @@ seeds, temperature, and sample counts explicit. Residue-specific allowed
 alphabets contain only the 20 canonical amino acids and are translated into a
 deterministic, SHA256-bound official `--omit_AA_per_residue` JSON sidecar; a
 bare sidecar path is not accepted. The upstream noncanonical `X` state is
-always omitted. Atomic planners may write the bytes to a staging path while
-binding a distinct final execution path; only the final path is serialized,
-and the promoted file has an explicit digest-validation method.
+always omitted. Explicit seeds must be integers from 1 through 4294967295;
+zero is rejected because the pinned `run.py` and `score.py` treat a falsey
+seed as a request for a random fallback. Atomic planners may write the bytes
+to a staging path while binding a distinct final execution path; only the final
+path is serialized, and the promoted file has an explicit digest-validation
+method.
 
 Generated design and score commands execute from a temporary source tree
 materialized directly from the pinned Git commit. They do not import helper

@@ -211,9 +211,9 @@ def test_score_request_enforces_upstream_minimum_batch_policy() -> None:
         _request(pdb_sha256="not-a-digest")
 
 
-@pytest.mark.parametrize("seeds", [(-1,), (2**32,), (True,), (1.5,)])
-def test_score_request_rejects_seeds_outside_upstream_numpy_domain(seeds: tuple[object, ...]) -> None:
-    with pytest.raises(ValueError, match="integers from 0 through 4294967295"):
+@pytest.mark.parametrize("seeds", [(-1,), (0,), (2**32,), (True,), (1.5,)])
+def test_score_request_rejects_seeds_outside_upstream_deterministic_domain(seeds: tuple[object, ...]) -> None:
+    with pytest.raises(ValueError, match="integers from 1 through 4294967295"):
         _request(seeds=seeds)
 
 
@@ -223,13 +223,13 @@ def test_score_request_requires_nonempty_seed_tuple(seeds: object) -> None:
         _request(seeds=seeds)
 
 
-def test_score_request_emits_numpy_seed_boundaries(tmp_path: Path) -> None:
-    request, checkout_root = _validated_request(tmp_path, seeds=(0, 2**32 - 1))
+def test_score_request_emits_deterministic_seed_boundaries(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path, seeds=(1, 2**32 - 1))
     commands = build_ligandmpnn_score_commands(
         request,
         checkout_root=checkout_root,
         execution_root=tmp_path,
     )
 
-    assert [command.seed for command in commands] == [0, 4294967295]
-    assert [command.argv[command.argv.index("--seed") + 1] for command in commands] == ["0", "4294967295"]
+    assert [command.seed for command in commands] == [1, 4294967295]
+    assert [command.argv[command.argv.index("--seed") + 1] for command in commands] == ["1", "4294967295"]

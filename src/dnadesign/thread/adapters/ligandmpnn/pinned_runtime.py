@@ -26,7 +26,12 @@ from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
     validate_context_inventory_for_input,
 )
 from dnadesign.thread.adapters.ligandmpnn.design_manifest import build_design_output_manifest
-from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnContextInventoryReference, LigandMpnnUpstreamPin
+from dnadesign.thread.adapters.ligandmpnn.models import (
+    MAX_LIGANDMPNN_SEED,
+    MIN_LIGANDMPNN_SEED,
+    LigandMpnnContextInventoryReference,
+    LigandMpnnUpstreamPin,
+)
 from dnadesign.thread.adapters.ligandmpnn.pinned_checkout import materialize_pinned_tree
 
 _ENTRYPOINTS = frozenset({"run.py", "score.py"})
@@ -1017,6 +1022,27 @@ def _validate_runtime_option_contract(arguments: tuple[str, ...]) -> None:
                 continue
             if option_name.startswith(earlier_name) or earlier_name.startswith(option_name):
                 raise ValueError(f"duplicate LigandMPNN runtime option or abbreviation: {option_name}")
+    _validate_runtime_seed(arguments)
+
+
+def _validate_runtime_seed(arguments: tuple[str, ...]) -> None:
+    """Reject seed zero because pinned upstream replaces falsey seeds randomly."""
+
+    seed_flag = "--seed"
+    if not _has_flag(list(arguments), seed_flag):
+        raise ValueError(
+            f"runtime argument {seed_flag} must be an integer from {MIN_LIGANDMPNN_SEED} through {MAX_LIGANDMPNN_SEED}"
+        )
+    value = _runtime_option_value(list(arguments), seed_flag)
+    if not value.isascii() or not value.isdecimal():
+        raise ValueError(
+            f"runtime argument {seed_flag} must be an integer from {MIN_LIGANDMPNN_SEED} through {MAX_LIGANDMPNN_SEED}"
+        )
+    seed = int(value)
+    if not MIN_LIGANDMPNN_SEED <= seed <= MAX_LIGANDMPNN_SEED:
+        raise ValueError(
+            f"runtime argument {seed_flag} must be an integer from {MIN_LIGANDMPNN_SEED} through {MAX_LIGANDMPNN_SEED}"
+        )
 
 
 def _reject_existing_score_output(arguments: list[str], *, pdb_path: Path) -> tuple[int, Path, Path]:

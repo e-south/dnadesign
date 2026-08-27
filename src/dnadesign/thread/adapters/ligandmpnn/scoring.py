@@ -16,7 +16,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
-from dnadesign.thread.adapters.ligandmpnn.commands import resolve_checkout_root_for_execution
+from dnadesign.thread.adapters.ligandmpnn.commands import (
+    resolve_checkout_root_for_execution,
+    resolve_execution_root_for_execution,
+)
 from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
     load_ligandmpnn_context_inventory,
     validate_context_inventory_for_input,
@@ -117,6 +120,7 @@ def build_ligandmpnn_score_commands(
 ) -> tuple[LigandMpnnCommand, ...]:
     """Build one explicit official ``score.py`` invocation per seed."""
 
+    execution_root = resolve_execution_root_for_execution(execution_root)
     checkout_root = resolve_checkout_root_for_execution(checkout_root, execution_root=execution_root)
     context_inventory = load_ligandmpnn_context_inventory(
         request.context_inventory,

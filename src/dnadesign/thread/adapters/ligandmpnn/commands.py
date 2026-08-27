@@ -32,6 +32,7 @@ def build_ligandmpnn_commands(
 ) -> tuple[LigandMpnnCommand, ...]:
     """Build one explicit official ``run.py`` invocation per requested seed."""
 
+    execution_root = resolve_execution_root_for_execution(execution_root)
     checkout_root = resolve_checkout_root_for_execution(checkout_root, execution_root=execution_root)
     context_inventory = load_ligandmpnn_context_inventory(
         request.context_inventory,
@@ -126,6 +127,17 @@ def resolve_checkout_root_for_execution(checkout_root: Path, *, execution_root: 
     if str(checkout_root).startswith("~"):
         raise ValueError("relative checkout_root must not begin with '~'")
     return execution_root / checkout_root
+
+
+def resolve_execution_root_for_execution(execution_root: Path) -> Path:
+    """Canonicalize one absolute workspace root before binding command evidence."""
+
+    if not isinstance(execution_root, Path) or not execution_root.is_absolute():
+        raise ValueError("execution_root must be an absolute directory")
+    root = execution_root.expanduser().resolve()
+    if not root.is_dir():
+        raise ValueError("execution_root must be an existing directory")
+    return root
 
 
 def _validate_alphabet_sidecar(

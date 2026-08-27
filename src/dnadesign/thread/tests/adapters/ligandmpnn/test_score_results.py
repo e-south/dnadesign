@@ -15,6 +15,8 @@ import hashlib
 import importlib
 import io
 import json
+import os
+import socket
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -442,6 +444,28 @@ def test_parser_rejects_symlinked_output_artifacts(tmp_path: Path) -> None:
     linked.symlink_to(source)
 
     with pytest.raises(ValueError, match="must not be symlinks"):
+        _parse(tmp_path, request)
+
+
+@pytest.mark.parametrize("kind", ["fifo", "socket", "directory"])
+def test_parser_rejects_extra_nonregular_score_artifacts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: str,
+) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    valid_output = _write_output(tmp_path, request, 7)
+    extra = valid_output.with_name(f"extra-{kind}.pt")
+    if kind == "fifo":
+        os.mkfifo(extra)
+    elif kind == "socket":
+        monkeypatch.chdir(extra.parent)
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as unix_socket:
+            unix_socket.bind(extra.name)
+    else:
+        extra.mkdir()
+
+    with pytest.raises(ValueError, match="must be regular files"):
         _parse(tmp_path, request)
 
 

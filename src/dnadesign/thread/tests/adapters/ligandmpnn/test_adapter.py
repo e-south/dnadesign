@@ -339,9 +339,9 @@ def test_request_rejects_ambiguous_or_nondeterministic_inputs(overrides: dict[st
         _request(**overrides)
 
 
-@pytest.mark.parametrize("seeds", [(-1,), (2**32,), (True,), (1.5,)])
-def test_design_request_rejects_seeds_outside_upstream_numpy_domain(seeds: tuple[object, ...]) -> None:
-    with pytest.raises(ValueError, match="integers from 0 through 4294967295"):
+@pytest.mark.parametrize("seeds", [(-1,), (0,), (2**32,), (True,), (1.5,)])
+def test_design_request_rejects_seeds_outside_upstream_deterministic_domain(seeds: tuple[object, ...]) -> None:
+    with pytest.raises(ValueError, match="integers from 1 through 4294967295"):
         _request(seeds=seeds)
 
 
@@ -351,17 +351,17 @@ def test_design_request_requires_nonempty_seed_tuple(seeds: object) -> None:
         _request(seeds=seeds)
 
 
-def test_design_request_emits_numpy_seed_boundaries(tmp_path: Path) -> None:
+def test_design_request_emits_deterministic_seed_boundaries(tmp_path: Path) -> None:
     request, checkout_root = _validated_request(
         tmp_path,
-        seeds=(0, 2**32 - 1),
+        seeds=(1, 2**32 - 1),
         packing=LigandMpnnPackingConfig(),
     )
 
     commands = build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
 
-    assert [command.seed for command in commands] == [0, 4294967295]
-    assert [command.argv[command.argv.index("--seed") + 1] for command in commands] == ["0", "4294967295"]
+    assert [command.seed for command in commands] == [1, 4294967295]
+    assert [command.argv[command.argv.index("--seed") + 1] for command in commands] == ["1", "4294967295"]
 
 
 def test_request_rejects_untyped_upstream_even_when_packing_is_disabled() -> None:

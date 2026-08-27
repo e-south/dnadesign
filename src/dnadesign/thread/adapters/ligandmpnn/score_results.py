@@ -19,6 +19,7 @@ import hashlib
 import io
 import json
 import math
+import stat
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -27,6 +28,7 @@ from typing import Any
 import numpy as np
 import torch
 
+from dnadesign.thread.adapters.ligandmpnn.commands import resolve_execution_root_for_execution
 from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
     LigandMpnnContextInventory,
     _read_descriptor_relative_regular_bytes,
@@ -273,9 +275,7 @@ def parse_ligandmpnn_score_outputs(
 
     if trust is not LigandMpnnScoreOutputTrust.PINNED_LOCAL_EXECUTION:
         raise ValueError("score parsing requires explicit pinned-local-execution trust")
-    root = execution_root.expanduser().resolve()
-    if not root.is_dir():
-        raise ValueError("execution_root must be an existing directory")
+    root = resolve_execution_root_for_execution(execution_root)
 
     input_path = _within_root(root, request.pdb_path, field_name="pdb_path")
     if not input_path.is_file():
@@ -321,7 +321,21 @@ def parse_ligandmpnn_score_outputs(
             "LigandMPNN score outputs must not be symlinks: "
             + ", ".join(path.relative_to(root).as_posix() for path in symlink_outputs)
         )
-    observed_paths = {path.resolve() for path in discovered_paths if path.is_file()}
+    nonregular_outputs: list[Path] = []
+    for path in discovered_paths:
+        try:
+            if not stat.S_ISREG(path.lstat().st_mode):
+                nonregular_outputs.append(path)
+        except OSError as error:
+            raise ValueError(
+                f"LigandMPNN score output could not be inspected safely: {_display_path(path, root)}"
+            ) from error
+    if nonregular_outputs:
+        raise ValueError(
+            "LigandMPNN score outputs must be regular files: "
+            + ", ".join(_display_path(path, root) for path in nonregular_outputs)
+        )
+    observed_paths = {path.resolve() for path in discovered_paths}
     expected_set = set(expected_paths)
     missing = sorted(expected_set - observed_paths)
     extra = sorted(observed_paths - expected_set)
