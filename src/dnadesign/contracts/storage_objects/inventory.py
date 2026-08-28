@@ -21,6 +21,7 @@ import shlex
 import stat
 import sys
 import tempfile
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -63,6 +64,11 @@ from .validation import (
 _LINUX_RENAME_NOREPLACE = 0x00000001
 _RENAME_EXCHANGE = 0x00000002
 _DARWIN_RENAME_EXCL = 0x00000004
+
+_POST_PUBLICATION_SETTLE_SECONDS = 0.5
+_TRANSIENT_POST_PUBLICATION_VALIDATION_ERROR = (
+    "storage object changed during validation; retry while the producer is quiescent"
+)
 
 
 def _require_posix_publication_capabilities() -> None:
@@ -1007,6 +1013,28 @@ def _publish_refresh_manifest(
         raise publication_error
 
 
+def _verify_published_manifest(
+    manifest_path: Path,
+    *,
+    allow_pending_demo_manifest: bool,
+    previous_bytes: bytes | None,
+):
+    """Retry one exact provider-settle race without relaxing validation."""
+
+    for attempt in range(2):
+        try:
+            return verify_storage_object(
+                manifest_path.parent,
+                _allow_pending_demo_manifest=allow_pending_demo_manifest,
+                _allow_pending_demo_lock=allow_pending_demo_manifest and previous_bytes is None,
+            )
+        except StorageObjectError as exc:
+            if attempt != 0 or str(exc) != _TRANSIENT_POST_PUBLICATION_VALIDATION_ERROR:
+                raise
+            time.sleep(_POST_PUBLICATION_SETTLE_SECONDS)
+    raise AssertionError("bounded storage-object publication validation exhausted unexpectedly")
+
+
 def _write_manifest(
     manifest_path: Path,
     payload: dict[str, object],
@@ -1089,10 +1117,10 @@ def _write_manifest(
             raise StorageObjectError(f"cannot write storage object manifest: {write_error}") from write_error
         raise
     try:
-        summary = verify_storage_object(
-            manifest_path.parent,
-            _allow_pending_demo_manifest=allow_pending_demo_manifest,
-            _allow_pending_demo_lock=allow_pending_demo_manifest and previous_bytes is None,
+        summary = _verify_published_manifest(
+            manifest_path,
+            allow_pending_demo_manifest=allow_pending_demo_manifest,
+            previous_bytes=previous_bytes,
         ).summary()
         if allow_pending_demo_manifest:
             summary["status"] = "created-pending-git-add" if previous_bytes is None else "refreshed-pending-git-add"

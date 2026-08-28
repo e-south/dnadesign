@@ -44,6 +44,82 @@ def _digest(path: Path) -> str:
     return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
 
 
+def test_inventory_retries_one_transient_post_publication_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    original_verify = storage_inventory.verify_storage_object
+    calls = 0
+    settle_delays: list[float] = []
+
+    def _verify(*args: object, **kwargs: object):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise StorageObjectError(storage_inventory._TRANSIENT_POST_PUBLICATION_VALIDATION_ERROR)
+        return original_verify(*args, **kwargs)
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _verify)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert calls == 2
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
+def test_inventory_does_not_retry_semantic_validation_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    calls = 0
+    settle_delays: list[float] = []
+
+    def _verify(*_args: object, **_kwargs: object):
+        nonlocal calls
+        calls += 1
+        raise StorageObjectError("declared resource digest mismatch")
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _verify)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    with pytest.raises(StorageObjectError, match="declared resource digest mismatch"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="usr",
+            object_kind="store",
+            content_schema="usr.dataset-root",
+            content_schema_version="v1",
+            producer_revision="test-revision",
+            storage_class="cold",
+            retention_policy="cold",
+        )
+
+    assert calls == 1
+    assert settle_delays == []
+    assert not (root / MANIFEST_NAME).exists()
+
+
 def _set_git_index_mode(checkout: Path, path: Path, mode: str) -> None:
     relative = path.relative_to(checkout).as_posix()
     if mode == "160000":
