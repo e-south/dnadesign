@@ -343,11 +343,16 @@ meta.yaml
 # ADEs
 AGENTS.md
 !src/dnadesign/baserender/AGENTS.md
+!src/dnadesign/cluster/AGENTS.md
 !src/dnadesign/construct/AGENTS.md
 !src/dnadesign/cruncher/AGENTS.md
+!src/dnadesign/infer/AGENTS.md
 !src/dnadesign/latentdna/AGENTS.md
 !src/dnadesign/notify/AGENTS.md
+!src/dnadesign/opal/AGENTS.md
+!src/dnadesign/opal/notebooks/AGENTS.md
 !src/dnadesign/permuter/AGENTS.md
+!src/dnadesign/usr/notebooks/AGENTS.md
 src/dnadesign/notify/.secrets/
 
 # Marimo
