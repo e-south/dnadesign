@@ -15,6 +15,7 @@ Use semantic lanes instead of a flat chronology.
 
 ### Current Proposals
 
+- [Cross-tool proposals](cross-tool/)
 - [Cruncher proposals](tools/cruncher/)
 - [DenseGen proposals](tools/densegen/)
 - [USR proposals](tools/usr/)

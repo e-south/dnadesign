@@ -1,0 +1,583 @@
+{
+  "schema": "dnadesign.storage-adoption-candidate-ledger/v1",
+  "observed_source_revision": "4ce87f8",
+  "source_root": "src/dnadesign",
+  "digest_algorithm": "sha256(sorted(relative_path NUL byte_size NUL file_sha256 NUL))",
+  "whole_ignored_tree": {
+    "file_count": 34226,
+    "bytes": 58669760759,
+    "digest": "sha256:996240a791dd58664d73a06526ea25dc5f162e80822cd15de77a1637e3af0cb0"
+  },
+  "candidates": [
+    {
+      "path": "latentdna/workspaces/stress_ethanol_cipro_growth",
+      "file_count": 3581,
+      "bytes": 21893767934,
+      "digest": "sha256:1467e79605671eb5dc64c103e115a19a91189c8063061bfe10398a914d25ead5"
+    },
+    {
+      "path": "studies/units/eco1_rt_repack",
+      "file_count": 16708,
+      "bytes": 11338517657,
+      "digest": "sha256:48a323944f0c6e2e53313abeee2d51c5195a0af51597c6c7c315dd632f9c59d5"
+    },
+    {
+      "path": "usr/datasets/usr_prom_eth_cip_opal_candidates",
+      "file_count": 15,
+      "bytes": 5306932643,
+      "digest": "sha256:f121a846fbb2b258891e3bc1cef413b99a4279a9a04ca3208ce05eaa74d5b56c"
+    },
+    {
+      "path": "usr/datasets/construct_prom_eth_cip_context",
+      "file_count": 32,
+      "bytes": 4805777345,
+      "digest": "sha256:22fd239530415d252f5201ccccef32e5182d720ac4788c01b9ae903ab4e89622"
+    },
+    {
+      "path": "latentdna/workspaces/rt_lnrna_sponging_construct_triage",
+      "file_count": 820,
+      "bytes": 3166859303,
+      "digest": "sha256:ccedb8baa51821e3ddfa71cd03304c786dfc7e35e979821af39500aade23131b"
+    },
+    {
+      "path": "archived/seqcnn",
+      "file_count": 399,
+      "bytes": 2590580883,
+      "digest": "sha256:f3fa9e3da3430857bf2a83e8ae9671df56a413005b6a6aa0cade8c095cb5f266"
+    },
+    {
+      "path": "archived/preprocessing",
+      "file_count": 299,
+      "bytes": 1292212438,
+      "digest": "sha256:d647ed3fd17c09474d54e3c6c002fc5e17bcf03365b6ad285c4066bd57159308"
+    },
+    {
+      "path": "usr/datasets/usr_prom_eth_cip_anchor",
+      "file_count": 35,
+      "bytes": 1252190004,
+      "digest": "sha256:868803762673c1086ec57b210400944b0f3d5f284b271ebfa005d56aeed1696c"
+    },
+    {
+      "path": "usr/datasets/archived",
+      "file_count": 190,
+      "bytes": 999702626,
+      "digest": "sha256:50f8fad2c285cdcd60e10879c1470d94a56be1f84c73478f91fa57dc17a678b9"
+    },
+    {
+      "path": "cruncher/workspaces/project_tfs_lexa_cpxr_baer_rcda_lrp_fur_fnr_acrr_soxr_soxs",
+      "file_count": 237,
+      "bytes": 922391554,
+      "digest": "sha256:3b0aee59b0eef2c6e7e2dec1b584f4bcf2a9dd2742d31178951a7145103d1736"
+    },
+    {
+      "path": "archived/densepromoters",
+      "file_count": 365,
+      "bytes": 674991450,
+      "digest": "sha256:691a0f426affafaa2bca784d0575dc5eca1ba849886fdf2d8452852a1a687f38"
+    },
+    {
+      "path": "studies/units/stress_ethanol_cipro_growth",
+      "file_count": 308,
+      "bytes": 425980354,
+      "digest": "sha256:8d5573ef08957a0420a7e345a31be56d368c4604ead4ad7034cb1c2d0c16e667"
+    },
+    {
+      "path": "libshuffle/batch_results",
+      "file_count": 56,
+      "bytes": 343302736,
+      "digest": "sha256:6f62806d2263c01964021215671a06fd8e8460b19c17876ebd39915ee4bb7af6"
+    },
+    {
+      "path": "densegen/workspaces/study_stress_ethanol_cipro",
+      "file_count": 1841,
+      "bytes": 241964838,
+      "digest": "sha256:ef9696620ed16df5d6fa03c6e58ce66fb66a31638969262af011cdfcb7c544a5"
+    },
+    {
+      "path": "cruncher/workspaces/multitf_baer_lexa_soxr_soxs",
+      "file_count": 130,
+      "bytes": 208015208,
+      "digest": "sha256:d7c1ee5d32f51686e6f8d0aee98f13a22002d47cdd3ad067ff40607197639a7f"
+    },
+    {
+      "path": "cruncher/workspaces/multitf_baer_lexa_soxr",
+      "file_count": 113,
+      "bytes": 197197215,
+      "digest": "sha256:d8137682d58bd564643b8bb6347c83978811b18fee0e67127674215f1f336b11"
+    },
+    {
+      "path": "cruncher/workspaces/demo_pairwise",
+      "file_count": 97,
+      "bytes": 195273511,
+      "digest": "sha256:a9105967dcd3bd4ec8b56639d7c857ba716208c9222af18902f569ab48a793f0"
+    },
+    {
+      "path": "cruncher/workspaces/multitf_cpxr_baer_lexa",
+      "file_count": 113,
+      "bytes": 192357523,
+      "digest": "sha256:29442693a18339408ba9b185798a7eafe5357be8975dd16765bb595a5bf57ab0"
+    },
+    {
+      "path": "cruncher/workspaces/demo_multitf",
+      "file_count": 103,
+      "bytes": 191172938,
+      "digest": "sha256:31e3d3ebe2e12263c338aeecfe493ca3cc6503daa37c42b609615fc2bffdf761"
+    },
+    {
+      "path": "cruncher/workspaces/pairwise_laci_arac",
+      "file_count": 94,
+      "bytes": 185912144,
+      "digest": "sha256:9a32ffde13119e48441619f9a2d9461a8202d93d01bd34e794541a0e76ac1b16"
+    },
+    {
+      "path": "cruncher/workspaces/pairwise_baer_lexa",
+      "file_count": 97,
+      "bytes": 180654323,
+      "digest": "sha256:7a79d5b51fa47955ca9934a2a175892aed7fad9fbe2cc5b950d1747ce72b7faf"
+    },
+    {
+      "path": "cruncher/workspaces/pairwise_soxr_soxs",
+      "file_count": 94,
+      "bytes": 180193456,
+      "digest": "sha256:1fa471c6a40807e8954c31f95c141c4c713b9f7cb18023d1378fa86dbeed0e44"
+    },
+    {
+      "path": "cruncher/workspaces/pairwise_baer_soxr",
+      "file_count": 95,
+      "bytes": 179613975,
+      "digest": "sha256:5198433d6807bb7642f955ffecea1cfc0c8fecede4dca36d0051bd6cc2cc6575"
+    },
+    {
+      "path": "cruncher/workspaces/pairwise_cpxr_lexa",
+      "file_count": 95,
+      "bytes": 175964446,
+      "digest": "sha256:534af862dc47b8d8d6be311db2945a1d3bc1870a7496f84b65658aa7962e8580"
+    },
+    {
+      "path": "cruncher/workspaces/pairwise_cpxr_soxr",
+      "file_count": 95,
+      "bytes": 174305322,
+      "digest": "sha256:9da8cf386d70d2228a6178662a90147f312fc627e882a4678bc0693b9da42412"
+    },
+    {
+      "path": "cruncher/workspaces/pairwise_cpxr_baer",
+      "file_count": 95,
+      "bytes": 173142563,
+      "digest": "sha256:c09332edd2523221abf46eedd40109d896dfd7e6120865d709dca0aaea1f1c2d"
+    },
+    {
+      "path": "usr/datasets/densegen_prom_eth_cip_source",
+      "file_count": 803,
+      "bytes": 149591469,
+      "digest": "sha256:c1c273430261a4b279b1dd52e1ca629dd36f8d709e96d194d72ea0e2e77d1748"
+    },
+    {
+      "path": "latentdna/workspaces/regulondb_native_promoter_panel",
+      "file_count": 435,
+      "bytes": 137512354,
+      "digest": "sha256:915d547896fca29b1634e020f4886932a532f04cccd8030c076bcd1482d26dfc"
+    },
+    {
+      "path": "prototypes/deepDNAshape",
+      "file_count": 222,
+      "bytes": 128356531,
+      "digest": "sha256:cfc53790407b92bc8d42d958f4161af30bca778f9c8dc89f81ff61c325675ffa"
+    },
+    {
+      "path": "prototypes/molbench",
+      "file_count": 14,
+      "bytes": 88555232,
+      "digest": "sha256:0f3c6da46818f7343fc2f036b33477200c094a4bbc0eef59c2d4d5928c23e76e"
+    },
+    {
+      "path": "nmf/batch_results",
+      "file_count": 118,
+      "bytes": 82665885,
+      "digest": "sha256:0714930016857f1c15fce8abb670e3c2c14668a4188d45da3e809d56b08ec370"
+    },
+    {
+      "path": "billboard/batch_results",
+      "file_count": 180,
+      "bytes": 68813424,
+      "digest": "sha256:f938cec35a0df9f94627f6b3cb29396e9d26b823a4116bc7b52b3b527bffe3a0"
+    },
+    {
+      "path": "archived/decoydesigner",
+      "file_count": 271,
+      "bytes": 63351790,
+      "digest": "sha256:6fe7908db11ecab71a6262f6c443a9c94a3af98094133ba45d34c0ffc2ced6ab"
+    },
+    {
+      "path": "_regenerable/caches-and-finder",
+      "file_count": 3608,
+      "bytes": 49137695,
+      "digest": "sha256:cdde1f5975a700cf35ac956417f33be9d94af48099bc39bc38d419c82893a47f"
+    },
+    {
+      "path": "archived/permuter",
+      "file_count": 125,
+      "bytes": 44486714,
+      "digest": "sha256:e5bd27d34a3554982df69c099825a619d90e8b1965b95866fc51f5d0f73ddde0"
+    },
+    {
+      "path": "cruncher/workspaces/portfolios",
+      "file_count": 26,
+      "bytes": 38362099,
+      "digest": "sha256:bbbd29b1ec9f8e7f964b2407c1965ae66b856297652613f5269972ca5213d677"
+    },
+    {
+      "path": "cruncher/workspaces/demo_monotypic_tetr",
+      "file_count": 62,
+      "bytes": 29019759,
+      "digest": "sha256:5db81a210ecb17f4a7b73957723319c7c8f942fb8bd28d6aae2fb88ff6c8274c"
+    },
+    {
+      "path": "archived/clustering",
+      "file_count": 241,
+      "bytes": 27386962,
+      "digest": "sha256:4dfcf986574b041688233cb862fe167884e2b1d6e7a93c98eac5e64ae0cfefcf"
+    },
+    {
+      "path": "densegen/workspaces/study_constitutive_sigma_panel",
+      "file_count": 114,
+      "bytes": 27368442,
+      "digest": "sha256:b4f7878bae484cbbf6f79897a56581d9dd1d335a9a2905399c989f8ffd809c85"
+    },
+    {
+      "path": "cruncher/workspaces/demo_monotypic_soxr",
+      "file_count": 69,
+      "bytes": 23706045,
+      "digest": "sha256:924300aa5066e94b48e2b89aedd17c598ab71629fec1cdf4e974230a15b0ec46"
+    },
+    {
+      "path": "cruncher/workspaces/demo_monotypic_lexa",
+      "file_count": 72,
+      "bytes": 23613172,
+      "digest": "sha256:75982a71404ba3181e9736e1b24ab05c9b1422a5920add3bc91d0aeec7b42b97"
+    },
+    {
+      "path": "cruncher/workspaces/demo_monotypic_baer",
+      "file_count": 69,
+      "bytes": 22282677,
+      "digest": "sha256:e66f94778d8c635ed39ec576fbf42131b6a230e301b38370f9522fe5b172f56c"
+    },
+    {
+      "path": "cruncher/workspaces/demo_monotypic_soxs",
+      "file_count": 68,
+      "bytes": 21503231,
+      "digest": "sha256:a82de2717f6363549137283bb106baac8da5b6a904985aeb4f2a294f0af74a96"
+    },
+    {
+      "path": "cruncher/workspaces/demo_monotypic_cpxr",
+      "file_count": 69,
+      "bytes": 21214156,
+      "digest": "sha256:88b11665df7e9453a269cc44e04f3755426849fc2f8069191809b0e98e333549"
+    },
+    {
+      "path": "cruncher/workspaces/archived",
+      "file_count": 81,
+      "bytes": 21213586,
+      "digest": "sha256:1161bf8052d6582f53201e4914eb32553eeec0a269517a51fafec5c89a6cfcb1"
+    },
+    {
+      "path": "densegen/workspaces/demo_dense_array_showcase",
+      "file_count": 85,
+      "bytes": 16495217,
+      "digest": "sha256:08364cecfbc8df1a5d593db74bb15574764a36ebaf82a40387ad5d64124031f2"
+    },
+    {
+      "path": "baserender/workspaces/usr_promoter_references_genbank",
+      "file_count": 51,
+      "bytes": 15366431,
+      "digest": "sha256:f07c99362931cd2ffec26e315e58708a13be7c93dcc235ec6dd68b0731f3a009"
+    },
+    {
+      "path": "_residual/cruncher",
+      "file_count": 169,
+      "bytes": 11345779,
+      "digest": "sha256:d6cfcde8a718d4934a5e5154704b9a39fabb0837f42c62d28f42fe080fad510c"
+    },
+    {
+      "path": "prototypes/evo_umap",
+      "file_count": 27,
+      "bytes": 10465272,
+      "digest": "sha256:1de868649915477e1537343a6f6617b824c3808977277a7b96998e75b5801a08"
+    },
+    {
+      "path": "tfkdanalysis/batch_results",
+      "file_count": 132,
+      "bytes": 9207166,
+      "digest": "sha256:5d95131c2ec590c048b6adc2c6287019e1ed707ea646c50185cb0306a6865c19"
+    },
+    {
+      "path": "baserender/workspaces/usr_sfxi_pdual10_densegen_promoters",
+      "file_count": 26,
+      "bytes": 8036852,
+      "digest": "sha256:02bbeaffb32018b00d63ca3b35611b793f0d87ca6417dbc4e842934af95751cc"
+    },
+    {
+      "path": "usr/datasets/usr_regulondb_native_promoters",
+      "file_count": 25,
+      "bytes": 6813696,
+      "digest": "sha256:1414a344c993ce29c9e6bd893e6b1f1c1b052177fb7e69ab69ffbfba61ebc3c1"
+    },
+    {
+      "path": "usr/datasets/densegen_study_constitutive_sigma_panel",
+      "file_count": 18,
+      "bytes": 5364618,
+      "digest": "sha256:64e8479150cea7743059823ea532b52f2d7e0256a7227c4621a2ac209fa4d704"
+    },
+    {
+      "path": "_residual/baserender",
+      "file_count": 37,
+      "bytes": 5289726,
+      "digest": "sha256:b53589579f382cf24ee32d7450e49de7b51a696e7d4a1e6e43ed5ba86d06d0eb"
+    },
+    {
+      "path": "cruncher/workspaces/scar_nick_teto",
+      "file_count": 265,
+      "bytes": 3575667,
+      "digest": "sha256:3fddd959142c9100bc822935fa9cb89c56f424b99add18d033a47212440baf18"
+    },
+    {
+      "path": "densegen/workspaces/demo_tfbs_baseline",
+      "file_count": 39,
+      "bytes": 3381826,
+      "digest": "sha256:fcdcc3849b626a035a6f014dc33e353e1f8612f169316cf9e73d5432770115ad"
+    },
+    {
+      "path": "archived/drug_transport",
+      "file_count": 6,
+      "bytes": 2678050,
+      "digest": "sha256:a49b67039b9067b35538fe375f503cba21d12bd32e9ea9f18f061f16832a1d9e"
+    },
+    {
+      "path": "densegen/workspaces/demo_sampling_baseline",
+      "file_count": 39,
+      "bytes": 2018330,
+      "digest": "sha256:efdfee227432fab00ff3ae846bf91e4f8218c3f8a3fb0d855cc8e15d48d68aef"
+    },
+    {
+      "path": "cruncher/workspaces/demo_yiu_payload",
+      "file_count": 11,
+      "bytes": 1907459,
+      "digest": "sha256:769deaa4528e4c190595299b50374d8d6c47ecbec2d05c643370b68a6ed2a9f1"
+    },
+    {
+      "path": "prototypes/promoter_calculator",
+      "file_count": 2,
+      "bytes": 1673242,
+      "digest": "sha256:c03473301e0c7509186c7e68c7d49eeb78190119fdd93da3cb6d320c15715ed2"
+    },
+    {
+      "path": "usr/datasets/construct_prom_eth_cip_reference_contexts",
+      "file_count": 21,
+      "bytes": 1584431,
+      "digest": "sha256:1d59f0b5107c007109730a71b40d8725e4b258a0bf46c02f0de4103d04686f38"
+    },
+    {
+      "path": "archived/densehairpins",
+      "file_count": 42,
+      "bytes": 1274460,
+      "digest": "sha256:62627a981f5136f070078709f802ef811064ad389699166c76a03369b7ace7f4"
+    },
+    {
+      "path": "usr/datasets/usr_regulondb_native_promoter_core60",
+      "file_count": 11,
+      "bytes": 1115392,
+      "digest": "sha256:92a4c4c0a8fbf7340d3312f4af107ad6bcd57550e7479ee200f5bcf78e27d6e6"
+    },
+    {
+      "path": "cruncher/workspaces/demo_released_snapback",
+      "file_count": 83,
+      "bytes": 991622,
+      "digest": "sha256:1d293a31a85d6be56a2d0479e6ab441939c78c3ea04b5589b61d077994a08054"
+    },
+    {
+      "path": "construct/workspaces/retron43_teto_manual_x8",
+      "file_count": 25,
+      "bytes": 709963,
+      "digest": "sha256:ca31e7fd37e4ab47ff8d18c05daf7ad407100d8c98977ef03a2a67f2ace1d6dc"
+    },
+    {
+      "path": "usr/datasets/construct_prom_eth_cip_reference_core60",
+      "file_count": 21,
+      "bytes": 563511,
+      "digest": "sha256:59626ba0165e3f44ee1fd6a8078e90eb2dcb76ea762a682ab54df28f8d5e0533"
+    },
+    {
+      "path": "densegen/workspaces/archived",
+      "file_count": 9,
+      "bytes": 329885,
+      "digest": "sha256:b080dfacf5b0faa3f45f81fce5e337831055f005511e4d61f0d575d3ad80d73c"
+    },
+    {
+      "path": "usr/datasets/densegen_demo_sampling_baseline",
+      "file_count": 17,
+      "bytes": 301302,
+      "digest": "sha256:550afe674bf8659b931471df818e26a96bf927fa10c641c8c8514aef1067e574"
+    },
+    {
+      "path": "usr/datasets/usr_promoter_references",
+      "file_count": 65,
+      "bytes": 299450,
+      "digest": "sha256:e89c40a3899a41763fb8f0cc32c39c53ffe02e7daa6d30d41f97a373de4c2dca"
+    },
+    {
+      "path": "archived/consensus_sites",
+      "file_count": 28,
+      "bytes": 259436,
+      "digest": "sha256:26e65abcf827e58ae27e603545d42a7da3fb3468efa77a199b90549582fd18ad"
+    },
+    {
+      "path": "archived/molbench",
+      "file_count": 52,
+      "bytes": 199229,
+      "digest": "sha256:ca02d5ebae018618bbc45ba93a623044fe609c8a43462e0780ea807617dda105"
+    },
+    {
+      "path": "usr/datasets/usr_sfxi_pdual10_densegen_promoters",
+      "file_count": 18,
+      "bytes": 191670,
+      "digest": "sha256:3899247647abdb32737d770371da12bed342f0e96c88ed7b699f77554a04f94b"
+    },
+    {
+      "path": "usr/datasets/usr_demo_cli_examples",
+      "file_count": 16,
+      "bytes": 187572,
+      "digest": "sha256:90e4f3eaf7447127469a966abda25c636024988b84008474f2bf690a8d4b2234"
+    },
+    {
+      "path": "usr/datasets/usr_pdual10_plasmid_template",
+      "file_count": 20,
+      "bytes": 163152,
+      "digest": "sha256:039e83be72cfbca2461f56ec1230da257722e9185db68376489b65e8884b3690"
+    },
+    {
+      "path": "_residual/junction",
+      "file_count": 1,
+      "bytes": 160898,
+      "digest": "sha256:1b90fd2b48345321f87037cea93047bcf3a9b1208812a19a985a3940978b525e"
+    },
+    {
+      "path": "usr/datasets/usr_mg1655_promoter_controls",
+      "file_count": 20,
+      "bytes": 159408,
+      "digest": "sha256:28077e8b7366415c5391e69c6b8302505d0494c871827c948ad6661997a26e0d"
+    },
+    {
+      "path": "archived/seqfetcher",
+      "file_count": 26,
+      "bytes": 100378,
+      "digest": "sha256:914e14a816ffb34976257abbdca68df517ea9b61781eb7a799d87f51a195942d"
+    },
+    {
+      "path": "baserender/workspaces/demo_densegen_render",
+      "file_count": 1,
+      "bytes": 77685,
+      "digest": "sha256:28f4d3e5923b04192c9fc9255bfca6b3cd25b999502ec1e8351428d4a2455a75"
+    },
+    {
+      "path": "usr/datasets/template_parts_demo",
+      "file_count": 10,
+      "bytes": 54713,
+      "digest": "sha256:b7ef06822c4105ff17dffd538faacde0349b54ba3e5abb2b9d956eca81143de1"
+    },
+    {
+      "path": "usr/datasets/anchor_parts_demo",
+      "file_count": 10,
+      "bytes": 52224,
+      "digest": "sha256:75499d3b5e1dc67753ddeadbcd6620e6243a4a4c4686b1a19ad21fc3695c742b"
+    },
+    {
+      "path": "archived/evoinference",
+      "file_count": 11,
+      "bytes": 29065,
+      "digest": "sha256:c225fcb983104141ffaf3eafe1d0b80d7b45858cc2b6ed07f8397d845e7eea11"
+    },
+    {
+      "path": "cruncher/workspaces/.DS_Store",
+      "file_count": 1,
+      "bytes": 28676,
+      "digest": "sha256:913175a8db9fc94ba5c72d1c6f68fa2211fdb24d9940486110b1b5c94813ea30"
+    },
+    {
+      "path": "archived/configs",
+      "file_count": 2,
+      "bytes": 28418,
+      "digest": "sha256:25aa0cf4c39b9cf99032f9a765fbdae6e5448988d470391fa4de38bee4b6e87b"
+    },
+    {
+      "path": "cruncher/workspaces/msd-HOPV5_snapback",
+      "file_count": 6,
+      "bytes": 28229,
+      "digest": "sha256:f1deffb7f1cc0540916fdf273529a37fd950aebddcad67517e63758bcf1ce529"
+    },
+    {
+      "path": "_residual/opal",
+      "file_count": 3,
+      "bytes": 24843,
+      "digest": "sha256:a5d80abf5707de8fa56a5d7de567831e42d56759dd830ab36f2d6de44ecd5677"
+    },
+    {
+      "path": "prototypes/rbs_calculator",
+      "file_count": 6,
+      "bytes": 22085,
+      "digest": "sha256:31d020a15685744205902073f5d50844ee83ed8b2dc6f93b5b28d60283539bdb"
+    },
+    {
+      "path": "archived/.DS_Store",
+      "file_count": 1,
+      "bytes": 18436,
+      "digest": "sha256:60c68a10b210a55243fd52d465af753e6b9bb7e9a9306c74c0ce5f9f15d65506"
+    },
+    {
+      "path": "densegen/workspaces/.DS_Store",
+      "file_count": 1,
+      "bytes": 14340,
+      "digest": "sha256:6bc9d8a515d6442ae657d53ba1344ba47ce07bc0b8c77bf749b23ba25308e969"
+    },
+    {
+      "path": "usr/datasets/.DS_Store",
+      "file_count": 1,
+      "bytes": 12292,
+      "digest": "sha256:6e0ac6ba2ba2239cbbf68ecac64ff94fc72eb83bd0f0ffc49edfc8289e2aa512"
+    },
+    {
+      "path": "latentdna/workspaces/.DS_Store",
+      "file_count": 1,
+      "bytes": 10244,
+      "digest": "sha256:01a46a2e073836db1617f120fbd9f9a4a5d3bea1820971faecb1211cfde2a054"
+    },
+    {
+      "path": "prototypes/.DS_Store",
+      "file_count": 1,
+      "bytes": 10244,
+      "digest": "sha256:125a00c09842ea2a89bb57e9498d3fb1463cda6d93604f25f4bc60b72d5cb83e"
+    },
+    {
+      "path": "archived/utils.py",
+      "file_count": 1,
+      "bytes": 9179,
+      "digest": "sha256:d9e1912130b8c5c7519f4c2ed6867d6e132c5023b560b4eee12676c255eb6cdb"
+    },
+    {
+      "path": "_source-rescue/ignored-agent-guidance",
+      "file_count": 5,
+      "bytes": 8773,
+      "digest": "sha256:03953212ec5461195455a638eca1d3ba0de44d504de4d00b273ce3ddce1000f7"
+    },
+    {
+      "path": "archived/README.md",
+      "file_count": 1,
+      "bytes": 3897,
+      "digest": "sha256:0cb652479f356f837043085be89db58ee9527e1ab6d608d9743af802fbb06c0b"
+    },
+    {
+      "path": "_residual/notify",
+      "file_count": 3,
+      "bytes": 714,
+      "digest": "sha256:ce2bdcdb8718bae29ae31904b4c57486e18df02db1bf063820426dc8940ddffe"
+    }
+  ]
+}
