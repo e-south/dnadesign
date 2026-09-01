@@ -930,7 +930,7 @@ def _recheck_verified_demo_snapshot(
         or coordination_state != expected_coordination_state
         or observed_tree_state != expected_tree_state
     ):
-        raise StorageObjectError(
+        raise _StorageSnapshotInconsistent(
             "demo storage object changed during Git index validation; retry while the producer is quiescent"
         )
 

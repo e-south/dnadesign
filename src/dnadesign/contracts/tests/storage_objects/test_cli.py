@@ -937,6 +937,55 @@ def test_inventory_bootstraps_demo_then_requires_manifest_to_be_tracked(
     assert indexed_lock.startswith("100644 ")
 
 
+def test_inventory_retries_demo_resource_snapshot_drift_after_git_index_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout = tmp_path / "checkout"
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    root = checkout / "examples" / "pilot"
+    root.mkdir(parents=True)
+    payload_path = root / "payload.txt"
+    payload_path.write_text("payload\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot/payload.txt"], check=True)
+    original_run = storage_validation.subprocess.run
+    changed = False
+    settle_delays: list[float] = []
+
+    def _run(*args: object, **kwargs: object):
+        nonlocal changed
+        completed = original_run(*args, **kwargs)
+        command = args[0]
+        if isinstance(command, list) and "cat-file" in command and not changed:
+            replacement = payload_path.with_name(".payload.txt.same-bytes")
+            replacement.write_bytes(payload_path.read_bytes())
+            replacement.chmod(stat.S_IMODE(payload_path.stat(follow_symlinks=False).st_mode))
+            replacement.replace(payload_path)
+            changed = True
+        return completed
+
+    monkeypatch.setattr(storage_validation.subprocess, "run", _run)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+        demo=True,
+    )
+
+    assert summary["status"] == "created-pending-git-add"
+    assert changed is True
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
 def test_demo_validation_requires_empty_lock_to_match_git_index(tmp_path: Path) -> None:
     checkout = tmp_path / "checkout"
     subprocess.run(["git", "init", "-q", str(checkout)], check=True)
@@ -972,8 +1021,12 @@ def test_demo_validation_requires_empty_lock_to_match_git_index(tmp_path: Path) 
         check=True,
     )
     lock_path.write_bytes(b"")
-    with pytest.raises(StorageObjectError, match=r"demo file differs from Git index: .*\.storage-object\.lock"):
+    with pytest.raises(
+        StorageObjectError,
+        match=r"demo file differs from Git index: .*\.storage-object\.lock",
+    ) as exc_info:
         verify_storage_object(root)
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
     subprocess.run(
         ["git", "-C", str(checkout), "add", "examples/pilot/.storage-object.lock"],
@@ -1285,8 +1338,9 @@ def test_demo_validation_rejects_index_change_after_checked_entry(
 
     monkeypatch.setattr(storage_validation.subprocess, "run", _run)
 
-    with pytest.raises(StorageObjectError, match="demo Git index changed during validation"):
+    with pytest.raises(StorageObjectError, match="demo Git index changed during validation") as exc_info:
         verify_storage_object(root)
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
     assert changed
 
