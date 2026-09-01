@@ -25,13 +25,11 @@ def _():
 
 @app.cell
 def _(mo):
-    mo.md(
-        """
-# USR dataset explorer
+    mo.md(r"""
+    # USR dataset explorer
 
-Interactive views for USR datasets: quick summaries, filters, and plots.
-"""
-    )
+    Interactive views for USR datasets: quick summaries, filters, and plots.
+    """)
     return
 
 
@@ -204,9 +202,9 @@ def _(alt, df_sample, mo, numeric_picker, pd):
     charts["Nulls"] = mo.ui.altair_chart(null_chart)
 
     if charts:
-        mo.ui.tabs(charts)
+        _ = mo.ui.tabs(charts)
     else:
-        mo.md("No plots available for this dataset.")
+        _ = mo.md("No plots available for this dataset.")
     return
 
 
