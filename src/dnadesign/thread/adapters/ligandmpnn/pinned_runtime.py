@@ -1919,18 +1919,7 @@ def _publish_score_output(source_path: Path, destination_path: Path) -> tuple[st
             if destination_fd is not None:
                 os.close(destination_fd)
         if destination_identity != source_identity or destination_sha256 != source_sha256:
-            _quarantine_and_remove_owned_leaf(
-                directory_fd,
-                destination_path.name,
-                destination_identity,
-                expected_bytes=None,
-                expected_sha256=destination_sha256,
-                error_type=LigandMpnnScorePublicationUncertainError,
-                changed_message="LigandMPNN changed score publication could not be removed safely",
-                inspect_message="LigandMPNN changed score publication could not be inspected",
-                durability_message="LigandMPNN changed score publication removal is uncertain",
-            )
-            raise ValueError("score output changed before atomic publication")
+            raise LigandMpnnScorePublicationUncertainError("LigandMPNN score publication identity changed")
         try:
             os.fsync(directory_fd)
         except OSError as publication_error:

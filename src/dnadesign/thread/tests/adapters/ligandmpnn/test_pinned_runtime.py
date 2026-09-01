@@ -1414,7 +1414,10 @@ def test_pinned_score_publication_binds_the_hashed_source_inode(
 
     monkeypatch.setattr(os, "link", _replace_source_then_link)
 
-    with pytest.raises(ValueError, match="score output changed before atomic publication"):
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnScorePublicationUncertainError,
+        match="score publication identity changed",
+    ):
         execute_pinned_entrypoint(
             checkout_root=checkout,
             upstream_commit=commit,
@@ -1436,7 +1439,63 @@ def test_pinned_score_publication_binds_the_hashed_source_inode(
         )
 
     assert displaced_score.read_text(encoding="utf-8") == "input-v1"
-    assert not published_score.exists()
+    assert published_score.read_text(encoding="utf-8") == "replacement-score"
+
+
+def test_pinned_score_publication_preserves_replacement_installed_after_link(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "scores"
+    published_score = output_root / "input.pt"
+    displaced_score = tmp_path / "owned-linked-score.pt"
+    original_link = os.link
+    replacement_installed = False
+
+    def _link_then_replace_destination(
+        source: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        destination: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        nonlocal replacement_installed
+        original_link(source, destination, *args, **kwargs)  # type: ignore[arg-type]
+        source_path = Path(source)
+        if source_path.name == "input.pt" and source_path.parent.name.startswith(".dnadesign-score-"):
+            published_score.rename(displaced_score)
+            published_score.write_text("post-link replacement", encoding="utf-8")
+            replacement_installed = True
+
+    monkeypatch.setattr(os, "link", _link_then_replace_destination)
+
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnScorePublicationUncertainError,
+        match="score publication identity changed",
+    ):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert replacement_installed
+    assert published_score.read_text(encoding="utf-8") == "post-link replacement"
+    assert displaced_score.read_text(encoding="utf-8") == "input-v1"
 
 
 def test_pinned_score_cleanup_failure_does_not_mask_original_execution_failure(
