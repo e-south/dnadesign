@@ -2,7 +2,7 @@
 doc_id: dnadesign-thread-docs
 surface: tool-docs
 owner: dnadesign-maintainers
-last_verified: 2026-08-27
+last_verified: 2026-09-01
 ---
 
 # Thread
