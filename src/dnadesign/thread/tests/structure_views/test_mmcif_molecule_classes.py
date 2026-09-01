@@ -45,6 +45,22 @@ ATOM C4' DG D 1
 #
 """
 
+_SEMICOLON_ATOM_NAME_MMCIF = """\
+data_semicolon_atom_name
+loop_
+_atom_site.group_PDB
+_atom_site.label_atom_id
+_atom_site.label_comp_id
+_atom_site.auth_asym_id
+_atom_site.auth_seq_id
+ATOM
+;O5'
+;
+DG D 1
+ATOM CA GLY A 1
+#
+"""
+
 
 def test_mmcif_molecule_classes_use_declared_atom_site_column_order() -> None:
     assert molecule_classes_in_structure_text(
@@ -79,6 +95,22 @@ def test_mmcif_molecule_filter_excludes_unquoted_prime_bearing_nucleotide_atoms(
     assert "ATOM CA GLY A 1" in protein_text
     assert "ATOM O5' DG D 1" not in protein_text
     assert "ATOM C4' DG D 1" not in protein_text
+    assert molecule_classes_in_structure_text(
+        protein_text,
+        structure_format="mmcif",
+    ) == frozenset({"protein"})
+
+
+def test_mmcif_molecule_filter_excludes_semicolon_delimited_nucleotide_atoms() -> None:
+    protein_text = filter_structure_text_by_molecule_classes(
+        _SEMICOLON_ATOM_NAME_MMCIF,
+        structure_format="mmcif",
+        visible_molecule_classes=("protein",),
+    )
+
+    assert "O5'" not in protein_text
+    assert "DG D 1" not in protein_text
+    assert "ATOM CA GLY A 1" in protein_text
     assert molecule_classes_in_structure_text(
         protein_text,
         structure_format="mmcif",

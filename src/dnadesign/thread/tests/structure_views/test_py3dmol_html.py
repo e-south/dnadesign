@@ -166,6 +166,11 @@ ATOM 8 N N9 . DG B 2 1 4.900 0.900 0.000 D 1 ? 1.00 80.00 1
 #
 """
 
+_MIXED_POLYMER_MMCIF_WITH_SEMICOLON_ATOM_NAME = _MIXED_POLYMER_MMCIF_WITH_UNQUOTED_PRIME_ATOMS.replace(
+    "ATOM 6 O O5' . DG B 2 1 4.200 0.200 0.000 D 1 ? 1.00 80.00 1",
+    "ATOM 6 O\n;O5'\n;\n. DG B 2 1 4.200 0.200 0.000 D 1 ? 1.00 80.00 1",
+)
+
 _DNA_ONLY_MMCIF = "\n".join(line for line in _SIDECHAIN_MMCIF.splitlines() if not line.startswith("ATOM "))
 _PROTEIN_ONLY_MMCIF = "\n".join(line for line in _SIDECHAIN_MMCIF.splitlines() if not line.startswith("HETATM "))
 _LIGAND_ONLY_MMCIF = _DNA_ONLY_MMCIF.replace(" DA D 2 1 ", " HEM L 2 1 ").replace(
@@ -778,6 +783,29 @@ def test_py3dmol_backend_hides_unquoted_prime_bearing_nucleotide_atoms() -> None
                 StructureViewModel(
                     "reference",
                     _MIXED_POLYMER_MMCIF_WITH_UNQUOTED_PRIME_ATOMS,
+                    structure_format="mmcif",
+                    label="Reference",
+                ),
+            ),
+            hidden_molecule_classes=("dna",),
+        )
+    )
+
+    unescaped_html = html_lib.unescape(rendered)
+    assert "GLY" in unescaped_html
+    assert "DG" not in unescaped_html
+    assert "O5'" not in unescaped_html
+    assert "C4'" not in unescaped_html
+
+
+def test_py3dmol_backend_hides_semicolon_delimited_nucleotide_atoms() -> None:
+    rendered = render_structure_view_html(
+        StructureViewSpec(
+            title="Protein-only CIF review",
+            models=(
+                StructureViewModel(
+                    "reference",
+                    _MIXED_POLYMER_MMCIF_WITH_SEMICOLON_ATOM_NAME,
                     structure_format="mmcif",
                     label="Reference",
                 ),

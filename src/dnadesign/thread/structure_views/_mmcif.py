@@ -350,31 +350,65 @@ def iter_mmcif_atom_site_records(structure_text: str) -> Iterator[MmcifAtomSiteR
             line_index = _skip_loop_values(lines, line_index)
             continue
 
-        value_buffer: list[tuple[str, int]] = []
+        value_buffer: list[tuple[str, tuple[int, ...]]] = []
         while line_index < len(lines):
             stripped = lines[line_index].strip()
             if _is_loop_boundary(stripped):
                 break
             source_line_index = line_index
-            line_index += 1
             if not stripped:
+                line_index += 1
                 continue
-            try:
-                values = tuple(_split_cif_line(stripped))
-            except ValueError:
-                value_buffer.clear()
-                continue
-            value_buffer.extend((value, source_line_index) for value in values)
+            if lines[source_line_index].startswith(";"):
+                value, source_line_indices, line_index = _consume_semicolon_cif_token(
+                    lines,
+                    source_line_index,
+                )
+                values = (value,)
+                value_source_lines = (source_line_indices,)
+            else:
+                line_index += 1
+                try:
+                    values = tuple(_split_cif_line(stripped))
+                except ValueError:
+                    value_buffer.clear()
+                    continue
+                value_source_lines = ((source_line_index,),) * len(values)
+            value_buffer.extend(zip(values, value_source_lines, strict=True))
             while len(value_buffer) >= len(headers):
                 row_values = value_buffer[: len(headers)]
                 del value_buffer[: len(headers)]
                 record = _atom_site_record(
                     [value for value, _ in row_values],
                     field_indices,
-                    source_line_indices=tuple(dict.fromkeys(index for _, index in row_values)),
+                    source_line_indices=tuple(
+                        dict.fromkeys(index for _, source_line_indices in row_values for index in source_line_indices)
+                    ),
                 )
                 if record is not None:
                     yield record
+
+
+def _consume_semicolon_cif_token(
+    lines: list[str],
+    opening_line_index: int,
+) -> tuple[str, tuple[int, ...], int]:
+    """Consume one CIF text-field token and retain every source line it spans."""
+
+    token_lines = [lines[opening_line_index][1:].rstrip()]
+    source_line_indices = [opening_line_index]
+    line_index = opening_line_index + 1
+    while line_index < len(lines):
+        line = lines[line_index]
+        source_line_indices.append(line_index)
+        line_index += 1
+        if line.startswith(";"):
+            trailing = line[1:]
+            if trailing.strip():
+                raise ValueError("mmCIF text-field closing delimiter must occupy its own line")
+            return "\n".join(token_lines), tuple(source_line_indices), line_index
+        token_lines.append(line.rstrip())
+    raise ValueError("mmCIF text field is missing its closing semicolon")
 
 
 def filter_mmcif_atom_site_records_by_residue_name(
