@@ -20,7 +20,11 @@ from pathlib import Path, PurePosixPath
 _COMPLETION_RECORD_NAME = ".dnadesign-ligandmpnn-execution.json"
 
 
-def build_design_output_manifest(output_root: Path) -> dict[str, object]:
+def build_design_output_manifest(
+    output_root: Path,
+    *,
+    expected_root_identity: tuple[int, int] | None = None,
+) -> dict[str, object]:
     """Read one design tree through descriptors and bind every public entry."""
 
     try:
@@ -28,6 +32,16 @@ def build_design_output_manifest(output_root: Path) -> dict[str, object]:
     except OSError as error:
         raise ValueError(f"design output directory could not be opened safely: {output_root}") from error
     try:
+        observed_root = os.fstat(root_fd)
+        if (
+            expected_root_identity is not None
+            and (
+                observed_root.st_dev,
+                observed_root.st_ino,
+            )
+            != expected_root_identity
+        ):
+            raise ValueError("design output directory identity changed before manifesting")
         entries = _manifest_entries(root_fd, relative_parent=PurePosixPath())
     finally:
         os.close(root_fd)

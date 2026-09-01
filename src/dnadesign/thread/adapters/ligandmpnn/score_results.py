@@ -571,7 +571,7 @@ def _validate_payload(
     if residue_count <= 0:
         raise ValueError("score output must contain at least one protein residue")
     expected_probability_shape = (expected_draws, residue_count, 21)
-    _numeric_array(payload, "logits", shape=expected_probability_shape)
+    logits = _numeric_array(payload, "logits", shape=expected_probability_shape)
     log_probabilities = _numeric_array(payload, "log_probs", shape=expected_probability_shape)
     if np.any(probabilities < 0) or np.any(probabilities > 1):
         raise ValueError("score output probs must be in [0, 1]")
@@ -579,6 +579,10 @@ def _validate_payload(
         raise ValueError("score output probs must sum to one across the raw alphabet")
     if not np.allclose(np.exp(log_probabilities), probabilities, rtol=1e-5, atol=1e-7):
         raise ValueError("score output probs do not match exp(log_probs)")
+    maximum_logits = np.max(logits, axis=-1, keepdims=True)
+    log_normalizer = maximum_logits + np.log(np.sum(np.exp(logits - maximum_logits), axis=-1, keepdims=True))
+    if not np.allclose(logits - log_normalizer, log_probabilities, rtol=1e-5, atol=1e-7):
+        raise ValueError("score output logits log-softmax does not match log_probs")
     _validate_decoding_order(
         payload,
         mode=mode,

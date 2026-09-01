@@ -335,6 +335,17 @@ def test_score_builder_rejects_invalid_context_before_command_emission(tmp_path:
         )
 
 
+def test_score_admission_rejects_logits_inconsistent_with_probabilities(tmp_path: Path) -> None:
+    request = _prepare_request(tmp_path, seeds=(7,))
+    payload = _score_payload(7, mode=request.mode)
+    logits = np.asarray(payload["logits"]).copy()
+    logits[..., 0] += 3.0
+    _write_output(tmp_path, request, 7, logits=logits)
+
+    with pytest.raises(ValueError, match=r"logits.*log_probs"):
+        _parse(tmp_path, request)
+
+
 def test_score_relative_checkout_is_anchored_for_foreign_cwd_admission(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

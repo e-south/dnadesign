@@ -1432,3 +1432,38 @@ def test_inventory_parser_rejects_nested_schema_drift(tmp_path: Path) -> None:
             LigandMpnnContextInventoryReference(path=reference.path, sha256=_sha256(encoded)),
             execution_root=tmp_path,
         )
+
+
+def test_packing_nonprotein_projection_preserves_insertion_code() -> None:
+    class _Atom:
+        def getName(self) -> str:
+            return "P"
+
+        def getElement(self) -> str:
+            return "P"
+
+        def getChid(self) -> str:
+            return "D"
+
+        def getResname(self) -> str:
+            return "DC"
+
+        def getResnum(self) -> int:
+            return 12
+
+        def getIcode(self) -> str:
+            return "A"
+
+        def getCoords(self) -> tuple[float, float, float]:
+            return (1.0, 0.0, 0.0)
+
+        def getOccupancy(self) -> float:
+            return 1.0
+
+    class _Selection:
+        def iterAtoms(self) -> object:
+            return iter((_Atom(),))
+
+    assert context_probe_module._pinned_preserved_nonprotein_atoms(_Selection()) == (
+        ("P", "P", "D", "DC", 12, "A", (1.0, 0.0, 0.0), 1.0),
+    )

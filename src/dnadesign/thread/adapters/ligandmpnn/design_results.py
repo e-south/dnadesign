@@ -215,6 +215,8 @@ def parse_ligandmpnn_design_outputs(
             fasta_bytes,
             input_stem=input_name,
             expected_design_count=request.batch_size * request.number_of_batches,
+            expected_seed=command.seed,
+            expected_temperature=request.temperature,
         )
         _validate_design_sequence_contract(request, protein_evidence, parsed_fasta)
         sequence_count = parsed_fasta.design_count
@@ -531,6 +533,7 @@ def _validate_pinned_write_full_pdb_atom_inventory(
             line[21:22].strip(),
             line[17:20].strip().upper(),
             residue_number,
+            line[26:27].strip(),
             tuple(round(value, 3) for value in coordinates),
             round(occupancy, 2),
         )

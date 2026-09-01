@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 
@@ -34,6 +35,8 @@ def parse_official_design_fasta(
     *,
     input_stem: str,
     expected_design_count: int,
+    expected_seed: int,
+    expected_temperature: float,
 ) -> int:
     """Validate one official ``run.py`` FASTA and return its design count."""
 
@@ -41,6 +44,8 @@ def parse_official_design_fasta(
         payload,
         input_stem=input_stem,
         expected_design_count=expected_design_count,
+        expected_seed=expected_seed,
+        expected_temperature=expected_temperature,
     ).design_count
 
 
@@ -49,6 +54,8 @@ def parse_official_design_fasta_records(
     *,
     input_stem: str,
     expected_design_count: int,
+    expected_seed: int,
+    expected_temperature: float,
 ) -> OfficialLigandMpnnDesignFasta:
     """Validate and return exact native/design segments from official ``run.py`` FASTA."""
 
@@ -61,8 +68,12 @@ def parse_official_design_fasta_records(
         raise ValueError("official LigandMPNN FASTA contains no records")
 
     native_header, native_sequence = records[0]
-    if not native_header.startswith(f"{input_stem}, T="):
-        raise ValueError("official LigandMPNN FASTA has an invalid native record header")
+    native_metadata = _parse_header_metadata(native_header, input_stem=input_stem, require_design_id=False)
+    _validate_execution_metadata(
+        native_metadata,
+        expected_seed=expected_seed,
+        expected_temperature=expected_temperature,
+    )
     native_segments = _validate_sequence(native_sequence)
     native_segment_lengths = tuple(len(segment) for segment in native_segments)
 
@@ -72,14 +83,17 @@ def parse_official_design_fasta_records(
         raise ValueError(
             f"official LigandMPNN FASTA expected {expected_design_count} designed records; observed {observed_count}"
         )
-    id_pattern = re.compile(rf"^{re.escape(input_stem)}, id=([0-9]+), ")
     observed_ids: list[int] = []
     designed_segments: list[tuple[str, ...]] = []
     for header, sequence in design_records:
-        match = id_pattern.match(header)
-        if match is None:
-            raise ValueError("official LigandMPNN FASTA has an invalid design record header")
-        observed_ids.append(int(match.group(1)))
+        metadata = _parse_header_metadata(header, input_stem=input_stem, require_design_id=True)
+        design_id = int(metadata.pop("id"))
+        _validate_execution_metadata(
+            metadata,
+            expected_seed=expected_seed,
+            expected_temperature=expected_temperature,
+        )
+        observed_ids.append(design_id)
         segments = _validate_sequence(sequence)
         designed_segments.append(segments)
         designed_segment_lengths = tuple(len(segment) for segment in segments)
@@ -97,6 +111,55 @@ def parse_official_design_fasta_records(
         native_segments=native_segments,
         designed_segments=tuple(designed_segments),
     )
+
+
+def _parse_header_metadata(
+    header: str,
+    *,
+    input_stem: str,
+    require_design_id: bool,
+) -> dict[str, str]:
+    parts = header.split(", ")
+    if not parts or parts[0] != input_stem:
+        raise ValueError("official LigandMPNN FASTA has an invalid record header")
+    metadata: dict[str, str] = {}
+    for item in parts[1:]:
+        if "=" not in item:
+            raise ValueError("official LigandMPNN FASTA header metadata must use key=value fields")
+        key, value = item.split("=", 1)
+        if not key or not value or key in metadata:
+            raise ValueError("official LigandMPNN FASTA header metadata is incomplete or duplicated")
+        metadata[key] = value
+    if not require_design_id and "id" in metadata:
+        raise ValueError("official LigandMPNN FASTA native record must not declare a design id")
+    if require_design_id and re.fullmatch(r"[0-9]+", metadata.get("id", "")) is None:
+        raise ValueError("official LigandMPNN FASTA has an invalid design record header")
+    return metadata
+
+
+def _validate_execution_metadata(
+    metadata: dict[str, str],
+    *,
+    expected_seed: int,
+    expected_temperature: float,
+) -> None:
+    try:
+        observed_seed = int(metadata["seed"])
+    except (KeyError, ValueError) as error:
+        raise ValueError("official LigandMPNN FASTA header is missing a valid seed") from error
+    try:
+        observed_temperature = float(metadata["T"])
+    except (KeyError, ValueError) as error:
+        raise ValueError("official LigandMPNN FASTA header is missing a valid temperature") from error
+    if observed_seed != expected_seed:
+        raise ValueError(
+            f"official LigandMPNN FASTA seed {observed_seed} does not match requested seed {expected_seed}"
+        )
+    if not math.isfinite(observed_temperature) or observed_temperature != float(expected_temperature):
+        raise ValueError(
+            "official LigandMPNN FASTA temperature "
+            f"{observed_temperature!r} does not match requested temperature {expected_temperature}"
+        )
 
 
 def _parse_fasta_records(text: str) -> list[tuple[str, str]]:

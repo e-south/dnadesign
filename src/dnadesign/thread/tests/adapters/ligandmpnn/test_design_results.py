@@ -438,6 +438,50 @@ def test_design_admission_rejects_invalid_official_fasta_records(
 
 
 @pytest.mark.parametrize(
+    "records",
+    [
+        [
+            ">input, T=9, seed=999\nAC:DE",
+            ">input, id=1, overall_confidence=0.1\nAC:DE",
+        ],
+        [
+            ">input, T=0.1, seed=7\nAC:DE",
+            ">input, id=1, T=9, seed=7\nAC:DE",
+        ],
+        [
+            ">input, T=0.1, seed=7\nAC:DE",
+            ">input, id=1, T=0.1, seed=999\nAC:DE",
+        ],
+    ],
+)
+def test_design_admission_binds_fasta_seed_and_temperature_metadata(
+    tmp_path: Path,
+    records: list[str],
+) -> None:
+    request, commands, output_root, _sidecar = _execute_design(tmp_path)
+    (output_root / "seqs/input.fa").write_text("\n".join(records), encoding="utf-8")
+    _rebind_completion_to_current_tree(output_root)
+
+    with pytest.raises(ValueError, match="seed|temperature"):
+        parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
+
+
+def test_packed_nonprotein_atom_inventory_binds_insertion_code() -> None:
+    expected = (("P", "P", "D", "DC", 12, "A", (1.0, 0.0, 0.0), 1.0),)
+    payload = ("HETATM    1  P    DC D  12B      1.000   0.000   0.000  1.00  0.00           P\nEND\n").encode("ascii")
+
+    with pytest.raises(ValueError, match="nonprotein context|unexpected atom"):
+        design_results_module._validate_pinned_write_full_pdb_atom_inventory(
+            payload,
+            packed_path=Path("packed.pdb"),
+            residue_ids=(),
+            expected_sequence=(),
+            canonical_heavy_atom_names=(),
+            preserved_nonprotein_atoms=expected,
+        )
+
+
+@pytest.mark.parametrize(
     "designed_sequence",
     [
         "A",

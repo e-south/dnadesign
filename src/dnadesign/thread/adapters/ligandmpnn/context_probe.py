@@ -1250,6 +1250,7 @@ def _pinned_preserved_nonprotein_atoms(other_atoms: Any) -> tuple[tuple[object, 
                 str(atom.getChid()).strip(),
                 str(atom.getResname()).strip().upper(),
                 int(atom.getResnum()),
+                str(atom.getIcode() or "").strip(),
                 tuple(round(float(value), 3) for value in coordinates),
                 round(float(occupancy), 2),
             )

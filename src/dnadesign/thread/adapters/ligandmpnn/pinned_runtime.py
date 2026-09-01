@@ -671,11 +671,18 @@ def execute_pinned_entrypoint(
                     execution_failure.add_note(f"private design attempt cleanup also failed: {cleanup_error}")
         if design_publication is not None:
             temporary_output_root, output_root = design_publication
+            assert design_attempt_identity is not None
             design_failure: BaseException | None = None
             design_published = False
             try:
+                _require_design_attempt_identity(temporary_output_root, design_attempt_identity)
                 _sync_regular_directory_tree(temporary_output_root)
-                design_output_manifest = build_design_output_manifest(temporary_output_root)
+                _require_design_attempt_identity(temporary_output_root, design_attempt_identity)
+                design_output_manifest = build_design_output_manifest(
+                    temporary_output_root,
+                    expected_root_identity=design_attempt_identity,
+                )
+                _require_design_attempt_identity(temporary_output_root, design_attempt_identity)
                 _write_completion_record(
                     temporary_output_root / _COMPLETION_RECORD_NAME,
                     _completion_record(
@@ -688,10 +695,23 @@ def execute_pinned_entrypoint(
                     rollback_output_identity=None,
                     rollback_output_sha256=None,
                 )
+                _require_design_attempt_identity(temporary_output_root, design_attempt_identity)
                 _sync_regular_directory_tree(temporary_output_root)
-                if build_design_output_manifest(temporary_output_root) != design_output_manifest:
+                _require_design_attempt_identity(temporary_output_root, design_attempt_identity)
+                if (
+                    build_design_output_manifest(
+                        temporary_output_root,
+                        expected_root_identity=design_attempt_identity,
+                    )
+                    != design_output_manifest
+                ):
                     raise ValueError("design output tree changed before atomic publication")
-                _publish_design_output_directory(temporary_output_root, output_root)
+                _require_design_attempt_identity(temporary_output_root, design_attempt_identity)
+                _publish_design_output_directory(
+                    temporary_output_root,
+                    output_root,
+                    expected_identity=design_attempt_identity,
+                )
                 design_published = True
             except BaseException as error:
                 design_failure = error
@@ -989,6 +1009,29 @@ def _create_private_attempt_directory(*, parent: Path, prefix: str) -> tuple[Pat
         return attempt_path, (observed.st_dev, observed.st_ino)
     finally:
         os.close(parent_fd)
+
+
+def _require_design_attempt_identity(path: Path, expected_identity: tuple[int, int]) -> None:
+    """Require the path to remain the private directory created for this execution."""
+
+    try:
+        parent_fd = _open_directory_path(path.parent, create=False)
+        try:
+            directory_fd = os.open(
+                path.name,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                dir_fd=parent_fd,
+            )
+            try:
+                observed = os.fstat(directory_fd)
+            finally:
+                os.close(directory_fd)
+        finally:
+            os.close(parent_fd)
+    except OSError as exc:
+        raise LigandMpnnDesignPublicationUncertainError("LigandMPNN design attempt identity changed") from exc
+    if (observed.st_dev, observed.st_ino) != expected_identity:
+        raise LigandMpnnDesignPublicationUncertainError("LigandMPNN design attempt identity changed")
 
 
 def _remove_directory_tree_contents(directory_fd: int) -> None:
@@ -1699,7 +1742,12 @@ def _owned_regular_leaf_matches_sha256(
     return True
 
 
-def _publish_design_output_directory(source_path: Path, destination_path: Path) -> None:
+def _publish_design_output_directory(
+    source_path: Path,
+    destination_path: Path,
+    *,
+    expected_identity: tuple[int, int],
+) -> None:
     """Publish one complete private output tree through an exclusive reservation."""
 
     if source_path.parent != destination_path.parent:
@@ -1719,6 +1767,8 @@ def _publish_design_output_directory(source_path: Path, destination_path: Path) 
             )
             source_status = os.fstat(source_fd)
             source_identity = (source_status.st_dev, source_status.st_ino)
+            if source_identity != expected_identity:
+                raise LigandMpnnDesignPublicationUncertainError("LigandMPNN design attempt identity changed")
         except OSError as exc:
             raise ValueError(f"design output attempt directory is not safe: {source_path}") from exc
         try:
@@ -1768,25 +1818,27 @@ def _publish_score_output(source_path: Path, destination_path: Path) -> tuple[st
     if source_path.is_symlink() or not source_path.is_file():
         raise ValueError(f"pinned score execution did not produce a regular output: {source_path}")
     source_flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+    source_fd: int | None = None
     try:
         source_fd = os.open(source_path, source_flags)
-        try:
-            source_status = os.fstat(source_fd)
-            if not stat.S_ISREG(source_status.st_mode):
-                raise OSError("score output is not regular")
-            source_identity = (source_status.st_dev, source_status.st_ino)
-            digest = hashlib.sha256()
-            while payload := os.read(source_fd, 1024 * 1024):
-                digest.update(payload)
-            os.fsync(source_fd)
-            source_sha256 = f"sha256:{digest.hexdigest()}"
-        finally:
-            os.close(source_fd)
+        source_status = os.fstat(source_fd)
+        if not stat.S_ISREG(source_status.st_mode):
+            raise OSError("score output is not regular")
+        source_identity = (source_status.st_dev, source_status.st_ino)
+        digest = hashlib.sha256()
+        while payload := os.read(source_fd, 1024 * 1024):
+            digest.update(payload)
+        os.fsync(source_fd)
+        source_sha256 = f"sha256:{digest.hexdigest()}"
     except OSError as exc:
+        if source_fd is not None:
+            os.close(source_fd)
         raise ValueError(f"score output could not be read durably: {source_path}") from exc
     try:
         directory_fd = _open_directory_path(destination_path.parent, create=False)
     except OSError as exc:
+        if source_fd is not None:
+            os.close(source_fd)
         raise ValueError(f"score output could not be published atomically: {destination_path}") from exc
     try:
         try:
@@ -1800,6 +1852,39 @@ def _publish_score_output(source_path: Path, destination_path: Path) -> tuple[st
             raise ValueError(f"score output already exists; refuse concurrent result: {destination_path}") from exc
         except OSError as exc:
             raise ValueError(f"score output could not be published atomically: {destination_path}") from exc
+        destination_fd: int | None = None
+        try:
+            destination_fd = os.open(
+                destination_path.name,
+                os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                dir_fd=directory_fd,
+            )
+            destination_status = os.fstat(destination_fd)
+            destination_identity = (destination_status.st_dev, destination_status.st_ino)
+            destination_digest = hashlib.sha256()
+            while payload := os.read(destination_fd, 1024 * 1024):
+                destination_digest.update(payload)
+            destination_sha256 = f"sha256:{destination_digest.hexdigest()}"
+        except OSError as exc:
+            raise LigandMpnnScorePublicationUncertainError(
+                "LigandMPNN score publication could not be verified"
+            ) from exc
+        finally:
+            if destination_fd is not None:
+                os.close(destination_fd)
+        if destination_identity != source_identity or destination_sha256 != source_sha256:
+            _quarantine_and_remove_owned_leaf(
+                directory_fd,
+                destination_path.name,
+                destination_identity,
+                expected_bytes=None,
+                expected_sha256=destination_sha256,
+                error_type=LigandMpnnScorePublicationUncertainError,
+                changed_message="LigandMPNN changed score publication could not be removed safely",
+                inspect_message="LigandMPNN changed score publication could not be inspected",
+                durability_message="LigandMPNN changed score publication removal is uncertain",
+            )
+            raise ValueError("score output changed before atomic publication")
         try:
             os.fsync(directory_fd)
         except OSError as publication_error:
@@ -1825,6 +1910,8 @@ def _publish_score_output(source_path: Path, destination_path: Path) -> tuple[st
         return source_sha256, source_identity
     finally:
         os.close(directory_fd)
+        if source_fd is not None:
+            os.close(source_fd)
 
 
 def _rollback_score_after_cleanup_failure(

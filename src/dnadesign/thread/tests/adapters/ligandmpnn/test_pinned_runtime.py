@@ -1390,6 +1390,55 @@ def test_pinned_score_cleanup_never_deletes_recreated_attempt_path(
     assert not (output_root / "input.pt").exists()
 
 
+def test_pinned_score_publication_binds_the_hashed_source_inode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "scores"
+    published_score = output_root / "input.pt"
+    displaced_score = tmp_path / "hashed-score.pt"
+    original_link = os.link
+
+    def _replace_source_then_link(
+        source: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        destination: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        *args: object,
+        **kwargs: object,
+    ) -> None:
+        source_path = Path(source)
+        if source_path.name == "input.pt" and source_path.parent.name.startswith(".dnadesign-score-"):
+            source_path.rename(displaced_score)
+            source_path.write_text("replacement-score", encoding="utf-8")
+        original_link(source, destination, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(os, "link", _replace_source_then_link)
+
+    with pytest.raises(ValueError, match="score output changed before atomic publication"):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert displaced_score.read_text(encoding="utf-8") == "input-v1"
+    assert not published_score.exists()
+
+
 def test_pinned_score_cleanup_failure_does_not_mask_original_execution_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -1695,9 +1744,14 @@ def test_pinned_design_runtime_publishes_only_one_concurrent_seed_directory(
     barrier = threading.Barrier(2)
     original_publish = pinned_runtime_module._publish_design_output_directory
 
-    def _synchronize_publish(source_path: Path, destination_path: Path) -> None:
+    def _synchronize_publish(
+        source_path: Path,
+        destination_path: Path,
+        *,
+        expected_identity: tuple[int, int],
+    ) -> None:
         barrier.wait(timeout=5)
-        original_publish(source_path, destination_path)
+        original_publish(source_path, destination_path, expected_identity=expected_identity)
 
     monkeypatch.setattr(pinned_runtime_module, "_publish_design_output_directory", _synchronize_publish)
 
@@ -1814,9 +1868,14 @@ def test_pinned_design_runtime_preserves_recreated_attempt_after_successful_publ
     original_publish = pinned_runtime_module._publish_design_output_directory
     recreated_attempt: Path | None = None
 
-    def _publish_then_recreate_attempt(source_path: Path, destination_path: Path) -> None:
+    def _publish_then_recreate_attempt(
+        source_path: Path,
+        destination_path: Path,
+        *,
+        expected_identity: tuple[int, int],
+    ) -> None:
         nonlocal recreated_attempt
-        original_publish(source_path, destination_path)
+        original_publish(source_path, destination_path, expected_identity=expected_identity)
         source_path.mkdir()
         (source_path / "foreign.txt").write_text("foreign", encoding="utf-8")
         recreated_attempt = source_path
@@ -1851,6 +1910,65 @@ def test_pinned_design_runtime_preserves_recreated_attempt_after_successful_publ
     assert recreated_attempt is not None
     assert (recreated_attempt / "foreign.txt").read_text(encoding="utf-8") == "foreign"
     assert (output_root / "design.txt").read_text(encoding="utf-8") == "input-v1"
+
+
+def test_pinned_design_publication_rejects_replaced_attempt_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "designs" / "seed_7"
+    completion_path = output_root / ".dnadesign-ligandmpnn-execution.json"
+    displaced_attempt = tmp_path / "original-design-attempt"
+    replacement_attempt: Path | None = None
+    original_run = subprocess.run
+
+    def _replace_attempt_after_execution(
+        command: object,
+        *args: object,
+        **kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        nonlocal replacement_attempt
+        result = original_run(command, *args, **kwargs)  # type: ignore[arg-type, return-value]
+        if isinstance(command, list) and any(str(value).endswith("run.py") for value in command):
+            attempt = Path(command[command.index("--out_folder") + 1])
+            attempt.rename(displaced_attempt)
+            attempt.mkdir()
+            (attempt / "foreign.txt").write_text("foreign", encoding="utf-8")
+            replacement_attempt = attempt
+        return result
+
+    monkeypatch.setattr(subprocess, "run", _replace_attempt_after_execution)
+
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnDesignPublicationUncertainError,
+        match="design attempt.*changed",
+    ):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            completion_record_path=completion_path,
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert replacement_attempt is not None
+    assert (replacement_attempt / "foreign.txt").read_text(encoding="utf-8") == "foreign"
+    assert (displaced_attempt / "design.txt").read_text(encoding="utf-8") == "input-v1"
+    assert not output_root.exists()
 
 
 def test_pinned_design_rollback_collision_never_deletes_foreign_attempt_path(

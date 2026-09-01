@@ -64,11 +64,12 @@ class LigandMpnnResidueAlphabetSidecar:
         if materialized_bytes is None or _digest(materialized_bytes) != self.sha256:
             raise ValueError("residue alphabet sidecar file SHA256 does not match receipt")
 
-    def validate_execution_file(self, request: LigandMpnnRequest) -> None:
+    def validate_execution_file(self, request: LigandMpnnRequest, *, execution_root: Path) -> None:
         """Validate the final command-bound file after staging is promoted."""
 
         self._validate_request_binding(request)
-        execution_bytes = _read_regular_file_bytes(self.path, label="execution residue alphabet sidecar")
+        execution_path = _anchor_relative_path(self.path, execution_root=execution_root)
+        execution_bytes = _read_regular_file_bytes(execution_path, label="execution residue alphabet sidecar")
         if execution_bytes is None or _digest(execution_bytes) != self.sha256:
             raise ValueError("execution residue alphabet sidecar SHA256 does not match receipt")
 

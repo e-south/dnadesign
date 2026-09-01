@@ -701,7 +701,35 @@ def test_sidecar_can_stage_bytes_while_binding_final_execution_path(tmp_path: Pa
 
     final_path.parent.mkdir(parents=True)
     staging_path.replace(final_path)
-    sidecar.validate_execution_file(request)
+    sidecar.validate_execution_file(request, execution_root=tmp_path)
+
+
+def test_sidecar_execution_validation_anchors_relative_path_to_execution_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request, _checkout_root = _validated_request(
+        tmp_path,
+        LigandMpnnResidueAlphabet(LigandMpnnResidue("A", 12), ("A", "G")),
+    )
+    relative_path = Path("evidence/omit.json")
+    sidecar = materialize_residue_alphabet_sidecar(
+        request,
+        relative_path,
+        write_path=tmp_path / relative_path,
+    )
+    foreign_root = tmp_path / "foreign"
+    foreign_root.mkdir()
+    foreign_path = foreign_root / relative_path
+    foreign_path.parent.mkdir()
+    foreign_path.write_bytes((tmp_path / relative_path).read_bytes())
+    monkeypatch.chdir(foreign_root)
+
+    sidecar.validate_execution_file(request, execution_root=tmp_path)
+
+    (tmp_path / relative_path).write_text("{}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="execution residue alphabet sidecar SHA256"):
+        sidecar.validate_execution_file(request, execution_root=tmp_path)
 
 
 def test_planned_receipt_binds_the_sidecar_digest(tmp_path: Path) -> None:
