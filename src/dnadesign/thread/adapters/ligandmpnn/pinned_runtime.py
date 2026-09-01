@@ -931,6 +931,28 @@ def _write_completion_record(
             except OSError:
                 durability_failure = True
                 raise
+            if rollback_output_path is not None:
+                assert rollback_output_identity is not None
+                assert rollback_output_sha256 is not None
+                output_directory_fd = _open_directory_path(rollback_output_path.parent, create=False)
+                try:
+                    output_is_owned = _owned_regular_leaf_matches_sha256(
+                        output_directory_fd,
+                        rollback_output_path.name,
+                        rollback_output_identity,
+                        rollback_output_sha256,
+                        error_type=LigandMpnnCompletionPublicationUncertainError,
+                        changed_message="LigandMPNN completion publication output rollback target changed",
+                        inspect_message=(
+                            "LigandMPNN completion publication output rollback target could not be inspected"
+                        ),
+                    )
+                    if not output_is_owned:
+                        raise LigandMpnnCompletionPublicationUncertainError(
+                            "LigandMPNN completion publication output rollback target changed"
+                        )
+                finally:
+                    os.close(output_directory_fd)
         except BaseException as publication_error:
             try:
                 _rollback_completion_and_output(
@@ -1783,6 +1805,27 @@ def _publish_design_output_directory(
         except OSError as exc:
             raise ValueError(f"design output could not be published atomically: {destination_path}") from exc
         try:
+            published_status = os.stat(destination_path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise LigandMpnnDesignPublicationUncertainError(
+                "LigandMPNN design publication could not be verified"
+            ) from exc
+        published_identity = (published_status.st_dev, published_status.st_ino)
+        if not stat.S_ISDIR(published_status.st_mode) or published_identity != expected_identity:
+            try:
+                _rename_no_replace(
+                    destination_path.name,
+                    source_path.name,
+                    src_dir_fd=parent_fd,
+                    dst_dir_fd=parent_fd,
+                )
+                os.fsync(parent_fd)
+            except OSError as recovery_error:
+                raise LigandMpnnDesignPublicationUncertainError(
+                    "LigandMPNN design attempt identity changed; foreign publication was preserved"
+                ) from recovery_error
+            raise LigandMpnnDesignPublicationUncertainError("LigandMPNN design attempt identity changed")
+        try:
             os.fsync(parent_fd)
         except OSError as publication_error:
             try:
@@ -1806,6 +1849,21 @@ def _publish_design_output_directory(
             raise ValueError(f"design output publication could not be made durable: {destination_path}") from (
                 publication_error
             )
+        try:
+            durable_status = os.stat(destination_path.name, dir_fd=parent_fd, follow_symlinks=False)
+        except OSError as exc:
+            raise LigandMpnnDesignPublicationUncertainError(
+                "LigandMPNN durable design publication could not be verified"
+            ) from exc
+        if (
+            not stat.S_ISDIR(durable_status.st_mode)
+            or (
+                durable_status.st_dev,
+                durable_status.st_ino,
+            )
+            != expected_identity
+        ):
+            raise LigandMpnnDesignPublicationUncertainError("LigandMPNN durable design publication identity changed")
     finally:
         if source_fd is not None:
             os.close(source_fd)
@@ -1907,6 +1965,17 @@ def _publish_score_output(source_path: Path, destination_path: Path) -> tuple[st
             raise ValueError(f"score output publication could not be made durable: {destination_path}") from (
                 publication_error
             )
+        score_is_owned = _owned_regular_leaf_matches_sha256(
+            directory_fd,
+            destination_path.name,
+            source_identity,
+            source_sha256,
+            error_type=LigandMpnnScorePublicationUncertainError,
+            changed_message="LigandMPNN durable score publication identity changed",
+            inspect_message="LigandMPNN durable score publication could not be inspected",
+        )
+        if not score_is_owned:
+            raise LigandMpnnScorePublicationUncertainError("LigandMPNN durable score publication identity changed")
         return source_sha256, source_identity
     finally:
         os.close(directory_fd)

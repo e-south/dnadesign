@@ -1858,6 +1858,94 @@ def test_pinned_design_runtime_preserves_empty_directory_created_at_publication_
     assert not (output_root / "design.txt").exists()
 
 
+def test_pinned_design_runtime_rejects_attempt_replaced_immediately_before_rename(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "designs" / "seed_7"
+    completion_path = output_root / ".dnadesign-ligandmpnn-execution.json"
+    displaced_attempt = output_root.parent / "owned-attempt-recovery"
+    original_rename_no_replace = pinned_runtime_module._rename_no_replace
+    replacement_path: Path | None = None
+
+    def _replace_checked_attempt_then_publish(
+        source_name: str,
+        destination_name: str,
+        *,
+        src_dir_fd: int,
+        dst_dir_fd: int,
+    ) -> None:
+        nonlocal replacement_path
+        if destination_name == output_root.name and replacement_path is None:
+            os.rename(
+                source_name,
+                displaced_attempt.name,
+                src_dir_fd=src_dir_fd,
+                dst_dir_fd=dst_dir_fd,
+            )
+            os.mkdir(source_name, dir_fd=src_dir_fd)
+            replacement_path = output_root.parent / source_name
+            replacement_fd = os.open(
+                source_name,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                dir_fd=src_dir_fd,
+            )
+            try:
+                foreign_fd = os.open(
+                    "foreign.txt",
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC,
+                    0o600,
+                    dir_fd=replacement_fd,
+                )
+                try:
+                    os.write(foreign_fd, b"foreign replacement")
+                    os.fsync(foreign_fd)
+                finally:
+                    os.close(foreign_fd)
+                os.fsync(replacement_fd)
+            finally:
+                os.close(replacement_fd)
+        original_rename_no_replace(
+            source_name,
+            destination_name,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+        )
+
+    monkeypatch.setattr(pinned_runtime_module, "_rename_no_replace", _replace_checked_attempt_then_publish)
+
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnDesignPublicationUncertainError,
+        match="design attempt identity changed",
+    ):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            completion_record_path=completion_path,
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert replacement_path is not None
+    assert not output_root.exists()
+    assert (replacement_path / "foreign.txt").read_text(encoding="utf-8") == "foreign replacement"
+    assert (displaced_attempt / "design.txt").read_text(encoding="utf-8") == "input-v1"
+
+
 def test_pinned_design_runtime_preserves_recreated_attempt_after_successful_publish(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2401,6 +2489,64 @@ def test_pinned_score_publication_rollback_preserves_concurrent_replacement(
     assert published_score.read_text(encoding="utf-8") == "concurrent replacement"
 
 
+def test_pinned_score_runtime_revalidates_score_after_publication_directory_fsync(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "scores"
+    output_root.mkdir()
+    published_score = output_root / "input.pt"
+    completion_path = tmp_path / ".test-ligandmpnn-execution.json"
+    original_fsync = os.fsync
+    replacement_installed = False
+
+    def _replace_score_during_successful_publication_sync(file_descriptor: int) -> None:
+        nonlocal replacement_installed
+        if (
+            not replacement_installed
+            and stat.S_ISDIR(os.fstat(file_descriptor).st_mode)
+            and published_score.is_file()
+            and not completion_path.exists()
+        ):
+            published_score.unlink()
+            published_score.write_text("concurrent replacement", encoding="utf-8")
+            with published_score.open("rb") as handle:
+                original_fsync(handle.fileno())
+            replacement_installed = True
+        original_fsync(file_descriptor)
+
+    monkeypatch.setattr(os, "fsync", _replace_score_during_successful_publication_sync)
+
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnScorePublicationUncertainError,
+        match="durable score publication identity changed",
+    ):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert replacement_installed
+    assert published_score.read_text(encoding="utf-8") == "concurrent replacement"
+    assert not completion_path.exists()
+
+
 def test_pinned_score_runtime_reports_uncertainty_when_score_rollback_fsync_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2567,6 +2713,64 @@ def test_pinned_score_completion_rollback_preserves_concurrent_score_replacement
         original_fsync(file_descriptor)
 
     monkeypatch.setattr(os, "fsync", _replace_score_then_fail_completion_fsync)
+
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnCompletionPublicationUncertainError,
+        match="completion publication output rollback target changed",
+    ):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert replacement_installed
+    assert published_score.read_text(encoding="utf-8") == "concurrent replacement"
+    assert not completion_path.exists()
+
+
+def test_pinned_score_runtime_revalidates_score_after_completion_directory_fsync(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "scores"
+    output_root.mkdir()
+    published_score = output_root / "input.pt"
+    completion_path = tmp_path / ".test-ligandmpnn-execution.json"
+    original_fsync = os.fsync
+    replacement_installed = False
+
+    def _replace_score_during_successful_completion_sync(file_descriptor: int) -> None:
+        nonlocal replacement_installed
+        if (
+            not replacement_installed
+            and stat.S_ISDIR(os.fstat(file_descriptor).st_mode)
+            and published_score.is_file()
+            and completion_path.is_file()
+        ):
+            published_score.unlink()
+            published_score.write_text("concurrent replacement", encoding="utf-8")
+            with published_score.open("rb") as handle:
+                original_fsync(handle.fileno())
+            replacement_installed = True
+        original_fsync(file_descriptor)
+
+    monkeypatch.setattr(os, "fsync", _replace_score_during_successful_completion_sync)
 
     with pytest.raises(
         pinned_runtime_module.LigandMpnnCompletionPublicationUncertainError,
