@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -102,22 +103,23 @@ def _collect_visible_markdown_files(repo_root: Path, root: Path) -> list[Path]:
             cwd=repo_root,
             check=False,
             capture_output=True,
-            text=True,
+            text=False,
         )
     except OSError:
         raise RuntimeError("git ls-files failed while inventorying documentation") from None
 
     if result.returncode != 0:
-        detail = result.stderr.strip()
+        detail = os.fsdecode(result.stderr).strip()
         message = "git ls-files failed while inventorying documentation"
         if detail:
             message = f"{message}: {detail}"
         raise RuntimeError(message)
 
     files: set[Path] = set()
-    for relative_path in result.stdout.split("\0"):
-        if not relative_path:
+    for relative_path_bytes in result.stdout.split(b"\0"):
+        if not relative_path_bytes:
             continue
+        relative_path = os.fsdecode(relative_path_bytes)
         path = repo_root / relative_path
         if path.suffix == ".md" and path.is_file():
             files.add(path)

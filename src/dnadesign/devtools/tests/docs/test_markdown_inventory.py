@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import datetime as dt
+import os
 import subprocess
 from pathlib import Path
 
@@ -158,17 +159,42 @@ def test_markdown_inventory_fails_closed_when_git_inventory_fails(
     _write(tmp_path / "docs" / "README.md", "# Documentation\n")
     calls = 0
 
-    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str | bytes]:
         nonlocal calls
         calls += 1
         if calls == 1:
             return subprocess.CompletedProcess(args[0], 0, stdout=f"{tmp_path}\n", stderr="")
-        return subprocess.CompletedProcess(args[0], 128, stdout="", stderr="fatal: inventory failed")
+        return subprocess.CompletedProcess(args[0], 128, stdout=b"", stderr=b"fatal: inventory failed")
 
     monkeypatch.setattr(markdown_inventory.subprocess, "run", fake_run)
 
     with pytest.raises(RuntimeError, match="git ls-files failed while inventorying documentation"):
         _collect_markdown_files(tmp_path)
+
+
+def test_markdown_inventory_decodes_git_paths_with_filesystem_semantics(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    relative_path_bytes = b"docs/non-utf8-\xff.md"
+    relative_path = os.fsdecode(relative_path_bytes)
+    document = tmp_path / relative_path
+    (tmp_path / "docs").mkdir()
+    calls = 0
+
+    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str | bytes]:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return subprocess.CompletedProcess(args[0], 0, stdout=f"{tmp_path}\n", stderr="")
+        return subprocess.CompletedProcess(args[0], 0, stdout=relative_path_bytes + b"\0", stderr=b"")
+
+    monkeypatch.setattr(markdown_inventory.subprocess, "run", fake_run)
+    monkeypatch.setattr(Path, "is_file", lambda path: path == document)
+
+    files = markdown_inventory._collect_visible_markdown_files(tmp_path, tmp_path / "docs")
+
+    assert files == [document]
 
 
 def test_broken_links_check_flags_missing_markdown_anchor(tmp_path: Path) -> None:
