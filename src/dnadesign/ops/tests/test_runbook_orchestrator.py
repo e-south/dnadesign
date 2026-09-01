@@ -133,12 +133,12 @@ densegen:
 
     runbook_payload: dict[str, object] = {
         "schema_version": 1,
-        "id": "study_stress_ethanol_cipro",
+        "id": "demo_densegen_run",
         "workflow_id": ("densegen_batch_with_notify" if include_notify else "densegen_batch_submit"),
         "project": "dunlop",
         "workspace_root": str(workspace_root),
         "logging": {
-            "stdout_dir": str(workspace_root / "outputs" / "logs" / "ops" / "sge" / "study_stress_ethanol_cipro"),
+            "stdout_dir": str(workspace_root / "outputs" / "logs" / "ops" / "sge" / "demo_densegen_run"),
         },
         "densegen": {
             "config": str(workspace_root / "config.yaml"),
@@ -324,12 +324,12 @@ def test_runbook_relative_paths_resolve_against_runbook_parent(tmp_path: Path) -
     payload = {
         "runbook": {
             "schema_version": 1,
-            "id": "study_stress_ethanol_cipro",
+            "id": "demo_densegen_run",
             "workflow_id": "densegen_batch_with_notify",
             "project": "dunlop",
             "workspace_root": "workspace",
             "logging": {
-                "stdout_dir": "workspace/outputs/logs/ops/sge/study_stress_ethanol_cipro",
+                "stdout_dir": "workspace/outputs/logs/ops/sge/demo_densegen_run",
             },
             "densegen": {
                 "config": "workspace/config.yaml",
@@ -771,7 +771,7 @@ def test_mode_resume_accepts_nested_densegen_used_tfbs_detail_column(tmp_path: P
         {
             "id": ["r1"],
             "sequence": ["ATGCATGC"],
-            "densegen__run_id": ["study_stress_ethanol_cipro"],
+            "densegen__run_id": ["demo_densegen_run"],
             "densegen__input_name": ["plan_pool__ethanol__sig35_f"],
             "densegen__plan": ["ethanol__sig35=f"],
             "densegen__used_tfbs_detail": used_tfbs_detail,
@@ -804,7 +804,7 @@ def test_mode_auto_selects_resume_with_record_part_artifacts_only(tmp_path: Path
         {
             "id": ["r1"],
             "sequence": ["ATGCATGC"],
-            "densegen__run_id": ["study_stress_ethanol_cipro"],
+            "densegen__run_id": ["demo_densegen_run"],
             "densegen__input_name": ["plan_pool__ethanol__sig35_f"],
             "densegen__plan": ["ethanol__sig35=f"],
             "densegen__used_tfbs_detail": used_tfbs_detail,
@@ -825,12 +825,7 @@ def test_mode_auto_selects_resume_when_attempt_artifacts_exist_with_usr_base_rec
     runbook = load_orchestration_runbook(runbook_path)
 
     usr_records_path = (
-        runbook.workspace_root
-        / "outputs"
-        / "usr_datasets"
-        / "densegen"
-        / "study_stress_ethanol_cipro"
-        / "records.parquet"
+        runbook.workspace_root / "outputs" / "usr_datasets" / "densegen" / "demo_densegen_run" / "records.parquet"
     )
     usr_records_path.parent.mkdir(parents=True, exist_ok=True)
     base_records_table = pyarrow.table({"id": ["r1"], "sequence": ["ATGCATGC"]})
@@ -858,7 +853,7 @@ def test_mode_auto_selects_resume_when_attempt_artifacts_exist_with_external_usr
     )
     runbook = load_orchestration_runbook(runbook_path)
 
-    usr_records_path = external_usr_root / "densegen" / "study_stress_ethanol_cipro" / "records.parquet"
+    usr_records_path = external_usr_root / "densegen" / "demo_densegen_run" / "records.parquet"
     usr_records_path.parent.mkdir(parents=True, exist_ok=True)
     used_tfbs_type = pyarrow.list_(
         pyarrow.struct(
@@ -872,7 +867,7 @@ def test_mode_auto_selects_resume_when_attempt_artifacts_exist_with_external_usr
         {
             "id": ["r1"],
             "sequence": ["ATGCATGC"],
-            "densegen__run_id": ["study_stress_ethanol_cipro"],
+            "densegen__run_id": ["demo_densegen_run"],
             "densegen__input_name": ["plan_pool__ethanol__sig35_f"],
             "densegen__plan": ["ethanol__sig35=f"],
             "densegen__used_tfbs_detail": used_tfbs_detail,
@@ -2218,7 +2213,7 @@ def test_batch_plan_includes_log_retention_prune_gate(tmp_path: Path) -> None:
 
     assert "dnadesign.ops.orchestrator.gates prune-ops-logs" in preflight_block
     assert f"--stdout-dir {shlex.quote(str(runbook.logging.stdout_dir))}" in preflight_block
-    assert "--runbook-id study_stress_ethanol_cipro" in preflight_block
+    assert "--runbook-id demo_densegen_run" in preflight_block
     assert "--keep-last 3" in preflight_block
     assert "--max-age-days 5" in preflight_block
     assert "--json" in preflight_block
@@ -3191,12 +3186,12 @@ def test_densegen_workflow_rejects_gpu_fields() -> None:
     payload = {
         "runbook": {
             "schema_version": 1,
-            "id": "study_stress_ethanol_cipro",
+            "id": "demo_densegen_run",
             "workflow_id": "densegen_batch_with_notify",
             "project": "dunlop",
             "workspace_root": "/tmp/workspace",
             "logging": {
-                "stdout_dir": "/tmp/workspace/outputs/logs/ops/sge/study_stress_ethanol_cipro",
+                "stdout_dir": "/tmp/workspace/outputs/logs/ops/sge/demo_densegen_run",
             },
             "densegen": {
                 "config": "/tmp/workspace/config.yaml",
@@ -3239,12 +3234,12 @@ def test_densegen_run_args_rejects_fresh_mode_without_fresh_flag() -> None:
     payload = {
         "runbook": {
             "schema_version": 1,
-            "id": "study_stress_ethanol_cipro",
+            "id": "demo_densegen_run",
             "workflow_id": "densegen_batch_submit",
             "project": "dunlop",
             "workspace_root": "/tmp/workspace",
             "logging": {
-                "stdout_dir": "/tmp/workspace/outputs/logs/ops/sge/study_stress_ethanol_cipro",
+                "stdout_dir": "/tmp/workspace/outputs/logs/ops/sge/demo_densegen_run",
             },
             "densegen": {
                 "config": "/tmp/workspace/config.yaml",
@@ -3610,7 +3605,7 @@ def test_execute_batch_plan_requires_secret_ref_for_orchestration_notify(tmp_pat
             provider="slack",
             webhook_env="NOTIFY_WEBHOOK",
             secret_ref="",
-            run_id="study_stress_ethanol_cipro",
+            run_id="demo_densegen_run",
             tls_ca_bundle="/etc/ssl/certs/ca-certificates.crt",
         ),
         decision_reason="secret-ref-required-test",
@@ -4271,7 +4266,7 @@ def test_cli_runbook_init_uses_repo_root_for_template_contracts(tmp_path: Path) 
 def test_cli_runbook_init_resolves_relative_workspace_root_against_repo_root(tmp_path: Path) -> None:
     runbook_path = tmp_path / "contracts" / "densegen-runbook.yaml"
     repo_root = tmp_path / "repo"
-    workspace_relative = Path("src/dnadesign/densegen/workspaces/study_stress_ethanol_cipro")
+    workspace_relative = Path("src/dnadesign/densegen/workspaces/demo_densegen_run")
     runner = CliRunner()
 
     result = runner.invoke(

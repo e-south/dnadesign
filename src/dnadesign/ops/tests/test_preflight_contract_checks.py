@@ -46,8 +46,8 @@ def _execution(argv: tuple[str, ...], cwd: Path, *, returncode: int, stdout: str
 def _contract() -> StudyOpsContract:
     return StudyOpsContract(
         study_id="demo_study",
-        status_kind="stress-ethanol-cipro-growth-status",
-        preflight_kind="stress-ethanol-cipro-growth-preflight",
+        status_kind="demo-study-status",
+        preflight_kind="demo-study-preflight",
         title="Demo study",
         snapshot_summary_scope="repo",
         execution_surfaces={

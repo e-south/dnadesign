@@ -21,6 +21,7 @@ import shlex
 import stat
 import sys
 import tempfile
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -54,6 +55,7 @@ from .models import (
     StorageObjectPublicationUnsupported,
 )
 from .validation import (
+    _StorageSnapshotInconsistent,
     resolve_storage_path,
     storage_file_paths,
     verify_manifest_index_if_git_resident,
@@ -63,6 +65,11 @@ from .validation import (
 _LINUX_RENAME_NOREPLACE = 0x00000001
 _RENAME_EXCHANGE = 0x00000002
 _DARWIN_RENAME_EXCL = 0x00000004
+
+_POST_PUBLICATION_SETTLE_SECONDS = 0.5
+_TRANSIENT_POST_PUBLICATION_VALIDATION_ERROR = (
+    "storage object changed during validation; retry while the producer is quiescent"
+)
 
 
 def _require_posix_publication_capabilities() -> None:
@@ -1007,6 +1014,76 @@ def _publish_refresh_manifest(
         raise publication_error
 
 
+def _verify_published_manifest(
+    manifest_path: Path,
+    *,
+    allow_pending_demo_manifest: bool,
+    previous_bytes: bytes | None,
+    published_bytes: bytes,
+    published_identity: tuple[int, int],
+):
+    """Retry one exact provider-settle race without relaxing validation."""
+
+    published_digest = _sha256_bytes(published_bytes)
+    for attempt in range(2):
+        _require_published_manifest_binding(
+            manifest_path,
+            published_bytes=published_bytes,
+            published_identity=published_identity,
+        )
+        try:
+            verified = verify_storage_object(
+                manifest_path.parent,
+                _allow_pending_demo_manifest=allow_pending_demo_manifest,
+                _allow_pending_demo_lock=allow_pending_demo_manifest and previous_bytes is None,
+                _allow_pending_lock_visibility=previous_bytes is None and attempt == 0,
+            )
+        except StorageObjectError as exc:
+            if attempt != 0 or not isinstance(exc, _StorageSnapshotInconsistent):
+                raise
+            _require_published_manifest_binding(
+                manifest_path,
+                published_bytes=published_bytes,
+                published_identity=published_identity,
+            )
+            time.sleep(_POST_PUBLICATION_SETTLE_SECONDS)
+            continue
+        if (
+            verified.manifest_digest != published_digest
+            or (
+                verified.manifest_device_id,
+                verified.manifest_inode,
+            )
+            != published_identity
+        ):
+            raise StorageObjectError("storage object verification result does not match the published receipt")
+        _require_published_manifest_binding(
+            manifest_path,
+            published_bytes=published_bytes,
+            published_identity=published_identity,
+        )
+        return verified
+    raise AssertionError("bounded storage-object publication validation exhausted unexpectedly")
+
+
+def _require_published_manifest_binding(
+    manifest_path: Path,
+    *,
+    published_bytes: bytes,
+    published_identity: tuple[int, int],
+) -> None:
+    """Require validation to remain bound to this operation's exact receipt."""
+
+    if not _entry_matches_regular_bytes(
+        manifest_path,
+        expected_identity=published_identity,
+        expected_bytes=published_bytes,
+    ):
+        raise StorageObjectError(
+            "storage object manifest changed after publication; refusing to validate an unrelated receipt"
+        )
+
+
 def _write_manifest(
     manifest_path: Path,
     payload: dict[str, object],
@@ -1089,10 +1166,16 @@ def _write_manifest(
             raise StorageObjectError(f"cannot write storage object manifest: {write_error}") from write_error
         raise
     try:
-        summary = verify_storage_object(
-            manifest_path.parent,
-            _allow_pending_demo_manifest=allow_pending_demo_manifest,
-            _allow_pending_demo_lock=allow_pending_demo_manifest and previous_bytes is None,
+        if published_identity is None:
+            raise StorageObjectPublicationUncertain(
+                "cannot identify the storage object manifest published by this operation"
+            )
+        summary = _verify_published_manifest(
+            manifest_path,
+            allow_pending_demo_manifest=allow_pending_demo_manifest,
+            previous_bytes=previous_bytes,
+            published_bytes=manifest_bytes,
+            published_identity=published_identity,
         ).summary()
         if allow_pending_demo_manifest:
             summary["status"] = "created-pending-git-add" if previous_bytes is None else "refreshed-pending-git-add"

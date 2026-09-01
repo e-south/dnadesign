@@ -441,11 +441,11 @@ def test_resolve_tool_events_path_densegen_from_usr_output_config(tmp_path: Path
                 "densegen:",
                 "  run:",
                 f"    root: {run_root}",
-                "    id: stress_ethanol_cipro",
+                "    id: demo_densegen_run",
                 "  output:",
                 "    targets: [usr]",
                 "    usr:",
-                "      dataset: densegen_prom_eth_cip_source",
+                "      dataset: densegen_demo_source",
                 "      root: outputs/usr_datasets",
                 "    schema:",
                 "      bio_type: dna",
@@ -458,10 +458,7 @@ def test_resolve_tool_events_path_densegen_from_usr_output_config(tmp_path: Path
 
     events_path, policy = resolve_tool_events_path(tool="densegen", config=config)
 
-    assert (
-        events_path
-        == (run_root / "outputs" / "usr_datasets" / "densegen_prom_eth_cip_source" / ".events.log").resolve()
-    )
+    assert events_path == (run_root / "outputs" / "usr_datasets" / "densegen_demo_source" / ".events.log").resolve()
     assert policy == "densegen"
 
 
@@ -475,11 +472,11 @@ def test_resolve_tool_events_path_densegen_supports_shared_usr_root_outside_outp
                 "densegen:",
                 "  run:",
                 f"    root: {run_root}",
-                "    id: stress_ethanol_cipro",
+                "    id: demo_densegen_run",
                 "  output:",
                 "    targets: [usr]",
                 "    usr:",
-                "      dataset: densegen_prom_eth_cip_source",
+                "      dataset: densegen_demo_source",
                 f"      root: {tmp_path / 'external_usr'}",
                 "    schema:",
                 "      bio_type: dna",
@@ -492,7 +489,7 @@ def test_resolve_tool_events_path_densegen_supports_shared_usr_root_outside_outp
 
     events_path, policy = resolve_tool_events_path(tool="densegen", config=config)
 
-    assert events_path == (tmp_path / "external_usr" / "densegen_prom_eth_cip_source" / ".events.log").resolve()
+    assert events_path == (tmp_path / "external_usr" / "densegen_demo_source" / ".events.log").resolve()
     assert policy == "densegen"
 
 
