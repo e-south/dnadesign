@@ -12,10 +12,12 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import datetime as dt
+import subprocess
 from pathlib import Path
 
 from dnadesign.devtools.docs import checks as docs_checks
 from dnadesign.devtools.docs.checks import (
+    _collect_markdown_files,
     _find_broken_links,
     main,
 )
@@ -114,6 +116,36 @@ def test_main_passes_for_valid_links(tmp_path: Path) -> None:
 
     rc = main(["--repo-root", str(tmp_path)])
     assert rc == 0
+
+
+def test_markdown_inventory_excludes_ignored_docs_and_keeps_new_docs(tmp_path: Path) -> None:
+    tracked_doc = tmp_path / "docs" / "README.md"
+    new_doc = tmp_path / "docs" / "new-guide.md"
+    ignored_doc = tmp_path / "docs" / "studies" / "private-study.md"
+    _write(tracked_doc, "# Documentation\n")
+    _write(new_doc, "# New guide\n")
+    _write(ignored_doc, "# Private study\n")
+    _write(tmp_path / ".gitignore", "docs/studies/\n")
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", "docs/README.md"], cwd=tmp_path, check=True)
+
+    docs_files, all_files = _collect_markdown_files(tmp_path)
+
+    assert docs_files == [tracked_doc, new_doc]
+    assert ignored_doc not in all_files
+
+
+def test_markdown_inventory_ignores_unrelated_ancestor_git_repository(tmp_path: Path) -> None:
+    extracted_root = tmp_path / "extracted"
+    extracted_doc = extracted_root / "docs" / "README.md"
+    _write(extracted_doc, "# Extracted documentation\n")
+    _write(tmp_path / ".gitignore", "extracted/\n")
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
+
+    docs_files, all_files = _collect_markdown_files(extracted_root)
+
+    assert docs_files == [extracted_doc]
+    assert all_files == [extracted_doc]
 
 
 def test_broken_links_check_flags_missing_markdown_anchor(tmp_path: Path) -> None:

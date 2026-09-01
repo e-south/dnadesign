@@ -148,14 +148,18 @@ def _is_git_ignored_untracked_path(*, repo_root: Path, path: Path) -> bool:
 
 
 def _is_generated_artifact_only_dir(path: Path) -> bool:
-    descendants = list(path.rglob("*"))
-    if not descendants:
+    children = list(path.iterdir())
+    if not children:
         return False
-    for descendant in descendants:
-        relative_parts = descendant.relative_to(path).parts
-        if any(part in _GENERATED_ARTIFACT_DIRS for part in relative_parts):
+
+    for child in children:
+        if child.name in _GENERATED_ARTIFACT_DIRS:
             continue
-        if descendant.is_file() and descendant.suffix in _GENERATED_ARTIFACT_SUFFIXES:
+        if child.is_symlink():
+            return False
+        if child.is_file() and child.suffix in _GENERATED_ARTIFACT_SUFFIXES:
+            continue
+        if child.is_dir() and _is_generated_artifact_only_dir(child):
             continue
         return False
     return True

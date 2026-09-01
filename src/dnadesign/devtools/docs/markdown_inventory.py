@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from dnadesign.devtools.ci.changes import discover_repo_tools
@@ -26,7 +27,7 @@ def _collect_markdown_files(repo_root: Path) -> tuple[list[Path], list[Path]]:
     if not docs_root.exists():
         raise FileNotFoundError("docs/ directory is missing")
 
-    docs_md_files = sorted(docs_root.rglob("*.md"))
+    docs_md_files = _collect_visible_markdown_files(repo_root, docs_root)
     tool_docs_md_files = _collect_tool_docs_markdown_files(repo_root)
     tool_readme_md_files = _collect_tool_readme_markdown_files(repo_root)
     all_md_files = list(docs_md_files)
@@ -50,9 +51,73 @@ def _collect_tool_docs_markdown_files(repo_root: Path) -> list[Path]:
         docs_root = src_root / tool_name / "docs"
         if not docs_root.exists():
             continue
-        for path in docs_root.rglob("*.md"):
+        for path in _collect_visible_markdown_files(repo_root, docs_root):
             tool_docs.add(path)
     return sorted(tool_docs)
+
+
+def _collect_visible_markdown_files(repo_root: Path, root: Path) -> list[Path]:
+    """Return tracked and nonignored-new Markdown below ``root``.
+
+    Git is the public-tree authority when available. A non-repository fixture
+    falls back to filesystem discovery so the checker remains usable in unit
+    tests and extracted documentation trees.
+    """
+
+    try:
+        relative_root = root.resolve().relative_to(repo_root.resolve())
+    except ValueError:
+        return []
+
+    try:
+        top_level_result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=repo_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        top_level_result = None
+
+    if (
+        top_level_result is None
+        or top_level_result.returncode != 0
+        or Path(top_level_result.stdout.strip()).resolve() != repo_root.resolve()
+    ):
+        return sorted(root.rglob("*.md"))
+
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "ls-files",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+                "-z",
+                "--",
+                relative_root.as_posix(),
+            ],
+            cwd=repo_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        result = None
+
+    if result is None or result.returncode != 0:
+        return sorted(root.rglob("*.md"))
+
+    files: set[Path] = set()
+    for relative_path in result.stdout.split("\0"):
+        if not relative_path:
+            continue
+        path = repo_root / relative_path
+        if path.suffix == ".md" and path.is_file():
+            files.add(path)
+    return sorted(files)
 
 
 def _collect_tool_readme_markdown_files(repo_root: Path) -> list[Path]:

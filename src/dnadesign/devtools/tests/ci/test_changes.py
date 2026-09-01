@@ -259,6 +259,19 @@ def test_discover_repo_tools_keeps_latentdna_and_ignores_cache_only_dirs(tmp_pat
     assert tool_names == {"latentdna"}
 
 
+def test_discover_repo_tools_ignores_nested_cache_only_dirs(tmp_path: Path) -> None:
+    src_root = tmp_path / "src" / "dnadesign"
+    (src_root / "latentdna").mkdir(parents=True, exist_ok=True)
+    (src_root / "latentdna" / "__init__.py").write_text("", encoding="utf-8")
+    cache_root = src_root / "retired_tool" / "compiler" / "contracts" / "__pycache__"
+    cache_root.mkdir(parents=True, exist_ok=True)
+    (cache_root / "models.cpython-312.pyc").write_bytes(b"cached")
+
+    tool_names = discover_repo_tools(repo_root=tmp_path)
+
+    assert tool_names == {"latentdna"}
+
+
 def test_discover_repo_tools_ignores_untracked_local_backup(tmp_path: Path) -> None:
     src_root = tmp_path / "src" / "dnadesign"
     (src_root / "latentdna").mkdir(parents=True, exist_ok=True)
