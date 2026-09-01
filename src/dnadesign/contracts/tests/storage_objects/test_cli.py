@@ -59,7 +59,9 @@ def test_inventory_retries_one_transient_post_publication_validation(
         nonlocal calls
         calls += 1
         if calls == 1:
-            raise StorageObjectError(storage_inventory._TRANSIENT_POST_PUBLICATION_VALIDATION_ERROR)
+            raise storage_validation._StorageSnapshotInconsistent(
+                storage_inventory._TRANSIENT_POST_PUBLICATION_VALIDATION_ERROR
+            )
         return original_verify(*args, **kwargs)
 
     monkeypatch.setattr(storage_inventory, "verify_storage_object", _verify)
@@ -80,6 +82,60 @@ def test_inventory_retries_one_transient_post_publication_validation(
 
     assert summary["status"] == "verified"
     assert calls == 2
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
+@pytest.mark.parametrize("listing_outcome", ["declared-missing", "undeclared"])
+def test_inventory_retries_one_transient_post_publication_listing_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    listing_outcome: str,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    payload_path = root / "payload.txt"
+    payload_path.write_text("payload\n", encoding="utf-8")
+    transient_path = root / "provider-transient.txt"
+    original_tree_paths = storage_validation._storage_tree_paths
+    original_tree_state = storage_validation._storage_tree_state
+    injected = False
+    settle_delays: list[float] = []
+
+    def _tree_paths(*args: object, **kwargs: object):
+        nonlocal injected
+        files, directories = original_tree_paths(*args, **kwargs)
+        if injected or not (root / MANIFEST_NAME).exists():
+            return files, directories
+        injected = True
+        if listing_outcome == "declared-missing":
+            return tuple(path for path in files if path != payload_path), directories
+        transient_path.write_text("transient provider listing\n", encoding="utf-8")
+        return (*files, transient_path), directories
+
+    def _tree_state(*args: object, **kwargs: object):
+        state = original_tree_state(*args, **kwargs)
+        transient_path.unlink(missing_ok=True)
+        return state
+
+    monkeypatch.setattr(storage_validation, "_storage_tree_paths", _tree_paths)
+    monkeypatch.setattr(storage_validation, "_storage_tree_state", _tree_state)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert injected is True
     assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
 
 
@@ -106,7 +162,9 @@ def test_inventory_rejects_receipt_replaced_before_transient_validation_retry(
             replacement.replace(manifest_path)
             replacement_stat = manifest_path.stat(follow_symlinks=False)
             replacement_identity = (replacement_stat.st_dev, replacement_stat.st_ino)
-            raise StorageObjectError(storage_inventory._TRANSIENT_POST_PUBLICATION_VALIDATION_ERROR)
+            raise storage_validation._StorageSnapshotInconsistent(
+                storage_inventory._TRANSIENT_POST_PUBLICATION_VALIDATION_ERROR
+            )
         return original_verify(*args, **kwargs)
 
     monkeypatch.setattr(storage_inventory, "verify_storage_object", _verify)
@@ -134,6 +192,40 @@ def test_inventory_rejects_receipt_replaced_before_transient_validation_retry(
     assert len(recovery_paths) == 1
     recovery_stat = recovery_paths[0].stat(follow_symlinks=False)
     assert (recovery_stat.st_dev, recovery_stat.st_ino) == replacement_identity
+
+
+def test_stable_regular_read_rejects_competing_inode_between_path_snapshots(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "manifest.json"
+    path.write_bytes(b"published receipt\n")
+    published_stat = path.stat(follow_symlinks=False)
+    competitor = tmp_path / "competitor.json"
+    competitor.write_bytes(b"competing receipt\n")
+    original_open = Path.open
+    original_stat = Path.stat
+
+    def _open(candidate: Path, *args: object, **kwargs: object):
+        if candidate != path:
+            return original_open(candidate, *args, **kwargs)
+        competitor.replace(path)
+        return original_open(candidate, *args, **kwargs)
+
+    def _stat(candidate: Path, *args: object, **kwargs: object):
+        if candidate == path:
+            return published_stat
+        return original_stat(candidate, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", _open)
+    monkeypatch.setattr(Path, "stat", _stat)
+
+    with pytest.raises(StorageObjectError, match="manifest changed during validation"):
+        storage_validation._read_stable_regular_bytes(
+            path,
+            label="storage object manifest",
+            change_message="manifest changed during validation",
+        )
 
 
 @pytest.mark.parametrize("competitor_changes_bytes", [False, True])
@@ -232,6 +324,80 @@ def test_inventory_does_not_retry_semantic_validation_failure(
 
     assert calls == 1
     assert settle_delays == []
+    assert not (root / MANIFEST_NAME).exists()
+
+
+def test_inventory_does_not_retry_untyped_error_with_transient_message(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    calls = 0
+    settle_delays: list[float] = []
+
+    def _verify(*_args: object, **_kwargs: object):
+        nonlocal calls
+        calls += 1
+        raise StorageObjectError(storage_inventory._TRANSIENT_POST_PUBLICATION_VALIDATION_ERROR)
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _verify)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    with pytest.raises(StorageObjectError, match="storage object changed during validation"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="usr",
+            object_kind="store",
+            content_schema="usr.dataset-root",
+            content_schema_version="v1",
+            producer_revision="test-revision",
+            storage_class="cold",
+            retention_policy="cold",
+        )
+
+    assert calls == 1
+    assert settle_delays == []
+    assert not (root / MANIFEST_NAME).exists()
+
+
+def test_inventory_retries_typed_snapshot_mismatch_exactly_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    calls = 0
+    settle_delays: list[float] = []
+
+    def _verify(*_args: object, **_kwargs: object):
+        nonlocal calls
+        calls += 1
+        raise storage_validation._StorageSnapshotInconsistent("undeclared files: transient.txt")
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _verify)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    with pytest.raises(StorageObjectError, match="undeclared files: transient.txt"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="usr",
+            object_kind="store",
+            content_schema="usr.dataset-root",
+            content_schema_version="v1",
+            producer_revision="test-revision",
+            storage_class="cold",
+            retention_policy="cold",
+        )
+
+    assert calls == 2
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
     assert not (root / MANIFEST_NAME).exists()
 
 

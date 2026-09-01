@@ -466,16 +466,16 @@ def test_verify_storage_object_rejects_manifest_changed_during_validation(
     changed["producer_revision"] = "test-revision-2"
     changed_bytes = json.dumps(changed).encode("utf-8")
     reads = 0
-    original_read_bytes = Path.read_bytes
+    original_read = storage_validation._read_stable_regular_bytes
 
-    def _read_bytes(path: Path) -> bytes:
+    def _read(path: Path, *, label: str, change_message: str) -> bytes:
         nonlocal reads
         if path == manifest_path:
             reads += 1
             return initial_bytes if reads == 1 else changed_bytes
-        return original_read_bytes(path)
+        return original_read(path, label=label, change_message=change_message)
 
-    monkeypatch.setattr(Path, "read_bytes", _read_bytes)
+    monkeypatch.setattr(storage_validation, "_read_stable_regular_bytes", _read)
 
     with pytest.raises(StorageObjectError, match="storage object changed during validation"):
         verify_storage_object(root)
@@ -488,14 +488,14 @@ def test_verify_storage_object_rejects_same_inode_manifest_rewrite_during_final_
     root = tmp_path / "pilot"
     _write_object(root)
     manifest_path = root / MANIFEST_NAME
-    original_read_bytes = Path.read_bytes
-    initial_bytes = original_read_bytes(manifest_path)
+    original_read = storage_validation._read_stable_regular_bytes
+    initial_bytes = manifest_path.read_bytes()
     replacement_bytes = b"!" + initial_bytes[1:]
     reads = 0
 
-    def _read_then_rewrite_same_inode(path: Path) -> bytes:
+    def _read_then_rewrite_same_inode(path: Path, *, label: str, change_message: str) -> bytes:
         nonlocal reads
-        content = original_read_bytes(path)
+        content = original_read(path, label=label, change_message=change_message)
         if path == manifest_path:
             reads += 1
             if reads == 2:
@@ -510,13 +510,13 @@ def test_verify_storage_object_rejects_same_inode_manifest_rewrite_during_final_
                 )
         return content
 
-    monkeypatch.setattr(Path, "read_bytes", _read_then_rewrite_same_inode)
+    monkeypatch.setattr(storage_validation, "_read_stable_regular_bytes", _read_then_rewrite_same_inode)
 
-    with pytest.raises(StorageObjectError, match="manifest changed during validation"):
+    with pytest.raises(StorageObjectError, match="changed during validation"):
         verify_storage_object(root)
 
     assert reads == 2
-    assert original_read_bytes(manifest_path) == replacement_bytes
+    assert manifest_path.read_bytes() == replacement_bytes
 
 
 def test_verify_storage_object_rechecks_shared_resource_access_on_second_pass(

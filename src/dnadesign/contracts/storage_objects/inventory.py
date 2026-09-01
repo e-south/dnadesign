@@ -55,6 +55,7 @@ from .models import (
     StorageObjectPublicationUnsupported,
 )
 from .validation import (
+    _StorageSnapshotInconsistent,
     resolve_storage_path,
     storage_file_paths,
     verify_manifest_index_if_git_resident,
@@ -1037,7 +1038,7 @@ def _verify_published_manifest(
                 _allow_pending_demo_lock=allow_pending_demo_manifest and previous_bytes is None,
             )
         except StorageObjectError as exc:
-            if attempt != 0 or str(exc) != _TRANSIENT_POST_PUBLICATION_VALIDATION_ERROR:
+            if attempt != 0 or not isinstance(exc, _StorageSnapshotInconsistent):
                 raise
             _require_published_manifest_binding(
                 manifest_path,

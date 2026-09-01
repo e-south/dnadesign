@@ -51,6 +51,10 @@ _CoordinationState = tuple[
 _RoutedObject = tuple[Path, ObjectKind, str, tuple[_StorageTreeEntryState, ...]]
 
 
+class _StorageSnapshotInconsistent(StorageObjectError):
+    """Signal one internally inconsistent filesystem snapshot."""
+
+
 def resolve_storage_path(path: Path, *, label: str, strict: bool = False) -> Path:
     """Resolve one contract path while normalizing filesystem-loop failures."""
 
@@ -102,7 +106,10 @@ def _read_stable_regular_bytes(
         before = path.stat(follow_symlinks=False)
         if not stat.S_ISREG(before.st_mode):
             raise StorageObjectError(f"{label} must remain a regular file: {path}")
-        content = path.read_bytes()
+        with path.open("rb") as handle:
+            opened = os.fstat(handle.fileno())
+            content = handle.read()
+            read_after = os.fstat(handle.fileno())
         after = path.stat(follow_symlinks=False)
     except StorageObjectError:
         raise
@@ -116,6 +123,22 @@ def _read_stable_regular_bytes(
         before.st_mtime_ns,
         before.st_ctime_ns,
     )
+    opened_state = (
+        opened.st_dev,
+        opened.st_ino,
+        opened.st_size,
+        opened.st_mode,
+        opened.st_mtime_ns,
+        opened.st_ctime_ns,
+    )
+    read_after_state = (
+        read_after.st_dev,
+        read_after.st_ino,
+        read_after.st_size,
+        read_after.st_mode,
+        read_after.st_mtime_ns,
+        read_after.st_ctime_ns,
+    )
     after_state = (
         after.st_dev,
         after.st_ino,
@@ -124,7 +147,14 @@ def _read_stable_regular_bytes(
         after.st_mtime_ns,
         after.st_ctime_ns,
     )
-    if not stat.S_ISREG(after.st_mode) or after_state != before_state:
+    if (
+        not stat.S_ISREG(opened.st_mode)
+        or not stat.S_ISREG(read_after.st_mode)
+        or not stat.S_ISREG(after.st_mode)
+        or opened_state != before_state
+        or read_after_state != opened_state
+        or after_state != before_state
+    ):
         raise StorageObjectError(change_message)
     return content
 
@@ -934,10 +964,10 @@ def verify_storage_object(
     }
     undeclared = sorted(actual_paths - declared_paths)
     if undeclared:
-        raise StorageObjectError(f"undeclared files: {', '.join(undeclared)}")
+        raise _StorageSnapshotInconsistent(f"undeclared files: {', '.join(undeclared)}")
     missing = sorted(declared_paths - actual_paths)
     if missing:
-        raise StorageObjectError(f"declared files are missing: {', '.join(missing)}")
+        raise _StorageSnapshotInconsistent(f"declared files are missing: {', '.join(missing)}")
     second_resources = tuple(_verify_resource(root, resource) for resource in manifest.resources)
     second_file_paths, second_directory_paths = _storage_tree_paths(root)
     second_tree_state = _storage_tree_state(root, second_file_paths, second_directory_paths)
@@ -975,7 +1005,9 @@ def verify_storage_object(
         or actual_paths != second_actual_paths
         or first_directories != second_directories
     ):
-        raise StorageObjectError("storage object changed during validation; retry while the producer is quiescent")
+        raise _StorageSnapshotInconsistent(
+            "storage object changed during validation; retry while the producer is quiescent"
+        )
 
     verified = VerifiedStorageObject(
         root=root,
