@@ -12,10 +12,16 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import datetime as dt
+import os
+import subprocess
 from pathlib import Path
 
+import pytest
+
 from dnadesign.devtools.docs import checks as docs_checks
+from dnadesign.devtools.docs import markdown_inventory
 from dnadesign.devtools.docs.checks import (
+    _collect_markdown_files,
     _find_broken_links,
     main,
 )
@@ -114,6 +120,81 @@ def test_main_passes_for_valid_links(tmp_path: Path) -> None:
 
     rc = main(["--repo-root", str(tmp_path)])
     assert rc == 0
+
+
+def test_markdown_inventory_excludes_ignored_docs_and_keeps_new_docs(tmp_path: Path) -> None:
+    tracked_doc = tmp_path / "docs" / "README.md"
+    new_doc = tmp_path / "docs" / "new-guide.md"
+    ignored_doc = tmp_path / "docs" / "studies" / "private-study.md"
+    _write(tracked_doc, "# Documentation\n")
+    _write(new_doc, "# New guide\n")
+    _write(ignored_doc, "# Private study\n")
+    _write(tmp_path / ".gitignore", "docs/studies/\n")
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", "docs/README.md"], cwd=tmp_path, check=True)
+
+    docs_files, all_files = _collect_markdown_files(tmp_path)
+
+    assert docs_files == [tracked_doc, new_doc]
+    assert ignored_doc not in all_files
+
+
+def test_markdown_inventory_ignores_unrelated_ancestor_git_repository(tmp_path: Path) -> None:
+    extracted_root = tmp_path / "extracted"
+    extracted_doc = extracted_root / "docs" / "README.md"
+    _write(extracted_doc, "# Extracted documentation\n")
+    _write(tmp_path / ".gitignore", "extracted/\n")
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
+
+    docs_files, all_files = _collect_markdown_files(extracted_root)
+
+    assert docs_files == [extracted_doc]
+    assert all_files == [extracted_doc]
+
+
+def test_markdown_inventory_fails_closed_when_git_inventory_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write(tmp_path / "docs" / "README.md", "# Documentation\n")
+    calls = 0
+
+    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str | bytes]:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return subprocess.CompletedProcess(args[0], 0, stdout=f"{tmp_path}\n", stderr="")
+        return subprocess.CompletedProcess(args[0], 128, stdout=b"", stderr=b"fatal: inventory failed")
+
+    monkeypatch.setattr(markdown_inventory.subprocess, "run", fake_run)
+
+    with pytest.raises(RuntimeError, match="git ls-files failed while inventorying documentation"):
+        _collect_markdown_files(tmp_path)
+
+
+def test_markdown_inventory_decodes_git_paths_with_filesystem_semantics(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    relative_path_bytes = b"docs/non-utf8-\xff.md"
+    relative_path = os.fsdecode(relative_path_bytes)
+    document = tmp_path / relative_path
+    (tmp_path / "docs").mkdir()
+    calls = 0
+
+    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str | bytes]:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return subprocess.CompletedProcess(args[0], 0, stdout=f"{tmp_path}\n", stderr="")
+        return subprocess.CompletedProcess(args[0], 0, stdout=relative_path_bytes + b"\0", stderr=b"")
+
+    monkeypatch.setattr(markdown_inventory.subprocess, "run", fake_run)
+    monkeypatch.setattr(Path, "is_file", lambda path: path == document)
+
+    files = markdown_inventory._collect_visible_markdown_files(tmp_path, tmp_path / "docs")
+
+    assert files == [document]
 
 
 def test_broken_links_check_flags_missing_markdown_anchor(tmp_path: Path) -> None:
