@@ -50,6 +50,7 @@ TEST_FAMILY_FILES = {
         "helpers.py",
         "test_layout.py",
         "test_navigation.py",
+        "test_notebook.py",
         "test_sync.py",
     },
     "datasets": {

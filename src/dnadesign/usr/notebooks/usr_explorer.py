@@ -14,11 +14,12 @@ def _():
     import pandas as pd
     import polars as pl
 
+    from dnadesign.usr import default_usr_root, resolve_usr_root_from_env
+
     alt.data_transformers.disable_max_rows()
 
     def dataset_root() -> Path:
-        # notebooks/ -> usr/ -> datasets/
-        return Path(__file__).resolve().parents[1] / "datasets"
+        return resolve_usr_root_from_env() or default_usr_root()
 
     return Path, alt, dataset_root, mo, np, pd, pl
 
