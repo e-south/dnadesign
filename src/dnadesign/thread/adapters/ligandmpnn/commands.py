@@ -207,6 +207,10 @@ def command_input_paths(
     if executable_path.is_absolute():
         inputs["python_executable"] = executable_path
     elif python_executable != executable_path.name:
+        if ".." in executable_path.parts:
+            raise ValueError(
+                "python_executable must not contain path traversal; per-seed output boundaries cannot be verified"
+            )
         inputs["python_executable"] = (Path.cwd() / executable_path).resolve()
     return inputs
 

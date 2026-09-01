@@ -288,9 +288,6 @@ def test_build_commands_rejects_relative_python_executable_traversing_into_per_s
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     request, checkout_root = _validated_request(tmp_path, seeds=(7,))
-    executable_path = tmp_path / "outputs/designs/seed_7/bin/python"
-    executable_path.parent.mkdir(parents=True)
-    executable_path.hardlink_to(Path(sys.executable))
     launcher_cwd = tmp_path / "launcher"
     launcher_cwd.mkdir()
     monkeypatch.chdir(launcher_cwd)
