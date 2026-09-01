@@ -1812,18 +1812,6 @@ def _publish_design_output_directory(
             ) from exc
         published_identity = (published_status.st_dev, published_status.st_ino)
         if not stat.S_ISDIR(published_status.st_mode) or published_identity != expected_identity:
-            try:
-                _rename_no_replace(
-                    destination_path.name,
-                    source_path.name,
-                    src_dir_fd=parent_fd,
-                    dst_dir_fd=parent_fd,
-                )
-                os.fsync(parent_fd)
-            except OSError as recovery_error:
-                raise LigandMpnnDesignPublicationUncertainError(
-                    "LigandMPNN design attempt identity changed; foreign publication was preserved"
-                ) from recovery_error
             raise LigandMpnnDesignPublicationUncertainError("LigandMPNN design attempt identity changed")
         try:
             os.fsync(parent_fd)

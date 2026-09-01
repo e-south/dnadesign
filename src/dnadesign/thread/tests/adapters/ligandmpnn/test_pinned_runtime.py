@@ -1941,8 +1941,95 @@ def test_pinned_design_runtime_rejects_attempt_replaced_immediately_before_renam
         )
 
     assert replacement_path is not None
-    assert not output_root.exists()
-    assert (replacement_path / "foreign.txt").read_text(encoding="utf-8") == "foreign replacement"
+    assert (output_root / "foreign.txt").read_text(encoding="utf-8") == "foreign replacement"
+    assert not replacement_path.exists()
+    assert (displaced_attempt / "design.txt").read_text(encoding="utf-8") == "input-v1"
+
+
+def test_pinned_design_runtime_preserves_replacement_installed_after_rename(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "designs" / "seed_7"
+    completion_path = output_root / ".dnadesign-ligandmpnn-execution.json"
+    displaced_attempt = output_root.parent / "owned-published-recovery"
+    original_rename_no_replace = pinned_runtime_module._rename_no_replace
+    replacement_installed = False
+
+    def _publish_then_replace_destination(
+        source_name: str,
+        destination_name: str,
+        *,
+        src_dir_fd: int,
+        dst_dir_fd: int,
+    ) -> None:
+        nonlocal replacement_installed
+        original_rename_no_replace(
+            source_name,
+            destination_name,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+        )
+        if destination_name == output_root.name and not replacement_installed:
+            os.rename(
+                destination_name,
+                displaced_attempt.name,
+                src_dir_fd=dst_dir_fd,
+                dst_dir_fd=dst_dir_fd,
+            )
+            os.mkdir(destination_name, dir_fd=dst_dir_fd)
+            replacement_fd = os.open(
+                destination_name,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                dir_fd=dst_dir_fd,
+            )
+            try:
+                foreign_fd = os.open(
+                    "foreign.txt",
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC,
+                    0o600,
+                    dir_fd=replacement_fd,
+                )
+                try:
+                    os.write(foreign_fd, b"post-rename replacement")
+                    os.fsync(foreign_fd)
+                finally:
+                    os.close(foreign_fd)
+                os.fsync(replacement_fd)
+            finally:
+                os.close(replacement_fd)
+            replacement_installed = True
+
+    monkeypatch.setattr(pinned_runtime_module, "_rename_no_replace", _publish_then_replace_destination)
+
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnDesignPublicationUncertainError,
+        match="design attempt identity changed",
+    ):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            completion_record_path=completion_path,
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert replacement_installed
+    assert (output_root / "foreign.txt").read_text(encoding="utf-8") == "post-rename replacement"
     assert (displaced_attempt / "design.txt").read_text(encoding="utf-8") == "input-v1"
 
 
