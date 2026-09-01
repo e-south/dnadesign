@@ -371,8 +371,9 @@ def test_verify_storage_object_wraps_resource_read_failures(
 
     monkeypatch.setattr(Path, "open", _open)
 
-    with pytest.raises(StorageObjectError, match="cannot read storage resource"):
+    with pytest.raises(StorageObjectError, match="cannot read storage resource") as exc_info:
         storage_validation.verify_storage_object(root)
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
 
 def test_verify_storage_object_rejects_bytes_changed_during_validation(
@@ -394,8 +395,9 @@ def test_verify_storage_object_rejects_bytes_changed_during_validation(
 
     monkeypatch.setattr(storage_validation, "_verify_resource", _verify)
 
-    with pytest.raises(StorageObjectError, match="declared resource digest mismatch"):
+    with pytest.raises(StorageObjectError, match="declared resource digest mismatch") as exc_info:
         verify_storage_object(root)
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
 
 def test_verify_storage_object_binds_digest_to_post_read_metadata(

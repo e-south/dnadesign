@@ -356,7 +356,12 @@ def _verify_resource(root: Path, resource: StoredResource) -> VerifiedStoredReso
         raise StorageObjectError(f"cannot inspect storage resource {resource.relative_path}: {exc}") from exc
     if not stat.S_ISREG(initial_stat.st_mode):
         raise StorageObjectError(f"declared resource is not a file: {resource.relative_path}")
-    observed_digest = _sha256(resolved)
+    try:
+        observed_digest = _sha256(resolved)
+    except StorageObjectError as exc:
+        if isinstance(exc.__cause__, FileNotFoundError):
+            raise _StorageSnapshotInconsistent(str(exc)) from exc.__cause__
+        raise
     if observed_digest != resource.digest:
         raise StorageObjectError(
             f"declared resource digest mismatch for {resource.relative_path}: "
@@ -412,6 +417,10 @@ def _verify_shared_resource_access(
     for resource in resources:
         try:
             resource_stat = resource.path.stat(follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise _StorageSnapshotInconsistent(
+                f"cannot inspect shared resource {resource.relative_path}: {exc}"
+            ) from exc
         except OSError as exc:
             raise StorageObjectError(f"cannot inspect shared resource {resource.relative_path}: {exc}") from exc
         if resource_stat.st_gid != shared_group:
@@ -424,6 +433,8 @@ def _verify_shared_resource_access(
         relative = directory.relative_to(root).as_posix()
         try:
             directory_stat = directory.stat(follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise _StorageSnapshotInconsistent(f"cannot inspect shared resource directory {relative}: {exc}") from exc
         except OSError as exc:
             raise StorageObjectError(f"cannot inspect shared resource directory {relative}: {exc}") from exc
         if directory_stat.st_gid != shared_group:

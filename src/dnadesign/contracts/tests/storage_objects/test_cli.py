@@ -220,6 +220,113 @@ def test_inventory_retries_declared_resource_missing_during_resolution(
     assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
 
 
+def test_inventory_retries_declared_resource_that_vanishes_before_digest_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    payload_path = root / "payload.txt"
+    payload_path.write_text("payload\n", encoding="utf-8")
+    displaced_path = tmp_path / "displaced-payload.txt"
+    original_open = Path.open
+    injected = False
+    settle_delays: list[float] = []
+
+    def _open(path: Path, *args: object, **kwargs: object):
+        nonlocal injected
+        if path == payload_path and not injected and (root / MANIFEST_NAME).exists():
+            injected = True
+            payload_path.replace(displaced_path)
+        return original_open(path, *args, **kwargs)
+
+    def _settle(delay: float) -> None:
+        settle_delays.append(delay)
+        displaced_path.replace(payload_path)
+
+    monkeypatch.setattr(Path, "open", _open)
+    monkeypatch.setattr(storage_inventory.time, "sleep", _settle)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert injected is True
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
+@pytest.mark.parametrize("target_kind", ["resource", "directory"])
+def test_inventory_retries_shared_posture_entry_that_vanishes_before_stat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target_kind: str,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(0o2770)
+    payload_path = root / "payload.txt"
+    payload_path.write_text("payload\n", encoding="utf-8")
+    directory_path = root / "empty-directory"
+    directory_path.mkdir()
+    target_path = payload_path if target_kind == "resource" else directory_path
+    displaced_path = tmp_path / f"displaced-{target_kind}"
+    original_shared_access = storage_validation._verify_shared_resource_access
+    original_stat = Path.stat
+    in_shared_access = False
+    injected = False
+    settle_delays: list[float] = []
+
+    def _shared_access(*args: object, **kwargs: object) -> None:
+        nonlocal in_shared_access
+        in_shared_access = True
+        try:
+            original_shared_access(*args, **kwargs)
+        finally:
+            in_shared_access = False
+
+    def _stat(path: Path, *args: object, **kwargs: object):
+        nonlocal injected
+        if path == target_path and in_shared_access and not injected:
+            injected = True
+            target_path.replace(displaced_path)
+        return original_stat(path, *args, **kwargs)
+
+    def _settle(delay: float) -> None:
+        settle_delays.append(delay)
+        displaced_path.replace(target_path)
+
+    monkeypatch.setattr(storage_validation, "_verify_shared_resource_access", _shared_access)
+    monkeypatch.setattr(Path, "stat", _stat)
+    monkeypatch.setattr(storage_inventory.time, "sleep", _settle)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert injected is True
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
 def test_inventory_rejects_receipt_replaced_before_transient_validation_retry(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
