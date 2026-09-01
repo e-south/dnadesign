@@ -87,17 +87,17 @@ def test_runbook_demo_snippet_check_accepts_commented_shell_and_yaml_blocks(tmp_
 
 def test_find_operational_runbook_path_issues_flags_repo_root_runbook(tmp_path: Path) -> None:
     _write(
-        tmp_path / "stress_ethanol_cipro.yaml",
+        tmp_path / "demo_study.yaml",
         "\n".join(
             [
                 "runbook:",
                 "  schema_version: 1",
-                "  id: study_stress_ethanol_cipro",
+                "  id: demo_densegen_run",
                 "  workflow_id: densegen_batch_submit",
                 "  project: dunlop",
                 "  workspace_root: /tmp/workspace",
                 "  logging:",
-                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/study_stress_ethanol_cipro",
+                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/demo_densegen_run",
                 "  densegen:",
                 "    config: /tmp/workspace/config.yaml",
                 "    qsub_template: docs/bu-scc/jobs/densegen-cpu.qsub",
@@ -110,7 +110,7 @@ def test_find_operational_runbook_path_issues_flags_repo_root_runbook(tmp_path: 
         + "\n",
     )
     _git_init(tmp_path)
-    _git_add(tmp_path, "stress_ethanol_cipro.yaml")
+    _git_add(tmp_path, "demo_study.yaml")
 
     issues = _find_operational_runbook_path_issues(tmp_path)
 
@@ -128,17 +128,17 @@ def test_find_operational_runbook_path_issues_rejects_malformed_tracked_yaml(tmp
 
 def test_find_operational_runbook_path_issues_ignores_untracked_yaml_noise_in_git_repo(tmp_path: Path) -> None:
     _write(
-        tmp_path / "stress_ethanol_cipro.yaml",
+        tmp_path / "demo_study.yaml",
         "\n".join(
             [
                 "runbook:",
                 "  schema_version: 1",
-                "  id: study_stress_ethanol_cipro",
+                "  id: demo_densegen_run",
                 "  workflow_id: densegen_batch_submit",
                 "  project: dunlop",
                 "  workspace_root: /tmp/workspace",
                 "  logging:",
-                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/study_stress_ethanol_cipro",
+                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/demo_densegen_run",
                 "  densegen:",
                 "    config: /tmp/workspace/config.yaml",
                 "    qsub_template: docs/bu-scc/jobs/densegen-cpu.qsub",
@@ -165,11 +165,11 @@ def test_find_operational_runbook_path_issues_ignores_untracked_yaml_noise_in_gi
         + "\n",
     )
     _git_init(tmp_path)
-    _git_add(tmp_path, "stress_ethanol_cipro.yaml")
+    _git_add(tmp_path, "demo_study.yaml")
 
     issues = _find_operational_runbook_path_issues(tmp_path)
 
-    assert any("stress_ethanol_cipro.yaml" in issue for issue in issues)
+    assert any("demo_study.yaml" in issue for issue in issues)
     assert not any("scratch/nested/noise.yaml" in issue for issue in issues)
 
 
@@ -180,12 +180,12 @@ def test_find_operational_runbook_path_issues_allows_packaged_presets(tmp_path: 
             [
                 "runbook:",
                 "  schema_version: 1",
-                "  id: study_stress_ethanol_cipro",
+                "  id: demo_densegen_run",
                 "  workflow_id: densegen_batch_submit",
                 "  project: dunlop",
                 "  workspace_root: /tmp/workspace",
                 "  logging:",
-                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/study_stress_ethanol_cipro",
+                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/demo_densegen_run",
                 "  densegen:",
                 "    config: /tmp/workspace/config.yaml",
                 "    qsub_template: docs/bu-scc/jobs/densegen-cpu.qsub",

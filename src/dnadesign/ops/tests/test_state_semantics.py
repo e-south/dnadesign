@@ -89,7 +89,7 @@ def test_campaign_overall_state_uses_shared_state_lattice() -> None:
         campaign_id="demo",
         steps=(
             _procedure_status(registry_id="ops.control-plane.orchestration", state="attention"),
-            _procedure_status(registry_id="studies.stress-ethanol-cipro-growth.status", state="missing"),
+            _procedure_status(registry_id="studies.demo-study.status", state="missing"),
         ),
     )
 
