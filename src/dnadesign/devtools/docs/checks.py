@@ -233,14 +233,22 @@ from dnadesign.devtools.docs.public_surface_contracts import (
 
 def _find_tool_readme_banner_issues(repo_root: Path) -> list[str]:
     """Compatibility seam for callers that patch the historical module globals."""
+    owner_catalog = _banner_contracts.BANNERS
     _banner_contracts.BANNERS = BANNERS
-    return _find_tool_readme_banner_issues_impl(repo_root)
+    try:
+        return _find_tool_readme_banner_issues_impl(repo_root)
+    finally:
+        _banner_contracts.BANNERS = owner_catalog
 
 
 def _find_banner_source_drift_issues(repo_root: Path) -> list[str]:
     """Compatibility seam for callers that patch the historical module globals."""
+    owner_check_banners = _banner_contracts.check_banners
     _banner_contracts.check_banners = check_banners
-    return _find_banner_source_drift_issues_impl(repo_root)
+    try:
+        return _find_banner_source_drift_issues_impl(repo_root)
+    finally:
+        _banner_contracts.check_banners = owner_check_banners
 
 
 def _build_parser() -> argparse.ArgumentParser:

@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from dnadesign.devtools.docs import banner_contracts
 from dnadesign.devtools.docs import checks as docs_checks
 from dnadesign.devtools.docs.banners.catalog import BannerSpec
 from dnadesign.devtools.docs.checks import (
@@ -160,6 +161,35 @@ def test_tool_readme_banner_check_rejects_swapped_catalog_paths(
 
     assert any(alpha_readme in issue and alpha_banner in issue and beta_banner in issue for issue in issues)
     assert any(beta_readme in issue and beta_banner in issue and alpha_banner in issue for issue in issues)
+
+
+def test_tool_readme_banner_compatibility_wrapper_restores_owner_catalog(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owner_catalog = banner_contracts.BANNERS
+    patched_catalog: tuple[BannerSpec, ...] = ()
+    monkeypatch.setattr(docs_checks, "BANNERS", patched_catalog)
+
+    _find_tool_readme_banner_issues(tmp_path)
+
+    assert banner_contracts.BANNERS is owner_catalog
+
+
+def test_banner_source_compatibility_wrapper_restores_owner_callable_after_exception(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owner_check_banners = banner_contracts.check_banners
+    (tmp_path / "src" / "dnadesign" / "devtools" / "docs" / "banners").mkdir(parents=True)
+
+    def _raise(_repo_root: Path) -> tuple[Path, ...]:
+        raise RuntimeError("sentinel banner failure")
+
+    monkeypatch.setattr(docs_checks, "check_banners", _raise)
+
+    with pytest.raises(RuntimeError, match="sentinel banner failure"):
+        docs_checks._find_banner_source_drift_issues(tmp_path)
+
+    assert banner_contracts.check_banners is owner_check_banners
 
 
 def test_tool_readme_banner_check_rejects_nonstandard_banner_dimensions(tmp_path: Path) -> None:
