@@ -31,7 +31,7 @@ def build_ligandmpnn_commands(
     python_executable: str = "python",
     residue_alphabet_sidecar: LigandMpnnResidueAlphabetSidecar | None = None,
 ) -> tuple[LigandMpnnCommand, ...]:
-    """Build one explicit official ``run.py`` invocation per requested seed."""
+    """Build one official ``run.py`` invocation per seed; relative interpreter paths use the current directory."""
 
     execution_root = resolve_execution_root_for_execution(execution_root)
     checkout_root = resolve_checkout_root_for_execution(checkout_root, execution_root=execution_root)
@@ -165,7 +165,7 @@ def _command_input_paths(
     python_executable: str,
     residue_alphabet_sidecar: LigandMpnnResidueAlphabetSidecar | None,
 ) -> dict[str, Path]:
-    """Inventory construction-time and runtime paths read by one command."""
+    """Inventory paths read during construction or launch using their actual resolution bases."""
 
     inputs = {
         "checkout_root": checkout_root,
@@ -176,7 +176,7 @@ def _command_input_paths(
     if executable_path.is_absolute():
         inputs["python_executable"] = executable_path
     elif python_executable != executable_path.name:
-        inputs["python_executable"] = execution_root / executable_path
+        inputs["python_executable"] = (Path.cwd() / executable_path).resolve()
     if residue_alphabet_sidecar is not None:
         sidecar_path = residue_alphabet_sidecar.path
         inputs["residue alphabet sidecar path"] = (
