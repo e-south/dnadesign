@@ -247,6 +247,45 @@ def test_build_commands_rejects_materialized_sidecar_nested_inside_per_seed_outp
         )
 
 
+@pytest.mark.parametrize("executable_form", ["absolute", "relative"])
+def test_build_commands_rejects_explicit_python_executable_nested_inside_per_seed_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    executable_form: str,
+) -> None:
+    request, checkout_root = _validated_request(tmp_path, seeds=(7,))
+    executable_path = tmp_path / "outputs/designs/seed_7/bin/python"
+    executable_path.parent.mkdir(parents=True)
+    executable_path.hardlink_to(Path(sys.executable))
+    foreign_cwd = tmp_path / "foreign-cwd"
+    foreign_cwd.mkdir()
+    monkeypatch.chdir(foreign_cwd)
+    python_executable = (
+        str(executable_path) if executable_form == "absolute" else executable_path.relative_to(tmp_path).as_posix()
+    )
+
+    with pytest.raises(ValueError, match="python_executable.*per-seed output"):
+        build_ligandmpnn_commands(
+            request,
+            checkout_root=checkout_root,
+            execution_root=tmp_path,
+            python_executable=python_executable,
+        )
+
+
+def test_build_commands_does_not_anchor_bare_python_command_name(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path, seeds=(7,))
+
+    command = build_ligandmpnn_commands(
+        request,
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
+        python_executable="python",
+    )[0]
+
+    assert command.argv[0] == "python"
+
+
 def test_command_input_guard_inventory_matches_all_construction_and_runtime_reads(tmp_path: Path) -> None:
     residue = LigandMpnnResidue(chain_id="A", residue_number=12)
     request, checkout_root = _validated_request(
@@ -273,6 +312,7 @@ def test_command_input_guard_inventory_matches_all_construction_and_runtime_read
         request,
         checkout_root=checkout_root,
         execution_root=tmp_path,
+        python_executable="tools/python",
         residue_alphabet_sidecar=sidecar,
     )
 
@@ -280,6 +320,7 @@ def test_command_input_guard_inventory_matches_all_construction_and_runtime_read
         "checkout_root": checkout_root,
         "pdb_path": tmp_path / request.pdb_path,
         "context inventory path": tmp_path / request.context_inventory.path,
+        "python_executable": tmp_path / "tools/python",
         "residue alphabet sidecar path": tmp_path / sidecar_path,
         "residue alphabet sidecar materialized_path": materialized_path,
     }

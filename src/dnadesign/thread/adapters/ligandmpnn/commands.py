@@ -39,6 +39,7 @@ def build_ligandmpnn_commands(
         request,
         checkout_root=checkout_root,
         execution_root=execution_root,
+        python_executable=python_executable,
         residue_alphabet_sidecar=residue_alphabet_sidecar,
     )
     context_inventory = load_ligandmpnn_context_inventory(
@@ -137,6 +138,7 @@ def _validate_command_input_output_separation(
     *,
     checkout_root: Path,
     execution_root: Path,
+    python_executable: str,
     residue_alphabet_sidecar: LigandMpnnResidueAlphabetSidecar | None,
 ) -> None:
     """Reject inputs that make a per-seed output exist before execution."""
@@ -145,6 +147,7 @@ def _validate_command_input_output_separation(
         request,
         checkout_root=checkout_root,
         execution_root=execution_root,
+        python_executable=python_executable,
         residue_alphabet_sidecar=residue_alphabet_sidecar,
     )
     for seed in request.seeds:
@@ -159,6 +162,7 @@ def _command_input_paths(
     *,
     checkout_root: Path,
     execution_root: Path,
+    python_executable: str,
     residue_alphabet_sidecar: LigandMpnnResidueAlphabetSidecar | None,
 ) -> dict[str, Path]:
     """Inventory construction-time and runtime paths read by one command."""
@@ -168,6 +172,11 @@ def _command_input_paths(
         "pdb_path": execution_root / request.pdb_path,
         "context inventory path": execution_root / request.context_inventory.path,
     }
+    executable_path = Path(python_executable)
+    if executable_path.is_absolute():
+        inputs["python_executable"] = executable_path
+    elif python_executable != executable_path.name:
+        inputs["python_executable"] = execution_root / executable_path
     if residue_alphabet_sidecar is not None:
         sidecar_path = residue_alphabet_sidecar.path
         inputs["residue alphabet sidecar path"] = (
