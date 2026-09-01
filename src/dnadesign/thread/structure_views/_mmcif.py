@@ -11,13 +11,14 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import shlex
 from dataclasses import dataclass
 from io import StringIO
 from typing import Iterator, TextIO
 
 from Bio.PDB.MMCIF2Dict import MMCIF2Dict
 
+_CIF_QUOTE_CHARS = frozenset({"'", '"'})
+_CIF_WHITESPACE_CHARS = frozenset({" ", "\t"})
 _BROWSER_ATOM_SITE_FIELDS: tuple[str, ...] = (
     "_atom_site.group_pdb",
     "_atom_site.id",
@@ -68,6 +69,37 @@ class _CifSourceToken(str):
         return token
 
 
+def _split_cif_line(line: str) -> Iterator[_CifSourceToken]:
+    """Yield source-aware CIF tokens from one non-semicolon data line."""
+
+    in_token = False
+    quote_open: str | None = None
+    start_index = 0
+    for index, character in enumerate(line):
+        if character in _CIF_WHITESPACE_CHARS:
+            if in_token and quote_open is None:
+                in_token = False
+                yield _CifSourceToken(line[start_index:index], quoted=False)
+        elif character in _CIF_QUOTE_CHARS:
+            if quote_open is None and not in_token:
+                quote_open = character
+                in_token = True
+                start_index = index + 1
+            elif character == quote_open and (index + 1 == len(line) or line[index + 1] in _CIF_WHITESPACE_CHARS):
+                quote_open = None
+                in_token = False
+                yield _CifSourceToken(line[start_index:index], quoted=True)
+        elif character == "#" and not in_token:
+            return
+        elif not in_token:
+            in_token = True
+            start_index = index
+    if in_token:
+        yield _CifSourceToken(line[start_index:], quoted=False)
+    if quote_open is not None:
+        raise ValueError(f"mmCIF line ended with an open quote: {line}")
+
+
 class _SourceAwareMMCIF2Dict(MMCIF2Dict):
     """Retain literal-vs-null provenance discarded from public dictionary values."""
 
@@ -79,32 +111,7 @@ class _SourceAwareMMCIF2Dict(MMCIF2Dict):
                 yield _CifSourceToken(token, quoted=True)
 
     def _splitline(self, line: str) -> Iterator[str]:
-        in_token = False
-        quote_open: str | None = None
-        start_index = 0
-        for index, character in enumerate(line):
-            if character in self.whitespace_chars:
-                if in_token and quote_open is None:
-                    in_token = False
-                    yield _CifSourceToken(line[start_index:index], quoted=False)
-            elif character in self.quote_chars:
-                if quote_open is None and not in_token:
-                    quote_open = character
-                    in_token = True
-                    start_index = index + 1
-                elif character == quote_open and (index + 1 == len(line) or line[index + 1] in self.whitespace_chars):
-                    quote_open = None
-                    in_token = False
-                    yield _CifSourceToken(line[start_index:index], quoted=True)
-            elif character == "#" and not in_token:
-                return
-            elif not in_token:
-                in_token = True
-                start_index = index
-        if in_token:
-            yield _CifSourceToken(line[start_index:], quoted=False)
-        if quote_open is not None:
-            raise ValueError(f"mmCIF line ended with an open quote: {line}")
+        yield from _split_cif_line(line)
 
 
 def serialize_mmcif_atom_sites_for_3dmol(
@@ -353,7 +360,7 @@ def iter_mmcif_atom_site_records(structure_text: str) -> Iterator[MmcifAtomSiteR
             if not stripped:
                 continue
             try:
-                values = shlex.split(stripped, comments=False, posix=True)
+                values = tuple(_split_cif_line(stripped))
             except ValueError:
                 value_buffer.clear()
                 continue

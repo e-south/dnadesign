@@ -989,6 +989,70 @@ def test_pinned_runtime_rejects_sidecar_changed_after_planning(tmp_path: Path) -
         )
 
 
+@pytest.mark.parametrize(
+    "flag",
+    [
+        "--checkpoint_ligand_mpnn",
+        "--checkpoint_path_sc",
+        "--pdb_path",
+        "--omit_AA_per_residue",
+    ],
+)
+def test_runtime_staging_rejects_input_replaced_by_fifo_without_blocking(
+    tmp_path: Path,
+    flag: str,
+) -> None:
+    source = tmp_path / "source"
+    source.write_bytes(b"attested-input")
+    expected = hashlib.sha256(source.read_bytes()).hexdigest()
+    destination = tmp_path / "staged"
+
+    probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import os, sys\n"
+                "from contextlib import contextmanager\n"
+                "from pathlib import Path\n"
+                "import dnadesign.thread.adapters.ligandmpnn.pinned_runtime as module\n"
+                "source, destination = Path(sys.argv[2]), Path(sys.argv[4])\n"
+                "original = module.open_regular_file\n"
+                "@contextmanager\n"
+                "def replace_before_open(path):\n"
+                "    if path == source:\n"
+                "        path.unlink()\n"
+                "        os.mkfifo(path)\n"
+                "    with original(path) as handle:\n"
+                "        yield handle\n"
+                "module.open_regular_file = replace_before_open\n"
+                "try:\n"
+                "    module._replace_verified_file(\n"
+                "        [sys.argv[1], str(source)],\n"
+                "        flag=sys.argv[1],\n"
+                "        expected_sha256=sys.argv[3],\n"
+                "        destination=destination,\n"
+                "    )\n"
+                "except ValueError as error:\n"
+                "    assert 'must reference a regular file' in str(error)\n"
+                "else:\n"
+                "    raise SystemExit('nonregular staged input was accepted')\n"
+                "assert not destination.exists()\n"
+            ),
+            flag,
+            str(source),
+            expected,
+            str(destination),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=2,
+    )
+
+    assert probe.stderr == ""
+
+
 def test_pinned_runtime_stages_verified_sidecar_before_execution(tmp_path: Path) -> None:
     checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
     sidecar = tmp_path / "residue-alphabet.json"

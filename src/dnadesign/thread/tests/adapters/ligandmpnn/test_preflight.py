@@ -14,6 +14,7 @@ from __future__ import annotations
 import errno
 import hashlib
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -226,6 +227,47 @@ def test_preflight_rejects_symlinked_checkpoint_before_execution(tmp_path: Path)
     assert [(issue.check_id, issue.path) for issue in report.issues] == [
         ("thread.ligandmpnn.checkpoint_not_regular", str(checkpoint))
     ]
+
+
+def test_preflight_rejects_checkpoint_replaced_by_fifo_without_blocking(tmp_path: Path) -> None:
+    checkpoint = tmp_path / "checkpoint.pt"
+    checkpoint.write_bytes(b"checkpoint-v1")
+    expected = _sha256(checkpoint.read_bytes())
+
+    probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import os, sys\n"
+                "from contextlib import contextmanager\n"
+                "from pathlib import Path\n"
+                "import dnadesign.thread.adapters.ligandmpnn.preflight as module\n"
+                "target = Path(sys.argv[1])\n"
+                "original = module.open_regular_file\n"
+                "@contextmanager\n"
+                "def replace_before_open(path):\n"
+                "    if path == target:\n"
+                "        path.unlink()\n"
+                "        os.mkfifo(path)\n"
+                "    with original(path) as handle:\n"
+                "        yield handle\n"
+                "module.open_regular_file = replace_before_open\n"
+                "issues = []\n"
+                "module._check_digest(target, sys.argv[2], 'checkpoint', issues)\n"
+                "assert [issue.check_id for issue in issues] == "
+                "['thread.ligandmpnn.checkpoint_not_regular']\n"
+            ),
+            str(checkpoint),
+            expected,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=2,
+    )
+
+    assert probe.stderr == ""
 
 
 def test_preflight_reads_pinned_blobs_without_replacement_refs(tmp_path: Path) -> None:

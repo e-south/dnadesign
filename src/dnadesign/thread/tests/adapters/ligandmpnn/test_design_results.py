@@ -34,7 +34,10 @@ from dnadesign.thread.adapters.ligandmpnn import (
     parse_ligandmpnn_design_outputs,
 )
 from dnadesign.thread.adapters.ligandmpnn.context_inventory import LigandMpnnProteinStructureEvidence
-from dnadesign.thread.adapters.ligandmpnn.design_fasta import OfficialLigandMpnnDesignFasta
+from dnadesign.thread.adapters.ligandmpnn.design_fasta import (
+    OfficialLigandMpnnDesignFasta,
+    parse_official_design_fasta_records,
+)
 from dnadesign.thread.adapters.ligandmpnn.design_manifest import build_design_output_manifest
 from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import write_context_inventory
 from dnadesign.thread.tests.adapters.ligandmpnn.test_pinned_runtime import _checkout
@@ -371,6 +374,53 @@ def test_design_admission_preserves_uppercase_pdb_extension_in_official_fasta_na
     result = parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
 
     assert result.sequence_count == request.expected_sequence_count == 1
+
+
+def test_official_fasta_metadata_parser_preserves_input_stem_containing_delimiter() -> None:
+    payload = b"\n".join(
+        (
+            b">complex, apo, T=0.1, seed=7, batch_size=1, number_of_batches=1",
+            b"ACD",
+            b">complex, apo, id=1, T=0.1, seed=7",
+            b"AYD",
+        )
+    )
+
+    parsed = parse_official_design_fasta_records(
+        payload,
+        input_stem="complex, apo",
+        expected_design_count=1,
+        expected_seed=7,
+        expected_temperature=0.1,
+        expected_batch_size=1,
+        expected_number_of_batches=1,
+    )
+
+    assert parsed.native_segments == ("ACD",)
+    assert parsed.designed_segments == (("AYD",),)
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        "complex, apoX, T=0.1, seed=7, batch_size=1, number_of_batches=1",
+        "complex, apo,T=0.1, seed=7, batch_size=1, number_of_batches=1",
+        "complex, apo",
+    ],
+)
+def test_official_fasta_metadata_parser_rejects_malformed_input_stem_prefix(header: str) -> None:
+    payload = f">{header}\nACD\n".encode()
+
+    with pytest.raises(ValueError, match="invalid record header"):
+        parse_official_design_fasta_records(
+            payload,
+            input_stem="complex, apo",
+            expected_design_count=0,
+            expected_seed=7,
+            expected_temperature=0.1,
+            expected_batch_size=1,
+            expected_number_of_batches=0,
+        )
 
 
 def test_design_admission_rejects_completed_tree_without_official_fasta(tmp_path: Path) -> None:

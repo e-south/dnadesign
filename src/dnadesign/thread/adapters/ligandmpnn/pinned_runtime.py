@@ -25,6 +25,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+from dnadesign.thread.adapters.ligandmpnn._regular_files import NonRegularFileError, open_regular_file
 from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
     load_ligandmpnn_context_inventory,
     validate_context_inventory_for_input,
@@ -1378,10 +1379,11 @@ def _replace_verified_file(
         raise ValueError(f"runtime arguments must contain exactly one {flag}")
     value_index = positions[0] + 1
     source_path = Path(arguments[value_index]).expanduser()
-    if source_path.is_symlink() or not source_path.is_file():
-        raise ValueError(f"{flag} must reference a regular file")
     try:
-        payload = source_path.read_bytes()
+        with open_regular_file(source_path) as handle:
+            payload = handle.read()
+    except (FileNotFoundError, NonRegularFileError) as exc:
+        raise ValueError(f"{flag} must reference a regular file") from exc
     except OSError as exc:
         raise ValueError(f"{flag} file could not be read") from exc
     observed_sha256 = hashlib.sha256(payload).hexdigest()

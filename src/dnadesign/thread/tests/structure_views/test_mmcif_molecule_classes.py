@@ -31,6 +31,20 @@ U ? HETATM 2 P R
 #
 """
 
+_UNQUOTED_PRIME_ATOM_MMCIF = """\
+data_unquoted_prime_atoms
+loop_
+_atom_site.group_PDB
+_atom_site.label_atom_id
+_atom_site.label_comp_id
+_atom_site.auth_asym_id
+_atom_site.auth_seq_id
+ATOM CA GLY A 1
+ATOM O5' DG D 1
+ATOM C4' DG D 1
+#
+"""
+
 
 def test_mmcif_molecule_classes_use_declared_atom_site_column_order() -> None:
     assert molecule_classes_in_structure_text(
@@ -53,3 +67,19 @@ def test_mmcif_molecule_filter_uses_declared_atom_site_column_order() -> None:
         dna_text,
         structure_format="mmcif",
     ) == frozenset({"dna"})
+
+
+def test_mmcif_molecule_filter_excludes_unquoted_prime_bearing_nucleotide_atoms() -> None:
+    protein_text = filter_structure_text_by_molecule_classes(
+        _UNQUOTED_PRIME_ATOM_MMCIF,
+        structure_format="mmcif",
+        visible_molecule_classes=("protein",),
+    )
+
+    assert "ATOM CA GLY A 1" in protein_text
+    assert "ATOM O5' DG D 1" not in protein_text
+    assert "ATOM C4' DG D 1" not in protein_text
+    assert molecule_classes_in_structure_text(
+        protein_text,
+        structure_format="mmcif",
+    ) == frozenset({"protein"})

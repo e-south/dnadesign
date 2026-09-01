@@ -132,11 +132,14 @@ def _parse_header_metadata(
     input_stem: str,
     require_design_id: bool,
 ) -> dict[str, str]:
-    parts = header.split(", ")
-    if not parts or parts[0] != input_stem:
+    metadata_prefix = f"{input_stem}, "
+    if not header.startswith(metadata_prefix):
+        raise ValueError("official LigandMPNN FASTA has an invalid record header")
+    metadata_text = header.removeprefix(metadata_prefix)
+    if not metadata_text:
         raise ValueError("official LigandMPNN FASTA has an invalid record header")
     metadata: dict[str, str] = {}
-    for item in parts[1:]:
+    for item in metadata_text.split(", "):
         if "=" not in item:
             raise ValueError("official LigandMPNN FASTA header metadata must use key=value fields")
         key, value = item.split("=", 1)

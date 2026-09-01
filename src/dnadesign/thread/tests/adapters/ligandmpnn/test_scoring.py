@@ -127,6 +127,67 @@ def test_score_request_preserves_dot_output_as_an_execution_root_seed_directory(
     assert command.argv[command.argv.index("--out_folder") + 1] == "seed_7"
 
 
+def test_score_commands_reject_checkout_nested_inside_per_seed_output(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path)
+    nested_checkout = tmp_path / "outputs/scores/seed_7/LigandMPNN"
+    nested_checkout.parent.mkdir(parents=True)
+    checkout_root.rename(nested_checkout)
+
+    with pytest.raises(ValueError, match="checkout_root.*per-seed output"):
+        build_ligandmpnn_score_commands(
+            request,
+            checkout_root=nested_checkout,
+            execution_root=tmp_path,
+        )
+
+
+def test_score_commands_reject_checkout_symlinked_inside_per_seed_output(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path)
+    nested_checkout = tmp_path / "outputs/scores/seed_7/LigandMPNN"
+    nested_checkout.parent.mkdir(parents=True)
+    checkout_root.rename(nested_checkout)
+    checkout_alias = tmp_path / "checkout-alias"
+    checkout_alias.symlink_to(nested_checkout, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="checkout_root.*per-seed output"):
+        build_ligandmpnn_score_commands(
+            request,
+            checkout_root=checkout_alias,
+            execution_root=tmp_path,
+        )
+
+
+def test_score_commands_reject_context_inventory_at_planned_completion_leaf(tmp_path: Path) -> None:
+    checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
+    pdb_payload = b"ATOM pinned score input\n"
+    pdb_path = tmp_path / "inputs/target.pdb"
+    pdb_path.parent.mkdir(parents=True)
+    pdb_path.write_bytes(pdb_payload)
+    pdb_sha256 = hashlib.sha256(pdb_payload).hexdigest()
+    completion_path = Path("outputs/scores/seed_7/.dnadesign-ligandmpnn-execution.json")
+    context_inventory = write_context_inventory(
+        tmp_path,
+        input_path=Path("inputs/target.pdb"),
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=True,
+        parser_sha256=parser_sha256,
+        relative_path=completion_path,
+    )
+    request = _request(
+        pdb_sha256=pdb_sha256,
+        upstream=LigandMpnnUpstreamPin(commit=commit, checkpoint_sha256=_DIGEST),
+        context_inventory=context_inventory,
+    )
+
+    with pytest.raises(ValueError, match="context inventory path.*per-seed output"):
+        build_ligandmpnn_score_commands(
+            request,
+            checkout_root=checkout_root,
+            execution_root=tmp_path,
+        )
+
+
 def test_single_aa_probability_command_is_explicit(tmp_path: Path) -> None:
     request, checkout_root = _validated_request(tmp_path)
     command = build_ligandmpnn_score_commands(

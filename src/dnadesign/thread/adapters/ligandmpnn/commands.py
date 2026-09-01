@@ -150,11 +150,12 @@ def _validate_command_input_output_separation(
         python_executable=python_executable,
         residue_alphabet_sidecar=residue_alphabet_sidecar,
     )
-    for seed in request.seeds:
-        output_path = execution_root / request.output_dir / f"seed_{seed}"
-        for field_name, input_path in inputs.items():
-            if input_path == output_path or input_path.is_relative_to(output_path):
-                raise ValueError(f"{field_name} must not be nested inside a per-seed output directory")
+    validate_inputs_outside_per_seed_outputs(
+        inputs,
+        output_dir=request.output_dir,
+        seeds=request.seeds,
+        execution_root=execution_root,
+    )
 
 
 def _command_input_paths(
@@ -167,16 +168,13 @@ def _command_input_paths(
 ) -> dict[str, Path]:
     """Inventory paths read during construction or launch using their actual resolution bases."""
 
-    inputs = {
-        "checkout_root": checkout_root,
-        "pdb_path": execution_root / request.pdb_path,
-        "context inventory path": execution_root / request.context_inventory.path,
-    }
-    executable_path = Path(python_executable)
-    if executable_path.is_absolute():
-        inputs["python_executable"] = executable_path
-    elif python_executable != executable_path.name:
-        inputs["python_executable"] = (Path.cwd() / executable_path).resolve()
+    inputs = command_input_paths(
+        checkout_root=checkout_root,
+        execution_root=execution_root,
+        pdb_path=request.pdb_path,
+        context_inventory_path=request.context_inventory.path,
+        python_executable=python_executable,
+    )
     if residue_alphabet_sidecar is not None:
         sidecar_path = residue_alphabet_sidecar.path
         inputs["residue alphabet sidecar path"] = (
@@ -188,6 +186,52 @@ def _command_input_paths(
                 materialized_path if materialized_path.is_absolute() else Path.cwd() / materialized_path
             )
     return inputs
+
+
+def command_input_paths(
+    *,
+    checkout_root: Path,
+    execution_root: Path,
+    pdb_path: Path,
+    context_inventory_path: Path,
+    python_executable: str,
+) -> dict[str, Path]:
+    """Inventory inputs shared by design and score command lifecycles."""
+
+    inputs = {
+        "checkout_root": checkout_root,
+        "pdb_path": execution_root / pdb_path,
+        "context inventory path": execution_root / context_inventory_path,
+    }
+    executable_path = Path(python_executable)
+    if executable_path.is_absolute():
+        inputs["python_executable"] = executable_path
+    elif python_executable != executable_path.name:
+        inputs["python_executable"] = (Path.cwd() / executable_path).resolve()
+    return inputs
+
+
+def validate_inputs_outside_per_seed_outputs(
+    inputs: dict[str, Path],
+    *,
+    output_dir: Path,
+    seeds: tuple[int, ...],
+    execution_root: Path,
+) -> None:
+    """Reject command inputs that occupy a planned per-seed output tree."""
+
+    for seed in seeds:
+        output_path = execution_root / output_dir / f"seed_{seed}"
+        resolved_output_path = output_path.resolve()
+        for field_name, input_path in inputs.items():
+            resolved_input_path = input_path.resolve()
+            if (
+                input_path == output_path
+                or input_path.is_relative_to(output_path)
+                or resolved_input_path == resolved_output_path
+                or resolved_input_path.is_relative_to(resolved_output_path)
+            ):
+                raise ValueError(f"{field_name} must not be nested inside a per-seed output directory")
 
 
 def resolve_checkout_root_for_execution(checkout_root: Path, *, execution_root: Path) -> Path:

@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from dnadesign.thread.adapters.ligandmpnn._regular_files import NonRegularFileError, open_regular_file
 from dnadesign.thread.adapters.ligandmpnn.models import LigandMpnnUpstreamPin
 from dnadesign.thread.adapters.ligandmpnn.pinned_checkout import (
     index_path_matches_commit,
@@ -230,20 +231,20 @@ def _check_digest(
     label: str,
     issues: list[LigandMpnnPreflightIssue],
 ) -> None:
-    if path.is_symlink():
+    try:
+        observed = _sha256_file(path)
+    except FileNotFoundError:
+        issues.append(_issue(f"missing_{label}", f"checkout is missing pinned {label.replace('_', ' ')}", path))
+        return
+    except NonRegularFileError:
         issues.append(
             _issue(
                 f"{label}_not_regular",
-                f"pinned {label.replace('_', ' ')} must be a regular file, not a symlink",
+                f"pinned {label.replace('_', ' ')} must be a regular file",
                 path,
             )
         )
         return
-    if not path.is_file():
-        issues.append(_issue(f"missing_{label}", f"checkout is missing pinned {label.replace('_', ' ')}", path))
-        return
-    try:
-        observed = _sha256_file(path)
     except OSError:
         issues.append(_issue(f"unreadable_{label}", f"pinned {label.replace('_', ' ')} could not be read", path))
         return
@@ -253,7 +254,7 @@ def _check_digest(
 
 def _sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
-    with path.open("rb") as handle:
+    with open_regular_file(path) as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()

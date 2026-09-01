@@ -770,6 +770,29 @@ def test_py3dmol_backend_serializes_mmcif_for_3dmol_without_prime_token_ambiguit
     assert '","mmcif");' not in unescaped_html
 
 
+def test_py3dmol_backend_hides_unquoted_prime_bearing_nucleotide_atoms() -> None:
+    rendered = render_structure_view_html(
+        StructureViewSpec(
+            title="Protein-only CIF review",
+            models=(
+                StructureViewModel(
+                    "reference",
+                    _MIXED_POLYMER_MMCIF_WITH_UNQUOTED_PRIME_ATOMS,
+                    structure_format="mmcif",
+                    label="Reference",
+                ),
+            ),
+            hidden_molecule_classes=("dna",),
+        )
+    )
+
+    unescaped_html = html_lib.unescape(rendered)
+    assert "GLY" in unescaped_html
+    assert "DG" not in unescaped_html
+    assert "O5'" not in unescaped_html
+    assert "C4'" not in unescaped_html
+
+
 @pytest.mark.parametrize(
     ("structure_text", "hidden_molecule_classes"),
     (

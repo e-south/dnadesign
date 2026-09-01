@@ -40,6 +40,7 @@ _PROTEINMPNN_FILES = {
 }
 _LIGANDMPNN_FILES = {
     "__init__.py",
+    "_regular_files.py",
     "alphabets.py",
     "commands.py",
     "context_inventory.py",

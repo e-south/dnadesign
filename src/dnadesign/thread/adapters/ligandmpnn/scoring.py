@@ -17,8 +17,10 @@ from enum import Enum
 from pathlib import Path
 
 from dnadesign.thread.adapters.ligandmpnn.commands import (
+    command_input_paths,
     resolve_checkout_root_for_execution,
     resolve_execution_root_for_execution,
+    validate_inputs_outside_per_seed_outputs,
 )
 from dnadesign.thread.adapters.ligandmpnn.context_inventory import (
     load_ligandmpnn_context_inventory,
@@ -123,6 +125,18 @@ def build_ligandmpnn_score_commands(
 
     execution_root = resolve_execution_root_for_execution(execution_root)
     checkout_root = resolve_checkout_root_for_execution(checkout_root, execution_root=execution_root)
+    validate_inputs_outside_per_seed_outputs(
+        command_input_paths(
+            checkout_root=checkout_root,
+            execution_root=execution_root,
+            pdb_path=request.pdb_path,
+            context_inventory_path=request.context_inventory.path,
+            python_executable=python_executable,
+        ),
+        output_dir=request.output_dir,
+        seeds=request.seeds,
+        execution_root=execution_root,
+    )
     context_inventory = load_ligandmpnn_context_inventory(
         request.context_inventory,
         execution_root=execution_root,
