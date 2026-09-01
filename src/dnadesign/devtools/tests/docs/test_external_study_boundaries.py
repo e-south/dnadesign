@@ -18,7 +18,10 @@ _EXTERNAL_STUDY_IDS = (
     "stress-ethanol-cipro-growth",
     "retron-hairpin-design",
 )
-_EXTERNAL_STUDY_ID_ALIASES = ("study_stress_ethanol_cipro",)
+_EXTERNAL_STUDY_ID_ALIASES = (
+    "study_stress_ethanol_cipro",
+    "stress_ethanol_cipro",
+)
 
 
 def _external_registry_prefixes() -> tuple[str, ...]:
