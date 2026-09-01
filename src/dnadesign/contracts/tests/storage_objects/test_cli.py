@@ -136,6 +136,68 @@ def test_inventory_rejects_receipt_replaced_before_transient_validation_retry(
     assert (recovery_stat.st_dev, recovery_stat.st_ino) == replacement_identity
 
 
+@pytest.mark.parametrize("competitor_changes_bytes", [False, True])
+def test_inventory_rejects_aba_receipt_replacement_during_verification(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    competitor_changes_bytes: bool,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    original_verify = storage_inventory.verify_storage_object
+    calls = 0
+    published_identity: tuple[int, int] | None = None
+
+    def _verify(*args: object, **kwargs: object):
+        nonlocal calls, published_identity
+        calls += 1
+        published_stat = manifest_path.stat(follow_symlinks=False)
+        published_identity = (published_stat.st_dev, published_stat.st_ino)
+        published_backup = tmp_path / "published-manifest-backup.json"
+        os.link(manifest_path, published_backup)
+        competitor = tmp_path / "competing-manifest.json"
+        if competitor_changes_bytes:
+            competitor_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            competitor_payload["producer_revision"] = "competing-revision"
+            competitor.write_text(
+                json.dumps(competitor_payload, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        else:
+            competitor.write_bytes(manifest_path.read_bytes())
+        competitor.chmod(stat.S_IMODE(published_stat.st_mode))
+        competitor.replace(manifest_path)
+        try:
+            verified = original_verify(*args, **kwargs)
+        finally:
+            published_backup.replace(manifest_path)
+        restored_stat = manifest_path.stat(follow_symlinks=False)
+        assert (restored_stat.st_dev, restored_stat.st_ino) == published_identity
+        return verified
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _verify)
+
+    with pytest.raises(StorageObjectError, match="verification result does not match the published receipt"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="usr",
+            object_kind="store",
+            content_schema="usr.dataset-root",
+            content_schema_version="v1",
+            producer_revision="test-revision",
+            storage_class="cold",
+            retention_policy="cold",
+        )
+
+    assert calls == 1
+    assert published_identity is not None
+    assert not manifest_path.exists()
+
+
 def test_inventory_does_not_retry_semantic_validation_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

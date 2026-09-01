@@ -981,6 +981,8 @@ def verify_storage_object(
         root=root,
         manifest_path=resolve_storage_path(manifest_path, label="storage object manifest", strict=True),
         manifest_digest=_sha256_bytes(second_manifest_bytes),
+        manifest_device_id=second_coordination_state[1][2],
+        manifest_inode=second_coordination_state[1][3],
         manifest=manifest,
         resources=second_resources,
     )

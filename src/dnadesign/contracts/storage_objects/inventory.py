@@ -1023,6 +1023,7 @@ def _verify_published_manifest(
 ):
     """Retry one exact provider-settle race without relaxing validation."""
 
+    published_digest = _sha256_bytes(published_bytes)
     for attempt in range(2):
         _require_published_manifest_binding(
             manifest_path,
@@ -1045,6 +1046,15 @@ def _verify_published_manifest(
             )
             time.sleep(_POST_PUBLICATION_SETTLE_SECONDS)
             continue
+        if (
+            verified.manifest_digest != published_digest
+            or (
+                verified.manifest_device_id,
+                verified.manifest_inode,
+            )
+            != published_identity
+        ):
+            raise StorageObjectError("storage object verification result does not match the published receipt")
         _require_published_manifest_binding(
             manifest_path,
             published_bytes=published_bytes,
