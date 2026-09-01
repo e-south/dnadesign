@@ -105,10 +105,14 @@ def _collect_visible_markdown_files(repo_root: Path, root: Path) -> list[Path]:
             text=True,
         )
     except OSError:
-        result = None
+        raise RuntimeError("git ls-files failed while inventorying documentation") from None
 
-    if result is None or result.returncode != 0:
-        return sorted(root.rglob("*.md"))
+    if result.returncode != 0:
+        detail = result.stderr.strip()
+        message = "git ls-files failed while inventorying documentation"
+        if detail:
+            message = f"{message}: {detail}"
+        raise RuntimeError(message)
 
     files: set[Path] = set()
     for relative_path in result.stdout.split("\0"):

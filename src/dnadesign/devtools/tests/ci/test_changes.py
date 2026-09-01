@@ -14,6 +14,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from dnadesign.devtools.ci.changes import (
     determine_scope,
     discover_external_integration_tools,
@@ -257,6 +259,18 @@ def test_discover_repo_tools_keeps_latentdna_and_ignores_cache_only_dirs(tmp_pat
 
     tool_names = discover_repo_tools(repo_root=tmp_path)
     assert tool_names == {"latentdna"}
+
+
+def test_discover_repo_tools_rejects_symlink_disguised_as_generated_directory(tmp_path: Path) -> None:
+    src_root = tmp_path / "src" / "dnadesign"
+    external = tmp_path / "external-cache"
+    external.mkdir(parents=True)
+    candidate = src_root / "stale_cache"
+    candidate.mkdir(parents=True)
+    (candidate / "__pycache__").symlink_to(external, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="generated-artifact directory check rejects symlink"):
+        discover_repo_tools(repo_root=tmp_path)
 
 
 def test_discover_repo_tools_ignores_nested_cache_only_dirs(tmp_path: Path) -> None:

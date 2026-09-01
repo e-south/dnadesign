@@ -15,7 +15,10 @@ import datetime as dt
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from dnadesign.devtools.docs import checks as docs_checks
+from dnadesign.devtools.docs import markdown_inventory
 from dnadesign.devtools.docs.checks import (
     _collect_markdown_files,
     _find_broken_links,
@@ -146,6 +149,26 @@ def test_markdown_inventory_ignores_unrelated_ancestor_git_repository(tmp_path: 
 
     assert docs_files == [extracted_doc]
     assert all_files == [extracted_doc]
+
+
+def test_markdown_inventory_fails_closed_when_git_inventory_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _write(tmp_path / "docs" / "README.md", "# Documentation\n")
+    calls = 0
+
+    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return subprocess.CompletedProcess(args[0], 0, stdout=f"{tmp_path}\n", stderr="")
+        return subprocess.CompletedProcess(args[0], 128, stdout="", stderr="fatal: inventory failed")
+
+    monkeypatch.setattr(markdown_inventory.subprocess, "run", fake_run)
+
+    with pytest.raises(RuntimeError, match="git ls-files failed while inventorying documentation"):
+        _collect_markdown_files(tmp_path)
 
 
 def test_broken_links_check_flags_missing_markdown_anchor(tmp_path: Path) -> None:
