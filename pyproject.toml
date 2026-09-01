@@ -53,6 +53,7 @@ dependencies = [
   "certifi>=2025.11.12",
   "keyring>=25.6.0",
   "fastparquet>=2025.12.0",
+  "filelock>=3.20.3,<4",
   "marimo>=0.23.16",
   "openai>=2.14.0",
   "viennarna>=2.7.2",
@@ -79,6 +80,7 @@ baserender = "dnadesign.baserender:app"
 cruncher   = "dnadesign.cruncher.cli.app:app"
 junction = "dnadesign.junction.cli:main"
 ops        = "dnadesign.ops.cli:main"
+dnadesign-storage = "dnadesign.contracts.storage_objects.cli:main"
 
 [project.optional-dependencies]
 # GPU stack (Linux x86_64 only)
