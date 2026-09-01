@@ -46,6 +46,24 @@ def test_resolve_test_targets_includes_cluster_owned_cli_tests(tmp_path: Path) -
     assert targets == [str(cluster_tests), str(cluster_cli_tests)]
 
 
+def test_resolve_test_targets_includes_external_study_fixture_guard_for_notify_and_ops(tmp_path: Path) -> None:
+    guard = tmp_path / "src" / "dnadesign" / "devtools" / "tests" / "docs" / "test_external_study_boundaries.py"
+    guard.parent.mkdir(parents=True)
+    guard.touch()
+
+    for tool_name in ("notify", "ops"):
+        tool_tests = tmp_path / "src" / "dnadesign" / tool_name / "tests"
+        tool_tests.mkdir(parents=True)
+
+        targets = resolve_test_targets(
+            repo_root=tmp_path,
+            tool_names=[tool_name],
+            changed_files=[f"src/dnadesign/{tool_name}/tests/test_fixture.py"],
+        )
+
+        assert targets == [str(tool_tests), str(guard)]
+
+
 def test_main_fails_for_unknown_tool(tmp_path: Path) -> None:
     (tmp_path / "src" / "dnadesign" / "usr" / "tests").mkdir(parents=True, exist_ok=True)
 
