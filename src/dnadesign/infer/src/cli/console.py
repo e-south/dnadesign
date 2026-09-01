@@ -43,10 +43,11 @@ theme = Theme(
     }
 )
 console = Console(theme=theme)
+_diagnostic_console = Console(theme=theme, stderr=True)
 
 
 def setup_console_logging(level: str = "INFO", json_logs: bool = False) -> None:
-    _shared_setup_console_logging(level=level, json_logs=json_logs, rich_console=console)
+    _shared_setup_console_logging(level=level, json_logs=json_logs, rich_console=_diagnostic_console)
 
 
 def rich_tracebacks(enabled: bool = True) -> None:
