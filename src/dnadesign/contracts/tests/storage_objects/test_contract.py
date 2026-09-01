@@ -468,16 +468,53 @@ def test_verify_storage_object_rejects_manifest_changed_during_validation(
     reads = 0
     original_read = storage_validation._read_stable_regular_bytes
 
-    def _read(path: Path, *, label: str, change_message: str) -> bytes:
+    def _read(
+        path: Path,
+        *,
+        label: str,
+        change_message: str,
+        expected_identity: tuple[int, int],
+    ) -> bytes:
         nonlocal reads
         if path == manifest_path:
             reads += 1
             return initial_bytes if reads == 1 else changed_bytes
-        return original_read(path, label=label, change_message=change_message)
+        return original_read(
+            path,
+            label=label,
+            change_message=change_message,
+            expected_identity=expected_identity,
+        )
 
     monkeypatch.setattr(storage_validation, "_read_stable_regular_bytes", _read)
 
     with pytest.raises(StorageObjectError, match="storage object changed during validation"):
+        verify_storage_object(root)
+
+
+def test_verify_storage_object_binds_manifest_reads_to_coordination_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    manifest_path = root / MANIFEST_NAME
+    lock_path = root / LOCK_NAME
+    coordination_state = storage_validation._verify_coordination_posture(root, manifest_path, lock_path)
+    competing_manifest = tmp_path / "competing-manifest.json"
+    competing_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    competing_payload["producer_revision"] = "competing-revision"
+    competing_manifest.write_text(json.dumps(competing_payload), encoding="utf-8")
+    competing_manifest.chmod(stat.S_IMODE(manifest_path.stat(follow_symlinks=False).st_mode))
+    competing_manifest.replace(manifest_path)
+
+    monkeypatch.setattr(
+        storage_validation,
+        "_verify_coordination_posture",
+        lambda *_args, **_kwargs: coordination_state,
+    )
+
+    with pytest.raises(StorageObjectError, match="manifest changed during validation"):
         verify_storage_object(root)
 
 
@@ -493,9 +530,20 @@ def test_verify_storage_object_rejects_same_inode_manifest_rewrite_during_final_
     replacement_bytes = b"!" + initial_bytes[1:]
     reads = 0
 
-    def _read_then_rewrite_same_inode(path: Path, *, label: str, change_message: str) -> bytes:
+    def _read_then_rewrite_same_inode(
+        path: Path,
+        *,
+        label: str,
+        change_message: str,
+        expected_identity: tuple[int, int],
+    ) -> bytes:
         nonlocal reads
-        content = original_read(path, label=label, change_message=change_message)
+        content = original_read(
+            path,
+            label=label,
+            change_message=change_message,
+            expected_identity=expected_identity,
+        )
         if path == manifest_path:
             reads += 1
             if reads == 2:

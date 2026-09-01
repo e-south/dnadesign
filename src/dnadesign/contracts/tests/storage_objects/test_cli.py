@@ -139,6 +139,87 @@ def test_inventory_retries_one_transient_post_publication_listing_mismatch(
     assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
 
 
+def test_inventory_retries_stale_directory_entry_that_vanishes_before_stat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    stale_directory = root / "stale-directory"
+    stale_directory.mkdir(parents=True)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    original_tree_paths = storage_validation._storage_tree_paths
+    injected = False
+    settle_delays: list[float] = []
+
+    def _tree_paths(*args: object, **kwargs: object):
+        nonlocal injected
+        files, directories = original_tree_paths(*args, **kwargs)
+        if not injected and (root / MANIFEST_NAME).exists():
+            injected = True
+            stale_directory.rmdir()
+        return files, directories
+
+    monkeypatch.setattr(storage_validation, "_storage_tree_paths", _tree_paths)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert injected is True
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
+def test_inventory_retries_declared_resource_missing_during_resolution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    payload_path = root / "payload.txt"
+    payload_path.write_text("payload\n", encoding="utf-8")
+    original_resolve = Path.resolve
+    injected = False
+    settle_delays: list[float] = []
+
+    def _resolve(path: Path, *args: object, **kwargs: object):
+        nonlocal injected
+        if path == payload_path and not injected and (root / MANIFEST_NAME).exists():
+            injected = True
+            raise FileNotFoundError(2, "No such file or directory", str(path))
+        return original_resolve(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", _resolve)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert injected is True
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
 def test_inventory_rejects_receipt_replaced_before_transient_validation_retry(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -225,6 +306,7 @@ def test_stable_regular_read_rejects_competing_inode_between_path_snapshots(
             path,
             label="storage object manifest",
             change_message="manifest changed during validation",
+            expected_identity=(published_stat.st_dev, published_stat.st_ino),
         )
 
 
@@ -763,7 +845,7 @@ def test_demo_validation_clears_repository_local_git_environment(
     [
         ("manifest", "demo manifest changed during Git index validation"),
         ("resource", "digest mismatch"),
-        ("manifest_identity", "demo storage object changed during Git index validation"),
+        ("manifest_identity", "demo manifest changed during Git index validation"),
         ("resource_identity", "demo storage object changed during Git index validation"),
     ],
 )
