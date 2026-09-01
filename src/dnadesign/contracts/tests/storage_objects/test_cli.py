@@ -83,6 +83,59 @@ def test_inventory_retries_one_transient_post_publication_validation(
     assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
 
 
+def test_inventory_rejects_receipt_replaced_before_transient_validation_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    original_verify = storage_inventory.verify_storage_object
+    calls = 0
+    settle_delays: list[float] = []
+    replacement_identity: tuple[int, int] | None = None
+
+    def _verify(*args: object, **kwargs: object):
+        nonlocal calls, replacement_identity
+        calls += 1
+        if calls == 1:
+            replacement = manifest_path.with_name(f".{MANIFEST_NAME}.competitor")
+            replacement.write_bytes(manifest_path.read_bytes())
+            replacement.chmod(manifest_path.stat(follow_symlinks=False).st_mode & 0o777)
+            replacement.replace(manifest_path)
+            replacement_stat = manifest_path.stat(follow_symlinks=False)
+            replacement_identity = (replacement_stat.st_dev, replacement_stat.st_ino)
+            raise StorageObjectError(storage_inventory._TRANSIENT_POST_PUBLICATION_VALIDATION_ERROR)
+        return original_verify(*args, **kwargs)
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _verify)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="cannot identify the receipt moved"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="usr",
+            object_kind="store",
+            content_schema="usr.dataset-root",
+            content_schema_version="v1",
+            producer_revision="test-revision",
+            storage_class="cold",
+            retention_policy="cold",
+        )
+
+    assert calls == 1
+    assert settle_delays == []
+    assert replacement_identity is not None
+    assert not manifest_path.exists()
+    recovery_paths = tuple(root.glob(f".{MANIFEST_NAME}.rollback-*"))
+    assert len(recovery_paths) == 1
+    recovery_stat = recovery_paths[0].stat(follow_symlinks=False)
+    assert (recovery_stat.st_dev, recovery_stat.st_ino) == replacement_identity
+
+
 def test_inventory_does_not_retry_semantic_validation_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

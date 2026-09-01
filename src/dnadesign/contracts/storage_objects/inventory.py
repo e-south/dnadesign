@@ -1018,12 +1018,19 @@ def _verify_published_manifest(
     *,
     allow_pending_demo_manifest: bool,
     previous_bytes: bytes | None,
+    published_bytes: bytes,
+    published_identity: tuple[int, int],
 ):
     """Retry one exact provider-settle race without relaxing validation."""
 
     for attempt in range(2):
+        _require_published_manifest_binding(
+            manifest_path,
+            published_bytes=published_bytes,
+            published_identity=published_identity,
+        )
         try:
-            return verify_storage_object(
+            verified = verify_storage_object(
                 manifest_path.parent,
                 _allow_pending_demo_manifest=allow_pending_demo_manifest,
                 _allow_pending_demo_lock=allow_pending_demo_manifest and previous_bytes is None,
@@ -1031,8 +1038,38 @@ def _verify_published_manifest(
         except StorageObjectError as exc:
             if attempt != 0 or str(exc) != _TRANSIENT_POST_PUBLICATION_VALIDATION_ERROR:
                 raise
+            _require_published_manifest_binding(
+                manifest_path,
+                published_bytes=published_bytes,
+                published_identity=published_identity,
+            )
             time.sleep(_POST_PUBLICATION_SETTLE_SECONDS)
+            continue
+        _require_published_manifest_binding(
+            manifest_path,
+            published_bytes=published_bytes,
+            published_identity=published_identity,
+        )
+        return verified
     raise AssertionError("bounded storage-object publication validation exhausted unexpectedly")
+
+
+def _require_published_manifest_binding(
+    manifest_path: Path,
+    *,
+    published_bytes: bytes,
+    published_identity: tuple[int, int],
+) -> None:
+    """Require validation to remain bound to this operation's exact receipt."""
+
+    if not _entry_matches_regular_bytes(
+        manifest_path,
+        expected_identity=published_identity,
+        expected_bytes=published_bytes,
+    ):
+        raise StorageObjectError(
+            "storage object manifest changed after publication; refusing to validate an unrelated receipt"
+        )
 
 
 def _write_manifest(
@@ -1117,10 +1154,16 @@ def _write_manifest(
             raise StorageObjectError(f"cannot write storage object manifest: {write_error}") from write_error
         raise
     try:
+        if published_identity is None:
+            raise StorageObjectPublicationUncertain(
+                "cannot identify the storage object manifest published by this operation"
+            )
         summary = _verify_published_manifest(
             manifest_path,
             allow_pending_demo_manifest=allow_pending_demo_manifest,
             previous_bytes=previous_bytes,
+            published_bytes=manifest_bytes,
+            published_identity=published_identity,
         ).summary()
         if allow_pending_demo_manifest:
             summary["status"] = "created-pending-git-add" if previous_bytes is None else "refreshed-pending-git-add"
