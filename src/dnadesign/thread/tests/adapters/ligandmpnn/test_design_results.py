@@ -123,7 +123,7 @@ def _rebind_completion_to_current_tree(output_root: Path) -> None:
 
 
 def _replace_official_fasta(output_root: Path, *, native: str, designs: tuple[str, ...]) -> None:
-    records = [f">input, T=0.1, seed=7\n{native}"]
+    records = [f">input, T=0.1, seed=7, batch_size={len(designs)}, number_of_batches=1\n{native}"]
     records.extend(f">input, id={index}, T=0.1, seed=7\n{sequence}" for index, sequence in enumerate(designs, start=1))
     (output_root / "seqs/input.fa").write_text("\n".join(records), encoding="utf-8")
     _rebind_completion_to_current_tree(output_root)
@@ -389,17 +389,20 @@ def test_design_admission_rejects_completed_tree_without_official_fasta(tmp_path
 @pytest.mark.parametrize(
     ("records", "message"),
     [
-        ([">input, T=0.1, seed=7\nACD"], "expected 2 designed records; observed 0"),
+        (
+            [">input, T=0.1, seed=7, batch_size=2, number_of_batches=1\nACD"],
+            "expected 2 designed records; observed 0",
+        ),
         (
             [
-                ">input, T=0.1, seed=7\nACD",
+                ">input, T=0.1, seed=7, batch_size=2, number_of_batches=1\nACD",
                 ">input, id=1, T=0.1, seed=7\nACD",
             ],
             "expected 2 designed records; observed 1",
         ),
         (
             [
-                ">input, T=0.1, seed=7\nACD",
+                ">input, T=0.1, seed=7, batch_size=2, number_of_batches=1\nACD",
                 ">input, id=1, T=0.1, seed=7\nACD",
                 ">input, id=2, T=0.1, seed=7\nACD",
                 ">input, id=3, T=0.1, seed=7\nACD",
@@ -408,7 +411,7 @@ def test_design_admission_rejects_completed_tree_without_official_fasta(tmp_path
         ),
         (
             [
-                ">input, T=0.1, seed=7\nACD",
+                ">input, T=0.1, seed=7, batch_size=2, number_of_batches=1\nACD",
                 ">input, id=1, T=0.1, seed=7\nACD",
                 ">input, id=1, T=0.1, seed=7\nACD",
             ],
@@ -416,7 +419,7 @@ def test_design_admission_rejects_completed_tree_without_official_fasta(tmp_path
         ),
         (
             [
-                ">input, T=0.1, seed=7\nACD",
+                ">input, T=0.1, seed=7, batch_size=2, number_of_batches=1\nACD",
                 ">input, id=1, T=0.1, seed=7\nAC*",
                 ">input, id=2, T=0.1, seed=7\nACD",
             ],
@@ -441,15 +444,15 @@ def test_design_admission_rejects_invalid_official_fasta_records(
     "records",
     [
         [
-            ">input, T=9, seed=999\nAC:DE",
+            ">input, T=9, seed=999, batch_size=1, number_of_batches=1\nAC:DE",
             ">input, id=1, overall_confidence=0.1\nAC:DE",
         ],
         [
-            ">input, T=0.1, seed=7\nAC:DE",
+            ">input, T=0.1, seed=7, batch_size=1, number_of_batches=1\nAC:DE",
             ">input, id=1, T=9, seed=7\nAC:DE",
         ],
         [
-            ">input, T=0.1, seed=7\nAC:DE",
+            ">input, T=0.1, seed=7, batch_size=1, number_of_batches=1\nAC:DE",
             ">input, id=1, T=0.1, seed=999\nAC:DE",
         ],
     ],
@@ -463,6 +466,33 @@ def test_design_admission_binds_fasta_seed_and_temperature_metadata(
     _rebind_completion_to_current_tree(output_root)
 
     with pytest.raises(ValueError, match="seed|temperature"):
+        parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "replacement"),
+    [("batch_size", "1"), ("number_of_batches", "6")],
+)
+def test_design_admission_binds_native_fasta_batch_shape(
+    tmp_path: Path,
+    field_name: str,
+    replacement: str,
+) -> None:
+    request, commands, output_root, _sidecar = _execute_design(
+        tmp_path,
+        batch_size=2,
+        number_of_batches=3,
+    )
+    fasta_path = output_root / "seqs/input.fa"
+    records = fasta_path.read_text(encoding="utf-8").splitlines()
+    metadata = records[0].replace(
+        f"{field_name}={'2' if field_name == 'batch_size' else '3'}", f"{field_name}={replacement}"
+    )
+    records[0] = metadata
+    fasta_path.write_text("\n".join(records) + "\n", encoding="utf-8")
+    _rebind_completion_to_current_tree(output_root)
+
+    with pytest.raises(ValueError, match=field_name):
         parse_ligandmpnn_design_outputs(request, commands, execution_root=tmp_path)
 
 
@@ -498,7 +528,7 @@ def test_design_admission_rejects_designs_that_change_ordered_native_chain_shape
     (output_root / "seqs/input.fa").write_text(
         "\n".join(
             [
-                ">input, T=0.1, seed=7\nAC:DE",
+                ">input, T=0.1, seed=7, batch_size=1, number_of_batches=1\nAC:DE",
                 f">input, id=1, T=0.1, seed=7\n{designed_sequence}",
             ]
         ),
@@ -517,7 +547,7 @@ def test_design_admission_accepts_mutations_that_preserve_ordered_native_chain_s
     (output_root / "seqs/input.fa").write_text(
         "\n".join(
             [
-                ">input, T=0.1, seed=7\nAC:DE",
+                ">input, T=0.1, seed=7, batch_size=1, number_of_batches=1\nAC:DE",
                 ">input, id=1, T=0.1, seed=7\nYC:YY",
             ]
         ),

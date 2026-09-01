@@ -180,6 +180,37 @@ def test_request_preserves_valid_nested_relative_output_directory(tmp_path: Path
     assert command.argv[command.argv.index("--out_folder") + 1] == "results/nested/designs/seed_7"
 
 
+def test_build_commands_rejects_pdb_nested_inside_per_seed_output(tmp_path: Path) -> None:
+    checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
+    pdb_path = Path("outputs/designs/seed_7/target.pdb")
+    absolute_pdb_path = tmp_path / pdb_path
+    absolute_pdb_path.parent.mkdir(parents=True)
+    absolute_pdb_path.write_bytes(_CONTEXT_PDB_PAYLOAD)
+    pdb_sha256 = hashlib.sha256(_CONTEXT_PDB_PAYLOAD).hexdigest()
+    context_inventory = write_context_inventory(
+        tmp_path,
+        input_path=pdb_path,
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=True,
+        parser_sha256=parser_sha256,
+    )
+    request = _request(
+        pdb_path=pdb_path,
+        pdb_sha256=pdb_sha256,
+        context_inventory=context_inventory,
+        upstream=LigandMpnnUpstreamPin(
+            commit=commit,
+            checkpoint_sha256=_DIGEST,
+            packing_checkpoint_sha256=_PACKING_DIGEST,
+        ),
+        seeds=(7,),
+    )
+
+    with pytest.raises(ValueError, match="pdb_path.*per-seed output"):
+        build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
+
+
 def test_build_commands_resolves_relative_checkout_against_execution_root(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -2092,6 +2092,123 @@ def test_pinned_design_runtime_preserves_replacement_installed_after_rename(
     assert (displaced_attempt / "design.txt").read_text(encoding="utf-8") == "input-v1"
 
 
+def test_pinned_design_runtime_revalidates_child_manifest_after_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "designs" / "seed_7"
+    completion_path = output_root / ".dnadesign-ligandmpnn-execution.json"
+    original_manifest = pinned_runtime_module.build_design_output_manifest
+    manifest_calls = 0
+
+    def _replace_child_after_final_private_manifest(
+        root: Path,
+        *,
+        expected_root_identity: tuple[int, int] | None = None,
+    ) -> dict[str, object]:
+        nonlocal manifest_calls
+        manifest = original_manifest(root, expected_root_identity=expected_root_identity)
+        manifest_calls += 1
+        if manifest_calls == 2:
+            (root / "design.txt").write_text("post-manifest replacement", encoding="utf-8")
+        return manifest
+
+    monkeypatch.setattr(
+        pinned_runtime_module,
+        "build_design_output_manifest",
+        _replace_child_after_final_private_manifest,
+    )
+
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnDesignPublicationUncertainError,
+        match="design output tree changed during atomic publication",
+    ):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            completion_record_path=completion_path,
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert manifest_calls >= 3
+    assert (output_root / "design.txt").read_text(encoding="utf-8") == "post-manifest replacement"
+
+
+def test_pinned_design_runtime_revalidates_completion_after_directory_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "designs" / "seed_7"
+    completion_path = output_root / ".dnadesign-ligandmpnn-execution.json"
+    displaced_completion = tmp_path / "owned-design-completion.json"
+    original_publish = pinned_runtime_module._publish_design_output_directory
+    replacement_installed = False
+
+    def _replace_completion_then_publish(
+        source_path: Path,
+        destination_path: Path,
+        *,
+        expected_identity: tuple[int, int],
+    ) -> None:
+        nonlocal replacement_installed
+        private_completion = source_path / completion_path.name
+        private_completion.rename(displaced_completion)
+        private_completion.write_text("foreign design completion", encoding="utf-8")
+        replacement_installed = True
+        original_publish(source_path, destination_path, expected_identity=expected_identity)
+
+    monkeypatch.setattr(
+        pinned_runtime_module,
+        "_publish_design_output_directory",
+        _replace_completion_then_publish,
+    )
+
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnDesignPublicationUncertainError,
+        match="design completion changed during atomic publication",
+    ):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="run.py",
+            completion_record_path=completion_path,
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert replacement_installed
+    assert completion_path.read_text(encoding="utf-8") == "foreign design completion"
+    assert displaced_completion.is_file()
+
+
 def test_pinned_design_runtime_preserves_recreated_attempt_after_successful_publish(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2945,6 +3062,64 @@ def test_pinned_score_runtime_revalidates_score_after_completion_directory_fsync
     assert replacement_installed
     assert published_score.read_text(encoding="utf-8") == "concurrent replacement"
     assert not completion_path.exists()
+
+
+def test_pinned_score_runtime_revalidates_completion_after_output_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout, commit, checkpoint, checkpoint_sha256, pdb, pdb_sha256 = _checkout(tmp_path)
+    output_root = tmp_path / "scores"
+    output_root.mkdir()
+    published_score = output_root / "input.pt"
+    completion_path = tmp_path / ".test-ligandmpnn-execution.json"
+    displaced_completion = tmp_path / "owned-completion.json"
+    original_matches = pinned_runtime_module._owned_regular_leaf_matches_sha256
+    replacement_installed = False
+
+    def _replace_completion_after_output_validation(*args: object, **kwargs: object) -> bool:
+        nonlocal replacement_installed
+        owned = original_matches(*args, **kwargs)
+        if owned and completion_path.is_file() and not replacement_installed:
+            completion_path.rename(displaced_completion)
+            completion_path.write_text("foreign completion", encoding="utf-8")
+            replacement_installed = True
+        return owned
+
+    monkeypatch.setattr(
+        pinned_runtime_module,
+        "_owned_regular_leaf_matches_sha256",
+        _replace_completion_after_output_validation,
+    )
+
+    with pytest.raises(
+        pinned_runtime_module.LigandMpnnCompletionPublicationUncertainError,
+        match="completion publication rollback target changed",
+    ):
+        execute_pinned_entrypoint(
+            checkout_root=checkout,
+            upstream_commit=commit,
+            checkpoint_sha256=checkpoint_sha256,
+            pdb_sha256=pdb_sha256,
+            packing_checkpoint_sha256=None,
+            residue_alphabet_sha256=None,
+            entrypoint="score.py",
+            arguments=(
+                "--model_type",
+                "ligand_mpnn",
+                "--checkpoint_ligand_mpnn",
+                str(checkpoint),
+                "--pdb_path",
+                str(pdb),
+                "--out_folder",
+                str(output_root),
+            ),
+        )
+
+    assert replacement_installed
+    assert completion_path.read_text(encoding="utf-8") == "foreign completion"
+    assert published_score.read_text(encoding="utf-8") == "input-v1"
+    assert displaced_completion.is_file()
 
 
 def test_pinned_score_completion_rollback_preserves_concurrent_completion_replacement(

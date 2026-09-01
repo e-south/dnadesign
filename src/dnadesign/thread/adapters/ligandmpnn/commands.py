@@ -35,6 +35,12 @@ def build_ligandmpnn_commands(
 
     execution_root = resolve_execution_root_for_execution(execution_root)
     checkout_root = resolve_checkout_root_for_execution(checkout_root, execution_root=execution_root)
+    _validate_command_input_output_separation(
+        request,
+        checkout_root=checkout_root,
+        execution_root=execution_root,
+        residue_alphabet_sidecar=residue_alphabet_sidecar,
+    )
     context_inventory = load_ligandmpnn_context_inventory(
         request.context_inventory,
         execution_root=execution_root,
@@ -124,6 +130,30 @@ def build_ligandmpnn_commands(
         )
         commands.append(LigandMpnnCommand(seed=seed, output_dir=output_dir, argv=argv))
     return tuple(commands)
+
+
+def _validate_command_input_output_separation(
+    request: LigandMpnnRequest,
+    *,
+    checkout_root: Path,
+    execution_root: Path,
+    residue_alphabet_sidecar: LigandMpnnResidueAlphabetSidecar | None,
+) -> None:
+    """Reject inputs that make a per-seed output exist before execution."""
+
+    inputs = {
+        "checkout_root": checkout_root,
+        "pdb_path": request.pdb_path,
+        "context inventory path": request.context_inventory.path,
+    }
+    if residue_alphabet_sidecar is not None:
+        inputs["residue alphabet sidecar path"] = residue_alphabet_sidecar.path
+    for seed in request.seeds:
+        output_path = execution_root / request.output_dir / f"seed_{seed}"
+        for field_name, input_path in inputs.items():
+            anchored_input = input_path if input_path.is_absolute() else execution_root / input_path
+            if anchored_input == output_path or anchored_input.is_relative_to(output_path):
+                raise ValueError(f"{field_name} must not be nested inside a per-seed output directory")
 
 
 def resolve_checkout_root_for_execution(checkout_root: Path, *, execution_root: Path) -> Path:

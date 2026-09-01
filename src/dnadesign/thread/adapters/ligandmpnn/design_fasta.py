@@ -37,6 +37,8 @@ def parse_official_design_fasta(
     expected_design_count: int,
     expected_seed: int,
     expected_temperature: float,
+    expected_batch_size: int,
+    expected_number_of_batches: int,
 ) -> int:
     """Validate one official ``run.py`` FASTA and return its design count."""
 
@@ -46,6 +48,8 @@ def parse_official_design_fasta(
         expected_design_count=expected_design_count,
         expected_seed=expected_seed,
         expected_temperature=expected_temperature,
+        expected_batch_size=expected_batch_size,
+        expected_number_of_batches=expected_number_of_batches,
     ).design_count
 
 
@@ -56,8 +60,13 @@ def parse_official_design_fasta_records(
     expected_design_count: int,
     expected_seed: int,
     expected_temperature: float,
+    expected_batch_size: int,
+    expected_number_of_batches: int,
 ) -> OfficialLigandMpnnDesignFasta:
     """Validate and return exact native/design segments from official ``run.py`` FASTA."""
+
+    if expected_design_count != expected_batch_size * expected_number_of_batches:
+        raise ValueError("official LigandMPNN FASTA expected design count does not match requested batch shape")
 
     try:
         text = payload.decode("utf-8")
@@ -73,6 +82,8 @@ def parse_official_design_fasta_records(
         native_metadata,
         expected_seed=expected_seed,
         expected_temperature=expected_temperature,
+        expected_batch_size=expected_batch_size,
+        expected_number_of_batches=expected_number_of_batches,
     )
     native_segments = _validate_sequence(native_sequence)
     native_segment_lengths = tuple(len(segment) for segment in native_segments)
@@ -92,6 +103,8 @@ def parse_official_design_fasta_records(
             metadata,
             expected_seed=expected_seed,
             expected_temperature=expected_temperature,
+            expected_batch_size=None,
+            expected_number_of_batches=None,
         )
         observed_ids.append(design_id)
         segments = _validate_sequence(sequence)
@@ -142,6 +155,8 @@ def _validate_execution_metadata(
     *,
     expected_seed: int,
     expected_temperature: float,
+    expected_batch_size: int | None,
+    expected_number_of_batches: int | None,
 ) -> None:
     try:
         observed_seed = int(metadata["seed"])
@@ -160,6 +175,27 @@ def _validate_execution_metadata(
             "official LigandMPNN FASTA temperature "
             f"{observed_temperature!r} does not match requested temperature {expected_temperature}"
         )
+    if expected_batch_size is not None:
+        observed_batch_size = _parse_positive_header_integer(metadata, "batch_size")
+        if observed_batch_size != expected_batch_size:
+            raise ValueError(
+                "official LigandMPNN FASTA batch_size "
+                f"{observed_batch_size} does not match requested batch_size {expected_batch_size}"
+            )
+    if expected_number_of_batches is not None:
+        observed_number_of_batches = _parse_positive_header_integer(metadata, "number_of_batches")
+        if observed_number_of_batches != expected_number_of_batches:
+            raise ValueError(
+                "official LigandMPNN FASTA number_of_batches "
+                f"{observed_number_of_batches} does not match requested number_of_batches {expected_number_of_batches}"
+            )
+
+
+def _parse_positive_header_integer(metadata: dict[str, str], field_name: str) -> int:
+    value = metadata.get(field_name, "")
+    if re.fullmatch(r"[1-9][0-9]*", value) is None:
+        raise ValueError(f"official LigandMPNN FASTA header is missing a valid {field_name}")
+    return int(value)
 
 
 def _parse_fasta_records(text: str) -> list[tuple[str, str]]:

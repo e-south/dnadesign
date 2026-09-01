@@ -217,6 +217,8 @@ def parse_ligandmpnn_design_outputs(
             expected_design_count=request.batch_size * request.number_of_batches,
             expected_seed=command.seed,
             expected_temperature=request.temperature,
+            expected_batch_size=request.batch_size,
+            expected_number_of_batches=request.number_of_batches,
         )
         _validate_design_sequence_contract(request, protein_evidence, parsed_fasta)
         sequence_count = parsed_fasta.design_count

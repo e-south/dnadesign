@@ -683,14 +683,15 @@ def execute_pinned_entrypoint(
                     expected_root_identity=design_attempt_identity,
                 )
                 _require_design_attempt_identity(temporary_output_root, design_attempt_identity)
-                _write_completion_record(
+                design_completion_payload = _completion_record(
+                    execution,
+                    observed_execution_sha256,
+                    score_output_sha256=None,
+                    design_output_manifest=design_output_manifest,
+                )
+                design_completion_identity, design_completion_bytes = _write_completion_record(
                     temporary_output_root / _COMPLETION_RECORD_NAME,
-                    _completion_record(
-                        execution,
-                        observed_execution_sha256,
-                        score_output_sha256=None,
-                        design_output_manifest=design_output_manifest,
-                    ),
+                    design_completion_payload,
                     rollback_output_path=None,
                     rollback_output_identity=None,
                     rollback_output_sha256=None,
@@ -711,6 +712,13 @@ def execute_pinned_entrypoint(
                     temporary_output_root,
                     output_root,
                     expected_identity=design_attempt_identity,
+                )
+                _verify_published_design_output(
+                    output_root,
+                    expected_root_identity=design_attempt_identity,
+                    expected_manifest=design_output_manifest,
+                    completion_identity=design_completion_identity,
+                    completion_bytes=design_completion_bytes,
                 )
                 design_published = True
             except BaseException as error:
@@ -890,7 +898,7 @@ def _write_completion_record(
     rollback_output_path: Path | None,
     rollback_output_identity: tuple[int, int] | None,
     rollback_output_sha256: str | None,
-) -> None:
+) -> tuple[tuple[int, int], bytes]:
     if not isinstance(path, Path):
         raise ValueError("completion record path must be a Path")
     if not path.name or ".." in path.parts:
@@ -953,6 +961,20 @@ def _write_completion_record(
                         )
                 finally:
                     os.close(output_directory_fd)
+            assert completion_identity is not None
+            completion_is_owned = _owned_regular_leaf_matches_bytes(
+                directory_fd,
+                path.name,
+                completion_identity,
+                encoded,
+                error_type=LigandMpnnCompletionPublicationUncertainError,
+                changed_message="LigandMPNN completion publication rollback target changed",
+                inspect_message="LigandMPNN completion publication rollback target could not be inspected",
+            )
+            if not completion_is_owned:
+                raise LigandMpnnCompletionPublicationUncertainError(
+                    "LigandMPNN completion publication rollback target changed"
+                )
         except BaseException as publication_error:
             try:
                 _rollback_completion_and_output(
@@ -981,6 +1003,8 @@ def _write_completion_record(
         if completion_descriptor is not None:
             os.close(completion_descriptor)
         os.close(directory_fd)
+    assert completion_identity is not None
+    return completion_identity, encoded
 
 
 def _open_directory_path(path: Path, *, create: bool) -> int:
@@ -1856,6 +1880,53 @@ def _publish_design_output_directory(
         if source_fd is not None:
             os.close(source_fd)
         os.close(parent_fd)
+
+
+def _verify_published_design_output(
+    output_root: Path,
+    *,
+    expected_root_identity: tuple[int, int],
+    expected_manifest: dict[str, object],
+    completion_identity: tuple[int, int],
+    completion_bytes: bytes,
+) -> None:
+    """Bind the published artifact tree and completion leaf before success."""
+
+    try:
+        published_manifest = build_design_output_manifest(
+            output_root,
+            expected_root_identity=expected_root_identity,
+        )
+    except ValueError as error:
+        raise LigandMpnnDesignPublicationUncertainError(
+            "LigandMPNN design output tree changed during atomic publication"
+        ) from error
+    if published_manifest != expected_manifest:
+        raise LigandMpnnDesignPublicationUncertainError(
+            "LigandMPNN design output tree changed during atomic publication"
+        )
+    try:
+        output_directory_fd = _open_directory_path(output_root, create=False)
+    except OSError as error:
+        raise LigandMpnnDesignPublicationUncertainError(
+            "LigandMPNN design completion changed during atomic publication"
+        ) from error
+    try:
+        completion_is_owned = _owned_regular_leaf_matches_bytes(
+            output_directory_fd,
+            _COMPLETION_RECORD_NAME,
+            completion_identity,
+            completion_bytes,
+            error_type=LigandMpnnDesignPublicationUncertainError,
+            changed_message="LigandMPNN design completion changed during atomic publication",
+            inspect_message="LigandMPNN design completion could not be inspected after publication",
+        )
+        if not completion_is_owned:
+            raise LigandMpnnDesignPublicationUncertainError(
+                "LigandMPNN design completion changed during atomic publication"
+            )
+    finally:
+        os.close(output_directory_fd)
 
 
 def _publish_score_output(source_path: Path, destination_path: Path) -> tuple[str, tuple[int, int]]:
