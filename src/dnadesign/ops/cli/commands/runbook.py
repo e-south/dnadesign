@@ -708,7 +708,10 @@ def runbook_fill_infer(
         Path | None,
         typer.Option(
             "--repo-root",
-            help="Repository root used for study discovery and relative runbook paths.",
+            help=(
+                "OPS repository root used to launch discovery. External study repo: references resolve "
+                "from the repository that owns the study."
+            ),
         ),
     ] = None,
     mode: Annotated[
