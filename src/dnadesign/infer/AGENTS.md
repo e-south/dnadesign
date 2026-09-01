@@ -37,7 +37,7 @@ feature sidecars, and USR writeback work.
 
 ### Outputs / naming
 When writing back to USR, output columns follow:
-- `infer__<model_id>**<job_id>**<out_id>`
+- `infer__<model_id>__<job_id>__<out_id>`
 
 For sequence-view feature bundles, prefer the sidecar contract above. Consumers
 should join aliases to vectors/scalars and USR sequence views rather than

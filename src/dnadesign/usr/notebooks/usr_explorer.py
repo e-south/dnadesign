@@ -16,11 +16,11 @@ def _():
 
     alt.data_transformers.disable_max_rows()
 
-    def _dataset_root() -> Path:
+    def dataset_root() -> Path:
         # notebooks/ -> usr/ -> datasets/
-        return Path(__file__).resolve().parents[2] / "datasets"
+        return Path(__file__).resolve().parents[1] / "datasets"
 
-    return Path, alt, mo, np, pd, pl, _dataset_root
+    return Path, alt, dataset_root, mo, np, pd, pl
 
 
 @app.cell
@@ -34,8 +34,8 @@ def _(mo):
 
 
 @app.cell
-def _(_dataset_root, mo):
-    datasets_root = _dataset_root()
+def _(dataset_root, mo):
+    datasets_root = dataset_root()
     dataset_names = sorted([p.name for p in datasets_root.iterdir() if p.is_dir() and (p / "records.parquet").exists()])
 
     dataset_picker = mo.ui.dropdown(
@@ -119,7 +119,7 @@ def _(df_preview, mo):
 
 @app.cell
 def _(df_sample, mo, pl):
-    numeric_cols = [name for name, dtype in zip(df_sample.columns, df_sample.dtypes) if pl.datatypes.is_numeric(dtype)]
+    numeric_cols = [name for name, dtype in zip(df_sample.columns, df_sample.dtypes) if dtype.is_numeric()]
     numeric_picker = mo.ui.dropdown(
         options=numeric_cols,
         value=(numeric_cols[0] if numeric_cols else None),
@@ -201,10 +201,7 @@ def _(alt, df_sample, mo, numeric_picker, pd):
     )
     charts["Nulls"] = mo.ui.altair_chart(null_chart)
 
-    if charts:
-        _ = mo.ui.tabs(charts)
-    else:
-        _ = mo.md("No plots available for this dataset.")
+    mo.output.replace(mo.ui.tabs(charts) if charts else mo.md("No plots available for this dataset."))
     return
 
 

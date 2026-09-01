@@ -4,7 +4,7 @@
 
 ### Setup
 ```bash
-uv sync --locked --group notebooks
+uv sync --locked
 ```
 
 ### Edit
