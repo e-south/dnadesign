@@ -265,6 +265,48 @@ def test_inventory_retries_declared_resource_that_vanishes_before_digest_open(
     assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
 
 
+def test_inventory_retries_resource_metadata_drift_during_digest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    payload_path = root / "payload.txt"
+    payload_path.write_text("payload\n", encoding="utf-8")
+    original_sha256 = storage_validation._sha256
+    injected = False
+    settle_delays: list[float] = []
+
+    def _sha256(path: Path) -> str:
+        nonlocal injected
+        digest = original_sha256(path)
+        if path == payload_path and not injected and (root / MANIFEST_NAME).exists():
+            injected = True
+            before = path.stat(follow_symlinks=False)
+            os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000))
+        return digest
+
+    monkeypatch.setattr(storage_validation, "_sha256", _sha256)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert injected is True
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
 @pytest.mark.parametrize("target_kind", ["resource", "directory"])
 def test_inventory_retries_shared_posture_entry_that_vanishes_before_stat(
     tmp_path: Path,

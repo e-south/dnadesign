@@ -390,7 +390,7 @@ def _verify_resource(root: Path, resource: StoredResource) -> VerifiedStoredReso
         final_stat.st_ctime_ns,
     )
     if initial_identity != final_identity:
-        raise StorageObjectError(
+        raise _StorageSnapshotInconsistent(
             f"declared resource changed during validation: {resource.relative_path}; "
             "retry while the producer is quiescent"
         )
