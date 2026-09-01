@@ -51,7 +51,7 @@ _LEGACY_PREFLIGHT_CHECK_KEYS = frozenset({"phase_id", "phase"})
 
 def load_study_ops_contract(study_root: Path) -> StudyOpsContract:
     resolved_study_root = study_root.expanduser().resolve()
-    repo_root = _discover_repo_root(resolved_study_root)
+    repo_root = discover_study_repository_root(resolved_study_root)
     contract_path = resolved_study_root / "operations" / "ops.study.yaml"
     if not contract_path.exists():
         raise ValueError(f"study record missing ops.study.yaml: {contract_path}")
@@ -759,11 +759,12 @@ def _validate_contract_path_ref(
     )
 
 
-def _discover_repo_root(study_root: Path) -> Path:
+def discover_study_repository_root(study_root: Path) -> Path:
+    """Return the nearest repository root that owns ``study_root``."""
     for parent in (study_root, *study_root.parents):
         if (parent / "pyproject.toml").exists():
-            return parent
+            return parent.resolve()
     raise ValueError(f"study record must live inside a repository with pyproject.toml: {study_root}")
 
 
-__all__ = ["load_study_ops_contract"]
+__all__ = ["discover_study_repository_root", "load_study_ops_contract"]

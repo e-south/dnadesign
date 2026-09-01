@@ -11,7 +11,7 @@
 **Status-kind:** ops-audit-json
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-09
+**Last verified:** 2026-09-01
 
 This contract defines machine-readable runbooks for cross-tool BU SCC control-plane orchestration.
 It does not own durable USR-backed data-plane workflows; return to the root docs router or USR operations docs when the next procedure is about shared datasets rather than scheduler sequencing.
@@ -175,6 +175,8 @@ must be repaired under the current runtime fingerprint. It does not merge
 runbooks or event streams: Notify remains one watcher per lane, and each
 executed lane writes its audit JSON under
 `<workspace-root>/outputs/logs/ops/audit/<runbook-id>.fill-infer.json`.
+For an external study, `repo:` references in its contract resolve from the
+repository that owns the study, not from the dnadesign checkout launching OPS.
 
 For sequence-view feature backfills, the completion inventory also emits a
 `shard_plan` with shard count, pending vector/scalar key counts, runtime
