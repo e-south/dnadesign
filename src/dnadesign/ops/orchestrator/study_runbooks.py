@@ -15,11 +15,19 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from dnadesign.ops.status.path_ref import resolve_path_ref
-from dnadesign.ops.study.record_loader import load_study_ops_contract
+from dnadesign.ops.study.record_loader import discover_study_repository_root, load_study_ops_contract
 
 
 def discover_infer_runbook_paths_for_study(*, study_dir: Path, repo_root: Path) -> tuple[Path, ...]:
+    """Resolve Infer runbooks from the repository that owns the study.
+
+    ``repo_root`` remains part of the public call contract for same-repository
+    callers, but it must not rebase references owned by an external study.
+    """
     resolved_study_dir = study_dir.expanduser().resolve()
+    resolved_caller_repo_root = repo_root.expanduser().resolve()
+    study_repo_root = discover_study_repository_root(resolved_study_dir)
+    reference_repo_root = resolved_caller_repo_root if resolved_caller_repo_root == study_repo_root else study_repo_root
     contract_path = resolved_study_dir / "operations" / "ops.study.yaml"
     contract = load_study_ops_contract(resolved_study_dir)
     paths: list[Path] = []
@@ -37,7 +45,7 @@ def discover_infer_runbook_paths_for_study(*, study_dir: Path, repo_root: Path) 
         paths.append(
             resolve_path_ref(
                 runbook_ref,
-                repo_root=repo_root,
+                repo_root=reference_repo_root,
                 manifest_dir=resolved_study_dir,
                 default_base="manifest",
                 label=f"ops.study.yaml execution_surfaces.{surface_id}.runbook_ref",
