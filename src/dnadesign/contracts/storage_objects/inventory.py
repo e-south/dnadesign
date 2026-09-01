@@ -1036,6 +1036,7 @@ def _verify_published_manifest(
                 manifest_path.parent,
                 _allow_pending_demo_manifest=allow_pending_demo_manifest,
                 _allow_pending_demo_lock=allow_pending_demo_manifest and previous_bytes is None,
+                _allow_pending_lock_visibility=previous_bytes is None and attempt == 0,
             )
         except StorageObjectError as exc:
             if attempt != 0 or not isinstance(exc, _StorageSnapshotInconsistent):

@@ -85,6 +85,133 @@ def test_inventory_retries_one_transient_post_publication_validation(
     assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
 
 
+def test_inventory_retries_first_create_only_lock_visibility_miss(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    lock_path = root / LOCK_NAME
+    original_stat = Path.stat
+    original_is_symlink = Path.is_symlink
+    original_verify_coordination_posture = storage_validation._verify_coordination_posture
+    misses = 0
+    lock_type_checked = False
+    verifying_coordination = False
+    settle_delays: list[float] = []
+
+    def _stat(path: Path, *args: object, **kwargs: object):
+        nonlocal misses
+        if verifying_coordination and lock_type_checked and path == lock_path and misses == 0:
+            misses += 1
+            raise FileNotFoundError(2, "No such file or directory", str(path))
+        return original_stat(path, *args, **kwargs)
+
+    def _is_symlink(path: Path) -> bool:
+        nonlocal lock_type_checked
+        result = original_is_symlink(path)
+        if verifying_coordination and path == lock_path:
+            lock_type_checked = True
+        return result
+
+    def _verify_coordination_posture(*args: object, **kwargs: object):
+        nonlocal lock_type_checked, verifying_coordination
+        lock_type_checked = False
+        verifying_coordination = True
+        try:
+            return original_verify_coordination_posture(*args, **kwargs)
+        finally:
+            verifying_coordination = False
+
+    monkeypatch.setattr(Path, "stat", _stat)
+    monkeypatch.setattr(Path, "is_symlink", _is_symlink)
+    monkeypatch.setattr(storage_validation, "_verify_coordination_posture", _verify_coordination_posture)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert misses == 1
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
+def test_inventory_hard_fails_persistent_create_only_lock_visibility_miss(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    lock_path = root / LOCK_NAME
+    original_stat = Path.stat
+    original_is_symlink = Path.is_symlink
+    original_verify_coordination_posture = storage_validation._verify_coordination_posture
+    misses = 0
+    lock_type_checked = False
+    verifying_coordination = False
+    settle_delays: list[float] = []
+
+    def _stat(path: Path, *args: object, **kwargs: object):
+        nonlocal misses
+        if verifying_coordination and lock_type_checked and path == lock_path and misses < 2:
+            misses += 1
+            raise FileNotFoundError(2, "No such file or directory", str(path))
+        return original_stat(path, *args, **kwargs)
+
+    def _is_symlink(path: Path) -> bool:
+        nonlocal lock_type_checked
+        result = original_is_symlink(path)
+        if verifying_coordination and path == lock_path:
+            lock_type_checked = True
+        return result
+
+    def _verify_coordination_posture(*args: object, **kwargs: object):
+        nonlocal lock_type_checked, verifying_coordination
+        lock_type_checked = False
+        verifying_coordination = True
+        try:
+            return original_verify_coordination_posture(*args, **kwargs)
+        finally:
+            verifying_coordination = False
+
+    monkeypatch.setattr(Path, "stat", _stat)
+    monkeypatch.setattr(Path, "is_symlink", _is_symlink)
+    monkeypatch.setattr(storage_validation, "_verify_coordination_posture", _verify_coordination_posture)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    with pytest.raises(StorageObjectError, match="storage object lock is missing") as exc_info:
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="usr",
+            object_kind="store",
+            content_schema="usr.dataset-root",
+            content_schema_version="v1",
+            producer_revision="test-revision",
+            storage_class="cold",
+            retention_policy="cold",
+        )
+
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
+    assert misses == 2
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+    assert not manifest_path.exists()
+
+
 @pytest.mark.parametrize("listing_outcome", ["declared-missing", "undeclared"])
 def test_inventory_retries_one_transient_post_publication_listing_mismatch(
     tmp_path: Path,
@@ -937,7 +1064,7 @@ def test_inventory_bootstraps_demo_then_requires_manifest_to_be_tracked(
     assert indexed_lock.startswith("100644 ")
 
 
-def test_inventory_retries_demo_resource_snapshot_drift_after_git_index_read(
+def test_inventory_retries_demo_metadata_drift_after_git_index_read(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -957,10 +1084,11 @@ def test_inventory_retries_demo_resource_snapshot_drift_after_git_index_read(
         completed = original_run(*args, **kwargs)
         command = args[0]
         if isinstance(command, list) and "cat-file" in command and not changed:
-            replacement = payload_path.with_name(".payload.txt.same-bytes")
-            replacement.write_bytes(payload_path.read_bytes())
-            replacement.chmod(stat.S_IMODE(payload_path.stat(follow_symlinks=False).st_mode))
-            replacement.replace(payload_path)
+            before = payload_path.stat(follow_symlinks=False)
+            os.utime(
+                payload_path,
+                ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000),
+            )
             changed = True
         return completed
 
@@ -1174,10 +1302,11 @@ def test_demo_validation_rechecks_filesystem_bytes_after_git_index_reads(
 
     monkeypatch.setattr(storage_validation.subprocess, "run", _run)
 
-    with pytest.raises(StorageObjectError, match=error):
+    with pytest.raises(StorageObjectError, match=error) as exc_info:
         verify_storage_object(root)
 
     assert changed
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
 
 @pytest.mark.parametrize("entry_kind", ["file", "directory"])
@@ -1205,10 +1334,11 @@ def test_demo_validation_rechecks_exact_closure_after_git_index_reads(
 
     monkeypatch.setattr(storage_validation.subprocess, "run", _run)
 
-    with pytest.raises(StorageObjectError, match="changed during Git index validation"):
+    with pytest.raises(StorageObjectError, match="changed during Git index validation") as exc_info:
         verify_storage_object(root)
 
     assert changed
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
 
 @pytest.mark.parametrize("replacement_kind", ["root", "nested_directory"])
@@ -1253,10 +1383,11 @@ def test_demo_validation_rejects_same_path_directory_replacement_after_git_reads
 
     monkeypatch.setattr(storage_validation.subprocess, "run", _run)
 
-    with pytest.raises(StorageObjectError, match="changed during Git index validation"):
+    with pytest.raises(StorageObjectError, match="changed during Git index validation") as exc_info:
         verify_storage_object(root)
 
     assert changed
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
 
 @pytest.mark.parametrize("target_kind", ["resource", "directory"])
@@ -1302,10 +1433,11 @@ def test_shared_demo_rejects_access_posture_drift_after_git_reads(
 
     monkeypatch.setattr(storage_validation.subprocess, "run", _run)
 
-    with pytest.raises(StorageObjectError, match="changed during Git index validation"):
+    with pytest.raises(StorageObjectError, match="changed during Git index validation") as exc_info:
         verify_storage_object(root)
 
     assert changed
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
 
 def test_demo_validation_rejects_index_change_after_checked_entry(
@@ -3393,7 +3525,7 @@ def test_refresh_rejects_missing_lock_while_an_unlinked_inode_is_held(tmp_path: 
     held_lock.acquire()
     lock_path.unlink()
     try:
-        with pytest.raises(StorageObjectError, match="storage object lock is missing"):
+        with pytest.raises(StorageObjectError, match="storage object lock is missing") as exc_info:
             refresh_storage_object(
                 root,
                 expected_manifest_digest=_digest(manifest_path),
@@ -3403,6 +3535,7 @@ def test_refresh_rejects_missing_lock_while_an_unlinked_inode_is_held(tmp_path: 
         held_lock.release()
 
     assert not lock_path.exists()
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
     assert manifest_path.read_bytes() == prior_manifest
     assert payload.read_text(encoding="utf-8") == "payload\n"
 

@@ -446,6 +446,8 @@ def _verify_coordination_posture(
     root: Path,
     manifest_path: Path,
     lock_path: Path,
+    *,
+    allow_missing_lock_snapshot: bool = False,
 ) -> _CoordinationState:
     """Validate and fingerprint root, manifest, and lock coordination state."""
 
@@ -496,7 +498,10 @@ def _verify_coordination_posture(
         try:
             lock_stat = lock_path.stat(follow_symlinks=False)
         except FileNotFoundError as exc:
-            raise StorageObjectError(f"storage object lock is missing: {lock_path}") from exc
+            error = StorageObjectError(f"storage object lock is missing: {lock_path}")
+            if allow_missing_lock_snapshot:
+                raise _StorageSnapshotInconsistent(str(error)) from exc
+            raise error from exc
         if not stat.S_ISREG(lock_stat.st_mode):
             raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
         lock_mode = stat.S_IMODE(lock_stat.st_mode)
@@ -926,13 +931,27 @@ def _recheck_verified_demo_snapshot(
     final_file_paths, final_directory_paths = _storage_tree_paths(verified.root)
     observed_tree_state = _storage_tree_state(verified.root, final_file_paths, final_directory_paths)
     if (
-        observed_resources != expected_resources
-        or coordination_state != expected_coordination_state
-        or observed_tree_state != expected_tree_state
-    ):
-        raise _StorageSnapshotInconsistent(
-            "demo storage object changed during Git index validation; retry while the producer is quiescent"
+        observed_resources == expected_resources
+        and (
+            coordination_state[0],
+            coordination_state[1][:5],
+            coordination_state[2],
         )
+        == (
+            expected_coordination_state[0],
+            expected_coordination_state[1][:5],
+            expected_coordination_state[2],
+        )
+        and tuple(entry[:8] for entry in observed_tree_state) == tuple(entry[:8] for entry in expected_tree_state)
+    ):
+        if coordination_state != expected_coordination_state or observed_tree_state != expected_tree_state:
+            raise _StorageSnapshotInconsistent(
+                "demo storage object changed during Git index validation; retry while the producer is quiescent"
+            )
+        return
+    raise StorageObjectError(
+        "demo storage object changed during Git index validation; retry while the producer is quiescent"
+    )
 
 
 def verify_storage_object(
@@ -940,6 +959,7 @@ def verify_storage_object(
     *,
     _allow_pending_demo_manifest: bool = False,
     _allow_pending_demo_lock: bool = False,
+    _allow_pending_lock_visibility: bool = False,
 ) -> VerifiedStorageObject:
     """Verify one explicit storage object and require exact file closure."""
 
@@ -955,7 +975,12 @@ def verify_storage_object(
     if not manifest_path.is_file():
         raise StorageObjectError(f"storage object root is missing {MANIFEST_NAME}: {root}")
     lock_path = root / LOCK_NAME
-    coordination_state = _verify_coordination_posture(root, manifest_path, lock_path)
+    coordination_state = _verify_coordination_posture(
+        root,
+        manifest_path,
+        lock_path,
+        allow_missing_lock_snapshot=_allow_pending_lock_visibility,
+    )
     (_root_type, root_mode, _root_owner, shared_group, _root_device, _root_inode), manifest_state, _lock_state = (
         coordination_state
     )

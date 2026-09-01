@@ -972,8 +972,10 @@ def test_verify_storage_root_rejects_missing_object_lock_before_validation(tmp_p
     _write_object(object_root)
     (object_root / LOCK_NAME).unlink()
 
-    with pytest.raises(StorageObjectError, match="storage object lock is missing"):
+    with pytest.raises(StorageObjectError, match="storage object lock is missing") as exc_info:
         verify_storage_root(storage_root)
+
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
 
 def test_verify_storage_root_rejects_lock_replaced_during_acquisition(
