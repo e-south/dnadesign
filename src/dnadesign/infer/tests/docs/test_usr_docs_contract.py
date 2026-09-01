@@ -22,7 +22,11 @@ def _repo_root() -> Path:
     raise RuntimeError("repo root not found")
 
 
-def test_infer_readme_documents_usr_column_name_contract() -> None:
-    readme = (_repo_root() / "src/dnadesign/infer/README.md").read_text(encoding="utf-8")
-    assert "infer__<model_id>__<job_id>__<out_id>" in readme
-    assert "infer__<model_id>**<job_id>**<out_id>" not in readme
+def test_infer_docs_document_usr_column_name_contract() -> None:
+    for relative_path in (
+        "src/dnadesign/infer/README.md",
+        "src/dnadesign/infer/AGENTS.md",
+    ):
+        text = (_repo_root() / relative_path).read_text(encoding="utf-8")
+        assert "infer__<model_id>__<job_id>__<out_id>" in text
+        assert "infer__<model_id>**<job_id>**<out_id>" not in text
