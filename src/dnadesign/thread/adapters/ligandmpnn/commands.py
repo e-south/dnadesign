@@ -141,19 +141,44 @@ def _validate_command_input_output_separation(
 ) -> None:
     """Reject inputs that make a per-seed output exist before execution."""
 
-    inputs = {
-        "checkout_root": checkout_root,
-        "pdb_path": request.pdb_path,
-        "context inventory path": request.context_inventory.path,
-    }
-    if residue_alphabet_sidecar is not None:
-        inputs["residue alphabet sidecar path"] = residue_alphabet_sidecar.path
+    inputs = _command_input_paths(
+        request,
+        checkout_root=checkout_root,
+        execution_root=execution_root,
+        residue_alphabet_sidecar=residue_alphabet_sidecar,
+    )
     for seed in request.seeds:
         output_path = execution_root / request.output_dir / f"seed_{seed}"
         for field_name, input_path in inputs.items():
-            anchored_input = input_path if input_path.is_absolute() else execution_root / input_path
-            if anchored_input == output_path or anchored_input.is_relative_to(output_path):
+            if input_path == output_path or input_path.is_relative_to(output_path):
                 raise ValueError(f"{field_name} must not be nested inside a per-seed output directory")
+
+
+def _command_input_paths(
+    request: LigandMpnnRequest,
+    *,
+    checkout_root: Path,
+    execution_root: Path,
+    residue_alphabet_sidecar: LigandMpnnResidueAlphabetSidecar | None,
+) -> dict[str, Path]:
+    """Inventory construction-time and runtime paths read by one command."""
+
+    inputs = {
+        "checkout_root": checkout_root,
+        "pdb_path": execution_root / request.pdb_path,
+        "context inventory path": execution_root / request.context_inventory.path,
+    }
+    if residue_alphabet_sidecar is not None:
+        sidecar_path = residue_alphabet_sidecar.path
+        inputs["residue alphabet sidecar path"] = (
+            sidecar_path if sidecar_path.is_absolute() else execution_root / sidecar_path
+        )
+        materialized_path = residue_alphabet_sidecar.materialized_path
+        if materialized_path is not None:
+            inputs["residue alphabet sidecar materialized_path"] = (
+                materialized_path if materialized_path.is_absolute() else Path.cwd() / materialized_path
+            )
+    return inputs
 
 
 def resolve_checkout_root_for_execution(checkout_root: Path, *, execution_root: Path) -> Path:

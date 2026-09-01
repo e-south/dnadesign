@@ -21,15 +21,18 @@ from pathlib import Path
 
 import pytest
 
+import dnadesign.thread.adapters.ligandmpnn.commands as commands_module
 from dnadesign.thread.adapters.ligandmpnn import (
     LigandMpnnContextInventoryReference,
     LigandMpnnPackingConfig,
     LigandMpnnRequest,
     LigandMpnnResidue,
+    LigandMpnnResidueAlphabet,
     LigandMpnnUpstreamPin,
     build_ligandmpnn_commands,
     build_planned_receipt,
     load_ligandmpnn_context_inventory,
+    materialize_residue_alphabet_sidecar,
 )
 from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import (
     create_pinned_context_checkout,
@@ -209,6 +212,77 @@ def test_build_commands_rejects_pdb_nested_inside_per_seed_output(tmp_path: Path
 
     with pytest.raises(ValueError, match="pdb_path.*per-seed output"):
         build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
+
+
+def test_build_commands_rejects_materialized_sidecar_nested_inside_per_seed_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    residue = LigandMpnnResidue(chain_id="A", residue_number=12)
+    request, checkout_root = _validated_request(
+        tmp_path,
+        fixed_residues=(),
+        redesigned_residues=(residue,),
+        residue_alphabets=(
+            LigandMpnnResidueAlphabet(
+                residue=residue,
+                allowed_amino_acids=("A", "G"),
+            ),
+        ),
+        seeds=(7,),
+    )
+    sidecar = materialize_residue_alphabet_sidecar(
+        request,
+        Path("evidence/residue-alphabets.json"),
+        write_path=Path("outputs/designs/seed_7/materialized-residue-alphabets.json"),
+    )
+
+    with pytest.raises(ValueError, match="materialized_path.*per-seed output"):
+        build_ligandmpnn_commands(
+            request,
+            checkout_root=checkout_root,
+            execution_root=tmp_path,
+            residue_alphabet_sidecar=sidecar,
+        )
+
+
+def test_command_input_guard_inventory_matches_all_construction_and_runtime_reads(tmp_path: Path) -> None:
+    residue = LigandMpnnResidue(chain_id="A", residue_number=12)
+    request, checkout_root = _validated_request(
+        tmp_path,
+        fixed_residues=(),
+        redesigned_residues=(residue,),
+        residue_alphabets=(
+            LigandMpnnResidueAlphabet(
+                residue=residue,
+                allowed_amino_acids=("A", "G"),
+            ),
+        ),
+        seeds=(7,),
+    )
+    sidecar_path = Path("evidence/residue-alphabets.json")
+    materialized_path = tmp_path / "staging/residue-alphabets.json"
+    sidecar = materialize_residue_alphabet_sidecar(
+        request,
+        sidecar_path,
+        write_path=materialized_path,
+    )
+
+    guarded_paths = commands_module._command_input_paths(
+        request,
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
+        residue_alphabet_sidecar=sidecar,
+    )
+
+    assert guarded_paths == {
+        "checkout_root": checkout_root,
+        "pdb_path": tmp_path / request.pdb_path,
+        "context inventory path": tmp_path / request.context_inventory.path,
+        "residue alphabet sidecar path": tmp_path / sidecar_path,
+        "residue alphabet sidecar materialized_path": materialized_path,
+    }
 
 
 def test_build_commands_resolves_relative_checkout_against_execution_root(
