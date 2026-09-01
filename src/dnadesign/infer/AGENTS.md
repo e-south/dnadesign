@@ -51,7 +51,8 @@ uv run infer presets list
 uv run infer presets show evo2/extract_logits_ll
 
 # YAML-driven
-uv run infer run --config src/dnadesign/infer/config.yaml --help
+uv run infer run --help
+uv run infer run --config src/dnadesign/infer/workspaces/evo2_feature_bundle_smoke/config.yaml --dry-run
 
 # Ad-hoc single output
 uv run infer extract --help

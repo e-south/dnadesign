@@ -1,22 +1,16 @@
-## Notebooks for agents
+## OPAL notebook support for agents
 
 - Follow repo-root `AGENTS.md`.
-- Canonical marimo rules: `docs/notebooks/marimo-reference.md`.
-- Only edit code inside `@app.cell` bodies.
-- Treat `src/dnadesign/opal/campaigns/**/outputs/**` as generated.
-- If writing files, write to a clearly named local output dir and ask before committing.
-- Generate operative campaign notebooks through `opal notebook generate`; do
-  not fork generated cells into campaign-specific source modules.
-- Multi-view notebooks use `Round | Selection view | Deliverable`. Shared
-  model diagnostics appear once; target masks and selections resolve from the
-  selected view.
+- This directory owns ordinary Python support APIs used by generated OPAL
+  notebooks; it does not contain the generated marimo notebooks themselves.
+- Preserve the public imports from `notebooks.api` and keep generated-notebook
+  behavior covered by the notebook and CLI suites.
+- Campaign notebook generation and artifact rules are owned by the nearest
+  campaign and OPAL instructions, not by this support-module scope.
 
-### Run/edit
+### Tests
 ```bash
 uv sync --locked
-
-uv run opal notebook generate -c src/dnadesign/opal/campaigns/<campaign>/configs/campaign.yaml \
-  --round latest --force
-uv run marimo check src/dnadesign/opal/campaigns/<campaign>/notebooks/*.py
-uv run opal notebook run -c src/dnadesign/opal/campaigns/<campaign>/configs/campaign.yaml
+uv run pytest -q src/dnadesign/opal/tests/notebooks \
+  src/dnadesign/opal/tests/cli/test_cli_notebook_generate.py
 ```

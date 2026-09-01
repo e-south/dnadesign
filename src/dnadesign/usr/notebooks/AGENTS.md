@@ -14,5 +14,5 @@ uv run marimo edit --sandbox --watch src/dnadesign/usr/notebooks/<notebook>.py
 
 ### Lint
 ```bash
-uv run marimo check --fix
+uv run marimo check src/dnadesign/usr/notebooks/*.py
 ```
