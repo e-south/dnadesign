@@ -19,6 +19,7 @@ import hashlib
 import io
 import json
 import math
+import os
 import stat
 from dataclasses import dataclass, field
 from enum import Enum
@@ -280,7 +281,11 @@ def parse_ligandmpnn_score_outputs(
     input_path = _within_root(root, request.pdb_path, field_name="pdb_path")
     if not input_path.is_file():
         raise ValueError(f"score input does not exist: {request.pdb_path}")
-    observed_input_sha256 = _sha256_file(input_path)
+    observed_input_sha256 = _sha256_descriptor_relative_regular_file(
+        root,
+        input_path.relative_to(root),
+        label="LigandMPNN input PDB",
+    )
     expected_input_sha256 = f"sha256:{request.pdb_sha256}"
     if observed_input_sha256 != expected_input_sha256:
         raise ValueError(f"input SHA256 mismatch: expected {expected_input_sha256}, observed {observed_input_sha256}")
@@ -751,12 +756,48 @@ def _command_sha256(command: LigandMpnnCommand) -> str:
     return _sha256_bytes(payload)
 
 
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+def _sha256_descriptor_relative_regular_file(
+    execution_root: Path,
+    relative_path: Path,
+    *,
+    label: str,
+) -> str:
+    """Hash one regular leaf through a no-follow descriptor chain."""
+
+    if relative_path.is_absolute() or not relative_path.name or ".." in relative_path.parts:
+        raise ValueError(f"{label} path must be a safe relative path")
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW
+    leaf_flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK
+    root_parts = execution_root.parts
+    if not execution_root.is_absolute() or not root_parts:
+        raise ValueError("execution_root must resolve to an absolute directory")
+    try:
+        directory_fd = os.open(execution_root.anchor, directory_flags)
+        try:
+            for component in (*root_parts[1:], *relative_path.parent.parts):
+                if component in {"", "."}:
+                    continue
+                next_fd = os.open(component, directory_flags, dir_fd=directory_fd)
+                os.close(directory_fd)
+                directory_fd = next_fd
+            leaf_fd = os.open(relative_path.name, leaf_flags, dir_fd=directory_fd)
+        finally:
+            os.close(directory_fd)
+    except FileNotFoundError as error:
+        raise ValueError(f"{label} does not exist: {relative_path}") from error
+    except OSError as error:
+        raise ValueError(f"{label} could not be opened safely: {relative_path}") from error
+    try:
+        if not stat.S_ISREG(os.fstat(leaf_fd).st_mode):
+            raise ValueError(f"{label} must be a regular file")
+        digest = hashlib.sha256()
+        while chunk := os.read(leaf_fd, 1024 * 1024):
             digest.update(chunk)
-    return f"sha256:{digest.hexdigest()}"
+        return f"sha256:{digest.hexdigest()}"
+    except OSError as error:
+        raise ValueError(f"{label} could not be read safely: {relative_path}") from error
+    finally:
+        os.close(leaf_fd)
 
 
 def _sha256_bytes(payload: bytes) -> str:

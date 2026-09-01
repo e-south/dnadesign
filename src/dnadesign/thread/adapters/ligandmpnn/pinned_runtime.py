@@ -1934,30 +1934,39 @@ def _verify_published_design_output(
 def _publish_score_output(source_path: Path, destination_path: Path) -> tuple[str, tuple[int, int]]:
     """Publish and durably commit one score without concurrent replacement."""
 
-    if source_path.is_symlink() or not source_path.is_file():
-        raise ValueError(f"pinned score execution did not produce a regular output: {source_path}")
-    source_flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
-    source_fd: int | None = None
     try:
-        source_fd = os.open(source_path, source_flags)
-        source_status = os.fstat(source_fd)
-        if not stat.S_ISREG(source_status.st_mode):
-            raise OSError("score output is not regular")
-        source_identity = (source_status.st_dev, source_status.st_ino)
-        digest = hashlib.sha256()
-        while payload := os.read(source_fd, 1024 * 1024):
-            digest.update(payload)
-        os.fsync(source_fd)
-        source_sha256 = f"sha256:{digest.hexdigest()}"
+        with open_regular_file(source_path) as source_handle:
+            source_status = os.fstat(source_handle.fileno())
+            source_identity = (source_status.st_dev, source_status.st_ino)
+            digest = hashlib.sha256()
+            while payload := source_handle.read(1024 * 1024):
+                digest.update(payload)
+            os.fsync(source_handle.fileno())
+            source_sha256 = f"sha256:{digest.hexdigest()}"
+            return _publish_open_score_output(
+                source_path,
+                destination_path,
+                source_identity=source_identity,
+                source_sha256=source_sha256,
+            )
+    except (FileNotFoundError, NonRegularFileError) as exc:
+        raise ValueError(f"pinned score execution did not produce a regular output: {source_path}") from exc
     except OSError as exc:
-        if source_fd is not None:
-            os.close(source_fd)
         raise ValueError(f"score output could not be read durably: {source_path}") from exc
+
+
+def _publish_open_score_output(
+    source_path: Path,
+    destination_path: Path,
+    *,
+    source_identity: tuple[int, int],
+    source_sha256: str,
+) -> tuple[str, tuple[int, int]]:
+    """Publish one descriptor-bound score after its content is made durable."""
+
     try:
         directory_fd = _open_directory_path(destination_path.parent, create=False)
     except OSError as exc:
-        if source_fd is not None:
-            os.close(source_fd)
         raise ValueError(f"score output could not be published atomically: {destination_path}") from exc
     try:
         try:
@@ -1975,10 +1984,12 @@ def _publish_score_output(source_path: Path, destination_path: Path) -> tuple[st
         try:
             destination_fd = os.open(
                 destination_path.name,
-                os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK,
                 dir_fd=directory_fd,
             )
             destination_status = os.fstat(destination_fd)
+            if not stat.S_ISREG(destination_status.st_mode):
+                raise OSError("published score output is not regular")
             destination_identity = (destination_status.st_dev, destination_status.st_ino)
             destination_digest = hashlib.sha256()
             while payload := os.read(destination_fd, 1024 * 1024):
@@ -2029,8 +2040,6 @@ def _publish_score_output(source_path: Path, destination_path: Path) -> tuple[st
         return source_sha256, source_identity
     finally:
         os.close(directory_fd)
-        if source_fd is not None:
-            os.close(source_fd)
 
 
 def _rollback_score_after_cleanup_failure(

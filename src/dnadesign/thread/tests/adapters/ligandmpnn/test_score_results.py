@@ -459,6 +459,45 @@ def test_parser_binds_exact_request_commands_inputs_and_raw_probabilities(tmp_pa
     assert receipt["context"]["observed_inventory"]["observed"]["effective_nucleotide_atom_count"] == 2
 
 
+def test_score_input_digest_rejects_fifo_after_path_check_without_blocking(tmp_path: Path) -> None:
+    input_path = tmp_path / "inputs/target.pdb"
+    input_path.parent.mkdir()
+    input_path.write_bytes(b"attested-input")
+
+    probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import os, sys\n"
+                "from pathlib import Path\n"
+                "import dnadesign.thread.adapters.ligandmpnn.score_results as module\n"
+                "root, relative_path = Path(sys.argv[1]), Path(sys.argv[2])\n"
+                "target = root / relative_path\n"
+                "assert target.is_file()\n"
+                "target.unlink()\n"
+                "os.mkfifo(target)\n"
+                "try:\n"
+                "    module._sha256_descriptor_relative_regular_file(\n"
+                "        root, relative_path, label='LigandMPNN input PDB'\n"
+                "    )\n"
+                "except ValueError as error:\n"
+                "    assert 'must be a regular file' in str(error)\n"
+                "else:\n"
+                "    raise SystemExit('nonregular score input was accepted')\n"
+            ),
+            str(tmp_path),
+            str(input_path.relative_to(tmp_path)),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=2,
+    )
+
+    assert probe.stderr == ""
+
+
 @pytest.mark.parametrize(
     "payload",
     [

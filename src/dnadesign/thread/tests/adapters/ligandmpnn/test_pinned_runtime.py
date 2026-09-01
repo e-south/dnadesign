@@ -1506,6 +1506,100 @@ def test_pinned_score_publication_binds_the_hashed_source_inode(
     assert published_score.read_text(encoding="utf-8") == "replacement-score"
 
 
+def test_pinned_score_publication_rejects_source_replaced_by_fifo_without_blocking(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "score.pt"
+    source.write_bytes(b"score")
+    destination = tmp_path / "published" / "score.pt"
+    destination.parent.mkdir()
+
+    probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import os, sys\n"
+                "from contextlib import contextmanager\n"
+                "from pathlib import Path\n"
+                "import dnadesign.thread.adapters.ligandmpnn.pinned_runtime as module\n"
+                "source, destination = Path(sys.argv[1]), Path(sys.argv[2])\n"
+                "original = module.open_regular_file\n"
+                "@contextmanager\n"
+                "def replace_before_open(path):\n"
+                "    if path == source:\n"
+                "        path.unlink()\n"
+                "        os.mkfifo(path)\n"
+                "    with original(path) as handle:\n"
+                "        yield handle\n"
+                "module.open_regular_file = replace_before_open\n"
+                "try:\n"
+                "    module._publish_score_output(source, destination)\n"
+                "except ValueError as error:\n"
+                "    assert 'did not produce a regular output' in str(error)\n"
+                "else:\n"
+                "    raise SystemExit('nonregular score output was accepted')\n"
+                "assert not destination.exists()\n"
+            ),
+            str(source),
+            str(destination),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=2,
+    )
+
+    assert probe.stderr == ""
+
+
+def test_pinned_score_publication_rejects_fifo_linked_after_source_open_without_blocking(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "score.pt"
+    source.write_bytes(b"score")
+    displaced_source = tmp_path / "opened-score.pt"
+    destination = tmp_path / "published" / "score.pt"
+    destination.parent.mkdir()
+
+    probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import os, stat, sys\n"
+                "from pathlib import Path\n"
+                "import dnadesign.thread.adapters.ligandmpnn.pinned_runtime as module\n"
+                "source, displaced, destination = map(Path, sys.argv[1:])\n"
+                "original_link = os.link\n"
+                "def replace_source_then_link(source_arg, destination_arg, *args, **kwargs):\n"
+                "    source_path = Path(source_arg)\n"
+                "    source_path.rename(displaced)\n"
+                "    os.mkfifo(source_path)\n"
+                "    original_link(source_arg, destination_arg, *args, **kwargs)\n"
+                "os.link = replace_source_then_link\n"
+                "try:\n"
+                "    module._publish_score_output(source, destination)\n"
+                "except module.LigandMpnnScorePublicationUncertainError as error:\n"
+                "    assert 'could not be verified' in str(error)\n"
+                "else:\n"
+                "    raise SystemExit('replacement FIFO publication was accepted')\n"
+                "assert displaced.read_bytes() == b'score'\n"
+                "assert stat.S_ISFIFO(destination.lstat().st_mode)\n"
+            ),
+            str(source),
+            str(displaced_source),
+            str(destination),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=2,
+    )
+
+    assert probe.stderr == ""
+
+
 def test_pinned_score_publication_preserves_replacement_installed_after_link(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
