@@ -1,7 +1,7 @@
 ## Developer Documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-09
+**Last verified:** 2026-09-01
 
 Use this index to find maintainer workflows, checks, and planning records.
 
@@ -15,6 +15,20 @@ detected automatically; CI supplies `.ci_changed_files.txt` so committed PR
 changes use their Git change dates. Scheduled review-age findings are advisory.
 
 Do not bump verification dates without reviewing the affected content.
+
+The documentation checker keeps one ordered CLI coordinator at
+`dnadesign.devtools.docs.checks`. Policy ownership is split by document
+contract:
+
+- `markdown_inventory`: Markdown discovery, headings, anchors, and links.
+- `document_metadata`: owner, verification, execution-plan, and catalog metadata.
+- `operations_contracts`: runbook examples, paths, transient artifacts, and operations terminology.
+- `public_surface_contracts`: root routes, tool catalogs, README structure, and public documentation language.
+- `banner_contracts`: banner catalog, placement, dimensions, and generated-source drift.
+
+`check_contracts` contains shared immutable policy values. New checks belong in
+the module that owns their document semantics; `checks.main()` only fixes their
+execution order and diagnostic precedence.
 
 ### Start here
 
