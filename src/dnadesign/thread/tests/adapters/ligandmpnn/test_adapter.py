@@ -1,0 +1,857 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/tests/adapters/ligandmpnn/test_adapter.py
+
+Behavior tests for LigandMPNN request and command adaptation.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import subprocess
+import sys
+import textwrap
+from dataclasses import replace
+from pathlib import Path
+
+import pytest
+
+import dnadesign.thread.adapters.ligandmpnn.commands as commands_module
+from dnadesign.thread.adapters.ligandmpnn import (
+    LigandMpnnContextInventoryReference,
+    LigandMpnnPackingConfig,
+    LigandMpnnRequest,
+    LigandMpnnResidue,
+    LigandMpnnResidueAlphabet,
+    LigandMpnnUpstreamPin,
+    build_ligandmpnn_commands,
+    build_planned_receipt,
+    load_ligandmpnn_context_inventory,
+    materialize_residue_alphabet_sidecar,
+)
+from dnadesign.thread.tests.adapters.ligandmpnn._context_inventory import (
+    create_pinned_context_checkout,
+    write_context_inventory,
+)
+
+_DIGEST = "a" * 64
+_PACKING_DIGEST = "b" * 64
+_COMMIT = "26ec57ac976ade5379920dbd43c7f97a91cf82de"  # pragma: allowlist secret
+_CONTEXT_PDB_PAYLOAD = b"ATOM pinned context input\n"
+
+
+def test_torch_independent_public_surface_imports_without_torch() -> None:
+    script = textwrap.dedent(
+        """
+        import importlib.abc
+        import sys
+
+        class BlockTorch(importlib.abc.MetaPathFinder):
+            def find_spec(self, fullname, path=None, target=None):
+                if fullname == "torch" or fullname.startswith("torch."):
+                    raise ModuleNotFoundError("No module named 'torch'", name="torch")
+                return None
+
+        sys.meta_path.insert(0, BlockTorch())
+        from dnadesign.thread.adapters.ligandmpnn import (
+            LigandMpnnRequest,
+            LigandMpnnScoreRequest,
+            preflight_ligandmpnn,
+        )
+        assert LigandMpnnRequest is not None
+        assert LigandMpnnScoreRequest is not None
+        assert callable(preflight_ligandmpnn)
+        assert "torch" not in sys.modules
+
+        try:
+            from dnadesign.thread.adapters.ligandmpnn import LigandMpnnScoreOutput
+        except ModuleNotFoundError as error:
+            assert error.name == "torch"
+        else:
+            raise AssertionError("scoring output API unexpectedly imported without Torch")
+        """
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        text=True,
+        capture_output=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+
+
+def _write_context_input(root: Path) -> str:
+    path = root / "inputs/target.pdb"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(_CONTEXT_PDB_PAYLOAD)
+    return hashlib.sha256(_CONTEXT_PDB_PAYLOAD).hexdigest()
+
+
+def _request(**overrides: object) -> LigandMpnnRequest:
+    values: dict[str, object] = {
+        "request_id": "generic_binding_site_v1",
+        "pdb_path": Path("inputs/target.pdb"),
+        "pdb_sha256": _DIGEST,
+        "output_dir": Path("outputs/designs"),
+        "upstream": LigandMpnnUpstreamPin(
+            commit=_COMMIT,
+            checkpoint_sha256=_DIGEST,
+            packing_checkpoint_sha256=_PACKING_DIGEST,
+        ),
+        "context_inventory": LigandMpnnContextInventoryReference(
+            path=Path("evidence/context-inventory.json"), sha256=_DIGEST
+        ),
+        "fixed_residues": (
+            LigandMpnnResidue(chain_id="A", residue_number=12),
+            LigandMpnnResidue(chain_id="A", residue_number=13, insertion_code="B"),
+        ),
+        "seeds": (7, 11),
+        "temperature": 0.2,
+        "batch_size": 2,
+        "number_of_batches": 3,
+        "use_atom_context": False,
+        "use_side_chain_context": True,
+        "packing": LigandMpnnPackingConfig(
+            enabled=True,
+            number_of_packs_per_design=4,
+            repack_everything=False,
+            use_ligand_context=True,
+        ),
+    }
+    values.update(overrides)
+    return LigandMpnnRequest(**values)  # type: ignore[arg-type]
+
+
+def _validated_request(tmp_path: Path, **overrides: object) -> tuple[LigandMpnnRequest, Path]:
+    checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
+    pdb_sha256 = _write_context_input(tmp_path)
+    parse_all_atoms = bool(overrides.get("use_side_chain_context", True))
+    context_inventory = write_context_inventory(
+        tmp_path,
+        input_path=Path("inputs/target.pdb"),
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=parse_all_atoms,
+        parser_sha256=parser_sha256,
+    )
+    values: dict[str, object] = {
+        "pdb_sha256": pdb_sha256,
+        "context_inventory": context_inventory,
+        "upstream": LigandMpnnUpstreamPin(
+            commit=commit,
+            checkpoint_sha256=_DIGEST,
+            packing_checkpoint_sha256=_PACKING_DIGEST,
+        ),
+    }
+    values.update(overrides)
+    return _request(**values), checkout_root
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value", "message"),
+    [
+        ("pdb_path", Path("/tmp/target.pdb"), "safe non-option relative"),
+        ("pdb_path", Path("~/target.pdb"), "safe non-option relative"),
+        ("pdb_path", Path("-option-like-input.pdb"), "safe non-option relative"),
+        ("output_dir", Path("/tmp/designs"), "safe non-option relative"),
+        ("output_dir", Path("~/designs"), "safe non-option relative"),
+        ("output_dir", Path("-option-like-output"), "must not begin with a hyphen"),
+        ("output_dir", Path("results/../designs"), "must not contain traversal"),
+    ],
+)
+def test_request_rejects_paths_that_cannot_round_trip_through_runtime_argv(
+    field_name: str,
+    value: Path,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        _request(**{field_name: value})
+
+
+def test_request_preserves_valid_nested_relative_output_directory(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path, output_dir=Path("results/nested/designs"))
+
+    command = build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)[0]
+
+    assert command.output_dir == Path("results/nested/designs/seed_7")
+    assert command.argv[command.argv.index("--out_folder") + 1] == "results/nested/designs/seed_7"
+
+
+def test_build_commands_rejects_pdb_nested_inside_per_seed_output(tmp_path: Path) -> None:
+    checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
+    pdb_path = Path("outputs/designs/seed_7/target.pdb")
+    absolute_pdb_path = tmp_path / pdb_path
+    absolute_pdb_path.parent.mkdir(parents=True)
+    absolute_pdb_path.write_bytes(_CONTEXT_PDB_PAYLOAD)
+    pdb_sha256 = hashlib.sha256(_CONTEXT_PDB_PAYLOAD).hexdigest()
+    context_inventory = write_context_inventory(
+        tmp_path,
+        input_path=pdb_path,
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=True,
+        parser_sha256=parser_sha256,
+    )
+    request = _request(
+        pdb_path=pdb_path,
+        pdb_sha256=pdb_sha256,
+        context_inventory=context_inventory,
+        upstream=LigandMpnnUpstreamPin(
+            commit=commit,
+            checkpoint_sha256=_DIGEST,
+            packing_checkpoint_sha256=_PACKING_DIGEST,
+        ),
+        seeds=(7,),
+    )
+
+    with pytest.raises(ValueError, match="pdb_path.*per-seed output"):
+        build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
+
+
+def test_build_commands_rejects_materialized_sidecar_nested_inside_per_seed_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    residue = LigandMpnnResidue(chain_id="A", residue_number=12)
+    request, checkout_root = _validated_request(
+        tmp_path,
+        fixed_residues=(),
+        redesigned_residues=(residue,),
+        residue_alphabets=(
+            LigandMpnnResidueAlphabet(
+                residue=residue,
+                allowed_amino_acids=("A", "G"),
+            ),
+        ),
+        seeds=(7,),
+    )
+    sidecar = materialize_residue_alphabet_sidecar(
+        request,
+        Path("evidence/residue-alphabets.json"),
+        write_path=Path("outputs/designs/seed_7/materialized-residue-alphabets.json"),
+    )
+
+    with pytest.raises(ValueError, match="materialized_path.*per-seed output"):
+        build_ligandmpnn_commands(
+            request,
+            checkout_root=checkout_root,
+            execution_root=tmp_path,
+            residue_alphabet_sidecar=sidecar,
+        )
+
+
+def test_build_commands_rejects_absolute_python_executable_nested_inside_per_seed_output(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path, seeds=(7,))
+    executable_path = tmp_path / "outputs/designs/seed_7/bin/python"
+    executable_path.parent.mkdir(parents=True)
+    executable_path.hardlink_to(Path(sys.executable))
+
+    with pytest.raises(ValueError, match="python_executable.*per-seed output"):
+        build_ligandmpnn_commands(
+            request,
+            checkout_root=checkout_root,
+            execution_root=tmp_path,
+            python_executable=str(executable_path),
+        )
+
+
+def test_build_commands_resolves_relative_python_executable_against_process_cwd(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request, checkout_root = _validated_request(tmp_path, seeds=(7,))
+    foreign_cwd = tmp_path / "foreign-cwd"
+    executable_path = foreign_cwd / "outputs/designs/seed_7/bin/python"
+    executable_path.parent.mkdir(parents=True)
+    executable_path.hardlink_to(Path(sys.executable))
+    monkeypatch.chdir(foreign_cwd)
+
+    command = build_ligandmpnn_commands(
+        request,
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
+        python_executable="outputs/designs/seed_7/bin/python",
+    )[0]
+
+    assert command.argv[0] == "outputs/designs/seed_7/bin/python"
+
+
+def test_build_commands_rejects_relative_python_executable_traversing_into_per_seed_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request, checkout_root = _validated_request(tmp_path, seeds=(7,))
+    launcher_cwd = tmp_path / "launcher"
+    launcher_cwd.mkdir()
+    monkeypatch.chdir(launcher_cwd)
+
+    with pytest.raises(ValueError, match="python_executable.*per-seed output"):
+        build_ligandmpnn_commands(
+            request,
+            checkout_root=checkout_root,
+            execution_root=tmp_path,
+            python_executable="../outputs/designs/seed_7/bin/python",
+        )
+
+
+def test_build_commands_does_not_anchor_bare_python_command_name(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path, seeds=(7,))
+
+    command = build_ligandmpnn_commands(
+        request,
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
+        python_executable="python",
+    )[0]
+
+    assert command.argv[0] == "python"
+
+
+def test_command_input_guard_inventory_matches_all_construction_and_runtime_reads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    residue = LigandMpnnResidue(chain_id="A", residue_number=12)
+    request, checkout_root = _validated_request(
+        tmp_path,
+        fixed_residues=(),
+        redesigned_residues=(residue,),
+        residue_alphabets=(
+            LigandMpnnResidueAlphabet(
+                residue=residue,
+                allowed_amino_acids=("A", "G"),
+            ),
+        ),
+        seeds=(7,),
+    )
+    sidecar_path = Path("evidence/residue-alphabets.json")
+    materialized_path = tmp_path / "staging/residue-alphabets.json"
+    sidecar = materialize_residue_alphabet_sidecar(
+        request,
+        sidecar_path,
+        write_path=materialized_path,
+    )
+    launcher_cwd = tmp_path / "launcher"
+    launcher_cwd.mkdir()
+    monkeypatch.chdir(launcher_cwd)
+
+    guarded_paths = commands_module._command_input_paths(
+        request,
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
+        python_executable="tools/python",
+        residue_alphabet_sidecar=sidecar,
+    )
+
+    assert guarded_paths == {
+        "checkout_root": checkout_root,
+        "pdb_path": tmp_path / request.pdb_path,
+        "context inventory path": tmp_path / request.context_inventory.path,
+        "python_executable": launcher_cwd / "tools/python",
+        "residue alphabet sidecar path": tmp_path / sidecar_path,
+        "residue alphabet sidecar materialized_path": materialized_path,
+    }
+
+
+def test_build_commands_resolves_relative_checkout_against_execution_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request, checkout_root = _validated_request(tmp_path, packing=LigandMpnnPackingConfig())
+    option_looking_checkout = checkout_root.with_name("-checkout")
+    checkout_root.rename(option_looking_checkout)
+    checkout_root = option_looking_checkout
+    relative_checkout = checkout_root.relative_to(tmp_path)
+    foreign_cwd = tmp_path / "foreign-cwd"
+    foreign_cwd.mkdir()
+    monkeypatch.chdir(foreign_cwd)
+
+    command = build_ligandmpnn_commands(
+        request,
+        checkout_root=relative_checkout,
+        execution_root=tmp_path,
+        python_executable=sys.executable,
+    )[0]
+
+    assert command.argv[command.argv.index("--checkout-root") + 1] == str(checkout_root)
+    assert "--checkout-root=-checkout" not in command.argv
+    assert command.argv[command.argv.index("--checkpoint_ligand_mpnn") + 1] == str(
+        checkout_root / request.upstream.checkpoint_path
+    )
+
+
+@pytest.mark.parametrize("checkout_root", [Path("../LigandMPNN"), Path("~/LigandMPNN")])
+def test_build_commands_rejects_escaping_relative_checkout_root(
+    tmp_path: Path,
+    checkout_root: Path,
+) -> None:
+    request, _absolute_checkout = _validated_request(tmp_path, packing=LigandMpnnPackingConfig())
+
+    with pytest.raises(ValueError, match="relative checkout_root"):
+        build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
+
+
+def test_build_commands_declares_exact_official_ligandmpnn_flags_per_seed(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path)
+
+    commands = build_ligandmpnn_commands(
+        request,
+        checkout_root=checkout_root,
+        execution_root=tmp_path,
+        python_executable="python3",
+    )
+
+    assert len(commands) == 2
+    planned_execution_sha256 = commands[0].argv[commands[0].argv.index("--planned-execution-sha256") + 1]
+    assert len(planned_execution_sha256) == 64
+    assert commands[0].argv == (
+        "python3",
+        "-m",
+        "dnadesign.thread.adapters.ligandmpnn.pinned_runtime",
+        "--checkout-root",
+        str(checkout_root),
+        "--upstream-commit",
+        request.upstream.commit,
+        "--checkpoint-sha256",
+        _DIGEST,
+        "--pdb-sha256",
+        request.pdb_sha256,
+        "--request-id",
+        request.request_id,
+        "--execution-root",
+        str(tmp_path),
+        "--context-inventory-path",
+        request.context_inventory.path.as_posix(),
+        "--context-inventory-sha256",
+        request.context_inventory.sha256,
+        "--packing-checkpoint-sha256",
+        _PACKING_DIGEST,
+        "--planned-execution-sha256",
+        planned_execution_sha256,
+        "--completion-record",
+        "outputs/designs/seed_7/.dnadesign-ligandmpnn-execution.json",
+        "--entrypoint",
+        "run.py",
+        "--",
+        "--model_type",
+        "ligand_mpnn",
+        "--checkpoint_ligand_mpnn",
+        str(checkout_root / "model_params/ligandmpnn_v_32_010_25.pt"),
+        "--pdb_path",
+        "inputs/target.pdb",
+        "--out_folder",
+        "outputs/designs/seed_7",
+        "--seed",
+        "7",
+        "--temperature",
+        "0.2",
+        "--batch_size",
+        "2",
+        "--number_of_batches",
+        "3",
+        "--ligand_mpnn_use_atom_context",
+        "0",
+        "--ligand_mpnn_use_side_chain_context",
+        "1",
+        "--fixed_residues",
+        "A12 A13B",
+        "--pack_side_chains",
+        "1",
+        "--number_of_packs_per_design",
+        "4",
+        "--repack_everything",
+        "0",
+        "--pack_with_ligand_context",
+        "1",
+        "--checkpoint_path_sc",
+        str(checkout_root / "model_params/ligandmpnn_sc_v_32_002_16.pt"),
+    )
+    assert commands[1].seed == 11
+    assert commands[1].argv[commands[1].argv.index("--seed") + 1] == "11"
+    assert request.expected_sequence_count == 12
+
+
+def test_redesigned_residues_use_the_distinct_official_flag(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(
+        tmp_path,
+        fixed_residues=(),
+        redesigned_residues=(LigandMpnnResidue(chain_id="B", residue_number=-2, insertion_code="A"),),
+        packing=LigandMpnnPackingConfig(),
+    )
+
+    argv = build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)[0].argv
+
+    assert "--fixed_residues" not in argv
+    assert argv[argv.index("--redesigned_residues") + 1] == "B-2A"
+    assert argv[argv.index("--pack_side_chains") + 1] == "0"
+
+
+@pytest.mark.parametrize(
+    ("field_name", "residue"),
+    [
+        ("fixed_residues", LigandMpnnResidue("B", 12)),
+        ("fixed_residues", LigandMpnnResidue("A", 14)),
+        ("fixed_residues", LigandMpnnResidue("A", 13, "A")),
+        ("redesigned_residues", LigandMpnnResidue("B", 12)),
+        ("redesigned_residues", LigandMpnnResidue("A", 14)),
+        ("redesigned_residues", LigandMpnnResidue("A", 13, "A")),
+    ],
+)
+def test_build_commands_rejects_selectors_absent_from_pinned_parser_protein_identities(
+    tmp_path: Path,
+    field_name: str,
+    residue: LigandMpnnResidue,
+) -> None:
+    selection = {"fixed_residues": (), "redesigned_residues": ()}
+    selection[field_name] = (residue,)
+    request, checkout_root = _validated_request(tmp_path, **selection)
+
+    with pytest.raises(ValueError, match=rf"{field_name}.*{residue.upstream_id}.*not present"):
+        build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
+
+
+def test_build_commands_rejects_pdb_under_symlinked_ancestor_before_emission(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path)
+    original_inputs = tmp_path / "original-inputs"
+    (tmp_path / "inputs").rename(original_inputs)
+    (tmp_path / "inputs").symlink_to(original_inputs, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="context probe input could not be opened safely"):
+        build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
+
+
+def test_command_preserves_requested_temperature_precision(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path, temperature=0.123456789)
+
+    argv = build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)[0].argv
+
+    assert argv[argv.index("--temperature") + 1] == "0.123456789"
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"temperature": float("nan")}, "temperature must be finite and positive"),
+        ({"batch_size": 0}, "batch_size must be positive"),
+        (
+            {"redesigned_residues": (LigandMpnnResidue("B", 2),)},
+            "fixed_residues and redesigned_residues are mutually exclusive",
+        ),
+        (
+            {"fixed_residues": (LigandMpnnResidue("A", 12), LigandMpnnResidue("A", 12))},
+            "fixed_residues contains duplicate residue A12",
+        ),
+    ],
+)
+def test_request_rejects_ambiguous_or_nondeterministic_inputs(overrides: dict[str, object], message: str) -> None:
+    with pytest.raises(ValueError, match=message):
+        _request(**overrides)
+
+
+@pytest.mark.parametrize("seeds", [(-1,), (0,), (2**32,), (True,), (1.5,)])
+def test_design_request_rejects_seeds_outside_upstream_deterministic_domain(seeds: tuple[object, ...]) -> None:
+    with pytest.raises(ValueError, match="integers from 1 through 4294967295"):
+        _request(seeds=seeds)
+
+
+@pytest.mark.parametrize("seeds", [(), [1]])
+def test_design_request_requires_nonempty_seed_tuple(seeds: object) -> None:
+    with pytest.raises(ValueError, match="nonempty tuple"):
+        _request(seeds=seeds)
+
+
+def test_design_request_emits_deterministic_seed_boundaries(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(
+        tmp_path,
+        seeds=(1, 2**32 - 1),
+        packing=LigandMpnnPackingConfig(),
+    )
+
+    commands = build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
+
+    assert [command.seed for command in commands] == [1, 4294967295]
+    assert [command.argv[command.argv.index("--seed") + 1] for command in commands] == ["1", "4294967295"]
+
+
+def test_request_rejects_untyped_upstream_even_when_packing_is_disabled() -> None:
+    with pytest.raises(ValueError, match="upstream must be a LigandMpnnUpstreamPin"):
+        _request(upstream="unpinned", packing=LigandMpnnPackingConfig())
+
+
+@pytest.mark.parametrize("field_name", ["checkpoint_path", "packing_checkpoint_path"])
+def test_upstream_pin_rejects_tilde_prefixed_checkpoint_paths(field_name: str) -> None:
+    values = {
+        "commit": _COMMIT,
+        "checkpoint_sha256": _DIGEST,
+        "checkpoint_path": Path("model_params/design.pt"),
+        "packing_checkpoint_path": Path("model_params/packing.pt"),
+    }
+    values[field_name] = Path("~/weights.pt")
+
+    with pytest.raises(ValueError, match=rf"{field_name} must be a checkout-relative file path"):
+        LigandMpnnUpstreamPin(**values)
+
+
+def test_residue_identifier_rejects_non_pdb_chain_or_insertion_codes() -> None:
+    with pytest.raises(ValueError, match="chain_id must be one ASCII alphanumeric character"):
+        LigandMpnnResidue(chain_id="AA", residue_number=1)
+    with pytest.raises(ValueError, match="insertion_code must be one ASCII letter"):
+        LigandMpnnResidue(chain_id="A", residue_number=1, insertion_code="BC")
+    with pytest.raises(ValueError, match="insertion_code must be one ASCII letter"):
+        LigandMpnnResidue(chain_id="A", residue_number=1, insertion_code="2")
+
+
+@pytest.mark.parametrize("chain_id", ["é", "１", "١"])
+def test_residue_identifier_rejects_non_ascii_alphanumeric_chain_ids(chain_id: str) -> None:
+    with pytest.raises(ValueError, match="chain_id must be one ASCII alphanumeric character"):
+        LigandMpnnResidue(chain_id=chain_id, residue_number=12)
+
+
+@pytest.mark.parametrize("chain_id", ["A", "z", "0"])
+def test_residue_identifier_preserves_ascii_alphanumeric_chain_ids(chain_id: str) -> None:
+    assert LigandMpnnResidue(chain_id=chain_id, residue_number=12).upstream_id == f"{chain_id}12"
+
+
+def test_planned_receipt_is_normalized_and_records_no_execution_claim(tmp_path: Path) -> None:
+    checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
+    pdb_sha256 = _write_context_input(tmp_path)
+    context_inventory = write_context_inventory(
+        tmp_path,
+        input_path=Path("inputs/target.pdb"),
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=True,
+        parser_sha256=parser_sha256,
+    )
+    request = _request(
+        pdb_sha256=pdb_sha256,
+        context_inventory=context_inventory,
+        upstream=LigandMpnnUpstreamPin(
+            commit=commit,
+            checkpoint_sha256=_DIGEST,
+            packing_checkpoint_sha256=_PACKING_DIGEST,
+        ),
+    )
+    commands = build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
+
+    receipt = build_planned_receipt(
+        request,
+        commands,
+        execution_root=tmp_path,
+        checkout_root=checkout_root,
+    )
+
+    payload = receipt.to_dict()
+    assert payload["schema_id"] == "thread.ligandmpnn.run_receipt"
+    assert payload["status"] == "planned_not_run"
+    assert payload["model_type"] == "ligand_mpnn"
+    assert payload["schema_version"] == 2
+    assert payload["expected_sequence_count"] == 12
+    assert payload["provenance"] == {
+        "upstream_repository": "https://github.com/dauparas/LigandMPNN",
+        "upstream_commit": commit,
+        "checkpoint_sha256": f"sha256:{_DIGEST}",
+        "packing_checkpoint_sha256": f"sha256:{_PACKING_DIGEST}",
+    }
+    assert payload["commands"][0]["argv"][0] == "python"
+    assert payload["input"] == {"path": "inputs/target.pdb", "sha256": f"sha256:{pdb_sha256}"}
+    assert payload["context_inventory"] == {
+        "path": "evidence/context-inventory.json",
+        "sha256": f"sha256:{context_inventory.sha256}",
+    }
+
+
+def test_planned_receipt_rejects_missing_or_partial_command_sets(tmp_path: Path) -> None:
+    checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
+    pdb_sha256 = _write_context_input(tmp_path)
+    context_inventory = write_context_inventory(
+        tmp_path,
+        input_path=Path("inputs/target.pdb"),
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=True,
+        parser_sha256=parser_sha256,
+    )
+    request = _request(
+        pdb_sha256=pdb_sha256,
+        context_inventory=context_inventory,
+        upstream=LigandMpnnUpstreamPin(
+            commit=commit,
+            checkpoint_sha256=_DIGEST,
+            packing_checkpoint_sha256=_PACKING_DIGEST,
+        ),
+    )
+    commands = build_ligandmpnn_commands(request, checkout_root=checkout_root, execution_root=tmp_path)
+
+    for supplied in ((), commands[:-1]):
+        with pytest.raises(ValueError, match="commands do not match the deterministic request command set"):
+            build_planned_receipt(
+                request,
+                supplied,
+                execution_root=tmp_path,
+                checkout_root=checkout_root,
+            )
+
+
+@pytest.mark.parametrize(
+    ("input_path", "input_sha256", "upstream_commit", "parse_all_atoms", "message"),
+    [
+        (
+            Path("inputs/other.pdb"),
+            "d" * 64,
+            _COMMIT,
+            True,
+            "context inventory input identity does not match request",
+        ),
+        (
+            Path("inputs/target.pdb"),
+            _DIGEST,
+            "d" * 40,
+            True,
+            "context inventory upstream commit does not match request",
+        ),
+        (
+            Path("inputs/target.pdb"),
+            _DIGEST,
+            _COMMIT,
+            False,
+            "context inventory parse_all_atoms does not match side-chain-context mode",
+        ),
+    ],
+)
+def test_planned_receipt_rejects_context_inventory_for_different_request(
+    tmp_path: Path,
+    input_path: Path,
+    input_sha256: str,
+    upstream_commit: str,
+    parse_all_atoms: bool,
+    message: str,
+) -> None:
+    checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
+    inventory_commit = commit if upstream_commit == _COMMIT else upstream_commit
+    context_inventory = write_context_inventory(
+        tmp_path,
+        input_path=input_path,
+        input_sha256=input_sha256,
+        upstream_commit=inventory_commit,
+        parse_all_atoms=parse_all_atoms,
+        parser_sha256=parser_sha256,
+    )
+    request = _request(
+        context_inventory=context_inventory,
+        upstream=LigandMpnnUpstreamPin(
+            commit=commit,
+            checkpoint_sha256=_DIGEST,
+            packing_checkpoint_sha256=_PACKING_DIGEST,
+        ),
+    )
+    with pytest.raises(ValueError, match=message):
+        build_ligandmpnn_commands(
+            request,
+            checkout_root=checkout_root,
+            execution_root=tmp_path,
+        )
+
+
+def test_planned_receipt_rejects_inventory_from_different_parser_blob(tmp_path: Path) -> None:
+    checkout_root, commit, _parser_sha256 = create_pinned_context_checkout(tmp_path)
+    context_inventory = write_context_inventory(
+        tmp_path,
+        input_path=Path("inputs/target.pdb"),
+        input_sha256=_DIGEST,
+        upstream_commit=commit,
+        parse_all_atoms=True,
+        parser_sha256="d" * 64,
+    )
+    request = _request(
+        context_inventory=context_inventory,
+        upstream=LigandMpnnUpstreamPin(
+            commit=commit,
+            checkpoint_sha256=_DIGEST,
+            packing_checkpoint_sha256=_PACKING_DIGEST,
+        ),
+    )
+    with pytest.raises(ValueError, match="parser digest does not match pinned upstream commit"):
+        build_ligandmpnn_commands(
+            request,
+            checkout_root=checkout_root,
+            execution_root=tmp_path,
+        )
+
+
+def test_planned_receipt_rejects_self_asserted_context_atoms(tmp_path: Path) -> None:
+    checkout_root, commit, parser_sha256 = create_pinned_context_checkout(tmp_path)
+    pdb_payload = b"ATOM pinned context input\n"
+    pdb_path = tmp_path / "inputs/target.pdb"
+    pdb_path.parent.mkdir(parents=True)
+    pdb_path.write_bytes(pdb_payload)
+    pdb_sha256 = hashlib.sha256(pdb_payload).hexdigest()
+    reference = write_context_inventory(
+        tmp_path,
+        input_path=Path("inputs/target.pdb"),
+        input_sha256=pdb_sha256,
+        upstream_commit=commit,
+        parse_all_atoms=True,
+        parser_sha256=parser_sha256,
+    )
+    inventory = load_ligandmpnn_context_inventory(reference, execution_root=tmp_path)
+    forged_atom = replace(
+        inventory.atoms[0],
+        serial=2,
+        atom_name="O5'",
+        element="O",
+        upstream_element_type=8,
+    )
+    forged_inventory = replace(inventory, atoms=(*inventory.atoms, forged_atom))
+    forged_payload = (json.dumps(forged_inventory.to_dict(), indent=2, sort_keys=True) + "\n").encode()
+    (tmp_path / reference.path).write_bytes(forged_payload)
+    forged_reference = LigandMpnnContextInventoryReference(
+        path=reference.path,
+        sha256=hashlib.sha256(forged_payload).hexdigest(),
+    )
+    request = _request(
+        pdb_sha256=pdb_sha256,
+        context_inventory=forged_reference,
+        upstream=LigandMpnnUpstreamPin(
+            commit=commit,
+            checkpoint_sha256=_DIGEST,
+            packing_checkpoint_sha256=_PACKING_DIGEST,
+        ),
+    )
+    with pytest.raises(ValueError, match="context inventory does not match pinned parser derivation"):
+        build_ligandmpnn_commands(
+            request,
+            checkout_root=checkout_root,
+            execution_root=tmp_path,
+        )
+
+
+def test_command_builder_rejects_missing_context_inventory(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path)
+    (tmp_path / request.context_inventory.path).unlink()
+
+    with pytest.raises(ValueError, match="context inventory does not exist"):
+        build_ligandmpnn_commands(
+            request,
+            checkout_root=checkout_root,
+            execution_root=tmp_path,
+        )
+
+
+def test_command_builder_rejects_tampered_context_inventory_bytes(tmp_path: Path) -> None:
+    request, checkout_root = _validated_request(tmp_path)
+    (tmp_path / request.context_inventory.path).write_bytes(b"tampered")
+
+    with pytest.raises(ValueError, match="context inventory SHA256 mismatch"):
+        build_ligandmpnn_commands(
+            request,
+            checkout_root=checkout_root,
+            execution_root=tmp_path,
+        )
