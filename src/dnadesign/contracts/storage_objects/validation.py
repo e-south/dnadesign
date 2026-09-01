@@ -51,6 +51,10 @@ _CoordinationState = tuple[
 _RoutedObject = tuple[Path, ObjectKind, str, tuple[_StorageTreeEntryState, ...]]
 
 
+class _StorageSnapshotInconsistent(StorageObjectError):
+    """Signal one internally inconsistent filesystem snapshot."""
+
+
 def resolve_storage_path(path: Path, *, label: str, strict: bool = False) -> Path:
     """Resolve one contract path while normalizing filesystem-loop failures."""
 
@@ -95,6 +99,7 @@ def _read_stable_regular_bytes(
     *,
     label: str,
     change_message: str,
+    expected_identity: tuple[int, int],
 ) -> bytes:
     """Read one regular file while binding bytes to stable metadata."""
 
@@ -102,7 +107,10 @@ def _read_stable_regular_bytes(
         before = path.stat(follow_symlinks=False)
         if not stat.S_ISREG(before.st_mode):
             raise StorageObjectError(f"{label} must remain a regular file: {path}")
-        content = path.read_bytes()
+        with path.open("rb") as handle:
+            opened = os.fstat(handle.fileno())
+            content = handle.read()
+            read_after = os.fstat(handle.fileno())
         after = path.stat(follow_symlinks=False)
     except StorageObjectError:
         raise
@@ -116,6 +124,22 @@ def _read_stable_regular_bytes(
         before.st_mtime_ns,
         before.st_ctime_ns,
     )
+    opened_state = (
+        opened.st_dev,
+        opened.st_ino,
+        opened.st_size,
+        opened.st_mode,
+        opened.st_mtime_ns,
+        opened.st_ctime_ns,
+    )
+    read_after_state = (
+        read_after.st_dev,
+        read_after.st_ino,
+        read_after.st_size,
+        read_after.st_mode,
+        read_after.st_mtime_ns,
+        read_after.st_ctime_ns,
+    )
     after_state = (
         after.st_dev,
         after.st_ino,
@@ -124,8 +148,14 @@ def _read_stable_regular_bytes(
         after.st_mtime_ns,
         after.st_ctime_ns,
     )
-    if not stat.S_ISREG(after.st_mode) or after_state != before_state:
+    snapshots = (before, opened, read_after, after)
+    if any(
+        not stat.S_ISREG(snapshot.st_mode) or (snapshot.st_dev, snapshot.st_ino) != expected_identity
+        for snapshot in snapshots
+    ):
         raise StorageObjectError(change_message)
+    if opened_state != before_state or read_after_state != opened_state or after_state != before_state:
+        raise _StorageSnapshotInconsistent(change_message)
     return content
 
 
@@ -141,6 +171,7 @@ def _recheck_verified_manifest(verified: VerifiedStorageObject) -> None:
         manifest_path,
         label="storage object manifest",
         change_message="storage object manifest changed during root validation; retry while producers are quiescent",
+        expected_identity=(verified.manifest_device_id, verified.manifest_inode),
     )
     if _sha256_bytes(manifest_bytes) != verified.manifest_digest:
         raise StorageObjectError(
@@ -187,9 +218,10 @@ def _storage_tree_paths(root: Path) -> tuple[tuple[Path, ...], tuple[Path, ...]]
     """Return regular files and directories while rejecting unsafe entries."""
 
     def _raise_walk_error(error: OSError) -> None:
-        raise StorageObjectError(
-            f"cannot traverse storage object: {error.filename or root}: {error.strerror or error}"
-        ) from error
+        message = f"cannot traverse storage object: {error.filename or root}: {error.strerror or error}"
+        if isinstance(error, FileNotFoundError):
+            raise _StorageSnapshotInconsistent(message) from error
+        raise StorageObjectError(message) from error
 
     files: list[Path] = []
     directories: list[Path] = []
@@ -225,6 +257,8 @@ def _storage_tree_paths(root: Path) -> tuple[tuple[Path, ...], tuple[Path, ...]]
                 raise StorageObjectError(f"symlink is not allowed: {relative}")
             try:
                 mode = path.lstat().st_mode
+            except FileNotFoundError as exc:
+                raise _StorageSnapshotInconsistent(f"cannot inspect storage entry: {relative}: {exc}") from exc
             except OSError as exc:
                 raise StorageObjectError(f"cannot inspect storage entry: {relative}: {exc}") from exc
             if not stat.S_ISREG(mode):
@@ -272,6 +306,8 @@ def _storage_tree_state(
         relative = "." if path == root else path.relative_to(root).as_posix()
         try:
             entry_stat = path.stat(follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise _StorageSnapshotInconsistent(f"cannot inspect storage entry: {relative}: {exc}") from exc
         except OSError as exc:
             raise StorageObjectError(f"cannot inspect storage entry: {relative}: {exc}") from exc
         is_coordination_lock = path.parent == root and path.name == LOCK_NAME
@@ -296,22 +332,34 @@ def _verify_resource(root: Path, resource: StoredResource) -> VerifiedStoredReso
     source_path = root / resource.relative_path
     if source_path.is_symlink():
         raise StorageObjectError(f"symlink is not allowed: {resource.relative_path}")
-    resolved = resolve_storage_path(
-        source_path,
-        label=f"declared resource {resource.relative_path}",
-        strict=True,
-    )
+    try:
+        resolved = resolve_storage_path(
+            source_path,
+            label=f"declared resource {resource.relative_path}",
+            strict=True,
+        )
+    except StorageObjectError as exc:
+        if isinstance(exc.__cause__, FileNotFoundError):
+            raise _StorageSnapshotInconsistent(str(exc)) from exc.__cause__
+        raise
     try:
         resolved.relative_to(root)
     except ValueError as exc:
         raise StorageObjectError(f"declared resource escapes storage root: {resource.relative_path}") from exc
     try:
         initial_stat = resolved.stat(follow_symlinks=False)
+    except FileNotFoundError as exc:
+        raise _StorageSnapshotInconsistent(f"cannot inspect storage resource {resource.relative_path}: {exc}") from exc
     except OSError as exc:
         raise StorageObjectError(f"cannot inspect storage resource {resource.relative_path}: {exc}") from exc
     if not stat.S_ISREG(initial_stat.st_mode):
         raise StorageObjectError(f"declared resource is not a file: {resource.relative_path}")
-    observed_digest = _sha256(resolved)
+    try:
+        observed_digest = _sha256(resolved)
+    except StorageObjectError as exc:
+        if isinstance(exc.__cause__, FileNotFoundError):
+            raise _StorageSnapshotInconsistent(str(exc)) from exc.__cause__
+        raise
     if observed_digest != resource.digest:
         raise StorageObjectError(
             f"declared resource digest mismatch for {resource.relative_path}: "
@@ -319,6 +367,8 @@ def _verify_resource(root: Path, resource: StoredResource) -> VerifiedStoredReso
         )
     try:
         final_stat = resolved.stat(follow_symlinks=False)
+    except FileNotFoundError as exc:
+        raise _StorageSnapshotInconsistent(f"cannot inspect storage resource {resource.relative_path}: {exc}") from exc
     except OSError as exc:
         raise StorageObjectError(f"cannot inspect storage resource {resource.relative_path}: {exc}") from exc
     initial_identity = (
@@ -338,7 +388,7 @@ def _verify_resource(root: Path, resource: StoredResource) -> VerifiedStoredReso
         final_stat.st_ctime_ns,
     )
     if initial_identity != final_identity:
-        raise StorageObjectError(
+        raise _StorageSnapshotInconsistent(
             f"declared resource changed during validation: {resource.relative_path}; "
             "retry while the producer is quiescent"
         )
@@ -365,6 +415,10 @@ def _verify_shared_resource_access(
     for resource in resources:
         try:
             resource_stat = resource.path.stat(follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise _StorageSnapshotInconsistent(
+                f"cannot inspect shared resource {resource.relative_path}: {exc}"
+            ) from exc
         except OSError as exc:
             raise StorageObjectError(f"cannot inspect shared resource {resource.relative_path}: {exc}") from exc
         if resource_stat.st_gid != shared_group:
@@ -377,6 +431,8 @@ def _verify_shared_resource_access(
         relative = directory.relative_to(root).as_posix()
         try:
             directory_stat = directory.stat(follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise _StorageSnapshotInconsistent(f"cannot inspect shared resource directory {relative}: {exc}") from exc
         except OSError as exc:
             raise StorageObjectError(f"cannot inspect shared resource directory {relative}: {exc}") from exc
         if directory_stat.st_gid != shared_group:
@@ -390,6 +446,8 @@ def _verify_coordination_posture(
     root: Path,
     manifest_path: Path,
     lock_path: Path,
+    *,
+    allow_missing_lock_snapshot: bool = False,
 ) -> _CoordinationState:
     """Validate and fingerprint root, manifest, and lock coordination state."""
 
@@ -440,7 +498,10 @@ def _verify_coordination_posture(
         try:
             lock_stat = lock_path.stat(follow_symlinks=False)
         except FileNotFoundError as exc:
-            raise StorageObjectError(f"storage object lock is missing: {lock_path}") from exc
+            error = StorageObjectError(f"storage object lock is missing: {lock_path}")
+            if allow_missing_lock_snapshot:
+                raise _StorageSnapshotInconsistent(str(error)) from exc
+            raise error from exc
         if not stat.S_ISREG(lock_stat.st_mode):
             raise StorageObjectError(f"storage object lock must be a regular file: {lock_path}")
         lock_mode = stat.S_IMODE(lock_stat.st_mode)
@@ -835,6 +896,7 @@ def _recheck_verified_demo_snapshot(
         verified.manifest_path,
         label="demo manifest after Git index validation",
         change_message="demo manifest changed during Git index validation; retry while the producer is quiescent",
+        expected_identity=(verified.manifest_device_id, verified.manifest_inode),
     )
     if _sha256_bytes(manifest_bytes) != verified.manifest_digest:
         raise StorageObjectError(
@@ -869,13 +931,27 @@ def _recheck_verified_demo_snapshot(
     final_file_paths, final_directory_paths = _storage_tree_paths(verified.root)
     observed_tree_state = _storage_tree_state(verified.root, final_file_paths, final_directory_paths)
     if (
-        observed_resources != expected_resources
-        or coordination_state != expected_coordination_state
-        or observed_tree_state != expected_tree_state
-    ):
-        raise StorageObjectError(
-            "demo storage object changed during Git index validation; retry while the producer is quiescent"
+        observed_resources == expected_resources
+        and (
+            coordination_state[0],
+            coordination_state[1][:5],
+            coordination_state[2],
         )
+        == (
+            expected_coordination_state[0],
+            expected_coordination_state[1][:5],
+            expected_coordination_state[2],
+        )
+        and tuple(entry[:8] for entry in observed_tree_state) == tuple(entry[:8] for entry in expected_tree_state)
+    ):
+        if coordination_state != expected_coordination_state or observed_tree_state != expected_tree_state:
+            raise _StorageSnapshotInconsistent(
+                "demo storage object changed during Git index validation; retry while the producer is quiescent"
+            )
+        return
+    raise StorageObjectError(
+        "demo storage object changed during Git index validation; retry while the producer is quiescent"
+    )
 
 
 def verify_storage_object(
@@ -883,6 +959,7 @@ def verify_storage_object(
     *,
     _allow_pending_demo_manifest: bool = False,
     _allow_pending_demo_lock: bool = False,
+    _allow_pending_lock_visibility: bool = False,
 ) -> VerifiedStorageObject:
     """Verify one explicit storage object and require exact file closure."""
 
@@ -898,14 +975,20 @@ def verify_storage_object(
     if not manifest_path.is_file():
         raise StorageObjectError(f"storage object root is missing {MANIFEST_NAME}: {root}")
     lock_path = root / LOCK_NAME
-    coordination_state = _verify_coordination_posture(root, manifest_path, lock_path)
-    (_root_type, root_mode, _root_owner, shared_group, _root_device, _root_inode), _manifest_state, _lock_state = (
+    coordination_state = _verify_coordination_posture(
+        root,
+        manifest_path,
+        lock_path,
+        allow_missing_lock_snapshot=_allow_pending_lock_visibility,
+    )
+    (_root_type, root_mode, _root_owner, shared_group, _root_device, _root_inode), manifest_state, _lock_state = (
         coordination_state
     )
     manifest_bytes = _read_stable_regular_bytes(
         manifest_path,
         label="storage object manifest",
         change_message="storage object manifest changed during validation; retry while the producer is quiescent",
+        expected_identity=(manifest_state[2], manifest_state[3]),
     )
     manifest = load_storage_object_manifest_bytes(manifest_bytes, source_label=str(manifest_path))
 
@@ -934,10 +1017,10 @@ def verify_storage_object(
     }
     undeclared = sorted(actual_paths - declared_paths)
     if undeclared:
-        raise StorageObjectError(f"undeclared files: {', '.join(undeclared)}")
+        raise _StorageSnapshotInconsistent(f"undeclared files: {', '.join(undeclared)}")
     missing = sorted(declared_paths - actual_paths)
     if missing:
-        raise StorageObjectError(f"declared files are missing: {', '.join(missing)}")
+        raise _StorageSnapshotInconsistent(f"declared files are missing: {', '.join(missing)}")
     second_resources = tuple(_verify_resource(root, resource) for resource in manifest.resources)
     second_file_paths, second_directory_paths = _storage_tree_paths(root)
     second_tree_state = _storage_tree_state(root, second_file_paths, second_directory_paths)
@@ -956,6 +1039,7 @@ def verify_storage_object(
         manifest_path,
         label="storage object manifest",
         change_message="storage object manifest changed during validation; retry while the producer is quiescent",
+        expected_identity=(manifest_state[2], manifest_state[3]),
     )
     second_coordination_state = _verify_coordination_posture(root, manifest_path, lock_path)
     if root_mode & stat.S_IWGRP:
@@ -975,12 +1059,16 @@ def verify_storage_object(
         or actual_paths != second_actual_paths
         or first_directories != second_directories
     ):
-        raise StorageObjectError("storage object changed during validation; retry while the producer is quiescent")
+        raise _StorageSnapshotInconsistent(
+            "storage object changed during validation; retry while the producer is quiescent"
+        )
 
     verified = VerifiedStorageObject(
         root=root,
         manifest_path=resolve_storage_path(manifest_path, label="storage object manifest", strict=True),
         manifest_digest=_sha256_bytes(second_manifest_bytes),
+        manifest_device_id=second_coordination_state[1][2],
+        manifest_inode=second_coordination_state[1][3],
         manifest=manifest,
         resources=second_resources,
     )

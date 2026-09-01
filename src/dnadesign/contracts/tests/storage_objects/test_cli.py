@@ -44,6 +44,806 @@ def _digest(path: Path) -> str:
     return f"sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}"
 
 
+def test_inventory_retries_one_transient_post_publication_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    original_verify = storage_inventory.verify_storage_object
+    calls = 0
+    settle_delays: list[float] = []
+
+    def _verify(*args: object, **kwargs: object):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise storage_validation._StorageSnapshotInconsistent(
+                storage_inventory._TRANSIENT_POST_PUBLICATION_VALIDATION_ERROR
+            )
+        return original_verify(*args, **kwargs)
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _verify)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert calls == 2
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
+def test_inventory_retries_first_create_only_lock_visibility_miss(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    lock_path = root / LOCK_NAME
+    original_stat = Path.stat
+    original_is_symlink = Path.is_symlink
+    original_verify_coordination_posture = storage_validation._verify_coordination_posture
+    misses = 0
+    lock_type_checked = False
+    verifying_coordination = False
+    settle_delays: list[float] = []
+
+    def _stat(path: Path, *args: object, **kwargs: object):
+        nonlocal misses
+        if verifying_coordination and lock_type_checked and path == lock_path and misses == 0:
+            misses += 1
+            raise FileNotFoundError(2, "No such file or directory", str(path))
+        return original_stat(path, *args, **kwargs)
+
+    def _is_symlink(path: Path) -> bool:
+        nonlocal lock_type_checked
+        result = original_is_symlink(path)
+        if verifying_coordination and path == lock_path:
+            lock_type_checked = True
+        return result
+
+    def _verify_coordination_posture(*args: object, **kwargs: object):
+        nonlocal lock_type_checked, verifying_coordination
+        lock_type_checked = False
+        verifying_coordination = True
+        try:
+            return original_verify_coordination_posture(*args, **kwargs)
+        finally:
+            verifying_coordination = False
+
+    monkeypatch.setattr(Path, "stat", _stat)
+    monkeypatch.setattr(Path, "is_symlink", _is_symlink)
+    monkeypatch.setattr(storage_validation, "_verify_coordination_posture", _verify_coordination_posture)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert misses == 1
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
+def test_inventory_hard_fails_persistent_create_only_lock_visibility_miss(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    lock_path = root / LOCK_NAME
+    original_stat = Path.stat
+    original_is_symlink = Path.is_symlink
+    original_verify_coordination_posture = storage_validation._verify_coordination_posture
+    misses = 0
+    lock_type_checked = False
+    verifying_coordination = False
+    settle_delays: list[float] = []
+
+    def _stat(path: Path, *args: object, **kwargs: object):
+        nonlocal misses
+        if verifying_coordination and lock_type_checked and path == lock_path and misses < 2:
+            misses += 1
+            raise FileNotFoundError(2, "No such file or directory", str(path))
+        return original_stat(path, *args, **kwargs)
+
+    def _is_symlink(path: Path) -> bool:
+        nonlocal lock_type_checked
+        result = original_is_symlink(path)
+        if verifying_coordination and path == lock_path:
+            lock_type_checked = True
+        return result
+
+    def _verify_coordination_posture(*args: object, **kwargs: object):
+        nonlocal lock_type_checked, verifying_coordination
+        lock_type_checked = False
+        verifying_coordination = True
+        try:
+            return original_verify_coordination_posture(*args, **kwargs)
+        finally:
+            verifying_coordination = False
+
+    monkeypatch.setattr(Path, "stat", _stat)
+    monkeypatch.setattr(Path, "is_symlink", _is_symlink)
+    monkeypatch.setattr(storage_validation, "_verify_coordination_posture", _verify_coordination_posture)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    with pytest.raises(StorageObjectError, match="storage object lock is missing") as exc_info:
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="usr",
+            object_kind="store",
+            content_schema="usr.dataset-root",
+            content_schema_version="v1",
+            producer_revision="test-revision",
+            storage_class="cold",
+            retention_policy="cold",
+        )
+
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
+    assert misses == 2
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+    assert not manifest_path.exists()
+
+
+@pytest.mark.parametrize("listing_outcome", ["declared-missing", "undeclared"])
+def test_inventory_retries_one_transient_post_publication_listing_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    listing_outcome: str,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    payload_path = root / "payload.txt"
+    payload_path.write_text("payload\n", encoding="utf-8")
+    transient_path = root / "provider-transient.txt"
+    original_tree_paths = storage_validation._storage_tree_paths
+    original_tree_state = storage_validation._storage_tree_state
+    injected = False
+    settle_delays: list[float] = []
+
+    def _tree_paths(*args: object, **kwargs: object):
+        nonlocal injected
+        files, directories = original_tree_paths(*args, **kwargs)
+        if injected or not (root / MANIFEST_NAME).exists():
+            return files, directories
+        injected = True
+        if listing_outcome == "declared-missing":
+            return tuple(path for path in files if path != payload_path), directories
+        transient_path.write_text("transient provider listing\n", encoding="utf-8")
+        return (*files, transient_path), directories
+
+    def _tree_state(*args: object, **kwargs: object):
+        state = original_tree_state(*args, **kwargs)
+        transient_path.unlink(missing_ok=True)
+        return state
+
+    monkeypatch.setattr(storage_validation, "_storage_tree_paths", _tree_paths)
+    monkeypatch.setattr(storage_validation, "_storage_tree_state", _tree_state)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert injected is True
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
+def test_inventory_retries_stale_directory_entry_that_vanishes_before_stat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    stale_directory = root / "stale-directory"
+    stale_directory.mkdir(parents=True)
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    original_tree_paths = storage_validation._storage_tree_paths
+    injected = False
+    settle_delays: list[float] = []
+
+    def _tree_paths(*args: object, **kwargs: object):
+        nonlocal injected
+        files, directories = original_tree_paths(*args, **kwargs)
+        if not injected and (root / MANIFEST_NAME).exists():
+            injected = True
+            stale_directory.rmdir()
+        return files, directories
+
+    monkeypatch.setattr(storage_validation, "_storage_tree_paths", _tree_paths)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert injected is True
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
+def test_inventory_retries_declared_resource_missing_during_resolution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    payload_path = root / "payload.txt"
+    payload_path.write_text("payload\n", encoding="utf-8")
+    original_resolve = Path.resolve
+    injected = False
+    settle_delays: list[float] = []
+
+    def _resolve(path: Path, *args: object, **kwargs: object):
+        nonlocal injected
+        if path == payload_path and not injected and (root / MANIFEST_NAME).exists():
+            injected = True
+            raise FileNotFoundError(2, "No such file or directory", str(path))
+        return original_resolve(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", _resolve)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert injected is True
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
+def test_inventory_retries_declared_resource_that_vanishes_before_digest_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    payload_path = root / "payload.txt"
+    payload_path.write_text("payload\n", encoding="utf-8")
+    displaced_path = tmp_path / "displaced-payload.txt"
+    original_open = Path.open
+    injected = False
+    settle_delays: list[float] = []
+
+    def _open(path: Path, *args: object, **kwargs: object):
+        nonlocal injected
+        if path == payload_path and not injected and (root / MANIFEST_NAME).exists():
+            injected = True
+            payload_path.replace(displaced_path)
+        return original_open(path, *args, **kwargs)
+
+    def _settle(delay: float) -> None:
+        settle_delays.append(delay)
+        displaced_path.replace(payload_path)
+
+    monkeypatch.setattr(Path, "open", _open)
+    monkeypatch.setattr(storage_inventory.time, "sleep", _settle)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert injected is True
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
+def test_inventory_retries_resource_metadata_drift_during_digest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    payload_path = root / "payload.txt"
+    payload_path.write_text("payload\n", encoding="utf-8")
+    original_sha256 = storage_validation._sha256
+    injected = False
+    settle_delays: list[float] = []
+
+    def _sha256(path: Path) -> str:
+        nonlocal injected
+        digest = original_sha256(path)
+        if path == payload_path and not injected and (root / MANIFEST_NAME).exists():
+            injected = True
+            before = path.stat(follow_symlinks=False)
+            os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000))
+        return digest
+
+    monkeypatch.setattr(storage_validation, "_sha256", _sha256)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert injected is True
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
+def test_inventory_retries_same_inode_manifest_metadata_drift_during_bound_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    original_read = storage_validation._read_stable_regular_bytes
+    original_stat = Path.stat
+    inside_bound_read = False
+    manifest_stats = 0
+    injected = False
+    settle_delays: list[float] = []
+
+    def _read(*args: object, **kwargs: object) -> bytes:
+        nonlocal inside_bound_read
+        inside_bound_read = True
+        try:
+            return original_read(*args, **kwargs)
+        finally:
+            inside_bound_read = False
+
+    def _stat(path: Path, *args: object, **kwargs: object):
+        nonlocal manifest_stats, injected
+        if path == manifest_path and inside_bound_read:
+            manifest_stats += 1
+            if manifest_stats == 2 and not injected:
+                injected = True
+                before = original_stat(path, follow_symlinks=False)
+                os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000))
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(storage_validation, "_read_stable_regular_bytes", _read)
+    monkeypatch.setattr(Path, "stat", _stat)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert injected is True
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
+@pytest.mark.parametrize("target_kind", ["resource", "directory"])
+def test_inventory_retries_shared_posture_entry_that_vanishes_before_stat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target_kind: str,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    root.chmod(0o2770)
+    payload_path = root / "payload.txt"
+    payload_path.write_text("payload\n", encoding="utf-8")
+    directory_path = root / "empty-directory"
+    directory_path.mkdir()
+    target_path = payload_path if target_kind == "resource" else directory_path
+    displaced_path = tmp_path / f"displaced-{target_kind}"
+    original_shared_access = storage_validation._verify_shared_resource_access
+    original_stat = Path.stat
+    in_shared_access = False
+    injected = False
+    settle_delays: list[float] = []
+
+    def _shared_access(*args: object, **kwargs: object) -> None:
+        nonlocal in_shared_access
+        in_shared_access = True
+        try:
+            original_shared_access(*args, **kwargs)
+        finally:
+            in_shared_access = False
+
+    def _stat(path: Path, *args: object, **kwargs: object):
+        nonlocal injected
+        if path == target_path and in_shared_access and not injected:
+            injected = True
+            target_path.replace(displaced_path)
+        return original_stat(path, *args, **kwargs)
+
+    def _settle(delay: float) -> None:
+        settle_delays.append(delay)
+        displaced_path.replace(target_path)
+
+    monkeypatch.setattr(storage_validation, "_verify_shared_resource_access", _shared_access)
+    monkeypatch.setattr(Path, "stat", _stat)
+    monkeypatch.setattr(storage_inventory.time, "sleep", _settle)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert injected is True
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
+def test_inventory_rejects_receipt_replaced_before_transient_validation_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    original_verify = storage_inventory.verify_storage_object
+    calls = 0
+    settle_delays: list[float] = []
+    replacement_identity: tuple[int, int] | None = None
+
+    def _verify(*args: object, **kwargs: object):
+        nonlocal calls, replacement_identity
+        calls += 1
+        if calls == 1:
+            replacement = manifest_path.with_name(f".{MANIFEST_NAME}.competitor")
+            replacement.write_bytes(manifest_path.read_bytes())
+            replacement.chmod(manifest_path.stat(follow_symlinks=False).st_mode & 0o777)
+            replacement.replace(manifest_path)
+            replacement_stat = manifest_path.stat(follow_symlinks=False)
+            replacement_identity = (replacement_stat.st_dev, replacement_stat.st_ino)
+            raise storage_validation._StorageSnapshotInconsistent(
+                storage_inventory._TRANSIENT_POST_PUBLICATION_VALIDATION_ERROR
+            )
+        return original_verify(*args, **kwargs)
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _verify)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    with pytest.raises(StorageObjectPublicationUncertain, match="cannot identify the receipt moved"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="usr",
+            object_kind="store",
+            content_schema="usr.dataset-root",
+            content_schema_version="v1",
+            producer_revision="test-revision",
+            storage_class="cold",
+            retention_policy="cold",
+        )
+
+    assert calls == 1
+    assert settle_delays == []
+    assert replacement_identity is not None
+    assert not manifest_path.exists()
+    recovery_paths = tuple(root.glob(f".{MANIFEST_NAME}.rollback-*"))
+    assert len(recovery_paths) == 1
+    recovery_stat = recovery_paths[0].stat(follow_symlinks=False)
+    assert (recovery_stat.st_dev, recovery_stat.st_ino) == replacement_identity
+
+
+def test_stable_regular_read_rejects_competing_inode_between_path_snapshots(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "manifest.json"
+    path.write_bytes(b"published receipt\n")
+    published_stat = path.stat(follow_symlinks=False)
+    competitor = tmp_path / "competitor.json"
+    competitor.write_bytes(b"competing receipt\n")
+    original_open = Path.open
+    original_stat = Path.stat
+
+    def _open(candidate: Path, *args: object, **kwargs: object):
+        if candidate != path:
+            return original_open(candidate, *args, **kwargs)
+        competitor.replace(path)
+        return original_open(candidate, *args, **kwargs)
+
+    def _stat(candidate: Path, *args: object, **kwargs: object):
+        if candidate == path:
+            return published_stat
+        return original_stat(candidate, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", _open)
+    monkeypatch.setattr(Path, "stat", _stat)
+
+    with pytest.raises(StorageObjectError, match="manifest changed during validation") as exc_info:
+        storage_validation._read_stable_regular_bytes(
+            path,
+            label="storage object manifest",
+            change_message="manifest changed during validation",
+            expected_identity=(published_stat.st_dev, published_stat.st_ino),
+        )
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
+
+
+def test_stable_regular_read_hard_fails_when_path_is_competitor_but_open_is_expected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "manifest.json"
+    path.write_bytes(b"published receipt\n")
+    published_stat = path.stat(follow_symlinks=False)
+    competitor = tmp_path / "competitor.json"
+    competitor.write_bytes(b"competing receipt\n")
+    competitor_stat = competitor.stat(follow_symlinks=False)
+    original_stat = Path.stat
+
+    def _stat(candidate: Path, *args: object, **kwargs: object):
+        if candidate == path:
+            return competitor_stat
+        return original_stat(candidate, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", _stat)
+
+    with pytest.raises(StorageObjectError, match="manifest changed during validation") as exc_info:
+        storage_validation._read_stable_regular_bytes(
+            path,
+            label="storage object manifest",
+            change_message="manifest changed during validation",
+            expected_identity=(published_stat.st_dev, published_stat.st_ino),
+        )
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
+
+
+@pytest.mark.parametrize("competitor_changes_bytes", [False, True])
+def test_inventory_rejects_aba_receipt_replacement_during_verification(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    competitor_changes_bytes: bool,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    original_verify = storage_inventory.verify_storage_object
+    calls = 0
+    published_identity: tuple[int, int] | None = None
+
+    def _verify(*args: object, **kwargs: object):
+        nonlocal calls, published_identity
+        calls += 1
+        published_stat = manifest_path.stat(follow_symlinks=False)
+        published_identity = (published_stat.st_dev, published_stat.st_ino)
+        published_backup = tmp_path / "published-manifest-backup.json"
+        os.link(manifest_path, published_backup)
+        competitor = tmp_path / "competing-manifest.json"
+        if competitor_changes_bytes:
+            competitor_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            competitor_payload["producer_revision"] = "competing-revision"
+            competitor.write_text(
+                json.dumps(competitor_payload, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        else:
+            competitor.write_bytes(manifest_path.read_bytes())
+        competitor.chmod(stat.S_IMODE(published_stat.st_mode))
+        competitor.replace(manifest_path)
+        try:
+            verified = original_verify(*args, **kwargs)
+        finally:
+            published_backup.replace(manifest_path)
+        restored_stat = manifest_path.stat(follow_symlinks=False)
+        assert (restored_stat.st_dev, restored_stat.st_ino) == published_identity
+        return verified
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _verify)
+
+    with pytest.raises(StorageObjectError, match="verification result does not match the published receipt"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="usr",
+            object_kind="store",
+            content_schema="usr.dataset-root",
+            content_schema_version="v1",
+            producer_revision="test-revision",
+            storage_class="cold",
+            retention_policy="cold",
+        )
+
+    assert calls == 1
+    assert published_identity is not None
+    assert not manifest_path.exists()
+
+
+def test_inventory_does_not_retry_semantic_validation_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    calls = 0
+    settle_delays: list[float] = []
+
+    def _verify(*_args: object, **_kwargs: object):
+        nonlocal calls
+        calls += 1
+        raise StorageObjectError("declared resource digest mismatch")
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _verify)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    with pytest.raises(StorageObjectError, match="declared resource digest mismatch"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="usr",
+            object_kind="store",
+            content_schema="usr.dataset-root",
+            content_schema_version="v1",
+            producer_revision="test-revision",
+            storage_class="cold",
+            retention_policy="cold",
+        )
+
+    assert calls == 1
+    assert settle_delays == []
+    assert not (root / MANIFEST_NAME).exists()
+
+
+def test_inventory_does_not_retry_untyped_error_with_transient_message(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    calls = 0
+    settle_delays: list[float] = []
+
+    def _verify(*_args: object, **_kwargs: object):
+        nonlocal calls
+        calls += 1
+        raise StorageObjectError(storage_inventory._TRANSIENT_POST_PUBLICATION_VALIDATION_ERROR)
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _verify)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    with pytest.raises(StorageObjectError, match="storage object changed during validation"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="usr",
+            object_kind="store",
+            content_schema="usr.dataset-root",
+            content_schema_version="v1",
+            producer_revision="test-revision",
+            storage_class="cold",
+            retention_policy="cold",
+        )
+
+    assert calls == 1
+    assert settle_delays == []
+    assert not (root / MANIFEST_NAME).exists()
+
+
+def test_inventory_retries_typed_snapshot_mismatch_exactly_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    calls = 0
+    settle_delays: list[float] = []
+
+    def _verify(*_args: object, **_kwargs: object):
+        nonlocal calls
+        calls += 1
+        raise storage_validation._StorageSnapshotInconsistent("undeclared files: transient.txt")
+
+    monkeypatch.setattr(storage_inventory, "verify_storage_object", _verify)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    with pytest.raises(StorageObjectError, match="undeclared files: transient.txt"):
+        inventory_storage_object(
+            root,
+            storage_id="pilot",
+            owner_repository="dnadesign",
+            owner_tool="usr",
+            object_kind="store",
+            content_schema="usr.dataset-root",
+            content_schema_version="v1",
+            producer_revision="test-revision",
+            storage_class="cold",
+            retention_policy="cold",
+        )
+
+    assert calls == 2
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+    assert not (root / MANIFEST_NAME).exists()
+
+
 def _set_git_index_mode(checkout: Path, path: Path, mode: str) -> None:
     relative = path.relative_to(checkout).as_posix()
     if mode == "160000":
@@ -264,6 +1064,56 @@ def test_inventory_bootstraps_demo_then_requires_manifest_to_be_tracked(
     assert indexed_lock.startswith("100644 ")
 
 
+def test_inventory_retries_demo_metadata_drift_after_git_index_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout = tmp_path / "checkout"
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    root = checkout / "examples" / "pilot"
+    root.mkdir(parents=True)
+    payload_path = root / "payload.txt"
+    payload_path.write_text("payload\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(checkout), "add", "examples/pilot/payload.txt"], check=True)
+    original_run = storage_validation.subprocess.run
+    changed = False
+    settle_delays: list[float] = []
+
+    def _run(*args: object, **kwargs: object):
+        nonlocal changed
+        completed = original_run(*args, **kwargs)
+        command = args[0]
+        if isinstance(command, list) and "cat-file" in command and not changed:
+            before = payload_path.stat(follow_symlinks=False)
+            os.utime(
+                payload_path,
+                ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000),
+            )
+            changed = True
+        return completed
+
+    monkeypatch.setattr(storage_validation.subprocess, "run", _run)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="cruncher",
+        object_kind="workspace",
+        content_schema="cruncher.workspace",
+        content_schema_version="1",
+        producer_revision="test-revision",
+        storage_class="reproducible",
+        retention_policy="review-before-delete",
+        demo=True,
+    )
+
+    assert summary["status"] == "created-pending-git-add"
+    assert changed is True
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
 def test_demo_validation_requires_empty_lock_to_match_git_index(tmp_path: Path) -> None:
     checkout = tmp_path / "checkout"
     subprocess.run(["git", "init", "-q", str(checkout)], check=True)
@@ -299,8 +1149,12 @@ def test_demo_validation_requires_empty_lock_to_match_git_index(tmp_path: Path) 
         check=True,
     )
     lock_path.write_bytes(b"")
-    with pytest.raises(StorageObjectError, match=r"demo file differs from Git index: .*\.storage-object\.lock"):
+    with pytest.raises(
+        StorageObjectError,
+        match=r"demo file differs from Git index: .*\.storage-object\.lock",
+    ) as exc_info:
         verify_storage_object(root)
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
     subprocess.run(
         ["git", "-C", str(checkout), "add", "examples/pilot/.storage-object.lock"],
@@ -406,7 +1260,7 @@ def test_demo_validation_clears_repository_local_git_environment(
     [
         ("manifest", "demo manifest changed during Git index validation"),
         ("resource", "digest mismatch"),
-        ("manifest_identity", "demo storage object changed during Git index validation"),
+        ("manifest_identity", "demo manifest changed during Git index validation"),
         ("resource_identity", "demo storage object changed during Git index validation"),
     ],
 )
@@ -448,10 +1302,11 @@ def test_demo_validation_rechecks_filesystem_bytes_after_git_index_reads(
 
     monkeypatch.setattr(storage_validation.subprocess, "run", _run)
 
-    with pytest.raises(StorageObjectError, match=error):
+    with pytest.raises(StorageObjectError, match=error) as exc_info:
         verify_storage_object(root)
 
     assert changed
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
 
 @pytest.mark.parametrize("entry_kind", ["file", "directory"])
@@ -479,10 +1334,11 @@ def test_demo_validation_rechecks_exact_closure_after_git_index_reads(
 
     monkeypatch.setattr(storage_validation.subprocess, "run", _run)
 
-    with pytest.raises(StorageObjectError, match="changed during Git index validation"):
+    with pytest.raises(StorageObjectError, match="changed during Git index validation") as exc_info:
         verify_storage_object(root)
 
     assert changed
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
 
 @pytest.mark.parametrize("replacement_kind", ["root", "nested_directory"])
@@ -527,10 +1383,11 @@ def test_demo_validation_rejects_same_path_directory_replacement_after_git_reads
 
     monkeypatch.setattr(storage_validation.subprocess, "run", _run)
 
-    with pytest.raises(StorageObjectError, match="changed during Git index validation"):
+    with pytest.raises(StorageObjectError, match="changed during Git index validation") as exc_info:
         verify_storage_object(root)
 
     assert changed
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
 
 @pytest.mark.parametrize("target_kind", ["resource", "directory"])
@@ -576,10 +1433,11 @@ def test_shared_demo_rejects_access_posture_drift_after_git_reads(
 
     monkeypatch.setattr(storage_validation.subprocess, "run", _run)
 
-    with pytest.raises(StorageObjectError, match="changed during Git index validation"):
+    with pytest.raises(StorageObjectError, match="changed during Git index validation") as exc_info:
         verify_storage_object(root)
 
     assert changed
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
 
 def test_demo_validation_rejects_index_change_after_checked_entry(
@@ -612,8 +1470,9 @@ def test_demo_validation_rejects_index_change_after_checked_entry(
 
     monkeypatch.setattr(storage_validation.subprocess, "run", _run)
 
-    with pytest.raises(StorageObjectError, match="demo Git index changed during validation"):
+    with pytest.raises(StorageObjectError, match="demo Git index changed during validation") as exc_info:
         verify_storage_object(root)
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
     assert changed
 
@@ -2666,7 +3525,7 @@ def test_refresh_rejects_missing_lock_while_an_unlinked_inode_is_held(tmp_path: 
     held_lock.acquire()
     lock_path.unlink()
     try:
-        with pytest.raises(StorageObjectError, match="storage object lock is missing"):
+        with pytest.raises(StorageObjectError, match="storage object lock is missing") as exc_info:
             refresh_storage_object(
                 root,
                 expected_manifest_digest=_digest(manifest_path),
@@ -2676,6 +3535,7 @@ def test_refresh_rejects_missing_lock_while_an_unlinked_inode_is_held(tmp_path: 
         held_lock.release()
 
     assert not lock_path.exists()
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
     assert manifest_path.read_bytes() == prior_manifest
     assert payload.read_text(encoding="utf-8") == "payload\n"
 

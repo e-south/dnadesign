@@ -371,8 +371,9 @@ def test_verify_storage_object_wraps_resource_read_failures(
 
     monkeypatch.setattr(Path, "open", _open)
 
-    with pytest.raises(StorageObjectError, match="cannot read storage resource"):
+    with pytest.raises(StorageObjectError, match="cannot read storage resource") as exc_info:
         storage_validation.verify_storage_object(root)
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
 
 def test_verify_storage_object_rejects_bytes_changed_during_validation(
@@ -394,8 +395,9 @@ def test_verify_storage_object_rejects_bytes_changed_during_validation(
 
     monkeypatch.setattr(storage_validation, "_verify_resource", _verify)
 
-    with pytest.raises(StorageObjectError, match="declared resource digest mismatch"):
+    with pytest.raises(StorageObjectError, match="declared resource digest mismatch") as exc_info:
         verify_storage_object(root)
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
 
 def test_verify_storage_object_binds_digest_to_post_read_metadata(
@@ -466,18 +468,55 @@ def test_verify_storage_object_rejects_manifest_changed_during_validation(
     changed["producer_revision"] = "test-revision-2"
     changed_bytes = json.dumps(changed).encode("utf-8")
     reads = 0
-    original_read_bytes = Path.read_bytes
+    original_read = storage_validation._read_stable_regular_bytes
 
-    def _read_bytes(path: Path) -> bytes:
+    def _read(
+        path: Path,
+        *,
+        label: str,
+        change_message: str,
+        expected_identity: tuple[int, int],
+    ) -> bytes:
         nonlocal reads
         if path == manifest_path:
             reads += 1
             return initial_bytes if reads == 1 else changed_bytes
-        return original_read_bytes(path)
+        return original_read(
+            path,
+            label=label,
+            change_message=change_message,
+            expected_identity=expected_identity,
+        )
 
-    monkeypatch.setattr(Path, "read_bytes", _read_bytes)
+    monkeypatch.setattr(storage_validation, "_read_stable_regular_bytes", _read)
 
     with pytest.raises(StorageObjectError, match="storage object changed during validation"):
+        verify_storage_object(root)
+
+
+def test_verify_storage_object_binds_manifest_reads_to_coordination_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    _write_object(root)
+    manifest_path = root / MANIFEST_NAME
+    lock_path = root / LOCK_NAME
+    coordination_state = storage_validation._verify_coordination_posture(root, manifest_path, lock_path)
+    competing_manifest = tmp_path / "competing-manifest.json"
+    competing_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    competing_payload["producer_revision"] = "competing-revision"
+    competing_manifest.write_text(json.dumps(competing_payload), encoding="utf-8")
+    competing_manifest.chmod(stat.S_IMODE(manifest_path.stat(follow_symlinks=False).st_mode))
+    competing_manifest.replace(manifest_path)
+
+    monkeypatch.setattr(
+        storage_validation,
+        "_verify_coordination_posture",
+        lambda *_args, **_kwargs: coordination_state,
+    )
+
+    with pytest.raises(StorageObjectError, match="manifest changed during validation"):
         verify_storage_object(root)
 
 
@@ -488,14 +527,25 @@ def test_verify_storage_object_rejects_same_inode_manifest_rewrite_during_final_
     root = tmp_path / "pilot"
     _write_object(root)
     manifest_path = root / MANIFEST_NAME
-    original_read_bytes = Path.read_bytes
-    initial_bytes = original_read_bytes(manifest_path)
+    original_read = storage_validation._read_stable_regular_bytes
+    initial_bytes = manifest_path.read_bytes()
     replacement_bytes = b"!" + initial_bytes[1:]
     reads = 0
 
-    def _read_then_rewrite_same_inode(path: Path) -> bytes:
+    def _read_then_rewrite_same_inode(
+        path: Path,
+        *,
+        label: str,
+        change_message: str,
+        expected_identity: tuple[int, int],
+    ) -> bytes:
         nonlocal reads
-        content = original_read_bytes(path)
+        content = original_read(
+            path,
+            label=label,
+            change_message=change_message,
+            expected_identity=expected_identity,
+        )
         if path == manifest_path:
             reads += 1
             if reads == 2:
@@ -510,13 +560,13 @@ def test_verify_storage_object_rejects_same_inode_manifest_rewrite_during_final_
                 )
         return content
 
-    monkeypatch.setattr(Path, "read_bytes", _read_then_rewrite_same_inode)
+    monkeypatch.setattr(storage_validation, "_read_stable_regular_bytes", _read_then_rewrite_same_inode)
 
-    with pytest.raises(StorageObjectError, match="manifest changed during validation"):
+    with pytest.raises(StorageObjectError, match="changed during validation"):
         verify_storage_object(root)
 
     assert reads == 2
-    assert original_read_bytes(manifest_path) == replacement_bytes
+    assert manifest_path.read_bytes() == replacement_bytes
 
 
 def test_verify_storage_object_rechecks_shared_resource_access_on_second_pass(
@@ -922,8 +972,10 @@ def test_verify_storage_root_rejects_missing_object_lock_before_validation(tmp_p
     _write_object(object_root)
     (object_root / LOCK_NAME).unlink()
 
-    with pytest.raises(StorageObjectError, match="storage object lock is missing"):
+    with pytest.raises(StorageObjectError, match="storage object lock is missing") as exc_info:
         verify_storage_root(storage_root)
+
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
 
 def test_verify_storage_root_rejects_lock_replaced_during_acquisition(

@@ -113,6 +113,8 @@ class VerifiedStorageObject:
     root: Path
     manifest_path: Path
     manifest_digest: str
+    manifest_device_id: int
+    manifest_inode: int
     manifest: StorageObjectManifest
     resources: tuple[VerifiedStoredResource, ...]
 
