@@ -191,7 +191,11 @@ jobs:
             src/dnadesign/devtools/tests/ci/test_workflow_contract.py
           )
           smoke_targets=(
-            src/dnadesign/devtools/tests/docs/test_checks.py
+            src/dnadesign/devtools/tests/docs/test_banner_contracts.py
+            src/dnadesign/devtools/tests/docs/test_document_metadata.py
+            src/dnadesign/devtools/tests/docs/test_markdown_inventory.py
+            src/dnadesign/devtools/tests/docs/test_operations_contracts.py
+            src/dnadesign/devtools/tests/docs/test_public_surface_contracts.py
             src/dnadesign/usr/tests/cli/test_cli_command_surface.py
           )
 
