@@ -307,6 +307,61 @@ def test_inventory_retries_resource_metadata_drift_during_digest(
     assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
 
 
+def test_inventory_retries_same_inode_manifest_metadata_drift_during_bound_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "pilot"
+    root.mkdir()
+    (root / "payload.txt").write_text("payload\n", encoding="utf-8")
+    manifest_path = root / MANIFEST_NAME
+    original_read = storage_validation._read_stable_regular_bytes
+    original_stat = Path.stat
+    inside_bound_read = False
+    manifest_stats = 0
+    injected = False
+    settle_delays: list[float] = []
+
+    def _read(*args: object, **kwargs: object) -> bytes:
+        nonlocal inside_bound_read
+        inside_bound_read = True
+        try:
+            return original_read(*args, **kwargs)
+        finally:
+            inside_bound_read = False
+
+    def _stat(path: Path, *args: object, **kwargs: object):
+        nonlocal manifest_stats, injected
+        if path == manifest_path and inside_bound_read:
+            manifest_stats += 1
+            if manifest_stats == 2 and not injected:
+                injected = True
+                before = original_stat(path, follow_symlinks=False)
+                os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns + 1_000_000_000))
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(storage_validation, "_read_stable_regular_bytes", _read)
+    monkeypatch.setattr(Path, "stat", _stat)
+    monkeypatch.setattr(storage_inventory.time, "sleep", settle_delays.append)
+
+    summary = inventory_storage_object(
+        root,
+        storage_id="pilot",
+        owner_repository="dnadesign",
+        owner_tool="usr",
+        object_kind="store",
+        content_schema="usr.dataset-root",
+        content_schema_version="v1",
+        producer_revision="test-revision",
+        storage_class="cold",
+        retention_policy="cold",
+    )
+
+    assert summary["status"] == "verified"
+    assert injected is True
+    assert settle_delays == [storage_inventory._POST_PUBLICATION_SETTLE_SECONDS]
+
+
 @pytest.mark.parametrize("target_kind", ["resource", "directory"])
 def test_inventory_retries_shared_posture_entry_that_vanishes_before_stat(
     tmp_path: Path,

@@ -153,11 +153,10 @@ def _read_stable_regular_bytes(
         or not stat.S_ISREG(read_after.st_mode)
         or not stat.S_ISREG(after.st_mode)
         or (opened.st_dev, opened.st_ino) != expected_identity
-        or opened_state != before_state
-        or read_after_state != opened_state
-        or after_state != before_state
     ):
         raise StorageObjectError(change_message)
+    if opened_state != before_state or read_after_state != opened_state or after_state != before_state:
+        raise _StorageSnapshotInconsistent(change_message)
     return content
 
 
