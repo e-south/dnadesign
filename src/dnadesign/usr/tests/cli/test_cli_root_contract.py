@@ -58,3 +58,31 @@ def test_cli_normalizes_usr_package_root_to_datasets_root(tmp_path: Path, monkey
     assert result.exit_code == 0, result.output
     assert '"dataset":"demo"' in result.output
     assert '"dataset":"datasets/demo"' not in result.output
+
+
+def test_cli_uses_external_usr_root_from_environment(tmp_path: Path, monkeypatch) -> None:
+    dataset_root = tmp_path / "external-usr"
+    ensure_registry(dataset_root)
+    ds = Dataset(dataset_root, "external_demo")
+    ds.init(source="test")
+    ds.add_sequences(["ACGT"], bio_type="dna", alphabet="dna_4", source="test")
+    monkeypatch.setenv("DNADESIGN_USR_ROOT", str(dataset_root))
+
+    result = CliRunner().invoke(cli_module.app, ["ls", "--format", "json"])
+
+    assert result.exit_code == 0, result.output
+    assert '"dataset":"external_demo"' in result.output
+
+
+def test_cli_rejects_missing_external_usr_root_from_environment(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    missing_root = tmp_path / "missing-usr"
+    monkeypatch.setenv("DNADESIGN_USR_ROOT", str(missing_root))
+
+    result = CliRunner().invoke(cli_module.app, ["ls", "--format", "json"])
+
+    assert result.exit_code != 0
+    assert "USR root is not an existing directory" in result.output
+    assert not missing_root.exists()

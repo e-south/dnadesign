@@ -33,6 +33,7 @@ from .support.resolution.paths import resolve_path_anywhere as _resolve_path_any
 from .support.resolution.roots import default_usr_root as _default_usr_root_impl
 from .support.resolution.roots import normalize_usr_root as _normalize_usr_root_impl
 from .support.resolution.roots import pkg_usr_root as _pkg_usr_root_impl
+from .support.resolution.roots import resolve_usr_root_from_env as _resolve_usr_root_from_env_impl
 from .support.wiring import dependencies as dependency_support
 from .support.wiring import registration as registration_support
 from .support.wiring.bindings import build_cli_bindings
@@ -107,6 +108,10 @@ def _default_usr_root() -> Path:
 
 def _normalize_usr_root(root: Path) -> Path:
     return _normalize_usr_root_impl(root, pkg_root=_pkg_usr_root())
+
+
+def _resolve_usr_root_from_env() -> Path | None:
+    return _resolve_usr_root_from_env_impl(pkg_root=_pkg_usr_root())
 
 
 def _assert_supported_root(root: Path) -> None:
@@ -265,6 +270,7 @@ state_app = _cli_apps.state_app
 _ctx_args = registration_support.ctx_args
 _root = registration_support.build_root_callback(
     default_usr_root=_default_usr_root,
+    resolve_usr_root_from_env=_resolve_usr_root_from_env,
     normalize_usr_root=_normalize_usr_root,
     assert_supported_root=_assert_supported_root,
 )
