@@ -71,6 +71,7 @@ def test_generic_test_fixtures_do_not_reuse_external_study_identity() -> None:
     root = _repo_root()
     paths = [
         *(root / "src" / "dnadesign" / "ops" / "tests").rglob("*.py"),
+        *(root / "src" / "dnadesign" / "notify" / "tests").rglob("*.py"),
         *(root / "src" / "dnadesign" / "devtools" / "tests" / "docs").rglob("*.py"),
     ]
     violations = [
