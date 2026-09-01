@@ -107,7 +107,7 @@ def _write_densegen_config(
             f"""
             densegen:
               run:
-                id: study_stress_ethanol_cipro
+                id: demo_densegen_run
                 root: {run_root}
               output:
                 targets: [parquet, usr]
@@ -568,7 +568,7 @@ def test_main_ensure_dir_writable_creates_directory_and_emits_record(tmp_path: P
 
 
 def test_main_prune_ops_logs_prunes_old_files_and_writes_manifest(tmp_path: Path, capsys) -> None:
-    stdout_dir = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "sge" / "study_stress_ethanol_cipro"
+    stdout_dir = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "sge" / "demo_densegen_run"
     stdout_dir.mkdir(parents=True, exist_ok=True)
     keep_file = stdout_dir / "dnadesign_densegen_cpu.100.out"
     prune_file = stdout_dir / "dnadesign_densegen_cpu.101.out"
@@ -584,7 +584,7 @@ def test_main_prune_ops_logs_prunes_old_files_and_writes_manifest(tmp_path: Path
             "--stdout-dir",
             str(stdout_dir),
             "--runbook-id",
-            "study_stress_ethanol_cipro",
+            "demo_densegen_run",
             "--keep-last",
             "1",
             "--max-age-days",
@@ -603,7 +603,7 @@ def test_main_prune_ops_logs_prunes_old_files_and_writes_manifest(tmp_path: Path
     assert payload["pruned_count"] == 1
     assert payload["manifest_path"] == str(manifest_path)
     manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert manifest_payload["runbook_id"] == "study_stress_ethanol_cipro"
+    assert manifest_payload["runbook_id"] == "demo_densegen_run"
     assert manifest_payload["pruned_count"] == 1
 
 
@@ -617,7 +617,7 @@ def test_main_prune_ops_logs_rejects_stdout_dir_outside_runbook_scope(tmp_path: 
             "--stdout-dir",
             str(stdout_dir),
             "--runbook-id",
-            "study_stress_ethanol_cipro",
+            "demo_densegen_run",
             "--keep-last",
             "5",
             "--max-age-days",
@@ -649,7 +649,7 @@ def test_main_prune_ops_logs_runtime_kind_prunes_old_files(tmp_path: Path, capsy
             "--log-kind",
             "runtime",
             "--runbook-id",
-            "study_stress_ethanol_cipro",
+            "demo_densegen_run",
             "--keep-last",
             "1",
             "--max-age-days",
@@ -670,7 +670,7 @@ def test_main_prune_ops_logs_runtime_kind_prunes_old_files(tmp_path: Path, capsy
 
 
 def test_main_prune_ops_logs_runtime_kind_rejects_invalid_scope(tmp_path: Path, capsys) -> None:
-    wrong_dir = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "sge" / "study_stress_ethanol_cipro"
+    wrong_dir = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "sge" / "demo_densegen_run"
     wrong_dir.mkdir(parents=True, exist_ok=True)
 
     exit_code = main(
@@ -681,7 +681,7 @@ def test_main_prune_ops_logs_runtime_kind_rejects_invalid_scope(tmp_path: Path, 
             "--log-kind",
             "runtime",
             "--runbook-id",
-            "study_stress_ethanol_cipro",
+            "demo_densegen_run",
             "--keep-last",
             "5",
             "--max-age-days",

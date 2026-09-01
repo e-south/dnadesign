@@ -17,6 +17,11 @@ from pathlib import Path
 _ADDITIONAL_TOOL_TEST_DIRS = {
     "cluster": ("src/cli/tests",),
 }
+_EXTERNAL_STUDY_FIXTURE_GUARD = "src/dnadesign/devtools/tests/docs/test_external_study_boundaries.py"
+_CROSS_TOOL_INVARIANT_TARGETS = {
+    "notify": (_EXTERNAL_STUDY_FIXTURE_GUARD,),
+    "ops": (_EXTERNAL_STUDY_FIXTURE_GUARD,),
+}
 
 
 def parse_tools_csv(value: str) -> list[str]:
@@ -44,7 +49,7 @@ def _load_changed_files(path: Path | None) -> list[str]:
 
 
 def _append_existing_target(targets: list[str], target: Path) -> None:
-    if target.is_dir():
+    if target.is_dir() or target.is_file():
         target_value = str(target)
         if target_value not in targets:
             targets.append(target_value)
@@ -66,6 +71,8 @@ def resolve_test_targets(
         _append_existing_target(targets, tool_root / "tests")
         for relative_test_dir in _ADDITIONAL_TOOL_TEST_DIRS.get(tool_name, ()):
             _append_existing_target(targets, tool_root / relative_test_dir)
+        for relative_test_target in _CROSS_TOOL_INVARIANT_TARGETS.get(tool_name, ()):
+            _append_existing_target(targets, repo_root / relative_test_target)
 
     return targets
 
