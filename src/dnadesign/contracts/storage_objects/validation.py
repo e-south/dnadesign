@@ -148,11 +148,10 @@ def _read_stable_regular_bytes(
         after.st_mtime_ns,
         after.st_ctime_ns,
     )
-    if (
-        not stat.S_ISREG(opened.st_mode)
-        or not stat.S_ISREG(read_after.st_mode)
-        or not stat.S_ISREG(after.st_mode)
-        or (opened.st_dev, opened.st_ino) != expected_identity
+    snapshots = (before, opened, read_after, after)
+    if any(
+        not stat.S_ISREG(snapshot.st_mode) or (snapshot.st_dev, snapshot.st_ino) != expected_identity
+        for snapshot in snapshots
     ):
         raise StorageObjectError(change_message)
     if opened_state != before_state or read_after_state != opened_state or after_state != before_state:

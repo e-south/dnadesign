@@ -505,13 +505,43 @@ def test_stable_regular_read_rejects_competing_inode_between_path_snapshots(
     monkeypatch.setattr(Path, "open", _open)
     monkeypatch.setattr(Path, "stat", _stat)
 
-    with pytest.raises(StorageObjectError, match="manifest changed during validation"):
+    with pytest.raises(StorageObjectError, match="manifest changed during validation") as exc_info:
         storage_validation._read_stable_regular_bytes(
             path,
             label="storage object manifest",
             change_message="manifest changed during validation",
             expected_identity=(published_stat.st_dev, published_stat.st_ino),
         )
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
+
+
+def test_stable_regular_read_hard_fails_when_path_is_competitor_but_open_is_expected(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = tmp_path / "manifest.json"
+    path.write_bytes(b"published receipt\n")
+    published_stat = path.stat(follow_symlinks=False)
+    competitor = tmp_path / "competitor.json"
+    competitor.write_bytes(b"competing receipt\n")
+    competitor_stat = competitor.stat(follow_symlinks=False)
+    original_stat = Path.stat
+
+    def _stat(candidate: Path, *args: object, **kwargs: object):
+        if candidate == path:
+            return competitor_stat
+        return original_stat(candidate, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", _stat)
+
+    with pytest.raises(StorageObjectError, match="manifest changed during validation") as exc_info:
+        storage_validation._read_stable_regular_bytes(
+            path,
+            label="storage object manifest",
+            change_message="manifest changed during validation",
+            expected_identity=(published_stat.st_dev, published_stat.st_ino),
+        )
+    assert not isinstance(exc_info.value, storage_validation._StorageSnapshotInconsistent)
 
 
 @pytest.mark.parametrize("competitor_changes_bytes", [False, True])
