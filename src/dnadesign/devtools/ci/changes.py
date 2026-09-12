@@ -154,7 +154,7 @@ def _is_generated_artifact_only_dir(path: Path) -> bool:
 
     for child in children:
         if child.is_symlink():
-            raise ValueError(f"generated-artifact directory check rejects symlink: {child}")
+            return False
         if child.name in _GENERATED_ARTIFACT_DIRS:
             continue
         if child.is_file() and child.suffix in _GENERATED_ARTIFACT_SUFFIXES:

@@ -261,16 +261,17 @@ def test_discover_repo_tools_keeps_latentdna_and_ignores_cache_only_dirs(tmp_pat
     assert tool_names == {"latentdna"}
 
 
-def test_discover_repo_tools_rejects_symlink_disguised_as_generated_directory(tmp_path: Path) -> None:
+@pytest.mark.parametrize("link_name", ["__pycache__", "source-link"])
+def test_discover_repo_tools_keeps_symlinks_without_following_them(tmp_path: Path, link_name: str) -> None:
     src_root = tmp_path / "src" / "dnadesign"
     external = tmp_path / "external-cache"
     external.mkdir(parents=True)
     candidate = src_root / "stale_cache"
     candidate.mkdir(parents=True)
-    (candidate / "__pycache__").symlink_to(external, target_is_directory=True)
+    (candidate / link_name).symlink_to(external, target_is_directory=True)
+    (external / "loop").symlink_to(external, target_is_directory=True)
 
-    with pytest.raises(ValueError, match="generated-artifact directory check rejects symlink"):
-        discover_repo_tools(repo_root=tmp_path)
+    assert discover_repo_tools(repo_root=tmp_path) == {"stale_cache"}
 
 
 def test_discover_repo_tools_ignores_nested_cache_only_dirs(tmp_path: Path) -> None:

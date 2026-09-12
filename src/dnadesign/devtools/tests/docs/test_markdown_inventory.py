@@ -155,6 +155,7 @@ def test_markdown_inventory_ignores_unrelated_ancestor_git_repository(tmp_path: 
 def test_markdown_inventory_fails_closed_when_git_inventory_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     _write(tmp_path / "docs" / "README.md", "# Documentation\n")
     calls = 0
@@ -170,6 +171,12 @@ def test_markdown_inventory_fails_closed_when_git_inventory_fails(
 
     with pytest.raises(RuntimeError, match="git ls-files failed while inventorying documentation"):
         _collect_markdown_files(tmp_path)
+
+    calls = 0
+    assert main(["--repo-root", str(tmp_path)]) == 1
+    captured = capsys.readouterr()
+    assert "git ls-files failed while inventorying documentation" in captured.out
+    assert "Traceback" not in captured.out + captured.err
 
 
 def test_markdown_inventory_decodes_git_paths_with_filesystem_semantics(
