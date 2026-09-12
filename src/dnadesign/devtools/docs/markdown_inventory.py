@@ -76,16 +76,21 @@ def _collect_visible_markdown_files(repo_root: Path, root: Path) -> list[Path]:
             cwd=repo_root,
             check=False,
             capture_output=True,
-            text=True,
+            text=False,
+            env={**os.environ, "LC_ALL": "C"},
         )
-    except OSError:
-        top_level_result = None
+    except OSError as error:
+        raise RuntimeError("git rev-parse failed while inventorying documentation") from error
 
-    if (
-        top_level_result is None
-        or top_level_result.returncode != 0
-        or Path(top_level_result.stdout.strip()).resolve() != repo_root.resolve()
-    ):
+    if top_level_result.returncode != 0:
+        detail = os.fsdecode(top_level_result.stderr).strip()
+        has_git_metadata = any(os.path.lexists(parent / ".git") for parent in (repo_root, *repo_root.parents))
+        if detail.startswith("fatal: not a git repository") and not has_git_metadata:
+            return sorted(root.rglob("*.md"))
+        raise RuntimeError(f"git rev-parse failed while inventorying documentation: {detail}")
+
+    top_level = Path(os.fsdecode(top_level_result.stdout.removesuffix(b"\n"))).resolve()
+    if top_level != repo_root.resolve():
         return sorted(root.rglob("*.md"))
 
     try:

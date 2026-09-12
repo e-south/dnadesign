@@ -164,7 +164,7 @@ def test_markdown_inventory_fails_closed_when_git_inventory_fails(
         nonlocal calls
         calls += 1
         if calls == 1:
-            return subprocess.CompletedProcess(args[0], 0, stdout=f"{tmp_path}\n", stderr="")
+            return subprocess.CompletedProcess(args[0], 0, stdout=os.fsencode(tmp_path) + b"\n", stderr=b"")
         return subprocess.CompletedProcess(args[0], 128, stdout=b"", stderr=b"fatal: inventory failed")
 
     monkeypatch.setattr(markdown_inventory.subprocess, "run", fake_run)
@@ -193,7 +193,7 @@ def test_markdown_inventory_decodes_git_paths_with_filesystem_semantics(
         nonlocal calls
         calls += 1
         if calls == 1:
-            return subprocess.CompletedProcess(args[0], 0, stdout=f"{tmp_path}\n", stderr="")
+            return subprocess.CompletedProcess(args[0], 0, stdout=os.fsencode(tmp_path) + b"\n", stderr=b"")
         return subprocess.CompletedProcess(args[0], 0, stdout=relative_path_bytes + b"\0", stderr=b"")
 
     monkeypatch.setattr(markdown_inventory.subprocess, "run", fake_run)
@@ -202,6 +202,47 @@ def test_markdown_inventory_decodes_git_paths_with_filesystem_semantics(
     files = markdown_inventory._collect_visible_markdown_files(tmp_path, tmp_path / "docs")
 
     assert files == [document]
+
+
+@pytest.mark.parametrize("name", [b"checkout-\xff", b"checkout-with-space "])
+def test_markdown_inventory_preserves_repository_root_filesystem_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: bytes
+) -> None:
+    repo_root = tmp_path / os.fsdecode(name)
+    document = repo_root / "docs" / "README.md"
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        assert kwargs["text"] is False
+        output = os.fsencode(repo_root) + b"\n" if command[1] == "rev-parse" else b"docs/README.md\0"
+        return subprocess.CompletedProcess(command, 0, stdout=output, stderr=b"")
+
+    monkeypatch.setattr(markdown_inventory.subprocess, "run", fake_run)
+    monkeypatch.setattr(Path, "is_file", lambda path: path == document)
+
+    assert markdown_inventory._collect_visible_markdown_files(repo_root, repo_root / "docs") == [document]
+
+
+def test_markdown_inventory_rejects_corrupt_repository_detection(tmp_path: Path) -> None:
+    _write(tmp_path / "docs" / "README.md", "# Documentation\n")
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
+    _write(tmp_path / ".git" / "HEAD", "malformed HEAD\n")
+
+    with pytest.raises(RuntimeError, match="git rev-parse failed"):
+        _collect_markdown_files(tmp_path)
+
+
+def test_markdown_inventory_rejects_repository_detection_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write(tmp_path / "docs" / "README.md", "# Documentation\n")
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        return subprocess.CompletedProcess(command, 128, stdout=b"", stderr=b"fatal: detected dubious ownership")
+
+    monkeypatch.setattr(markdown_inventory.subprocess, "run", fake_run)
+
+    with pytest.raises(RuntimeError, match="git rev-parse failed.*dubious ownership"):
+        _collect_markdown_files(tmp_path)
 
 
 def test_broken_links_check_flags_missing_markdown_anchor(tmp_path: Path) -> None:
