@@ -276,7 +276,7 @@ def main(argv: list[str] | None = None) -> int:
             repo_root,
             changed_files_file=args.changed_files_file,
         )
-    except (FileNotFoundError, ValueError) as exc:
+    except (FileNotFoundError, ValueError, RuntimeError) as exc:
         print(str(exc))
         return 1
 

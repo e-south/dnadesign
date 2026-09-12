@@ -14,6 +14,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from dnadesign.devtools.ci.changes import (
     determine_scope,
     discover_external_integration_tools,
@@ -256,6 +258,32 @@ def test_discover_repo_tools_keeps_latentdna_and_ignores_cache_only_dirs(tmp_pat
     (src_root / "stale_cache" / "__pycache__").mkdir(parents=True, exist_ok=True)
 
     tool_names = discover_repo_tools(repo_root=tmp_path)
+    assert tool_names == {"latentdna"}
+
+
+@pytest.mark.parametrize("link_name", ["__pycache__", "source-link"])
+def test_discover_repo_tools_keeps_symlinks_without_following_them(tmp_path: Path, link_name: str) -> None:
+    src_root = tmp_path / "src" / "dnadesign"
+    external = tmp_path / "external-cache"
+    external.mkdir(parents=True)
+    candidate = src_root / "stale_cache"
+    candidate.mkdir(parents=True)
+    (candidate / link_name).symlink_to(external, target_is_directory=True)
+    (external / "loop").symlink_to(external, target_is_directory=True)
+
+    assert discover_repo_tools(repo_root=tmp_path) == {"stale_cache"}
+
+
+def test_discover_repo_tools_ignores_nested_cache_only_dirs(tmp_path: Path) -> None:
+    src_root = tmp_path / "src" / "dnadesign"
+    (src_root / "latentdna").mkdir(parents=True, exist_ok=True)
+    (src_root / "latentdna" / "__init__.py").write_text("", encoding="utf-8")
+    cache_root = src_root / "retired_tool" / "compiler" / "contracts" / "__pycache__"
+    cache_root.mkdir(parents=True, exist_ok=True)
+    (cache_root / "models.cpython-312.pyc").write_bytes(b"cached")
+
+    tool_names = discover_repo_tools(repo_root=tmp_path)
+
     assert tool_names == {"latentdna"}
 
 
