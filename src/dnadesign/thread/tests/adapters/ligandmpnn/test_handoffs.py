@@ -1,4 +1,13 @@
-"""Public JSON handoffs preserve producer validation and full probabilities."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/tests/adapters/ligandmpnn/test_handoffs.py
+
+Public JSON handoffs preserve producer validation and full probabilities.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 import hashlib
 import json
@@ -186,3 +195,48 @@ def test_cli_rejects_ambiguous_json_before_emitting_any_plan(tmp_path, contents)
     )
     assert completed.returncode != 0
     assert completed.stdout == ""
+
+
+@pytest.mark.parametrize(
+    "failure", ["relative_root", "missing_checkout", "stale_context", "stale_input", "unknown_residue"]
+)
+def test_rejected_design_does_not_publish_sidecar_or_block_corrected_request(tmp_path, monkeypatch, failure):
+    request = _prepare_request(tmp_path)
+    score = score_request_document(request)
+    residue = {"chain_id": "A", "residue_number": 12, "insertion_code": ""}
+    design = {key: value for key, value in score.items() if key not in {"mode", "use_sequence"}}
+    design.update(
+        schema_id="thread.ligandmpnn.design_command_request",
+        temperature=0.1,
+        residue_alphabets=[{"residue": residue, "allowed_amino_acids": ["A", "C"]}],
+        redesigned_residues=[residue],
+        packing={
+            "enabled": False,
+            "number_of_packs_per_design": 4,
+            "repack_everything": False,
+            "use_ligand_context": True,
+        },
+    )
+    invalid = json.loads(json.dumps(design))
+    execution_root, checkout_root = tmp_path, tmp_path / "LigandMPNN"
+    monkeypatch.chdir(tmp_path)
+    if failure == "relative_root":
+        execution_root = type(tmp_path)(".")
+    elif failure == "missing_checkout":
+        checkout_root = tmp_path / "absent"
+    elif failure == "stale_context":
+        invalid["context_inventory"]["sha256"] = "sha256:" + "0" * 64
+    elif failure == "stale_input":
+        invalid["pdb_sha256"] = "0" * 64
+    else:
+        invalid["redesigned_residues"][0]["residue_number"] = 999
+        invalid["residue_alphabets"][0]["residue"]["residue_number"] = 999
+    sidecar = tmp_path / "residue-alphabets" / f"{request.request_id}.json"
+    with pytest.raises((ValueError, FileNotFoundError)):
+        plan_designs(invalid, checkout_root=checkout_root, execution_root=execution_root)
+    assert not sidecar.exists()
+    design["residue_alphabets"][0]["allowed_amino_acids"] = ["A", "D"]
+    corrected = plan_designs(design, checkout_root=tmp_path / "LigandMPNN", execution_root=tmp_path)
+    assert corrected["status"] == "planned_not_run"
+    content = sidecar.read_bytes()
+    assert corrected["residue_alphabet_sidecar"]["sha256"] == "sha256:" + hashlib.sha256(content).hexdigest()

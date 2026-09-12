@@ -37,6 +37,8 @@ declared execution root as the working directory; plans do not execute models.
 Design plans expose `residue_alphabet_sidecar` as the existing typed path/digest
 receipt, or null when no alphabet was requested. Consumers can validate and
 inventory those bytes without deriving an omission alphabet or decoding argv.
+The sidecar is published only after the design passes input and command
+validation; rejected requests leave no published alphabet file.
 
 ## Request fields
 

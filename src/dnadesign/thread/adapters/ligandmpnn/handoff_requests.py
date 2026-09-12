@@ -1,4 +1,13 @@
-"""Versioned JSON request admission for the LigandMPNN command boundary."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/adapters/ligandmpnn/handoff_requests.py
+
+Versioned JSON request admission for the LigandMPNN command boundary.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

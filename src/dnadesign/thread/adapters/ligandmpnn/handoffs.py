@@ -1,4 +1,13 @@
-"""Domain commands for attested plans and portable, uncensored score results."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/adapters/ligandmpnn/handoffs.py
+
+Domain commands for attested plans and portable, uncensored score results.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
@@ -6,6 +15,7 @@ import hashlib
 import json
 from importlib.metadata import distribution
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from ._regular_files import open_regular_file
 from .alphabets import materialize_residue_alphabet_sidecar
@@ -158,24 +168,31 @@ def plan_designs(
     document: dict, *, checkout_root: Path, execution_root: Path, python_executable: str = "python"
 ) -> dict:
     request = design_request_from_document(document)
-    sidecar = None
-    if request.residue_alphabets:
-        path = Path("residue-alphabets") / f"{request.request_id}.json"
-        sidecar = materialize_residue_alphabet_sidecar(request, path, write_path=execution_root / path)
-    commands = build_ligandmpnn_commands(
-        request,
-        checkout_root=checkout_root,
-        execution_root=execution_root,
-        python_executable=python_executable,
-        residue_alphabet_sidecar=sidecar,
-    )
+    producer = producer_identity()
+    request_document_sha256 = document_digest(document)
+    with TemporaryDirectory(prefix="ligandmpnn-design-") as staging:
+        sidecar = None
+        if request.residue_alphabets:
+            path = Path("residue-alphabets") / f"{request.request_id}.json"
+            sidecar = materialize_residue_alphabet_sidecar(
+                request, path, write_path=Path(staging).resolve() / "alphabet.json"
+            )
+        commands = build_ligandmpnn_commands(
+            request,
+            checkout_root=checkout_root,
+            execution_root=execution_root,
+            python_executable=python_executable,
+            residue_alphabet_sidecar=sidecar,
+        )
+        if sidecar is not None:
+            sidecar = materialize_residue_alphabet_sidecar(request, path, write_path=execution_root / path)
     return {
         "schema_id": "thread.ligandmpnn.design_plan",
         "schema_version": 1,
         "status": "planned_not_run",
-        "producer": producer_identity(),
+        "producer": producer,
         "request": document,
-        "request_document_sha256": document_digest(document),
+        "request_document_sha256": request_document_sha256,
         "residue_alphabet_sidecar": sidecar.to_dict() if sidecar is not None else None,
         "commands": [command.to_dict() for command in commands],
     }

@@ -1,4 +1,13 @@
-"""File-in, JSON-out commands; computation and upstream parsing stay producer-owned."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/thread/adapters/ligandmpnn/cli.py
+
+File-in, JSON-out commands; computation and upstream parsing stay producer-owned.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 
