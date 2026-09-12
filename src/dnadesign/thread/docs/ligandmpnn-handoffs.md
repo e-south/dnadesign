@@ -38,7 +38,10 @@ Design plans expose `residue_alphabet_sidecar` as the existing typed path/digest
 receipt, or null when no alphabet was requested. Consumers can validate and
 inventory those bytes without deriving an omission alphabet or decoding argv.
 The sidecar is published only after the design passes input and command
-validation; rejected requests leave no published alphabet file.
+validation; rejected requests do not publish an alphabet file.
+The output directory cannot equal or descend from the declared or materialized
+sidecar file, including through a path alias. A shared parent is allowed when
+the per-seed output directories remain separate from the sidecar.
 
 ## Request fields
 
@@ -77,11 +80,12 @@ existing `{path, sha256}` reference with a `sha256:` URI.
 
 `score-plan --input-root STAGING --execution-root FINAL` validates the input
 PDB and context inventory in staging while binding commands to the final
-execution directory. The pinned checkout must be absolute and outside staging.
+execution directory. The pinned checkout must be absolute and outside both
+the staging and final execution directories.
 The interpreter must be a bare PATH command such as `python3`, or an absolute
-path outside staging. Relative interpreter paths such as `venv/bin/python` and
-`./python` are rejected: they can resolve to a different file when executed
-from the final directory. A symlink route through the moving directory is
+path outside both directories. Relative interpreter paths such as
+`venv/bin/python` and `./python` are rejected: they can resolve to a different file when executed
+from the final directory. A symlink route through either directory is
 rejected even when its target is external.
 After the caller promotes the unchanged input tree, ordinary planning at the
 final root must reproduce the same commands. Changed input bytes still fail

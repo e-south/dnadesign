@@ -135,17 +135,21 @@ def build_ligandmpnn_score_commands(
         if execution_root.exists() and not execution_root.is_dir():
             raise ValueError("execution_root must be a directory")
         if input_root != execution_root and (
-            not checkout_root.is_absolute() or _moves_with_inputs(checkout_root, input_root)
+            not checkout_root.is_absolute()
+            or any(_moves_with_inputs(checkout_root, root) for root in (input_root, execution_root))
         ):
-            raise ValueError("staged planning requires an absolute checkout outside input_root")
+            raise ValueError("staged planning requires an absolute checkout outside input_root and execution_root")
         interpreter = Path(python_executable)
         if input_root != execution_root:
             if not interpreter.is_absolute() and python_executable != interpreter.name:
                 raise ValueError(
-                    "staged planning requires an absolute interpreter path outside input_root or a bare PATH command"
+                    "staged planning requires an absolute interpreter path outside input_root and execution_root "
+                    "or a bare PATH command"
                 )
-            if interpreter.is_absolute() and _moves_with_inputs(interpreter, input_root):
-                raise ValueError("staged planning requires an interpreter outside input_root")
+            if interpreter.is_absolute() and any(
+                _moves_with_inputs(interpreter, root) for root in (input_root, execution_root)
+            ):
+                raise ValueError("staged planning requires an interpreter outside input_root and execution_root")
     checkout_root = resolve_checkout_root_for_execution(checkout_root, execution_root=execution_root)
     validate_inputs_outside_per_seed_outputs(
         command_input_paths(
@@ -228,7 +232,7 @@ def build_ligandmpnn_score_commands(
 
 
 def _moves_with_inputs(path: Path, input_root: Path) -> bool:
-    """Detect both retained targets and symlink routes through a moving directory."""
+    """Detect targets and symlink routes under a staged or final input-tree root."""
 
     return path.resolve().is_relative_to(input_root) or any(
         parent.resolve() == input_root for parent in (path, *path.parents)

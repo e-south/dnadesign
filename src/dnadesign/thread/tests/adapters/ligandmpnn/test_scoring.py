@@ -260,6 +260,43 @@ def test_staged_score_plan_rejects_external_target_reached_through_moving_symlin
         build_ligandmpnn_score_commands(request, execution_root=tmp_path / "final", input_root=staging, **kwargs)
 
 
+@pytest.mark.parametrize("field", ["checkout", "interpreter"])
+@pytest.mark.parametrize("route", ["direct", "root_alias", "external_target"])
+def test_staged_score_plan_rejects_runtime_paths_through_final_root(tmp_path, field, route):
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    request, checkout = _validated_request(staging)
+    external_checkout = tmp_path / "checkout"
+    checkout.rename(external_checkout)
+    final = tmp_path / "final"
+    runtime_path = final / ("checkout" if field == "checkout" else "venv/bin/python")
+    if field == "checkout":
+        final.mkdir()
+        if route == "external_target":
+            runtime_path.symlink_to(external_checkout, target_is_directory=True)
+        else:
+            external_checkout.rename(runtime_path)
+    elif route == "external_target":
+        final.mkdir()
+        external_venv = tmp_path / "external-venv"
+        external_venv.mkdir()
+        (final / "venv").symlink_to(external_venv, target_is_directory=True)
+    else:
+        moving_interpreter = staging / "venv/bin/python"
+        moving_interpreter.parent.mkdir(parents=True)
+        moving_interpreter.write_text("placeholder")
+    if route == "root_alias":
+        alias = tmp_path / "final-alias"
+        alias.symlink_to(final, target_is_directory=True)
+        runtime_path = alias / runtime_path.relative_to(final)
+    kwargs = {"checkout_root": external_checkout, "python_executable": "python"}
+    kwargs["checkout_root" if field == "checkout" else "python_executable"] = (
+        runtime_path if field == "checkout" else str(runtime_path)
+    )
+    with pytest.raises(ValueError, match=f"{field}.*outside input_root and execution_root"):
+        build_ligandmpnn_score_commands(request, execution_root=final, input_root=staging, **kwargs)
+
+
 def test_score_request_preserves_dot_output_as_an_execution_root_seed_directory(tmp_path: Path) -> None:
     request, checkout_root = _validated_request(tmp_path, output_dir=Path("."))
 

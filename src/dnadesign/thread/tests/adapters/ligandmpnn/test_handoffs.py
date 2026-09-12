@@ -198,7 +198,18 @@ def test_cli_rejects_ambiguous_json_before_emitting_any_plan(tmp_path, contents)
 
 
 @pytest.mark.parametrize(
-    "failure", ["relative_root", "missing_checkout", "stale_context", "stale_input", "unknown_residue"]
+    "failure",
+    [
+        "relative_root",
+        "missing_checkout",
+        "stale_context",
+        "stale_input",
+        "unknown_residue",
+        "sidecar_output_equal",
+        "sidecar_output_descendant",
+        "sidecar_alias_equal",
+        "sidecar_alias_descendant",
+    ],
 )
 def test_rejected_design_does_not_publish_sidecar_or_block_corrected_request(tmp_path, monkeypatch, failure):
     request = _prepare_request(tmp_path)
@@ -228,9 +239,19 @@ def test_rejected_design_does_not_publish_sidecar_or_block_corrected_request(tmp
         invalid["context_inventory"]["sha256"] = "sha256:" + "0" * 64
     elif failure == "stale_input":
         invalid["pdb_sha256"] = "0" * 64
-    else:
+    elif failure == "unknown_residue":
         invalid["redesigned_residues"][0]["residue_number"] = 999
         invalid["residue_alphabets"][0]["residue"]["residue_number"] = 999
+    else:
+        parent = "residue-alphabets"
+        if failure.startswith("sidecar_alias"):
+            parent = "alphabet-alias"
+            (tmp_path / parent).symlink_to(tmp_path / "residue-alphabets", target_is_directory=True)
+        invalid["output_dir"] = f"{parent}/{request.request_id}.json"
+        if failure.endswith("descendant"):
+            invalid["output_dir"] += "/nested"
+        # Per-seed outputs may remain siblings of the input file in the same parent.
+        design["output_dir"] = "residue-alphabets"
     sidecar = tmp_path / "residue-alphabets" / f"{request.request_id}.json"
     with pytest.raises((ValueError, FileNotFoundError)):
         plan_designs(invalid, checkout_root=checkout_root, execution_root=execution_root)

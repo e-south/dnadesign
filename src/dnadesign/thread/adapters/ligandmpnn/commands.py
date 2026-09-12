@@ -150,6 +150,13 @@ def _validate_command_input_output_separation(
         python_executable=python_executable,
         residue_alphabet_sidecar=residue_alphabet_sidecar,
     )
+    output_path = execution_root / request.output_dir
+    for field_name in ("residue alphabet sidecar path", "residue alphabet sidecar materialized_path"):
+        sidecar_path = inputs.get(field_name)
+        if sidecar_path is not None and (
+            output_path.is_relative_to(sidecar_path) or output_path.resolve().is_relative_to(sidecar_path.resolve())
+        ):
+            raise ValueError(f"output_dir must not equal or descend from {field_name}")
     validate_inputs_outside_per_seed_outputs(
         inputs,
         output_dir=request.output_dir,
