@@ -129,6 +129,82 @@ def test_score_plan_binds_final_root_after_validating_staged_inputs(tmp_path: Pa
     assert planned == replayed
 
 
+@pytest.mark.parametrize("python_executable", ["venv/bin/python", "./python"])
+def test_staged_score_plan_rejects_relative_interpreter_paths_independent_of_planner_cwd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, python_executable: str
+) -> None:
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    request, checkout = _validated_request(staging)
+    external_checkout = tmp_path / "checkout"
+    checkout.rename(external_checkout)
+    interpreter = staging / python_executable
+    interpreter.parent.mkdir(parents=True, exist_ok=True)
+    interpreter.write_text("placeholder")
+    planner = tmp_path / "planner"
+    planner.mkdir()
+    monkeypatch.chdir(planner)
+
+    with pytest.raises(ValueError, match="staged planning requires an absolute interpreter"):
+        build_ligandmpnn_score_commands(
+            request,
+            checkout_root=external_checkout,
+            execution_root=tmp_path / "final",
+            input_root=staging,
+            python_executable=python_executable,
+        )
+
+
+@pytest.mark.parametrize("interpreter_kind", ["path_command", "absolute_external"])
+def test_staged_score_plan_preserves_explicit_external_interpreter_after_promotion(
+    tmp_path: Path, interpreter_kind: str
+) -> None:
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    request, checkout = _validated_request(staging)
+    external_checkout = tmp_path / "checkout"
+    checkout.rename(external_checkout)
+    python_executable = "python3"
+    if interpreter_kind == "absolute_external":
+        interpreter = tmp_path / "external-venv/bin/python"
+        interpreter.parent.mkdir(parents=True)
+        interpreter.write_text("placeholder")
+        python_executable = str(interpreter)
+    final = tmp_path / "final"
+    planned = build_ligandmpnn_score_commands(
+        request,
+        checkout_root=external_checkout,
+        execution_root=final,
+        input_root=staging,
+        python_executable=python_executable,
+    )
+    assert planned[0].argv[0] == python_executable
+    staging.rename(final)
+    replayed = build_ligandmpnn_score_commands(
+        request,
+        checkout_root=external_checkout,
+        execution_root=final,
+        python_executable=python_executable,
+    )
+    assert planned == replayed
+
+
+@pytest.mark.parametrize("explicit_input_root", [False, True])
+def test_unstaged_score_plan_retains_relative_interpreter_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, explicit_input_root: bool
+) -> None:
+    request, checkout = _validated_request(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    commands = build_ligandmpnn_score_commands(
+        request,
+        checkout_root=checkout,
+        execution_root=tmp_path,
+        input_root=tmp_path if explicit_input_root else None,
+        python_executable="venv/bin/python",
+    )
+    assert commands[0].argv[0] == "venv/bin/python"
+
+
 def test_score_staging_does_not_bypass_input_digest_validation(tmp_path: Path) -> None:
     staging = tmp_path / "staging"
     staging.mkdir()

@@ -78,8 +78,11 @@ existing `{path, sha256}` reference with a `sha256:` URI.
 `score-plan --input-root STAGING --execution-root FINAL` validates the input
 PDB and context inventory in staging while binding commands to the final
 execution directory. The pinned checkout must be absolute and outside staging.
-Explicit interpreter paths must also remain outside staging. A symlink route
-through the moving directory is rejected even when its target is external.
+The interpreter must be a bare PATH command such as `python3`, or an absolute
+path outside staging. Relative interpreter paths such as `venv/bin/python` and
+`./python` are rejected: they can resolve to a different file when executed
+from the final directory. A symlink route through the moving directory is
+rejected even when its target is external.
 After the caller promotes the unchanged input tree, ordinary planning at the
 final root must reproduce the same commands. Changed input bytes still fail
 validation. Omitting `--input-root` retains the existing requirement that

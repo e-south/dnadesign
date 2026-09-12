@@ -139,12 +139,13 @@ def build_ligandmpnn_score_commands(
         ):
             raise ValueError("staged planning requires an absolute checkout outside input_root")
         interpreter = Path(python_executable)
-        if (
-            input_root != execution_root
-            and (interpreter.is_absolute() or python_executable != interpreter.name)
-            and _moves_with_inputs(interpreter.absolute(), input_root)
-        ):
-            raise ValueError("staged planning requires an interpreter outside input_root")
+        if input_root != execution_root:
+            if not interpreter.is_absolute() and python_executable != interpreter.name:
+                raise ValueError(
+                    "staged planning requires an absolute interpreter path outside input_root or a bare PATH command"
+                )
+            if interpreter.is_absolute() and _moves_with_inputs(interpreter, input_root):
+                raise ValueError("staged planning requires an interpreter outside input_root")
     checkout_root = resolve_checkout_root_for_execution(checkout_root, execution_root=execution_root)
     validate_inputs_outside_per_seed_outputs(
         command_input_paths(
