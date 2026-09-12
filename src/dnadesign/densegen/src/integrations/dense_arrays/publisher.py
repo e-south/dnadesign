@@ -31,14 +31,16 @@ from dense_arrays.playback import (
     PlaybackDocument,
     dumps_playback_plan,
     dumps_realized_array,
+    reconstruct_playback,
 )
 from dense_arrays.playback.matplotlib_renderer import (
     render_collection_mp4,
     render_collection_poster_png,
 )
 from dense_arrays.playback.theme import (
+    LegendEntry,
     PlaybackPresentation,
-    legend_entries_for_profile,
+    validate_color,
 )
 from dense_arrays.realized import PlacementKind
 
@@ -47,7 +49,7 @@ from .baserender_projection import (
     BaseRenderDuplexProjection,
     DuplexPresentation,
 )
-from .playback import realized_array_from_densegen_record
+from .playback import densegen_playback_notices, realized_array_from_densegen_record
 
 _ENDPOINT_SCHEMA = "densegen.solution_path_playback_endpoint.v1"
 _SCENE_ID = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
@@ -89,7 +91,9 @@ _LABEL_FIELDS = {"forbidden_terms", "overrides"}
 _PRESENTATION_FIELDS = {
     "layout",
     "color_profile",
+    "colors_by_label",
     "show_legend",
+    "legend_entries",
     "graph_detail",
     "graph_fraction",
     "show_edge_costs",
@@ -406,6 +410,20 @@ def _load_endpoint(config_path: Path) -> _LoadedEndpoint:
     )
 
 
+def _presentation_legend_entries(value: object) -> tuple[LegendEntry, ...]:
+    if not isinstance(value, list):
+        raise TypeError("presentation.legend_entries must be a list")
+    entries = []
+    for index, item in enumerate(value):
+        field_name = f"presentation.legend_entries[{index}]"
+        item = _required_mapping(item, field_name=field_name)
+        _strict_fields(item, {"key", "label", "color"}, field_name=field_name)
+        entries.append(LegendEntry(key=item.get("key"), label=item.get("label"), color=item.get("color")))
+    if len({entry.key for entry in entries}) != len(entries):
+        raise ValueError("presentation.legend_entries keys must be unique")
+    return tuple(entries)
+
+
 def publish_densegen_playback_endpoint(
     config_path: Path,
     *,
@@ -498,13 +516,24 @@ def publish_densegen_playback_endpoint(
         presentation_spec.get("color_profile", "categorical"),
         field_name="presentation.color_profile",
     )
+    colors_raw = _required_mapping(
+        presentation_spec.get("colors_by_label", {}), field_name="presentation.colors_by_label"
+    )
+    colors_by_label = {}
+    for label, color in colors_raw.items():
+        label = _required_text(label, field_name="presentation.colors_by_label key")
+        validate_color(color)
+        colors_by_label[label] = color
     show_legend = _required_bool(
         presentation_spec.get("show_legend", False),
         field_name="presentation.show_legend",
     )
+    legend_entries = _presentation_legend_entries(presentation_spec.get("legend_entries", []))
+    if show_legend and not legend_entries:
+        raise ValueError("presentation.show_legend requires non-empty presentation.legend_entries")
     graph_detail = _choice(
         presentation_spec.get("graph_detail", "full"),
-        {"full", "reduced", "inset", "none"},
+        {"full", "reduced", "none"},
         field_name="presentation.graph_detail",
     )
     default_graph_fraction = 0.0 if graph_detail == "none" else 0.35
@@ -525,7 +554,7 @@ def publish_densegen_playback_endpoint(
     )
     playback_presentation = PlaybackPresentation(
         color_profile=color_profile,
-        legend_entries=(legend_entries_for_profile(color_profile) if show_legend else ()),
+        legend_entries=legend_entries if show_legend else (),
         graph_detail=graph_detail,
         graph_fraction=graph_fraction,
         show_edge_costs=show_edge_costs,
@@ -626,7 +655,7 @@ def publish_densegen_playback_endpoint(
     forbidden_terms = tuple(
         _required_text(value, field_name="labels.forbidden_terms[]").casefold() for value in forbidden_raw
     )
-    text_surfaces = [endpoint_title, *label_overrides.values()]
+    text_surfaces = [endpoint_title, *label_overrides.values(), *(entry.label for entry in legend_entries)]
     for term in forbidden_terms:
         if term and any(term in surface.casefold() for surface in text_surfaces):
             raise ValueError(f"configured presentation text contains forbidden term: {term!r}")
@@ -666,9 +695,7 @@ def publish_densegen_playback_endpoint(
             for term in forbidden_terms:
                 if term and any(term in label.casefold() for label in variant_labels):
                     raise ValueError(f"record-derived variant annotation contains forbidden term: {term!r}")
-        from dense_arrays.playback import reconstruct_playback
-
-        plan = reconstruct_playback(realized)
+        plan = reconstruct_playback(realized, notices=densegen_playback_notices(realized))
         realized_by_digest[plan.realization_digest] = realized
         scene_title_raw = spec.get("title")
         scene_title = (
@@ -693,7 +720,16 @@ def publish_densegen_playback_endpoint(
                 plan=plan,
                 title=scene_title,
                 subtitle=subtitle,
-                label_overrides=label_overrides,
+                label_overrides={
+                    placement.placement_id: label_overrides[placement.label]
+                    for placement in realized.placements
+                    if placement.label in label_overrides
+                },
+                color_overrides={
+                    placement.placement_id: colors_by_label[placement.label]
+                    for placement in realized.placements
+                    if placement.label in colors_by_label
+                },
                 presentation=playback_presentation,
             )
         )
@@ -770,7 +806,11 @@ def publish_densegen_playback_endpoint(
             "audience": audience,
             "presentation": {
                 "color_profile": color_profile,
+                "colors_by_label": colors_by_label,
                 "show_legend": show_legend,
+                "legend_entries": [
+                    {"key": entry.key, "label": entry.label, "color": entry.color} for entry in legend_entries
+                ],
                 "graph_detail": graph_detail,
                 "graph_fraction": graph_fraction,
                 "show_edge_costs": show_edge_costs,

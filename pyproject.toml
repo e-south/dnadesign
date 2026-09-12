@@ -290,7 +290,7 @@ url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [tool.uv.sources]
-dense-arrays = { git = "https://github.com/e-south/dense-arrays" }
+dense-arrays = { git = "https://github.com/e-south/dense-arrays", rev = "0036c59648b22a0f77f5df74b3ce61da7351e12a" } # pragma: allowlist secret
 
 # When infer-evo2 is enabled, use CUDA 13.0 wheels for the Torch family.
 torch = [

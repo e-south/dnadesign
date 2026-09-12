@@ -15,7 +15,7 @@ import json
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 
-from dense_arrays.playback import PlaybackPlan, reconstruct_playback
+from dense_arrays.playback import NoticeLevel, PlaybackNotice, PlaybackPlan, reconstruct_playback
 from dense_arrays.realized import (
     DeclaredConstraint,
     Orientation,
@@ -261,6 +261,25 @@ def realized_array_from_densegen_record(
     )
 
 
+def densegen_playback_notices(realized: RealizedArray) -> tuple[PlaybackNotice, ...]:
+    """Qualify coordinate recovery using DenseGen's persisted adapter evidence."""
+    notices = []
+    for source in ("offset_raw_plus_pad", "offset_raw"):
+        count = sum(placement.metadata.get("coordinate_source") == source for placement in realized.placements)
+        if count:
+            notices.append(
+                PlaybackNotice(
+                    code="coordinate_recovered",
+                    message=(
+                        f"{count} placement coordinate(s) were recovered from DenseGen {source} "
+                        "by exact realized-sequence agreement."
+                    ),
+                    level=NoticeLevel.WARNING,
+                )
+            )
+    return tuple(notices)
+
+
 def playback_plan_from_densegen_record(
     record: Mapping[str, object],
     *,
@@ -268,10 +287,9 @@ def playback_plan_from_densegen_record(
     source_sha256: str | None = None,
 ) -> PlaybackPlan:
     """Translate and compile one persisted DenseGen record for playback."""
-    return reconstruct_playback(
-        realized_array_from_densegen_record(
-            record,
-            source_ref=source_ref,
-            source_sha256=source_sha256,
-        )
+    realized = realized_array_from_densegen_record(
+        record,
+        source_ref=source_ref,
+        source_sha256=source_sha256,
     )
+    return reconstruct_playback(realized, notices=densegen_playback_notices(realized))

@@ -1,7 +1,7 @@
 ## DenseGen outputs reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-26
+**Last verified:** 2026-09-12
 This page defines what DenseGen writes, where it writes it, and which event stream each
 consumer should read.
 
@@ -417,5 +417,12 @@ DenseGen writes `outputs/tables/attempts.parquet`, an append-only audit log of s
 - `attempt_id` — stable join key across artifacts
 - `solution_id` — present for successful attempts
 - `attempt_index` — per-plan monotonic counter
+
+For returned candidates, `solver_solve_time_s` measures the elapsed time spent
+requesting that candidate from the optimizer iterator. It includes lazy model
+setup and enumeration bookkeeping, and excludes subsequent validation and
+output writing. DenseGen measures this at its runtime boundary without adding
+metadata attributes to the immutable optimizer result. No-solution attempt
+rows retain the elapsed library-attempt diagnostic.
 
 Each attempt also records the exact library TF/TFBS/site_id lists offered to the solver (subset attribution). If no attempts are logged, the file is absent. Attempts logs require `pyarrow`.

@@ -455,8 +455,10 @@ class StageBLibraryRuntimeCallbacks:
 
             generator_iter = iter(generator)
             while True:
+                candidate_started = time.monotonic()
                 try:
                     sol = next(generator_iter)
+                    solver_solve_time_s = max(0.0, time.monotonic() - candidate_started)
                 except StopIteration:
                     break
                 except ValueError as exc:
@@ -552,7 +554,7 @@ class StageBLibraryRuntimeCallbacks:
                     stage_a_nearest_selected_distance_by_index,
                     stage_a_nearest_selected_distance_norm_by_index,
                 )
-                solver_status, solver_objective, solver_solve_time_s = _extract_solver_metrics(sol)
+                solver_status, solver_objective = _extract_solver_metrics(sol)
 
                 covers_all, covers_required, rejection_reason, rejection_detail = _evaluate_solution_requirements(
                     min_count_per_tf=self._context.min_count_per_tf,

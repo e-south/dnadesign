@@ -39,6 +39,43 @@ uv run python -m dnadesign.densegen.src.integrations.dense_arrays playback-confi
 Replace `playback-config.yaml` with the recipe path. Pass `--replace` only when
 intentionally replacing an existing generated bundle.
 
+DenseGen owns the interpretation of its persisted coordinates. Its record
+adapter checks `offset`, `offset_raw` plus padding, and `offset_raw` against
+the realized sequence. When a raw-coordinate alternative is required,
+`playback_plan_from_densegen_record` and the publisher explicitly pass a
+`coordinate_recovered` notice to Dense Arrays; the generic playback engine
+does not infer that process claim from metadata names.
+
+Endpoint `labels.overrides` and `presentation.colors_by_label` use exact
+persisted placement labels, before display renaming. The publisher resolves
+both maps to placement IDs so the graph and BaseRender duplex share the same
+caller-authored presentation. Colors use opaque `#RRGGBB` values. For example,
+these fields can be added to a supported endpoint recipe:
+
+```yaml
+labels:
+  overrides:
+    TF_A: Example binding site # Rename this exact persisted label for display.
+presentation:
+  color_profile: uniform # Use a neutral default for placements without overrides.
+  colors_by_label:
+    TF_A: "#9C572B" # Apply this color to every placement with the exact label.
+  show_legend: true # Display the explicit entries below.
+  legend_entries:
+    - key: example_binding # Give this legend entry a unique presentation key.
+      label: Example binding site # Author the display text explicitly.
+      color: "#9C572B" # Match the corresponding placement color.
+```
+
+`legend_entries` are explicit `key`, `label`, and `color` records; the publisher
+does not infer biological groups or legend text from label spellings.
+Enabling `show_legend` requires at least one explicit entry. Entries may remain
+configured with `show_legend: false` to hide the legend temporarily.
+BaseRender owns the duplex distance brackets and declares that capability to
+the raster renderer, which avoids drawing the same bracket twice. Publication
+outputs remain the configured poster, MP4, and JSON bundle; the unused SVG
+frame attachment path has been removed.
+
 The public mechanics and authority language are owned by the `dense-arrays`
 package. Study-specific selection, labels, and interpretation remain in the
 owning research study.

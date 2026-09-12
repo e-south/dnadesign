@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import pytest
+from dense_arrays import DenseArray
 
 from dnadesign.densegen.src.adapters.optimizer import DenseArrayOptimizer
 from dnadesign.densegen.src.adapters.optimizer.dense_arrays import DenseArraysAdapter, _apply_solver_controls
@@ -137,3 +138,19 @@ def test_solver_enforces_min_total_sites_when_target_is_unreachable() -> None:
     )
     with pytest.raises(ValueError, match="No feasible solution was found"):
         _ = next(iter(run_with_constraint.generator))
+
+
+@pytest.mark.parametrize("strategy", ["optimal", "iterate", "diverse", "approximate"])
+def test_adapter_yields_native_results_without_private_timing_metadata(strategy: str) -> None:
+    run = DenseArraysAdapter().build(
+        library=["AAA"],
+        sequence_length=3,
+        solver="CBC",
+        strategy=strategy,
+        fixed_elements=None,
+        strands="single",
+    )
+    solution = next(iter(run.generator))
+    assert isinstance(solution, DenseArray)
+    assert solution.sequence == "AAA"
+    assert not hasattr(solution, "_densegen_solve_time_s")
