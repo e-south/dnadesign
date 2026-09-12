@@ -114,6 +114,189 @@ def test_score_request_preserves_valid_nested_relative_output_directory(tmp_path
     assert command.argv[command.argv.index("--out_folder") + 1] == "results/nested/scores/seed_7"
 
 
+def test_score_plan_binds_final_root_after_validating_staged_inputs(tmp_path: Path) -> None:
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    request, checkout_root = _validated_request(staging)
+    # The producer checkout is external to the directory being promoted.
+    checkout = tmp_path / "checkout"
+    checkout_root.rename(checkout)
+    final = tmp_path / "final"
+    planned = build_ligandmpnn_score_commands(request, checkout_root=checkout, execution_root=final, input_root=staging)
+    assert str(staging) not in planned[0].argv
+    staging.rename(final)
+    replayed = build_ligandmpnn_score_commands(request, checkout_root=checkout, execution_root=final)
+    assert planned == replayed
+
+
+@pytest.mark.parametrize("python_executable", ["venv/bin/python", "./python"])
+def test_staged_score_plan_rejects_relative_interpreter_paths_independent_of_planner_cwd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, python_executable: str
+) -> None:
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    request, checkout = _validated_request(staging)
+    external_checkout = tmp_path / "checkout"
+    checkout.rename(external_checkout)
+    interpreter = staging / python_executable
+    interpreter.parent.mkdir(parents=True, exist_ok=True)
+    interpreter.write_text("placeholder")
+    planner = tmp_path / "planner"
+    planner.mkdir()
+    monkeypatch.chdir(planner)
+
+    with pytest.raises(ValueError, match="staged planning requires an absolute interpreter"):
+        build_ligandmpnn_score_commands(
+            request,
+            checkout_root=external_checkout,
+            execution_root=tmp_path / "final",
+            input_root=staging,
+            python_executable=python_executable,
+        )
+
+
+@pytest.mark.parametrize("interpreter_kind", ["path_command", "absolute_external"])
+def test_staged_score_plan_preserves_explicit_external_interpreter_after_promotion(
+    tmp_path: Path, interpreter_kind: str
+) -> None:
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    request, checkout = _validated_request(staging)
+    external_checkout = tmp_path / "checkout"
+    checkout.rename(external_checkout)
+    python_executable = "python3"
+    if interpreter_kind == "absolute_external":
+        interpreter = tmp_path / "external-venv/bin/python"
+        interpreter.parent.mkdir(parents=True)
+        interpreter.write_text("placeholder")
+        python_executable = str(interpreter)
+    final = tmp_path / "final"
+    planned = build_ligandmpnn_score_commands(
+        request,
+        checkout_root=external_checkout,
+        execution_root=final,
+        input_root=staging,
+        python_executable=python_executable,
+    )
+    assert planned[0].argv[0] == python_executable
+    staging.rename(final)
+    replayed = build_ligandmpnn_score_commands(
+        request,
+        checkout_root=external_checkout,
+        execution_root=final,
+        python_executable=python_executable,
+    )
+    assert planned == replayed
+
+
+@pytest.mark.parametrize("explicit_input_root", [False, True])
+def test_unstaged_score_plan_retains_relative_interpreter_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, explicit_input_root: bool
+) -> None:
+    request, checkout = _validated_request(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    commands = build_ligandmpnn_score_commands(
+        request,
+        checkout_root=checkout,
+        execution_root=tmp_path,
+        input_root=tmp_path if explicit_input_root else None,
+        python_executable="venv/bin/python",
+    )
+    assert commands[0].argv[0] == "venv/bin/python"
+
+
+def test_score_staging_does_not_bypass_input_digest_validation(tmp_path: Path) -> None:
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    request, checkout = _validated_request(staging)
+    external_checkout = tmp_path / "checkout"
+    checkout.rename(external_checkout)
+    (staging / request.pdb_path).write_text("changed\n")
+    with pytest.raises(ValueError, match="SHA256|digest"):
+        build_ligandmpnn_score_commands(
+            request, checkout_root=external_checkout, execution_root=tmp_path / "final", input_root=staging
+        )
+
+
+@pytest.mark.parametrize("relative", [True, False])
+def test_staged_score_plan_rejects_interpreter_under_moving_input_root(tmp_path, monkeypatch, relative):
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    request, checkout = _validated_request(staging)
+    external_checkout = tmp_path / "checkout"
+    checkout.rename(external_checkout)
+    executable = staging / "bin/python"
+    executable.parent.mkdir()
+    executable.write_text("placeholder")
+    monkeypatch.chdir(tmp_path)
+    python_executable = str(executable.relative_to(tmp_path) if relative else executable)
+    with pytest.raises(ValueError, match="interpreter.*input_root"):
+        build_ligandmpnn_score_commands(
+            request,
+            checkout_root=external_checkout,
+            execution_root=tmp_path / "final",
+            input_root=staging,
+            python_executable=python_executable,
+        )
+
+
+@pytest.mark.parametrize("field", ["checkout", "interpreter"])
+def test_staged_score_plan_rejects_external_target_reached_through_moving_symlink(tmp_path, field):
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    request, checkout = _validated_request(staging)
+    external_checkout = tmp_path / "checkout"
+    checkout.rename(external_checkout)
+    alias_root = tmp_path / "stage-alias"
+    alias_root.symlink_to(staging, target_is_directory=True)
+    link = alias_root / "external-link"
+    link.symlink_to(external_checkout, target_is_directory=True)
+    kwargs = {"checkout_root": external_checkout, "python_executable": "python"}
+    if field == "checkout":
+        kwargs["checkout_root"] = link
+    else:
+        kwargs["python_executable"] = str(link / "python")
+    with pytest.raises(ValueError, match="outside input_root"):
+        build_ligandmpnn_score_commands(request, execution_root=tmp_path / "final", input_root=staging, **kwargs)
+
+
+@pytest.mark.parametrize("field", ["checkout", "interpreter"])
+@pytest.mark.parametrize("route", ["direct", "root_alias", "external_target"])
+def test_staged_score_plan_rejects_runtime_paths_through_final_root(tmp_path, field, route):
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    request, checkout = _validated_request(staging)
+    external_checkout = tmp_path / "checkout"
+    checkout.rename(external_checkout)
+    final = tmp_path / "final"
+    runtime_path = final / ("checkout" if field == "checkout" else "venv/bin/python")
+    if field == "checkout":
+        final.mkdir()
+        if route == "external_target":
+            runtime_path.symlink_to(external_checkout, target_is_directory=True)
+        else:
+            external_checkout.rename(runtime_path)
+    elif route == "external_target":
+        final.mkdir()
+        external_venv = tmp_path / "external-venv"
+        external_venv.mkdir()
+        (final / "venv").symlink_to(external_venv, target_is_directory=True)
+    else:
+        moving_interpreter = staging / "venv/bin/python"
+        moving_interpreter.parent.mkdir(parents=True)
+        moving_interpreter.write_text("placeholder")
+    if route == "root_alias":
+        alias = tmp_path / "final-alias"
+        alias.symlink_to(final, target_is_directory=True)
+        runtime_path = alias / runtime_path.relative_to(final)
+    kwargs = {"checkout_root": external_checkout, "python_executable": "python"}
+    kwargs["checkout_root" if field == "checkout" else "python_executable"] = (
+        runtime_path if field == "checkout" else str(runtime_path)
+    )
+    with pytest.raises(ValueError, match=f"{field}.*outside input_root and execution_root"):
+        build_ligandmpnn_score_commands(request, execution_root=final, input_root=staging, **kwargs)
+
+
 def test_score_request_preserves_dot_output_as_an_execution_root_seed_directory(tmp_path: Path) -> None:
     request, checkout_root = _validated_request(tmp_path, output_dir=Path("."))
 

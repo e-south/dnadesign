@@ -2,7 +2,7 @@
 doc_id: dnadesign-thread-docs
 surface: tool-docs
 owner: dnadesign-maintainers
-last_verified: 2026-09-01
+last_verified: 2026-09-12
 ---
 
 # Thread
@@ -13,6 +13,9 @@ provenance, results, and checks explicit. A caller supplies the scientific
 selection and decides what the results mean.
 
 ## Routes
+
+External studies can use the [LigandMPNN command and artifact handoffs](ligandmpnn-handoffs.md)
+to keep the producer runtime outside their package dependencies.
 
 | Job | Surface | Result |
 | --- | --- | --- |
@@ -184,6 +187,8 @@ context-probe entrypoint executes upstream parsing.
 - Model execution, credentials, schedulers, and device storage remain explicit
   operator concerns. There is no hidden fallback.
 
-Study-owned code may call these public packages after it has chosen subjects,
-masks, thresholds, and comparison policy. Thread must not import study code,
-name study objectives, or publish promotion decisions.
+Native library callers may use these public packages after choosing subjects,
+masks, thresholds, and comparison policy. External study workspaces use the
+command/artifact handoff when they need independent installation and evidence
+reading. Thread must not import study code, name study objectives, or publish
+promotion decisions.

@@ -119,11 +119,37 @@ def build_ligandmpnn_score_commands(
     *,
     checkout_root: Path,
     execution_root: Path,
+    input_root: Path | None = None,
     python_executable: str = "python",
 ) -> tuple[LigandMpnnCommand, ...]:
     """Build one explicit official ``score.py`` invocation per seed."""
 
-    execution_root = resolve_execution_root_for_execution(execution_root)
+    if input_root is None:
+        execution_root = resolve_execution_root_for_execution(execution_root)
+        input_root = execution_root
+    else:
+        input_root = resolve_execution_root_for_execution(input_root)
+        if not isinstance(execution_root, Path) or not execution_root.is_absolute():
+            raise ValueError("execution_root must be an absolute directory")
+        execution_root = execution_root.resolve()
+        if execution_root.exists() and not execution_root.is_dir():
+            raise ValueError("execution_root must be a directory")
+        if input_root != execution_root and (
+            not checkout_root.is_absolute()
+            or any(_moves_with_inputs(checkout_root, root) for root in (input_root, execution_root))
+        ):
+            raise ValueError("staged planning requires an absolute checkout outside input_root and execution_root")
+        interpreter = Path(python_executable)
+        if input_root != execution_root:
+            if not interpreter.is_absolute() and python_executable != interpreter.name:
+                raise ValueError(
+                    "staged planning requires an absolute interpreter path outside input_root and execution_root "
+                    "or a bare PATH command"
+                )
+            if interpreter.is_absolute() and any(
+                _moves_with_inputs(interpreter, root) for root in (input_root, execution_root)
+            ):
+                raise ValueError("staged planning requires an interpreter outside input_root and execution_root")
     checkout_root = resolve_checkout_root_for_execution(checkout_root, execution_root=execution_root)
     validate_inputs_outside_per_seed_outputs(
         command_input_paths(
@@ -139,7 +165,7 @@ def build_ligandmpnn_score_commands(
     )
     context_inventory = load_ligandmpnn_context_inventory(
         request.context_inventory,
-        execution_root=execution_root,
+        execution_root=input_root,
     )
     protein_evidence = validate_context_inventory_for_input(
         context_inventory,
@@ -148,7 +174,7 @@ def build_ligandmpnn_score_commands(
         upstream=request.upstream,
         use_side_chain_context=request.use_side_chain_context,
         checkout_root=checkout_root,
-        execution_root=execution_root,
+        execution_root=input_root,
     )
     validate_ligandmpnn_residue_selection(
         fixed_residue_ids=tuple(item.upstream_id for item in request.fixed_residues),
@@ -203,6 +229,14 @@ def build_ligandmpnn_score_commands(
         )
         commands.append(LigandMpnnCommand(seed=seed, output_dir=output_dir, argv=argv))
     return tuple(commands)
+
+
+def _moves_with_inputs(path: Path, input_root: Path) -> bool:
+    """Detect targets and symlink routes under a staged or final input-tree root."""
+
+    return path.resolve().is_relative_to(input_root) or any(
+        parent.resolve() == input_root for parent in (path, *path.parents)
+    )
 
 
 def _append_residue_selection(argv: list[str], request: LigandMpnnScoreRequest) -> None:

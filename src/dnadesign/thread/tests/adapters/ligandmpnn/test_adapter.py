@@ -247,6 +247,34 @@ def test_build_commands_rejects_materialized_sidecar_nested_inside_per_seed_outp
         )
 
 
+@pytest.mark.parametrize("field", ["path", "materialized_path"])
+@pytest.mark.parametrize("descendant", [False, True])
+def test_build_commands_rejects_output_directory_at_or_below_sidecar(tmp_path: Path, field, descendant) -> None:
+    residue = LigandMpnnResidue(chain_id="A", residue_number=12)
+    collision = Path("outputs/alphabet.json")
+    output_dir = collision / "nested" if descendant else collision
+    request, checkout_root = _validated_request(
+        tmp_path,
+        output_dir=output_dir,
+        fixed_residues=(),
+        redesigned_residues=(residue,),
+        residue_alphabets=(LigandMpnnResidueAlphabet(residue=residue, allowed_amino_acids=("A", "G")),),
+        seeds=(7,),
+    )
+    sidecar = materialize_residue_alphabet_sidecar(
+        request,
+        collision if field == "path" else Path("evidence/alphabet.json"),
+        write_path=tmp_path / (collision if field == "materialized_path" else "private/alphabet.json"),
+    )
+    with pytest.raises(ValueError, match="output_dir.*sidecar"):
+        build_ligandmpnn_commands(
+            request,
+            checkout_root=checkout_root,
+            execution_root=tmp_path,
+            residue_alphabet_sidecar=sidecar,
+        )
+
+
 def test_build_commands_rejects_absolute_python_executable_nested_inside_per_seed_output(tmp_path: Path) -> None:
     request, checkout_root = _validated_request(tmp_path, seeds=(7,))
     executable_path = tmp_path / "outputs/designs/seed_7/bin/python"
