@@ -1,6 +1,12 @@
-"""Check per-effect color controls before rendering.
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/baserender/tests/test_effect_presentation.py
+
+Check per-effect color controls before rendering.
 
 Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 from dataclasses import replace

@@ -1,6 +1,12 @@
-"""Check complete resting duplexes and stable placement geometry.
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/integrations/test_dense_arrays_resting_frames.py
+
+Check complete resting duplexes and stable placement geometry.
 
 Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 import matplotlib.colors as colors

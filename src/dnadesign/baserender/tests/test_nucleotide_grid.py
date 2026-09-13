@@ -1,6 +1,12 @@
-"""Keep feature nucleotides on the sequence row's glyph grid.
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/baserender/tests/test_nucleotide_grid.py
+
+Keep feature nucleotides on the sequence row's glyph grid.
 
 Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
 """
 
 import matplotlib.pyplot as plt
