@@ -47,15 +47,16 @@ the realized sequence. When a raw-coordinate alternative is required,
 does not infer that process claim from metadata names.
 
 Endpoint `labels.overrides` and `presentation.colors_by_label` use exact
-persisted placement labels, before display renaming. The publisher resolves
-both maps to placement IDs so the graph and BaseRender duplex share the same
-caller-authored presentation. Colors use opaque `#RRGGBB` values. For example,
-these fields can be added to a supported endpoint recipe:
+persisted placement labels. The publisher resolves both maps to placement IDs.
+Color overrides apply to the graph and BaseRender duplex. Label overrides
+change fixed-element annotation text when `duplex.fixed_element_annotations`
+is `variant`; TFBS features keep their nucleotide sequences as text. Use
+explicit legend entries to name TFBS groups.
+
+Colors use opaque `#RRGGBB` values. For example, these fields can be added to a
+supported endpoint recipe:
 
 ```yaml
-labels:
-  overrides:
-    TF_A: Example binding site # Rename this exact persisted label for display.
 presentation:
   color_profile: uniform # Use a neutral default for placements without overrides.
   colors_by_label:
