@@ -141,7 +141,7 @@ class _SpanLinkEffectContract:
         params = effect.params
         reject_unknown_keys(
             params,
-            {"label", "inner_margin_bp", "lane", "shrink_label_to_fit"},
+            {"label", "inner_margin_bp", "lane", "shrink_label_to_fit", "color", "label_color"},
             "span_link.params",
         )
         if "shrink_label_to_fit" in params:
@@ -299,7 +299,7 @@ class _AnchoredIllustrationEffectContract:
             )
             reject_unknown_keys(
                 binding,
-                {"anchor_id", "feature_id", "start", "end"},
+                {"anchor_id", "feature_id", "start", "end", "fill_color"},
                 f"anchored_illustration.target.bindings[{index}]",
             )
             for field_name in ("anchor_id", "feature_id", "start", "end"):
@@ -335,7 +335,7 @@ class _AnchoredIllustrationEffectContract:
             seen_features.add(feature_id)
         reject_unknown_keys(
             effect.params,
-            {"asset_id", "width_px", "top_gap_px", "fill_color", "fill_alpha"},
+            {"asset_id", "width_px", "top_gap_px", "fill_color", "fill_alpha", "image_tint"},
             "anchored_illustration.params",
         )
         ensure(

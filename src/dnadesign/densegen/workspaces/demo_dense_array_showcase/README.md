@@ -77,11 +77,21 @@ the raster renderer, which avoids drawing the same bracket twice. Publication
 outputs remain the configured poster, MP4, and JSON bundle; the unused SVG
 frame attachment path has been removed.
 
+Playback starts with the full graph, duplex, placement tracks, and configured
+annotations in light gray. Placements gain color as the animation advances;
+uncovered bases remain gray. The layout and nucleotide size stay fixed within
+each scene. The BaseRender frame callback accepts `None` for this pre-placement
+view and an integer for the corresponding completed placement.
+
 The public mechanics and authority language are owned by the `dense-arrays`
 package. Study-specific selection, labels, and interpretation remain in the
 owning research study.
 
 ### Endpoint schema migration
+
+`audience` accepts `public` or `study_publication` and is preserved in the
+bundle manifest. Both values use the same input validation and local output
+installation. Study-owned records and media remain in their study workspace.
 
 The publisher accepts `densegen.solution_path_playback_endpoint.v2`. To update
 an existing v1 recipe:

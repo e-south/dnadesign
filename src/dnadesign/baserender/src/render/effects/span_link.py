@@ -14,6 +14,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+import matplotlib.colors as mcolors
 from matplotlib.font_manager import FontProperties
 from matplotlib.textpath import TextPath
 
@@ -130,6 +131,9 @@ def validate_span_link(
     shrink_to_fit = effect.params.get("shrink_label_to_fit", True)
     if not isinstance(shrink_to_fit, bool):
         raise RenderingError("span_link params.shrink_label_to_fit must be bool")
+    for key in ("color", "label_color"):
+        if key in effect.params and not mcolors.is_color_like(effect.params[key]):
+            raise RenderingError(f"span_link params.{key} must be a valid color")
     if geometry.label:
         base_fs = int(style.font_size_span_link_label or max(6, style.font_size_seq))
         _text_px_width(geometry.label, style.font_label, base_fs, style.dpi)
@@ -146,8 +150,8 @@ def draw_span_link(
 ) -> None:
     geometry = compute_span_link_geometry(effect, layout, style, feature_boxes)
     x1, x2, y, label = geometry.x1, geometry.x2, geometry.y, geometry.label
-    color = str(style.span_link_color)
-    label_color = str(style.span_link_label_color or color)
+    color = effect.params.get("color", style.span_link_color)
+    label_color = effect.params.get("label_color", style.span_link_label_color or color)
     line_width = max(0.8, float(getattr(style, "span_link_line_width", 1.1)))
     tick_line_width = max(0.8, float(getattr(style, "span_link_tick_line_width", line_width)))
     base_fs = int(style.font_size_span_link_label or max(6, style.font_size_seq))

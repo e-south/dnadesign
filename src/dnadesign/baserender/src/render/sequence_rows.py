@@ -2085,12 +2085,18 @@ def _draw_mono_glyph(
     weight: str = "normal",
     zorder: float = 2.0,
     gid: str | None = None,
+    font_size: float | None = None,
+    cell_width: float | None = None,
 ) -> None:
     """Draw one sequence-aligned glyph through the canonical monospace path."""
 
     px_per_pt = style.dpi / 72.0
-    tp = _mono_text_path(char, style.font_mono, style.font_size_seq, weight)
-    y_mid_px = _mono_ag_mid_px(style.font_mono, style.font_size_seq, style.dpi, weight)
+    size = style.font_size_seq if font_size is None else font_size
+    tp = _mono_text_path(char, style.font_mono, size, weight)
+    if cell_width is not None:
+        bounds = tp.get_extents()
+        x += (cell_width - (bounds.x0 + bounds.x1) * px_per_pt) / 2
+    y_mid_px = _mono_ag_mid_px(style.font_mono, size, style.dpi, weight)
     trans = Affine2D().scale(px_per_pt).translate(x, y_center - y_mid_px) + ax.transData
     patch = PathPatch(
         tp,
@@ -2262,30 +2268,21 @@ def _draw_feature_box(
     if not draw_label or not label:
         return
 
-    px_per_pt = style.dpi / 72.0
-
     y_text_center = y + float(style.kmer.text_y_nudge_cells) * ch
+    font_size = _feature_label_font_size(style)
     for idx, char in enumerate(label):
         if char.isspace():
             continue
-        label_font_size = _feature_label_font_size(style)
-        tp = _mono_text_path(char, style.font_mono, label_font_size)
-        gb = tp.get_extents()
-        gx = ((gb.x0 + gb.x1) / 2.0) * px_per_pt
-        gy = ((gb.y0 + gb.y1) / 2.0) * px_per_pt
-        x_center = x + (idx + 0.5) * cw
-        trans = Affine2D().scale(px_per_pt).translate(x_center - gx, y_text_center - gy) + ax.transData
-        _add_fixed_layout_patch(
+        _draw_mono_glyph(
             ax,
-            PathPatch(
-                tp,
-                transform=trans,
-                facecolor=style.kmer.text_color,
-                edgecolor="none",
-                linewidth=0.0,
-                zorder=4,
-                clip_on=False,
-            ),
+            char,
+            x=x + idx * cw,
+            y_center=y_text_center,
+            style=style,
+            color=style.kmer.text_color,
+            zorder=4,
+            font_size=font_size,
+            cell_width=cw if font_size != style.font_size_seq else None,
         )
 
 

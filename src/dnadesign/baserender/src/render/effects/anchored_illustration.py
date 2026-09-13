@@ -20,6 +20,7 @@ from pathlib import Path
 
 import matplotlib.colors as mcolors
 import matplotlib.image as mpimg
+import numpy as np
 from matplotlib.patches import PathPatch
 from matplotlib.path import Path as MatplotlibPath
 
@@ -46,6 +47,7 @@ class AnchoredIllustrationBinding:
     feature_id: str
     start: int
     end: int
+    fill_color: str | None = None
 
 
 @dataclass(frozen=True)
@@ -160,9 +162,12 @@ def _bindings(
             raise RenderingError(f"target.bindings[{index}] start/end must be integers")
         if start < 0 or end <= start or end > len(record.sequence):
             raise RenderingError(f"target.bindings[{index}] span is outside the record sequence")
+        fill_color = raw.get("fill_color")
+        if "fill_color" in raw and (not isinstance(fill_color, str) or not mcolors.is_color_like(fill_color)):
+            raise RenderingError(f"target.bindings[{index}].fill_color must be a valid color string")
         seen_anchors.add(anchor_id)
         seen_features.add(feature_id)
-        bindings.append(AnchoredIllustrationBinding(anchor_id, feature_id, start, end))
+        bindings.append(AnchoredIllustrationBinding(anchor_id, feature_id, start, end, fill_color))
     return tuple(bindings)
 
 
@@ -228,6 +233,8 @@ def validate_anchored_illustration(
         raise RenderingError("anchored_illustration params.fill_alpha must be numeric")
     if not math.isfinite(float(alpha)) or not 0.0 < float(alpha) <= 1.0:
         raise RenderingError("anchored_illustration params.fill_alpha must be within (0, 1]")
+    if "image_tint" in effect.params and not mcolors.is_color_like(effect.params["image_tint"]):
+        raise RenderingError("anchored_illustration params.image_tint must be a valid color")
 
 
 def draw_anchored_illustration(
@@ -248,9 +255,10 @@ def draw_anchored_illustration(
         feature_box = feature_boxes.get(binding.feature_id)
         if feature_box is None:
             continue
-        visible.append((geometry.anchors[binding.anchor_id], feature_box))
+        binding_color = color if binding.fill_color is None else binding.fill_color
+        visible.append((geometry.anchors[binding.anchor_id], feature_box, binding_color))
     if visible:
-        for anchor, feature_box in visible:
+        for anchor, feature_box, binding_color in visible:
             shoulder = max(8.0, (geometry.x1 - geometry.x0) * 0.025)
             vertices = (
                 (anchor[0] - shoulder, anchor[1]),
@@ -271,7 +279,7 @@ def draw_anchored_illustration(
             )
             patch = PathPatch(
                 path,
-                facecolor=color,
+                facecolor=binding_color,
                 edgecolor="none",
                 linewidth=0.0,
                 alpha=alpha,
@@ -279,8 +287,12 @@ def draw_anchored_illustration(
             )
             patch.set_gid(f"anchored_illustration_footprint:{asset.asset_id}:{anchor[0]:.3f}")
             ax.add_artist(patch)
+    pixels = asset.image
+    if "image_tint" in effect.params:
+        pixels = np.array(pixels, copy=True)
+        pixels[:, :, :3] = mcolors.to_rgb(effect.params["image_tint"])
     image = ax.imshow(
-        asset.image,
+        pixels,
         extent=(geometry.x0, geometry.x1, geometry.y0, geometry.y1),
         origin="upper",
         interpolation="lanczos",
