@@ -20,6 +20,7 @@ from pathlib import Path
 
 import matplotlib.colors as mcolors
 import matplotlib.image as mpimg
+import numpy as np
 from matplotlib.patches import PathPatch
 from matplotlib.path import Path as MatplotlibPath
 
@@ -228,6 +229,8 @@ def validate_anchored_illustration(
         raise RenderingError("anchored_illustration params.fill_alpha must be numeric")
     if not math.isfinite(float(alpha)) or not 0.0 < float(alpha) <= 1.0:
         raise RenderingError("anchored_illustration params.fill_alpha must be within (0, 1]")
+    if "image_tint" in effect.params and not mcolors.is_color_like(effect.params["image_tint"]):
+        raise RenderingError("anchored_illustration params.image_tint must be a valid color")
 
 
 def draw_anchored_illustration(
@@ -279,8 +282,12 @@ def draw_anchored_illustration(
             )
             patch.set_gid(f"anchored_illustration_footprint:{asset.asset_id}:{anchor[0]:.3f}")
             ax.add_artist(patch)
+    pixels = asset.image
+    if "image_tint" in effect.params:
+        pixels = np.array(pixels, copy=True)
+        pixels[:, :, :3] = mcolors.to_rgb(effect.params["image_tint"])
     image = ax.imshow(
-        asset.image,
+        pixels,
         extent=(geometry.x0, geometry.x1, geometry.y0, geometry.y1),
         origin="upper",
         interpolation="lanczos",

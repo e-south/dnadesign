@@ -3,7 +3,7 @@ doc_id: baserender-reference
 title: BaseRender reference
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-10
+last_verified: 2026-09-13
 ---
 
 # BaseRender reference
@@ -149,6 +149,13 @@ Record is the renderer input:
 Feature and effect registries reject unknown kinds. Their payload contracts
 reject unknown fields and invalid coordinates. Adapters should retain
 provenance in meta without placing producer logic in the neutral model.
+
+Each `span_link` effect can set `params.color` and `params.label_color` to
+override its line and label colors. Without those fields, the style supplies
+both colors. An `anchored_illustration` can set `params.image_tint` to draw its
+image in one color while preserving the source alpha mask. Omit the tint to
+keep the image's original colors. Invalid colors fail before a figure is
+allocated.
 
 ## Styles
 

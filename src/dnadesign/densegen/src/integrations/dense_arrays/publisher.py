@@ -440,7 +440,7 @@ def publish_densegen_playback_endpoint(
     endpoint_id = _required_text(endpoint.get("endpoint_id"), field_name="endpoint_id")
     if not _SCENE_ID.fullmatch(endpoint_id):
         raise ValueError(f"endpoint_id must match {_SCENE_ID.pattern!r}: {endpoint_id!r}")
-    audience = _choice(endpoint.get("audience"), {"public"}, field_name="audience")
+    audience = _choice(endpoint.get("audience"), {"public", "study_publication"}, field_name="audience")
     source = _required_mapping(endpoint.get("source"), field_name="source")
     _strict_fields(source, _SOURCE_FIELDS, field_name="source")
     source_kind = _choice(source.get("kind"), {"densegen_records"}, field_name="source.kind")

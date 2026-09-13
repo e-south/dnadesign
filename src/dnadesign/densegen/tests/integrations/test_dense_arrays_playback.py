@@ -295,9 +295,14 @@ def test_publisher_restores_prior_bundle_when_replacement_install_fails(
     assert not tuple(output_path.parent.glob(f".{output_path.name}.backup-*"))
 
 
-def test_publisher_removes_prior_bundle_after_successful_replacement(tmp_path: Path) -> None:
+@pytest.mark.parametrize("audience", ["public", "study_publication"])
+def test_publisher_removes_prior_bundle_after_successful_replacement(tmp_path: Path, audience: str) -> None:
     config_path = _write_endpoint(tmp_path)
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["audience"] = audience
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
     output_path = publisher.publish_densegen_playback_endpoint(config_path)
+    assert json.loads((output_path / "manifest.json").read_text())["audience"] == audience
     marker = output_path / "prior-bundle.txt"
     marker.write_text("prior\n", encoding="utf-8")
 
@@ -538,13 +543,13 @@ def test_publisher_rejects_explicit_non_mapping_duplex(tmp_path: Path, value: ob
         publisher.publish_densegen_playback_endpoint(config_path)
 
 
-def test_publisher_rejects_nonpublic_audience(tmp_path: Path) -> None:
+def test_publisher_rejects_unknown_audience(tmp_path: Path) -> None:
     config_path = _write_endpoint(tmp_path)
     payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     payload["audience"] = "internal"
     config_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
-    with pytest.raises(ValueError, match=r"audience must be one of \['public'\]"):
+    with pytest.raises(ValueError, match=r"audience must be one of \['public', 'study_publication'\]"):
         publisher.publish_densegen_playback_endpoint(config_path)
 
 
@@ -797,7 +802,7 @@ def test_baserender_projection_omits_disabled_distance_bracket() -> None:
     )
 
 
-def test_baserender_projection_keeps_unplaced_internal_coordinates_hidden() -> None:
+def test_baserender_projection_keeps_unplaced_internal_coordinates_dimmed() -> None:
     record = {
         "id": "record-gap",
         "sequence": "AAATTTCCC",
@@ -831,7 +836,8 @@ def test_baserender_projection_keeps_unplaced_internal_coordinates_hidden() -> N
     projection = BaseRenderDuplexProjection((document,))
     final_record = projection._records[plan.realization_digest][-1]
 
-    assert final_record.meta["base_hidden_indices"] == {
+    assert "base_hidden_indices" not in final_record.meta
+    assert final_record.meta["dim_base_indices"] == {
         "primary": (3, 4, 5),
         "complement": (3, 4, 5),
     }

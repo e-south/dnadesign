@@ -395,7 +395,7 @@ wheels = [
 [[package]]
 name = "dense-arrays"
 version = "0.2.0"
-source = { git = "https://github.com/e-south/dense-arrays?rev=288af3c7253b4444903d116587b89c57bb76d311#288af3c7253b4444903d116587b89c57bb76d311" }
+source = { git = "https://github.com/e-south/dense-arrays?rev=582a7ef9c1de2c517941793820bb70ac08976a57#582a7ef9c1de2c517941793820bb70ac08976a57" }
 dependencies = [
     { name = "numpy" },
     { name = "ortools" },
@@ -520,7 +520,7 @@ requires-dist = [
     { name = "certifi", specifier = ">=2025.11.12" },
     { name = "click", specifier = ">=8.3.3" },
     { name = "cmake", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=3.18" },
-    { name = "dense-arrays", git = "https://github.com/e-south/dense-arrays?rev=288af3c7253b4444903d116587b89c57bb76d311" },
+    { name = "dense-arrays", git = "https://github.com/e-south/dense-arrays?rev=582a7ef9c1de2c517941793820bb70ac08976a57" },
     { name = "duckdb", specifier = ">=1.5.5,<2" },
     { name = "evo2", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=0.5.3" },
     { name = "fastparquet", specifier = ">=2025.12.0" },

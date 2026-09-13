@@ -19,6 +19,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 from dense_arrays.playback import PlaybackDocument
+from dense_arrays.playback.theme import RESTING_COLOR
 from dense_arrays.playback.typography import PUBLICATION_NUCLEOTIDE_TYPOGRAPHY
 from dense_arrays.realized import RealizedArray
 from PIL import Image
@@ -168,7 +169,7 @@ class BaseRenderDuplexProjection:
         self._palettes: dict[str, Palette] = {}
         self._crop_bounds_by_digest: dict[str, tuple[float, float, float, float]] = {}
         self._raster_cap_height_by_digest: dict[str, float] = {}
-        self._rgba_cache: OrderedDict[tuple[str, int], np.ndarray] = OrderedDict()
+        self._rgba_cache: OrderedDict[tuple[str, int | None], np.ndarray] = OrderedDict()
         for document in documents:
             records, palette = self._prepare_document(document)
             self._records[document.plan.realization_digest] = records
@@ -178,9 +179,9 @@ class BaseRenderDuplexProjection:
     def _tag(index: int) -> str:
         return f"playback:step:{index}"
 
-    def _record_for_step(self, document: PlaybackDocument, step_index: int) -> tuple[Record, dict[str, str]]:
+    def _record_for_step(self, document: PlaybackDocument, step_index: int | None) -> tuple[Record, dict[str, str]]:
         plan = document.plan
-        placed = plan.steps[: step_index + 1]
+        placed = () if step_index is None else plan.steps[: step_index + 1]
         step_by_id = {step.placement_id: step for step in plan.steps}
         fixed_pair_ids: set[str] = set()
         if document.presentation.show_distance_bracket != "never":
@@ -202,9 +203,10 @@ class BaseRenderDuplexProjection:
         palette: dict[str, str] = {}
         features: list[Feature] = []
         placement_metadata = self._placement_metadata.get(plan.realization_digest, {})
-        for index, step in enumerate(placed):
-            tag = self._tag(index)
-            palette[tag] = document.step_color(index)
+        for index, step in enumerate(plan.steps):
+            active = step in placed
+            tag = self._tag(index) if active else "playback:pending"
+            palette[tag] = document.step_color(index) if active else RESTING_COLOR
             strand = "rev" if step.orientation == "rev" else "fwd"
             sequence_segment = plan.realized_sequence[step.start : step.end]
             feature_label = sequence_segment.translate(_DNA_COMPLEMENT)[::-1] if strand == "rev" else sequence_segment
@@ -238,7 +240,7 @@ class BaseRenderDuplexProjection:
                         "component": role,
                         "variant_id": variant,
                         "display_label": display_label,
-                        "annotation_color": "#6B7280",
+                        "annotation_color": "#6B7280" if active else RESTING_COLOR,
                     }
                 )
             features.append(
@@ -252,11 +254,10 @@ class BaseRenderDuplexProjection:
                     render=feature_render,
                 )
             )
-        placed_ids = {feature.id for feature in features}
+        placed_ids = {step.placement_id for step in placed}
         effects: list[Effect] = []
         for result in constraint_results:
-            if result.upstream_placement_id not in placed_ids or result.downstream_placement_id not in placed_ids:
-                continue
+            active = result.upstream_placement_id in placed_ids and result.downstream_placement_id in placed_ids
             effects.append(
                 Effect(
                     kind="span_link",
@@ -268,6 +269,8 @@ class BaseRenderDuplexProjection:
                         "label": f"{result.actual_distance_bp} bp",
                         "lane": "top",
                         "shrink_label_to_fit": False,
+                        "color": "#000000" if active else RESTING_COLOR,
+                        "label_color": "#000000" if active else RESTING_COLOR,
                     },
                     render={"priority": 8, "track": 0},
                 )
@@ -300,26 +303,26 @@ class BaseRenderDuplexProjection:
                         "end": target_step.end,
                     }
                 )
-            if any(binding["feature_id"] in placed_ids for binding in bindings):
-                effects.append(
-                    Effect(
-                        kind="anchored_illustration",
-                        target={"bindings": bindings},
-                        params={
-                            "asset_id": overlay.asset_id,
-                            "width_px": 1216.0,
-                            "top_gap_px": 8.0,
-                            "fill_color": "#DDE2E7",
-                            "fill_alpha": 0.42,
-                        },
-                        render={"priority": 6},
-                    )
+            active = any(binding["feature_id"] in placed_ids for binding in bindings)
+            effects.append(
+                Effect(
+                    kind="anchored_illustration",
+                    target={"bindings": bindings},
+                    params={
+                        "asset_id": overlay.asset_id,
+                        "width_px": 1216.0,
+                        "top_gap_px": 8.0,
+                        "fill_color": "#DDE2E7" if active else RESTING_COLOR,
+                        **({} if active else {"image_tint": RESTING_COLOR}),
+                        "fill_alpha": 0.42,
+                    },
+                    render={"priority": 6},
                 )
+            )
         revealed = {
             coordinate for step in placed for span in step.added_spans for coordinate in range(span.start, span.end)
         }
-        hidden = tuple(coordinate for coordinate in range(len(plan.realized_sequence)) if coordinate not in revealed)
-        reveals_right_terminus = len(plan.realized_sequence) - 1 in revealed
+        dimmed = tuple(coordinate for coordinate in range(len(plan.realized_sequence)) if coordinate not in revealed)
         record = Record(
             id=f"{plan.realization_digest}:{step_index}",
             alphabet="IUPAC_DNA",
@@ -328,8 +331,8 @@ class BaseRenderDuplexProjection:
             effects=tuple(effects),
             display=Display(),
             meta={
-                "base_hidden_indices": {"primary": hidden, "complement": hidden},
-                "terminal_label_visibility": {"left": True, "right": reveals_right_terminus},
+                "dim_base_indices": {"primary": dimmed, "complement": dimmed},
+                "base_dim_color": RESTING_COLOR,
             },
         ).validate()
         return record, palette
@@ -337,7 +340,7 @@ class BaseRenderDuplexProjection:
     def _prepare_document(self, document: PlaybackDocument) -> tuple[tuple[Record, ...], Palette]:
         records: list[Record] = []
         colors: dict[str, str] = {}
-        for step_index in range(len(document.plan.steps)):
+        for step_index in (None, *range(len(document.plan.steps))):
             record, step_colors = self._record_for_step(document, step_index)
             records.append(record)
             colors.update(step_colors)
@@ -373,19 +376,24 @@ class BaseRenderDuplexProjection:
             prepared.append(replace(record, meta=meta))
         return tuple(prepared), Palette(colors)
 
-    def _figure(self, document: PlaybackDocument, step_index: int):
-        digest = document.plan.realization_digest
-        records = self._records[digest]
-        if not 0 <= step_index < len(records):
+    def _record_at(self, document: PlaybackDocument, step_index: int | None) -> Record:
+        records = self._records[document.plan.realization_digest]
+        if step_index is not None and (
+            isinstance(step_index, bool) or not isinstance(step_index, int) or not 0 <= step_index < len(records) - 1
+        ):
             raise IndexError(f"step_index out of range: {step_index}")
+        return records[0 if step_index is None else step_index + 1]
+
+    def _figure(self, document: PlaybackDocument, step_index: int | None):
         return render_record(
-            records[step_index],
+            self._record_at(document, step_index),
             renderer_name="sequence_rows",
-            style=self._style,
-            palette=self._palettes[digest],
+            style=replace(self._style, color_sequence=RESTING_COLOR) if step_index is None else self._style,
+            palette=self._palettes[document.plan.realization_digest],
         )
 
-    def render_rgba(self, document: PlaybackDocument, step_index: int) -> np.ndarray:
+    def render_rgba(self, document: PlaybackDocument, step_index: int | None) -> np.ndarray:
+        self._record_at(document, step_index)
         digest = document.plan.realization_digest
         key = (digest, step_index)
         cached = self._rgba_cache.get(key)
@@ -397,8 +405,8 @@ class BaseRenderDuplexProjection:
         from matplotlib.transforms import Bbox
 
         if digest not in self._crop_bounds_by_digest:
-            # Features have pinned tracks and the final frame contains every revealed
-            # artist. Its crop also reserves the right terminus before it is visible.
+            # Every frame has the complete layout. Share its final crop and scale
+            # while only the placement and annotation colors change.
             final_figure = self._figure(document, len(document.plan.steps) - 1)
             try:
                 final_figure.set_dpi(_RASTER_DPI)
