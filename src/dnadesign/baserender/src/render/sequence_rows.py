@@ -2086,12 +2086,16 @@ def _draw_mono_glyph(
     zorder: float = 2.0,
     gid: str | None = None,
     font_size: float | None = None,
+    cell_width: float | None = None,
 ) -> None:
     """Draw one sequence-aligned glyph through the canonical monospace path."""
 
     px_per_pt = style.dpi / 72.0
     size = style.font_size_seq if font_size is None else font_size
     tp = _mono_text_path(char, style.font_mono, size, weight)
+    if cell_width is not None:
+        bounds = tp.get_extents()
+        x += (cell_width - (bounds.x0 + bounds.x1) * px_per_pt) / 2
     y_mid_px = _mono_ag_mid_px(style.font_mono, size, style.dpi, weight)
     trans = Affine2D().scale(px_per_pt).translate(x, y_center - y_mid_px) + ax.transData
     patch = PathPatch(
@@ -2265,6 +2269,7 @@ def _draw_feature_box(
         return
 
     y_text_center = y + float(style.kmer.text_y_nudge_cells) * ch
+    font_size = _feature_label_font_size(style)
     for idx, char in enumerate(label):
         if char.isspace():
             continue
@@ -2276,7 +2281,8 @@ def _draw_feature_box(
             style=style,
             color=style.kmer.text_color,
             zorder=4,
-            font_size=_feature_label_font_size(style),
+            font_size=font_size,
+            cell_width=cw if font_size != style.font_size_seq else None,
         )
 
 
