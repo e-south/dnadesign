@@ -80,3 +80,21 @@ frame attachment path has been removed.
 The public mechanics and authority language are owned by the `dense-arrays`
 package. Study-specific selection, labels, and interpretation remain in the
 owning research study.
+
+### Endpoint schema migration
+
+The publisher accepts `densegen.solution_path_playback_endpoint.v2`. To update
+an existing v1 recipe:
+
+1. Set `schema: densegen.solution_path_playback_endpoint.v2`.
+2. If `show_legend` is enabled, author `presentation.legend_entries` with
+   explicit keys, labels, and colors as above, or set `show_legend: false`.
+3. Replace `graph_detail: inset` with `graph_detail: reduced` to retain the
+   traversal-only graph. Supported values are `full`, `reduced`, and `none`.
+4. Replace `color_profile: secg` with `uniform` or `categorical`, and supply
+   any required placement colors through `colors_by_label`.
+5. Re-run the configured endpoint to validate and publish its outputs.
+
+An unsupported schema is rejected before the source table is read or outputs
+are created. The realized-array adapter and publication bundle have separate
+schema versions; this migration changes the endpoint configuration only.

@@ -1,4 +1,4 @@
-schema: densegen.solution_path_playback_endpoint.v1
+schema: densegen.solution_path_playback_endpoint.v2
 endpoint_id: dense_array_constraint_showcase
 title: Dense-array fixed-element constraint showcase
 audience: public

@@ -91,7 +91,7 @@ def _write_endpoint(
     selected = _selected_rows(table_path, ("record-1",))
     selected_sha256 = _selected_records_sha256(selected, ("record-1",))
     config = {
-        "schema": "densegen.solution_path_playback_endpoint.v1",
+        "schema": "densegen.solution_path_playback_endpoint.v2",
         "endpoint_id": "fixture",
         "title": "Fixture endpoint",
         "audience": "public",
@@ -125,6 +125,21 @@ def _write_endpoint(
     config_path = workspace / "playback.yaml"
     config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
     return config_path
+
+
+@pytest.mark.parametrize("schema", ["densegen.solution_path_playback_endpoint.v1", "unknown", None])
+def test_publisher_rejects_unsupported_schema_before_reading_records(tmp_path: Path, schema: object) -> None:
+    config_path = _write_endpoint(tmp_path)
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["schema"] = schema
+    config["source"]["table"] = "missing.parquet"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="expected 'densegen.solution_path_playback_endpoint.v2'") as error:
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+    assert "endpoint-schema-migration" in str(error.value)
+    assert not (config_path.parent / "outputs" / "publication").exists()
 
 
 def test_reverse_placement_uses_realized_reverse_complement() -> None:

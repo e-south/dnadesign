@@ -51,7 +51,7 @@ from .baserender_projection import (
 )
 from .playback import densegen_playback_notices, realized_array_from_densegen_record
 
-_ENDPOINT_SCHEMA = "densegen.solution_path_playback_endpoint.v1"
+_ENDPOINT_SCHEMA = "densegen.solution_path_playback_endpoint.v2"
 _SCENE_ID = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 _ENDPOINT_FIELDS = {
     "schema",
@@ -401,7 +401,11 @@ def _load_endpoint(config_path: Path) -> _LoadedEndpoint:
     payload = yaml.safe_load(endpoint_bytes)
     endpoint = _required_mapping(payload, field_name="endpoint")
     if endpoint.get("schema") != _ENDPOINT_SCHEMA:
-        msg = f"unsupported endpoint schema: {endpoint.get('schema')!r}"
+        msg = (
+            f"unsupported endpoint schema: {endpoint.get('schema')!r}; expected {_ENDPOINT_SCHEMA!r}. "
+            "See src/dnadesign/densegen/workspaces/demo_dense_array_showcase/"
+            "README.md#endpoint-schema-migration."
+        )
         raise ValueError(msg)
     _strict_fields(endpoint, _ENDPOINT_FIELDS, field_name="endpoint")
     return _LoadedEndpoint(
