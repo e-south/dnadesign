@@ -1,7 +1,7 @@
 ## DenseGen outputs reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-09-12
+**Last verified:** 2026-09-13
 This page defines what DenseGen writes, where it writes it, and which event stream each
 consumer should read.
 
