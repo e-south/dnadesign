@@ -301,6 +301,7 @@ class BaseRenderDuplexProjection:
                         "feature_id": placement_id,
                         "start": target_step.start,
                         "end": target_step.end,
+                        "fill_color": "#DDE2E7" if placement_id in placed_ids else RESTING_COLOR,
                     }
                 )
             active = any(binding["feature_id"] in placed_ids for binding in bindings)
@@ -312,7 +313,7 @@ class BaseRenderDuplexProjection:
                         "asset_id": overlay.asset_id,
                         "width_px": 1216.0,
                         "top_gap_px": 8.0,
-                        "fill_color": "#DDE2E7" if active else RESTING_COLOR,
+                        "fill_color": "#DDE2E7",
                         **({} if active else {"image_tint": RESTING_COLOR}),
                         "fill_alpha": 0.42,
                     },

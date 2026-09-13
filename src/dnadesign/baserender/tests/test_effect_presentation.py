@@ -115,3 +115,58 @@ def test_anchored_illustration_rejects_invalid_tint_before_allocating_a_figure()
             palette=Palette({"kmer": "#FF0000"}),
         )
     assert plt.get_fignums() == before
+
+
+@pytest.mark.parametrize(
+    ("params", "binding_presentation", "expected"),
+    [
+        ({}, {}, ["#dde2e7", "#dde2e7"]),
+        ({"fill_color": "#FF0000"}, {}, ["#ff0000", "#ff0000"]),
+        ({"fill_color": "#FF0000"}, {"fill_color": "#D2D2D2"}, ["#ff0000", "#d2d2d2"]),
+    ],
+)
+def test_anchored_illustration_binding_color_overrides_only_its_footprint(params, binding_presentation, expected):
+    initialize_runtime()
+    record = _illustration("#D2D2D2")
+    effect = record.effects[0]
+    bindings = [dict(binding) for binding in effect.target["bindings"]]
+    bindings[1].update(binding_presentation)
+    record = replace(
+        record,
+        effects=(replace(effect, target={"bindings": bindings}, params={**effect.params, **params}),),
+    )
+    figure = render_record(
+        record,
+        renderer_name="sequence_rows",
+        style=Style(show_pair_rungs=False, show_coordinate_ticks=False, connectors=False),
+        palette=Palette({"kmer": "#FF0000"}),
+    )
+    try:
+        footprints = [
+            patch
+            for patch in figure.axes[0].patches
+            if (patch.get_gid() or "").startswith("anchored_illustration_footprint:")
+        ]
+        assert [colors.to_hex(patch.get_facecolor()) for patch in footprints] == expected
+        assert all(patch.get_alpha() == 0.42 for patch in footprints)
+    finally:
+        plt.close(figure)
+
+
+@pytest.mark.parametrize("color", [False, None, "bad-color", 123, ["#D2D2D2"]])
+def test_anchored_illustration_rejects_invalid_binding_color_before_allocating_a_figure(color):
+    initialize_runtime()
+    record = _illustration("#D2D2D2")
+    effect = record.effects[0]
+    bindings = [dict(binding) for binding in effect.target["bindings"]]
+    bindings[1]["fill_color"] = color
+    record = replace(record, effects=(replace(effect, target={"bindings": bindings}),))
+    before = plt.get_fignums()
+    with pytest.raises(RenderingError, match=r"target.bindings\[1\].fill_color"):
+        render_record(
+            record,
+            renderer_name="sequence_rows",
+            style=Style(show_pair_rungs=False, show_coordinate_ticks=False, connectors=False),
+            palette=Palette({"kmer": "#FF0000"}),
+        )
+    assert plt.get_fignums() == before

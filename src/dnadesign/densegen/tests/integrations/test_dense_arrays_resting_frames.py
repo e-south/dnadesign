@@ -109,6 +109,27 @@ def test_pending_constraint_annotations_keep_complete_neutral_geometry():
         assert all(np.allclose(colors.to_rgb(line.get_color()), [210 / 255] * 3) for line in axes[0].lines)
         assert len({tuple(ax.images[0].get_extent()) for ax in axes}) == 1
         assert len({tuple(ax.get_xlim()) for ax in axes}) == 1
+        footprints = [
+            sorted(
+                (
+                    patch
+                    for patch in ax.patches
+                    if (patch.get_gid() or "").startswith("anchored_illustration_footprint:")
+                ),
+                key=lambda patch: patch.get_path().vertices[:, 0].mean(),
+            )
+            for ax in axes
+        ]
+        assert [[colors.to_hex(patch.get_facecolor()) for patch in frame] for frame in footprints] == [
+            ["#d2d2d2", "#d2d2d2"],
+            ["#dde2e7", "#d2d2d2"],
+            ["#dde2e7", "#dde2e7"],
+        ]
+        for baseline, active, finished in zip(*footprints, strict=True):
+            np.testing.assert_array_equal(baseline.get_path().vertices, active.get_path().vertices)
+            np.testing.assert_array_equal(baseline.get_path().vertices, finished.get_path().vertices)
+        assert np.array_equal(axes[1].images[0].get_array(), axes[2].images[0].get_array())
+        assert not np.array_equal(baseline_image, axes[1].images[0].get_array())
     finally:
         for figure in figures:
             plt.close(figure)

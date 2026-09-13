@@ -47,6 +47,7 @@ class AnchoredIllustrationBinding:
     feature_id: str
     start: int
     end: int
+    fill_color: str | None = None
 
 
 @dataclass(frozen=True)
@@ -161,9 +162,12 @@ def _bindings(
             raise RenderingError(f"target.bindings[{index}] start/end must be integers")
         if start < 0 or end <= start or end > len(record.sequence):
             raise RenderingError(f"target.bindings[{index}] span is outside the record sequence")
+        fill_color = raw.get("fill_color")
+        if "fill_color" in raw and (not isinstance(fill_color, str) or not mcolors.is_color_like(fill_color)):
+            raise RenderingError(f"target.bindings[{index}].fill_color must be a valid color string")
         seen_anchors.add(anchor_id)
         seen_features.add(feature_id)
-        bindings.append(AnchoredIllustrationBinding(anchor_id, feature_id, start, end))
+        bindings.append(AnchoredIllustrationBinding(anchor_id, feature_id, start, end, fill_color))
     return tuple(bindings)
 
 
@@ -251,9 +255,10 @@ def draw_anchored_illustration(
         feature_box = feature_boxes.get(binding.feature_id)
         if feature_box is None:
             continue
-        visible.append((geometry.anchors[binding.anchor_id], feature_box))
+        binding_color = color if binding.fill_color is None else binding.fill_color
+        visible.append((geometry.anchors[binding.anchor_id], feature_box, binding_color))
     if visible:
-        for anchor, feature_box in visible:
+        for anchor, feature_box, binding_color in visible:
             shoulder = max(8.0, (geometry.x1 - geometry.x0) * 0.025)
             vertices = (
                 (anchor[0] - shoulder, anchor[1]),
@@ -274,7 +279,7 @@ def draw_anchored_illustration(
             )
             patch = PathPatch(
                 path,
-                facecolor=color,
+                facecolor=binding_color,
                 edgecolor="none",
                 linewidth=0.0,
                 alpha=alpha,

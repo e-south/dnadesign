@@ -157,6 +157,12 @@ image in one color while preserving the source alpha mask. Omit the tint to
 keep the image's original colors. Invalid colors fail before a figure is
 allocated.
 
+Each `anchored_illustration.target.bindings[]` item may set `fill_color` to
+override only that binding's connector footprint. Omitted binding colors use
+`params.fill_color`, whose default is `#DDE2E7`. Binding colors must be valid
+color strings and are checked before figure allocation. The image tint and
+other bindings retain their own presentation settings.
+
 ## Styles
 
 Style resolution applies, in order:

@@ -299,7 +299,7 @@ class _AnchoredIllustrationEffectContract:
             )
             reject_unknown_keys(
                 binding,
-                {"anchor_id", "feature_id", "start", "end"},
+                {"anchor_id", "feature_id", "start", "end", "fill_color"},
                 f"anchored_illustration.target.bindings[{index}]",
             )
             for field_name in ("anchor_id", "feature_id", "start", "end"):
