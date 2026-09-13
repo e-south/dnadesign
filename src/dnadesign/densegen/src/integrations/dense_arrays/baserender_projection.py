@@ -20,7 +20,7 @@ from dataclasses import dataclass, replace
 import numpy as np
 from dense_arrays.playback import PlaybackDocument
 from dense_arrays.playback.theme import RESTING_COLOR
-from dense_arrays.playback.typography import PUBLICATION_NUCLEOTIDE_TYPOGRAPHY
+from dense_arrays.playback.typography import PUBLICATION_LABEL_FONT_SIZE_PT, PUBLICATION_NUCLEOTIDE_TYPOGRAPHY
 from dense_arrays.realized import RealizedArray
 from PIL import Image
 
@@ -112,16 +112,21 @@ class BaseRenderDuplexProjection:
                 placement.placement_id: placement.metadata for placement in realized.placements
             }
         initialize_runtime()
+        typography = PUBLICATION_NUCLEOTIDE_TYPOGRAPHY
+        figure_scale = 1.6
+        label_ratio = PUBLICATION_LABEL_FONT_SIZE_PT / typography.graph_font_size_pt
+        # Glyph paths scale with the figure; Matplotlib text uses physical points.
+        annotation_size = round(typography.duplex_font_size_pt * figure_scale * label_ratio)
         self._style = Style(
             dpi=180,
-            figure_scale=1.6,
+            figure_scale=figure_scale,
             font_mono=PUBLICATION_NUCLEOTIDE_TYPOGRAPHY.family,
             font_label=PUBLICATION_NUCLEOTIDE_TYPOGRAPHY.family,
             font_size_seq=PUBLICATION_NUCLEOTIDE_TYPOGRAPHY.duplex_font_size_pt,
             font_size_label=PUBLICATION_NUCLEOTIDE_TYPOGRAPHY.duplex_font_size_pt,
             font_size_feature_label=30,
-            font_size_annotation_label=30,
-            font_size_span_link_label=30,
+            font_size_annotation_label=annotation_size,
+            font_size_span_link_label=round(typography.duplex_font_size_pt * label_ratio),
             color_sequence="#000000",
             padding_x=12.0,
             padding_y=12.0,

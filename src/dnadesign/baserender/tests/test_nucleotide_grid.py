@@ -56,8 +56,8 @@ def test_feature_glyphs_match_their_sequence_columns_and_scale(strand, family):
 
 
 @pytest.mark.parametrize("family", ["Arial", "DejaVu Sans Mono"])
-@pytest.mark.parametrize("label_size", [10, 30])
-def test_explicitly_resized_feature_glyphs_are_centered_in_each_cell(family, label_size):
+@pytest.mark.parametrize("label_size", [10, 20, 30])
+def test_feature_glyphs_are_centered_in_each_cell_at_equal_and_resized_fonts(family, label_size):
     from dnadesign.baserender.src.render.sequence_rows import _draw_feature_box
 
     style = Style(font_mono=family, font_size_seq=20, font_size_feature_label=label_size)
