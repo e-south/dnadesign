@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
@@ -26,9 +27,12 @@ from dense_arrays.realized import Orientation, PlacementKind
 
 from dnadesign.densegen.src.integrations.dense_arrays import publisher
 from dnadesign.densegen.src.integrations.dense_arrays.baserender_projection import (
+    AnchoredIllustrationPresentation,
     BaseRenderDuplexProjection,
+    DuplexPresentation,
 )
 from dnadesign.densegen.src.integrations.dense_arrays.playback import (
+    playback_plan_from_densegen_record,
     realized_array_from_densegen_record,
 )
 from dnadesign.densegen.src.integrations.dense_arrays.publisher import (
@@ -87,7 +91,7 @@ def _write_endpoint(
     selected = _selected_rows(table_path, ("record-1",))
     selected_sha256 = _selected_records_sha256(selected, ("record-1",))
     config = {
-        "schema": "densegen.solution_path_playback_endpoint.v1",
+        "schema": "densegen.solution_path_playback_endpoint.v2",
         "endpoint_id": "fixture",
         "title": "Fixture endpoint",
         "audience": "public",
@@ -121,6 +125,21 @@ def _write_endpoint(
     config_path = workspace / "playback.yaml"
     config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
     return config_path
+
+
+@pytest.mark.parametrize("schema", ["densegen.solution_path_playback_endpoint.v1", "unknown", None])
+def test_publisher_rejects_unsupported_schema_before_reading_records(tmp_path: Path, schema: object) -> None:
+    config_path = _write_endpoint(tmp_path)
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["schema"] = schema
+    config["source"]["table"] = "missing.parquet"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="expected 'densegen.solution_path_playback_endpoint.v2'") as error:
+        publisher.publish_densegen_playback_endpoint(config_path)
+
+    assert "endpoint-schema-migration" in str(error.value)
+    assert not (config_path.parent / "outputs" / "publication").exists()
 
 
 def test_reverse_placement_uses_realized_reverse_complement() -> None:
@@ -199,7 +218,7 @@ def test_fixed_element_recovers_sequence_consistent_raw_coordinate() -> None:
 
     assert realized.placements[0].start == 3
     assert realized.placements[0].metadata["coordinate_source"] == "offset_raw"
-    plan = reconstruct_playback(realized)
+    plan = playback_plan_from_densegen_record(record, source_ref="fixture.parquet")
     assert any(notice.code == "coordinate_recovered" for notice in plan.notices)
 
 
@@ -851,3 +870,193 @@ def test_baserender_projection_bounds_long_record_raster_memory() -> None:
     assert all(max(frame.shape[:2]) <= 2400 for frame in frames)
     assert all(frame.shape[0] * frame.shape[1] <= 3_000_000 for frame in frames)
     assert len(projection._rgba_cache) <= 2
+
+
+def _frame_geometry_fixture(sequence_length: int = 60):
+    sequence = "A" * sequence_length
+    details = [
+        {
+            "part_kind": "tfbs",
+            "sequence": sequence[start:end],
+            "offset": start,
+            "end": end,
+            "orientation": "fwd",
+            "tfbs_id": f"site-{index}",
+            "regulator": f"TF_{index}",
+        }
+        for index, (start, end) in enumerate(((0, 15), (sequence_length - 6, sequence_length)))
+    ]
+    details.extend(
+        {
+            "part_kind": "fixed_element",
+            "sequence": sequence[start : start + 6],
+            "offset": start,
+            "end": start + 6,
+            "orientation": "fwd",
+            "constraint_name": "anchor",
+            "placement_index": 0,
+            "role": role,
+            "variant_id": "a",
+            "spacer_length": 19,
+        }
+        for role, start in (("upstream", 20), ("downstream", 45))
+    )
+    realized = realized_array_from_densegen_record(
+        {"id": f"geometry-{sequence_length}", "sequence": sequence, "densegen__used_tfbs_detail": details},
+        source_ref="fixture.parquet",
+    )
+    plan = reconstruct_playback(realized)
+    document = PlaybackDocument(
+        plan=plan,
+        title="Geometry fixture",
+        color_overrides={plan.steps[0].placement_id: "#FF0000"},
+        presentation=PlaybackPresentation(show_distance_bracket="always"),
+    )
+    return document, realized
+
+
+@pytest.mark.parametrize("anchored", [False, True])
+def test_baserender_projection_keeps_scene_crop_scale_and_alignment(anchored: bool) -> None:
+    document, realized = _frame_geometry_fixture()
+    projection = BaseRenderDuplexProjection(
+        (document,),
+        realized_arrays={document.plan.realization_digest: realized},
+        presentation=DuplexPresentation(
+            anchored_illustration=(AnchoredIllustrationPresentation("rnap_sigma70", "anchor") if anchored else None)
+        ),
+    )
+    shapes, cap_heights, first_placement_boxes = [], [], []
+    for index in range(len(document.plan.steps)):
+        frame = projection.render_rgba(document, index)
+        shapes.append(frame.shape)
+        cap_heights.append(projection.native_nucleotide_cap_height_px)
+        red_pixels = (frame[:, :, 0] > 220) & (frame[:, :, 1] < 80) & (frame[:, :, 2] < 80)
+        rows, columns = np.where(red_pixels)
+        assert rows.size > 0
+        first_placement_boxes.append((rows.min(), rows.max(), columns.min(), columns.max()))
+
+    assert len(set(shapes)) == 1
+    assert len(set(cap_heights)) == 1
+    assert len(set(first_placement_boxes)) == 1
+    assert len(projection._rgba_cache) <= 2
+
+
+def test_baserender_projection_restores_scene_native_metric_on_cache_hit() -> None:
+    short_document, _ = _frame_geometry_fixture()
+    long_document, _ = _frame_geometry_fixture(100)
+    projection = BaseRenderDuplexProjection((short_document, long_document))
+    short_frame = projection.render_rgba(short_document, 0)
+    short_cap_height = projection.native_nucleotide_cap_height_px
+    projection.render_rgba(long_document, 0)
+    assert projection.native_nucleotide_cap_height_px != short_cap_height
+
+    assert projection.render_rgba(short_document, 0) is short_frame
+    assert projection.native_nucleotide_cap_height_px == short_cap_height
+    assert len(projection._rgba_cache) == 2
+
+
+@pytest.mark.parametrize("recovered", [False, True])
+def test_densegen_owner_emits_only_evidenced_coordinate_recovery(recovered: bool) -> None:
+    record = _publisher_row()
+    detail = record["densegen__used_tfbs_detail"][0]
+    if recovered:
+        detail["offset"] = 1
+        detail["offset_raw"] = -1
+        detail["pad_left"] = 1
+    plan = playback_plan_from_densegen_record(record, source_ref="fixture.parquet")
+    notices = [notice for notice in plan.notices if notice.code == "coordinate_recovered"]
+    assert bool(notices) is recovered
+    if recovered:
+        assert "1 placement" in notices[0].message
+        assert "offset_raw_plus_pad" in notices[0].message
+        assert notices[0].level.value == "warning"
+
+
+def test_publisher_preserves_producer_coordinate_recovery_notice(tmp_path: Path) -> None:
+    record = _publisher_row()
+    record["densegen__used_tfbs_detail"][0]["offset"] = 1
+    config_path = _write_endpoint(tmp_path, record=record)
+    output = publisher.publish_densegen_playback_endpoint(config_path)
+    plan = json.loads((output / "plans" / "clean_scene.json").read_text(encoding="utf-8"))
+    recovered = [notice for notice in plan["notices"] if notice["code"] == "coordinate_recovered"]
+    assert len(recovered) == 1
+    assert "offset_raw" in recovered[0]["message"]
+
+
+def test_publisher_projects_producer_labels_to_document_placement_ids(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_path = _write_endpoint(tmp_path, formats=("manifest.json", "poster.png"))
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["labels"]["overrides"] = {"TF_A": "Custom binding site"}
+    config["presentation"]["colors_by_label"] = {"TF_A": "#123456"}
+    config["presentation"]["show_legend"] = True
+    config["presentation"]["legend_entries"] = [{"key": "binding", "label": "Custom binding site", "color": "#123456"}]
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    captured = []
+    monkeypatch.setattr(
+        publisher,
+        "BaseRenderDuplexProjection",
+        lambda *_args, **_kwargs: SimpleNamespace(render_rgba=lambda *_inner: None),
+    )
+
+    def render(documents, path, **kwargs):
+        captured.extend(documents)
+        path.write_bytes(b"poster")
+
+    monkeypatch.setattr(publisher, "render_collection_poster_png", render)
+    publisher.publish_densegen_playback_endpoint(config_path)
+    document = captured[0]
+    assert document.step_label(0) == "Custom binding site"
+    assert document.step_color(0) == "#123456"
+    assert [(entry.label, entry.color) for entry in document.presentation.legend_entries] == [
+        ("Custom binding site", "#123456")
+    ]
+    assert set(document.color_overrides) == {document.plan.steps[0].placement_id}
+    assert set(document.label_overrides) == {document.plan.steps[0].placement_id}
+
+
+def test_baserender_projection_preserves_explicit_placement_colors() -> None:
+    plan = playback_plan_from_densegen_record(_publisher_row(), source_ref="fixture.parquet")
+    document = PlaybackDocument(
+        plan=plan,
+        title="Caller palette",
+        color_overrides={plan.steps[0].placement_id: "#123456"},
+    )
+    projection = BaseRenderDuplexProjection((document,))
+    _, colors = projection._record_for_step(document, 0)
+    assert set(colors.values()) == {"#123456"}
+
+
+@pytest.mark.parametrize("color", ["red", "#12345", False])
+def test_publisher_rejects_invalid_explicit_colors_before_output(tmp_path: Path, color: object) -> None:
+    config_path = _write_endpoint(tmp_path)
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["presentation"]["colors_by_label"] = {"TF_A": color}
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    with pytest.raises(ValueError, match="#RRGGBB"):
+        publisher.publish_densegen_playback_endpoint(config_path)
+    assert not (config_path.parent / "outputs" / "publication").exists()
+
+
+def test_publisher_validates_explicit_legend_text_before_output(tmp_path: Path) -> None:
+    config_path = _write_endpoint(tmp_path)
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["presentation"]["show_legend"] = True
+    config["presentation"]["legend_entries"] = [
+        {"key": "binding", "label": "Forbidden sigma factor label", "color": "#123456"}
+    ]
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    with pytest.raises(ValueError, match="presentation text contains forbidden term"):
+        publisher.publish_densegen_playback_endpoint(config_path)
+    assert not (config_path.parent / "outputs" / "publication").exists()
+
+
+def test_publisher_requires_explicit_entries_for_enabled_legend(tmp_path: Path) -> None:
+    config_path = _write_endpoint(tmp_path)
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    config["presentation"]["show_legend"] = True
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    with pytest.raises(ValueError, match="show_legend requires non-empty presentation.legend_entries"):
+        publisher.publish_densegen_playback_endpoint(config_path)
+    assert not (config_path.parent / "outputs" / "publication").exists()

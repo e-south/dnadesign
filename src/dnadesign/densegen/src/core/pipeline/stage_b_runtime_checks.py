@@ -86,7 +86,7 @@ def _evaluate_solution_requirements(
     return covers_all, covers_required, None, {}
 
 
-def _extract_solver_metrics(sol) -> tuple[str | None, float | None, float | None]:
+def _extract_solver_metrics(sol) -> tuple[str | None, float | None]:
     solver_status = getattr(sol, "status", None)
     if solver_status is not None:
         solver_status = str(solver_status)
@@ -97,8 +97,7 @@ def _extract_solver_metrics(sol) -> tuple[str | None, float | None, float | None
         solver_objective = float(solver_objective) if solver_objective is not None else None
     except (TypeError, ValueError):
         solver_objective = None
-    solver_solve_time_s = getattr(sol, "_densegen_solve_time_s", None)
-    return solver_status, solver_objective, solver_solve_time_s
+    return solver_status, solver_objective
 
 
 def _maybe_pad_sequence(

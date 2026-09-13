@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import yaml
+from dense_arrays import DenseArray
 
 from dnadesign.densegen.src.adapters.optimizer import OptimizerRun
 from dnadesign.densegen.src.adapters.outputs.base import SinkBase
@@ -187,7 +188,8 @@ class _SingleLateSolutionAdapter:
         return OptimizerRun(optimizer=opt, generator=_gen())
 
 
-def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
+@pytest.mark.parametrize("outcome", ["accepted", "rejected"])
+def test_round_robin_chunk_cap_subsample(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, outcome: str) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     (run_dir / "outputs" / "parquet").mkdir(parents=True)
@@ -261,11 +263,39 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
     cfg_path.write_text(yaml.safe_dump(cfg))
     loaded = load_config(cfg_path)
 
-    sink = _DummySink()
+    if outcome == "rejected":
+        monkeypatch.setattr(
+            "dnadesign.densegen.src.core.pipeline.stage_b_runtime_callbacks._evaluate_solution_requirements",
+            lambda **kwargs: (False, True, "min_count_per_tf", {"min_count_per_tf": 2, "missing_tfs": ["TF1"]}),
+        )
+    clock = [0.0]
+    monkeypatch.setattr(
+        "dnadesign.densegen.src.core.pipeline.stage_b_runtime_callbacks.time",
+        SimpleNamespace(monotonic=lambda: clock[0]),
+    )
+
+    class _TimedNativeAdapter:
+        def build(self, *, library, sequence_length, **kwargs):
+            def generate():
+                for index, elapsed in enumerate((0.25, 0.5)):
+                    offsets = [None] * len(library)
+                    offsets[index] = 0
+                    solution = DenseArray(library, sequence_length, offsets, [None] * len(library))
+                    clock[0] += elapsed
+                    yield solution
+
+            return OptimizerRun(optimizer=_DummyOpt(), generator=generate())
+
+    class _SlowSink(_DummySink):
+        def add(self, record):
+            clock[0] += 4.0
+            return super().add(record)
+
+    sink = _SlowSink()
     deps = PipelineDeps(
         source_factory=data_source_factory,
         sink_factory=lambda _cfg, _path: [sink],
-        optimizer=_DummyAdapter(),
+        optimizer=_TimedNativeAdapter(),
         pad=lambda *args, **kwargs: "",
     )
     plan_context = PlanRunContext(
@@ -301,6 +331,13 @@ def test_round_robin_chunk_cap_subsample(tmp_path: Path) -> None:
     )
 
     assert produced <= loaded.root.densegen.runtime.max_accepted_per_library
+    assert produced == len(sink.records) == (1 if outcome == "accepted" else 0)
+    attempts_parts = sorted((run_dir / "outputs" / "tables").glob("attempts_part-*.parquet"))
+    attempts = pd.concat([pd.read_parquet(path) for path in attempts_parts], ignore_index=True)
+    status = "ok" if outcome == "accepted" else "rejected"
+    candidates = attempts[attempts["status"] == status]
+    expected = [0.25] if outcome == "accepted" else [0.25, 0.5]
+    assert list(candidates["solver_solve_time_s"]) == expected
 
 
 def test_stall_detected_with_no_solutions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

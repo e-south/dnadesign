@@ -13,14 +13,12 @@ from __future__ import annotations
 
 import io
 import math
-import re
 from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 
 import numpy as np
-from dense_arrays.playback.graph import step_color
-from dense_arrays.playback.html import PlaybackDocument
+from dense_arrays.playback import PlaybackDocument
 from dense_arrays.playback.typography import PUBLICATION_NUCLEOTIDE_TYPOGRAPHY
 from dense_arrays.realized import RealizedArray
 from PIL import Image
@@ -38,7 +36,6 @@ from dnadesign.baserender import (
     render_record,
 )
 
-_SVG_RE = re.compile(r"(<svg\b.*</svg>)", re.DOTALL)
 _DNA_COMPLEMENT = str.maketrans("ATCGRYSWKMBDHVN", "TAGCYRSWMKVHDBN")
 _ANCHORED_ILLUSTRATION_TOP_BAND_PX = 550.0
 _RASTER_DPI = 72
@@ -75,6 +72,8 @@ class DuplexPresentation:
 
 class BaseRenderDuplexProjection:
     """Render truthful stepwise duplex frames with BaseRender sequence_rows."""
+
+    renders_distance_brackets = True
 
     def __init__(
         self,
@@ -167,8 +166,9 @@ class BaseRenderDuplexProjection:
         self.native_nucleotide_cap_height_px = self._native_nucleotide_cap_height_px
         self._records: dict[str, tuple[Record, ...]] = {}
         self._palettes: dict[str, Palette] = {}
+        self._crop_bounds_by_digest: dict[str, tuple[float, float, float, float]] = {}
+        self._raster_cap_height_by_digest: dict[str, float] = {}
         self._rgba_cache: OrderedDict[tuple[str, int], np.ndarray] = OrderedDict()
-        self._svg_cache: dict[tuple[str, int], str] = {}
         for document in documents:
             records, palette = self._prepare_document(document)
             self._records[document.plan.realization_digest] = records
@@ -204,7 +204,7 @@ class BaseRenderDuplexProjection:
         placement_metadata = self._placement_metadata.get(plan.realization_digest, {})
         for index, step in enumerate(placed):
             tag = self._tag(index)
-            palette[tag] = step_color(step, index, document.presentation.color_profile)
+            palette[tag] = document.step_color(index)
             strand = "rev" if step.orientation == "rev" else "fwd"
             sequence_segment = plan.realized_sequence[step.start : step.end]
             feature_label = sequence_segment.translate(_DNA_COMPLEMENT)[::-1] if strand == "rev" else sequence_segment
@@ -222,7 +222,7 @@ class BaseRenderDuplexProjection:
                     raise ValueError(f"fixed element {step.placement_id!r} requires role and variant_id")
                 base_label = str(
                     document.label_overrides.get(
-                        role,
+                        step.placement_id,
                         "fixed upstream element" if role == "upstream" else "fixed downstream element",
                     )
                 ).strip()
@@ -386,17 +386,40 @@ class BaseRenderDuplexProjection:
         )
 
     def render_rgba(self, document: PlaybackDocument, step_index: int) -> np.ndarray:
-        key = (document.plan.realization_digest, step_index)
+        digest = document.plan.realization_digest
+        key = (digest, step_index)
         cached = self._rgba_cache.get(key)
         if cached is not None:
             self._rgba_cache.move_to_end(key)
+            self.native_nucleotide_cap_height_px = self._raster_cap_height_by_digest[digest]
             return cached
         import matplotlib.pyplot as plt
+        from matplotlib.transforms import Bbox
+
+        if digest not in self._crop_bounds_by_digest:
+            # Features have pinned tracks and the final frame contains every revealed
+            # artist. Its crop also reserves the right terminus before it is visible.
+            final_figure = self._figure(document, len(document.plan.steps) - 1)
+            try:
+                final_figure.set_dpi(_RASTER_DPI)
+                final_figure.canvas.draw()
+                crop = final_figure.get_tightbbox(final_figure.canvas.get_renderer()).padded(0.01)
+                self._crop_bounds_by_digest[digest] = tuple(float(value) for value in crop.bounds)
+            finally:
+                plt.close(final_figure)
 
         figure = self._figure(document, step_index)
         buffer = io.BytesIO()
-        figure.savefig(buffer, format="png", dpi=_RASTER_DPI, bbox_inches="tight", pad_inches=0.01, facecolor="white")
-        plt.close(figure)
+        try:
+            figure.savefig(
+                buffer,
+                format="png",
+                dpi=_RASTER_DPI,
+                bbox_inches=Bbox.from_bounds(*self._crop_bounds_by_digest[digest]),
+                facecolor="white",
+            )
+        finally:
+            plt.close(figure)
         buffer.seek(0)
         image = Image.open(buffer).convert("RGBA")
         source_width, source_height = image.size
@@ -416,38 +439,10 @@ class BaseRenderDuplexProjection:
         self.native_nucleotide_cap_height_px = (
             self._native_nucleotide_cap_height_px * (_RASTER_DPI / self._style.dpi) * scale
         )
+        self._raster_cap_height_by_digest[digest] = self.native_nucleotide_cap_height_px
         rgba = np.asarray(image).copy()
         self._rgba_cache[key] = rgba
         self._rgba_cache.move_to_end(key)
         while len(self._rgba_cache) > _RGBA_CACHE_SIZE:
             self._rgba_cache.popitem(last=False)
         return rgba
-
-    def render_svg(self, document: PlaybackDocument, step_index: int) -> str:
-        key = (document.plan.realization_digest, step_index)
-        cached = self._svg_cache.get(key)
-        if cached is not None:
-            return cached
-        import matplotlib.pyplot as plt
-
-        figure = self._figure(document, step_index)
-        buffer = io.StringIO()
-        figure.savefig(buffer, format="svg", bbox_inches="tight", pad_inches=0.01, facecolor="white")
-        plt.close(figure)
-        match = _SVG_RE.search(buffer.getvalue())
-        if match is None:
-            raise ValueError("BaseRender did not emit an SVG root")
-        svg = match.group(1)
-        self._svg_cache[key] = svg
-        return svg
-
-    def attach_svg_frames(self, documents: tuple[PlaybackDocument, ...]) -> tuple[PlaybackDocument, ...]:
-        return tuple(
-            replace(
-                document,
-                duplex_svg_frames=tuple(
-                    self.render_svg(document, step_index) for step_index in range(len(document.plan.steps))
-                ),
-            )
-            for document in documents
-        )
