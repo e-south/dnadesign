@@ -68,7 +68,7 @@ def test_resting_frame_keeps_every_base_and_feature_in_neutral_gray():
     assert not np.array_equal(baseline, finished)
 
 
-def test_pending_constraint_annotations_keep_complete_neutral_geometry():
+def _anchored_projection():
     sequence = "A" * 60
     details = [
         {
@@ -89,7 +89,15 @@ def test_pending_constraint_annotations_keep_complete_neutral_geometry():
         {"id": "anchored-rest", "sequence": sequence, "densegen__used_tfbs_detail": details},
         source_ref="fixture.parquet",
     )
-    document = PlaybackDocument(plan=reconstruct_playback(realized), title="Anchored resting example")
+    plan = reconstruct_playback(realized)
+    document = PlaybackDocument(
+        plan=plan,
+        title="Anchored resting example",
+        label_overrides={
+            plan.steps[0].placement_id: "-35 element",
+            plan.steps[1].placement_id: "-10 element",
+        },
+    )
     projection = BaseRenderDuplexProjection(
         (document,),
         realized_arrays={document.plan.realization_digest: realized},
@@ -98,6 +106,11 @@ def test_pending_constraint_annotations_keep_complete_neutral_geometry():
             anchored_illustration=AnchoredIllustrationPresentation("rnap_sigma70", "anchor"),
         ),
     )
+    return document, projection
+
+
+def test_pending_constraint_annotations_keep_complete_neutral_geometry():
+    document, projection = _anchored_projection()
     figures = [projection._figure(document, step) for step in (None, 0, 1)]
     try:
         axes = [figure.axes[0] for figure in figures]
@@ -133,6 +146,30 @@ def test_pending_constraint_annotations_keep_complete_neutral_geometry():
     finally:
         for figure in figures:
             plt.close(figure)
+
+
+@pytest.mark.parametrize("dpi", [72, 180])
+def test_fixed_element_annotation_scale_matches_the_publication_legend(dpi):
+    from matplotlib.textpath import TextPath
+
+    document, projection = _anchored_projection()
+    figure = projection._figure(document, len(document.plan.steps) - 1)
+    try:
+        figure.set_dpi(dpi)
+        figure.canvas.draw()
+        axis = figure.axes[0]
+        annotations = [text for text in axis.texts if text.get_text().startswith(("-35", "-10"))]
+        assert len(annotations) == 2
+        nucleotide = next(patch for patch in axis.patches if patch.get_gid() == "sequence:fwd:20:A")
+        nucleotide_cap_height = nucleotide.get_window_extent().height
+        for annotation in annotations:
+            label_cap_height = (
+                TextPath((0, 0), "A", prop=annotation.get_fontproperties()).get_extents().height * dpi / 72
+            )
+            # The publication hierarchy uses 11.5-point labels beside 13.2-point nucleotides.
+            assert label_cap_height / nucleotide_cap_height == pytest.approx(11.5 / 13.2, rel=0.01)
+    finally:
+        plt.close(figure)
 
 
 @pytest.mark.parametrize("step", [-1, True, 1.5, 3])

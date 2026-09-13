@@ -83,9 +83,11 @@ uncovered bases remain gray. The layout and nucleotide size stay fixed within
 each scene. The BaseRender frame callback accepts `None` for this pre-placement
 view and an integer for the corresponding completed placement.
 
-The public mechanics and authority language are owned by the `dense-arrays`
-package. Study-specific selection, labels, and interpretation remain in the
-owning research study.
+Motif letters and both sequence strands share centered nucleotide cells.
+Fixed-element labels use the same visible text scale as the legend. Placement
+reconstruction and ordering details remain in media metadata; failed
+constraints remain visible on the figure. Study-specific selection, labels,
+and interpretation remain in the owning research study.
 
 ### Endpoint schema migration
 

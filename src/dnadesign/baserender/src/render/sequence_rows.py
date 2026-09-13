@@ -2227,6 +2227,7 @@ def _draw_sequence(
             color=glyph_color,
             weight=weight,
             gid=gid,
+            cell_width=cw,
         )
         x += cw
 
@@ -2282,7 +2283,7 @@ def _draw_feature_box(
             color=style.kmer.text_color,
             zorder=4,
             font_size=font_size,
-            cell_width=cw if font_size != style.font_size_seq else None,
+            cell_width=cw,
         )
 
 
