@@ -3,7 +3,7 @@ id: opal-reference-cli
 title: OPAL Command Line Interface
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-16
+last_verified: 2026-10-06
 audience:
   - operator
   - maintainer
@@ -119,6 +119,30 @@ opal init --config <yaml> [--json]
   Consolidate that history explicitly instead of initializing a second ledger.
 
 ---
+
+### `history rebind-state`
+
+After moving an entire campaign directory, preview an explicit rebinding of
+the retained state paths, then apply it:
+
+```bash
+opal history rebind-state -c <moved-campaign-yaml> \
+  --previous-workdir <absolute-original-workdir> [--apply] [--json]
+```
+
+The original state must name the supplied previous workdir and campaign slug.
+Every retained model digest and selection run identity is verified at its new
+location. Missing artifacts, symlinks (including in the receipt path), and paths
+outside the original workdir are rejected in both preview and apply. A missing
+campaign directory is rejected without creating it. The label-event ledger
+locator may be absent for a campaign using external sidecar labels; that absence
+is recorded explicitly.
+
+Only `state.json` path fields change. External dataset locations, model bytes,
+round snapshots, and ledgers remain unchanged. A campaign lock protects the
+operation. Its receipt and original state are saved under
+`outputs/history/state-path-rebindings/`. This command does not complete an
+aborted run; use the normal explicit `run --resume` route afterward if needed.
 
 ### `history import`
 
