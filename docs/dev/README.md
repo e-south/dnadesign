@@ -1,7 +1,7 @@
 ## Developer Documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-09-01
+**Last verified:** 2026-10-06
 
 Use this index to find maintainer workflows, checks, and planning records.
 
@@ -36,6 +36,7 @@ execution order and diagnostic precedence.
 2. Use [architecture decisions index](../architecture/decisions/README.md) for approved decisions.
 3. Use [CI and quality checks](#ci-and-quality-checks) before merging maintainer changes.
 4. Use the repo-local gate here rather than `./scripts/agent-verify`. That script belongs to the external agent-hub repo and is not present in `dnadesign`.
+5. Use [distribution builds and verification](distributions.md) for clean-source artifacts, version policy and citation metadata.
 
 ### Quick checks by change type
 
