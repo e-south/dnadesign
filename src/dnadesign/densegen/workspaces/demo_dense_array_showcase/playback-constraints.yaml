@@ -6,12 +6,28 @@ audience: public
 source:
   kind: densegen_records
   table: outputs/tables/records.parquet
-  selected_records_sha256: 1a1bbb70b9a7165349373ee05c7b54eb6301b4313656bbeee3bb6fb271f092dc  # pragma: allowlist secret
+  selected_records_sha256: 60e420332d5efb14504b2d00d55569153b2a5942573a1836f846679936715bb3  # pragma: allowlist secret
   records:
-    - id: 31ac2fcba97e70f1ff13a881e56828193ecb20b6
+    - id: 10ce79ef3f294893808ea63fae50d3c179aa753e
       scene: fixed_pair_a
-    - id: e989470a1bab43bf22ed5101ee3ceabac16ae020
+    - id: 7cf32ba3c07c990b1cac49d64dd809a4d7dd0ed2
+      scene: fixed_pair_b
+    - id: a2200ac46586206868f923e1fca5932986ca364c
       scene: fixed_pair_c
+    - id: 4bcf165bf7c1b678983d7a7e29ba1005e6be8006
+      scene: fixed_pair_d
+    - id: 5b7f1164b4ff44ad0f6192dcd76abfdbb7cb9427
+      scene: fixed_pair_e
+    - id: 7e5ed9a10a25f067218c16ef0a9409c5644ab5cf
+      scene: fixed_pair_f
+    - id: f6033f7958e0fa8d3025112f0e1314af43957b2d
+      scene: fixed_pair_g
+    - id: 0582d7e65e590dd54793911939d9487c097b294d
+      scene: fixed_pair_h
+    - id: de7699db4301a523201e1a648743d6f7e5f89696
+      scene: fixed_pair_i
+    - id: 616d99280ab9f2704c8f204b6234b8f64f7cf596
+      scene: fixed_pair_j
 
 adapter:
   kind: densegen_realized_array_v1
@@ -51,7 +67,15 @@ presentation:
   show_distance_bracket: always
   collection_order:
     - fixed_pair_a
+    - fixed_pair_b
     - fixed_pair_c
+    - fixed_pair_d
+    - fixed_pair_e
+    - fixed_pair_f
+    - fixed_pair_g
+    - fixed_pair_h
+    - fixed_pair_i
+    - fixed_pair_j
 
 duplex:
   fixed_element_annotations: none
