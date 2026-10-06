@@ -14,6 +14,16 @@ This section lists dated entries so you can jump to a specific investigation win
 - [2026-02-18](#2026-02-18)
 - [2026-03-16](#2026-03-16)
 - [2026-07-12](#2026-07-12)
+- [2026-10-06](#2026-10-06)
+
+### 2026-10-06
+
+Added clean-commit distribution builds and portable checksum verification under
+`devtools.package`, extending the existing distribution test domain. Build and
+runtime dependency locks remain separate. The source citation has no duplicate
+version; the build derives its version from `pyproject.toml`. Artifact integrity
+does not imply public release or downstream scientific acceptance. See
+[distribution builds](distributions.md) for the maintained procedure.
 
 ### 2026-02-04
 - Investigated the reported stall in `test_round_robin_chunk_cap.py::test_stall_detected_with_no_solutions`.
