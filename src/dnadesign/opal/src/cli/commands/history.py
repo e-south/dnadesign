@@ -21,6 +21,7 @@ from ...storage.history_relocation.column_contract import load_history_column_co
 from ...storage.history_relocation.inspection import plan_history_relocation
 from ...storage.history_relocation.materialization import apply_history_relocation
 from ...storage.history_relocation.state_projection import require_target_config_matches_run_history
+from ...storage.history_relocation.state_rebinding import rebind_state_paths
 from ..formatting import kv_block
 from ..registry import cli_group
 from ._common import (
@@ -35,6 +36,33 @@ from ._common import (
 
 history_app = typer.Typer(no_args_is_help=True, help="Inspect and relocate one campaign history.")
 cli_group("history", help="Inspect and relocate one campaign history.")(history_app)
+
+
+@history_app.command("rebind-state", help="Verify and rebind state paths after a whole campaign directory moves.")
+def history_rebind_state(
+    config: Optional[Path] = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG"),
+    previous_workdir: Path = typer.Option(..., "--previous-workdir"),
+    apply: bool = typer.Option(False, "--apply"),
+    json: bool = typer.Option(False, "--json/--text"),
+) -> None:
+    try:
+        cfg = load_cli_config(resolve_config_path(config))
+        payload = rebind_state_paths(
+            Path(cfg.campaign.workdir), previous_workdir, expected_slug=cfg.campaign.slug, apply=apply
+        )
+        if json:
+            json_out(payload)
+        else:
+            print_stdout(kv_block("history rebind-state", payload))
+    except OpalError as exc:
+        if json:
+            json_error("history rebind-state", exc)
+        else:
+            opal_error("history rebind-state", exc)
+        raise typer.Exit(code=exc.exit_code)
+    except Exception as exc:
+        internal_error("history rebind-state", exc)
+        raise typer.Exit(code=ExitCodes.INTERNAL_ERROR)
 
 
 @history_app.command("import", help="Import disjoint prior rounds into the configured campaign history.")
