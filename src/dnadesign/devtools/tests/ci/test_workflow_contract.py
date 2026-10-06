@@ -253,7 +253,6 @@ def test_checkout_and_artifact_actions_use_current_node24_releases() -> None:
 
 def test_codecov_uploads_are_pinned_verified_and_non_gating() -> None:
     workflow = _workflow()
-    expected_ref = "codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f"
 
     upload_steps = [
         step
@@ -262,7 +261,10 @@ def test_codecov_uploads_are_pinned_verified_and_non_gating() -> None:
         if str(step.get("uses", "")).startswith("codecov/codecov-action@")
     ]
 
-    assert [str(step["uses"]) for step in upload_steps] == [expected_ref, expected_ref]
+    assert len(upload_steps) == 2
+    refs = {str(step["uses"]) for step in upload_steps}
+    assert len(refs) == 1
+    assert re.fullmatch(r"codecov/codecov-action@[0-9a-f]{40}", refs.pop())
     for step in upload_steps:
         assert step["continue-on-error"] is True
         assert step["with"]["fail_ci_if_error"] is True

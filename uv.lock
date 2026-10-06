@@ -81,15 +81,15 @@ wheels = [
 
 [[package]]
 name = "anyio"
-version = "4.12.1"
+version = "4.14.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "idna" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/96/f0/5eb65b2bb0d09ac6776f2eb54adee6abe8228ea05b20a5ad0e4945de8aac/anyio-4.12.1.tar.gz", hash = "sha256:41cfcc3a4c85d3f05c932da7c26d0201ac36f72abd4435ba90d0464a3ffed703", size = 228685, upload-time = "2026-01-06T11:45:21.246Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/61/cc/a381afa6efea9f496eff839d4a6a1aed3bfafc7b3ab4b0d1b243a12573dd/anyio-4.14.2.tar.gz", hash = "sha256:cfa139f3ed1a23ee8f88a145ddb5ac7605b8bbfd8592baacd7ce3d8bb4313c7f", size = 260176, upload-time = "2026-07-12T20:29:07.082Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/38/0e/27be9fdef66e72d64c0cdc3cc2823101b80585f8119b5c112c2e8f5f7dab/anyio-4.12.1-py3-none-any.whl", hash = "sha256:d405828884fc140aa80a3c667b8beed277f1dfedec42ba031bd6ac3db606ab6c", size = 113592, upload-time = "2026-01-06T11:45:19.497Z" },
+    { url = "https://files.pythonhosted.org/packages/da/35/f2287558c17e29fafc8ef3daf819bb9834061cfa43bff8014f7df7f63bdc/anyio-4.14.2-py3-none-any.whl", hash = "sha256:9f505dda5ac9f0c8309b5e8bd445a8c2bf7246f3ce950121e45ea15bc41d1494", size = 125813, upload-time = "2026-07-12T20:29:05.763Z" },
 ]
 
 [[package]]
@@ -423,10 +423,16 @@ wheels = [
 
 [[package]]
 name = "dnadesign"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
+    { name = "numpy" },
+]
+
+[package.optional-dependencies]
+full = [
     { name = "altair" },
+    { name = "anyio" },
     { name = "arviz" },
     { name = "biopython" },
     { name = "certifi" },
@@ -444,7 +450,6 @@ dependencies = [
     { name = "markdown-it-py" },
     { name = "matplotlib" },
     { name = "netcdf4" },
-    { name = "numpy" },
     { name = "openai" },
     { name = "openpyxl" },
     { name = "ortools" },
@@ -463,6 +468,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "rich" },
     { name = "scanpy" },
+    { name = "scikit-learn" },
     { name = "scipy" },
     { name = "seaborn" },
     { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine == 'arm64' and sys_platform != 'linux'" },
@@ -477,8 +483,6 @@ dependencies = [
     { name = "xlrd" },
     { name = "zstd" },
 ]
-
-[package.optional-dependencies]
 infer-evo2 = [
     { name = "cmake", marker = "sys_platform == 'linux'" },
     { name = "evo2", marker = "sys_platform == 'linux'" },
@@ -511,72 +515,77 @@ test = [
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
+tools = [
+    { name = "dnadesign", extra = ["full"] },
+]
 
 [package.metadata]
 requires-dist = [
-    { name = "altair", specifier = ">=6.0.0" },
-    { name = "arviz", specifier = ">=0.23.0" },
-    { name = "biopython", specifier = ">=1.87" },
-    { name = "certifi", specifier = ">=2025.11.12" },
-    { name = "click", specifier = ">=8.3.3" },
+    { name = "altair", marker = "extra == 'full'", specifier = ">=6.0.0" },
+    { name = "anyio", marker = "extra == 'full'", specifier = ">=4.14.2" },
+    { name = "arviz", marker = "extra == 'full'", specifier = ">=0.23.0" },
+    { name = "biopython", marker = "extra == 'full'", specifier = ">=1.87" },
+    { name = "certifi", marker = "extra == 'full'", specifier = ">=2025.11.12" },
+    { name = "click", marker = "extra == 'full'", specifier = ">=8.3.3" },
     { name = "cmake", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=3.18" },
-    { name = "dense-arrays", git = "https://github.com/e-south/dense-arrays?rev=3f43ff9f73950224e6f89b50c126ee3f11eb5cbd" },
-    { name = "duckdb", specifier = ">=1.5.5,<2" },
+    { name = "dense-arrays", marker = "extra == 'full'", git = "https://github.com/e-south/dense-arrays?rev=3f43ff9f73950224e6f89b50c126ee3f11eb5cbd" },
+    { name = "duckdb", marker = "extra == 'full'", specifier = ">=1.5.5,<2" },
     { name = "evo2", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=0.5.3" },
-    { name = "fastparquet", specifier = ">=2025.12.0" },
-    { name = "filelock", specifier = ">=3.20.3,<4" },
+    { name = "fastparquet", marker = "extra == 'full'", specifier = ">=2025.12.0" },
+    { name = "filelock", marker = "extra == 'full'", specifier = ">=3.20.3,<4" },
     { name = "flash-attn", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=2.8.0.post2,<3" },
-    { name = "html5lib", specifier = ">=1.1,<2" },
-    { name = "igraph" },
-    { name = "keyring", specifier = ">=25.6.0" },
-    { name = "leidenalg" },
-    { name = "logomaker" },
-    { name = "marimo", specifier = ">=0.23.16" },
-    { name = "markdown-it-py", specifier = ">=4.0.0,<5" },
-    { name = "matplotlib" },
-    { name = "netcdf4", specifier = ">=1.7.3" },
+    { name = "html5lib", marker = "extra == 'full'", specifier = ">=1.1,<2" },
+    { name = "igraph", marker = "extra == 'full'" },
+    { name = "keyring", marker = "extra == 'full'", specifier = ">=25.6.0" },
+    { name = "leidenalg", marker = "extra == 'full'" },
+    { name = "logomaker", marker = "extra == 'full'" },
+    { name = "marimo", marker = "extra == 'full'", specifier = ">=0.23.16" },
+    { name = "markdown-it-py", marker = "extra == 'full'", specifier = ">=4.0.0,<5" },
+    { name = "matplotlib", marker = "extra == 'full'" },
+    { name = "netcdf4", marker = "extra == 'full'", specifier = ">=1.7.3" },
     { name = "ninja", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'" },
     { name = "numpy" },
     { name = "onnx", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=1.22.0" },
-    { name = "openai", specifier = ">=2.14.0" },
-    { name = "openpyxl" },
-    { name = "ortools", specifier = ">=9.9,<9.10" },
+    { name = "openai", marker = "extra == 'full'", specifier = ">=2.14.0" },
+    { name = "openpyxl", marker = "extra == 'full'" },
+    { name = "ortools", marker = "extra == 'full'", specifier = ">=9.9,<9.10" },
     { name = "packaging", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'" },
-    { name = "pandas" },
-    { name = "pillow", specifier = ">=12.3.0" },
+    { name = "pandas", marker = "extra == 'full'" },
+    { name = "pillow", marker = "extra == 'full'", specifier = ">=12.3.0" },
     { name = "pip", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=26.1.2" },
-    { name = "plotly", specifier = ">=6.9.0" },
-    { name = "polars", specifier = ">=1.36.1" },
-    { name = "psutil", specifier = ">=7.2.1" },
-    { name = "py3dmol", specifier = "==2.5.5" },
-    { name = "pyarrow", specifier = ">=23.0.1" },
-    { name = "pydantic" },
-    { name = "pygments", specifier = ">=2.20.0" },
-    { name = "pymc" },
-    { name = "pysam", specifier = ">=0.23.3" },
-    { name = "python-levenshtein" },
-    { name = "pyyaml" },
-    { name = "rich" },
-    { name = "scanpy", specifier = "==1.10.3" },
-    { name = "scipy", specifier = ">=1.17.0" },
-    { name = "seaborn" },
+    { name = "plotly", marker = "extra == 'full'", specifier = ">=6.9.0" },
+    { name = "polars", marker = "extra == 'full'", specifier = ">=1.36.1" },
+    { name = "psutil", marker = "extra == 'full'", specifier = ">=7.2.1" },
+    { name = "py3dmol", marker = "extra == 'full'", specifier = "==2.5.5" },
+    { name = "pyarrow", marker = "extra == 'full'", specifier = ">=23.0.1" },
+    { name = "pydantic", marker = "extra == 'full'" },
+    { name = "pygments", marker = "extra == 'full'", specifier = ">=2.20.0" },
+    { name = "pymc", marker = "extra == 'full'" },
+    { name = "pysam", marker = "extra == 'full'", specifier = ">=0.23.3" },
+    { name = "python-levenshtein", marker = "extra == 'full'" },
+    { name = "pyyaml", marker = "extra == 'full'" },
+    { name = "rich", marker = "extra == 'full'" },
+    { name = "scanpy", marker = "extra == 'full'", specifier = "==1.10.3" },
+    { name = "scikit-learn", marker = "extra == 'full'", specifier = ">=1.8,<2" },
+    { name = "scipy", marker = "extra == 'full'", specifier = ">=1.17.0" },
+    { name = "seaborn", marker = "extra == 'full'" },
     { name = "setuptools", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=84.0.0" },
-    { name = "torch", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'x86_64' and sys_platform == 'linux')", specifier = ">=2.13,<2.14" },
+    { name = "torch", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'full') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'full')", specifier = ">=2.13,<2.14" },
     { name = "torch", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=2.13,<2.14", index = "https://download.pytorch.org/whl/cu130", conflict = { package = "dnadesign", extra = "infer-evo2" } },
-    { name = "tqdm" },
+    { name = "tqdm", marker = "extra == 'full'" },
     { name = "transformer-engine", extras = ["pytorch"], marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=2.0,<3" },
     { name = "transformers", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'" },
-    { name = "typer" },
-    { name = "umap-learn", specifier = ">=0.5.11" },
-    { name = "upa-url", specifier = ">=1.1.0,<2" },
-    { name = "vegafusion", specifier = ">=2.0.3" },
-    { name = "viennarna", specifier = ">=2.7.2" },
-    { name = "vl-convert-python", specifier = ">=1.9.0" },
+    { name = "typer", marker = "extra == 'full'" },
+    { name = "umap-learn", marker = "extra == 'full'", specifier = ">=0.5.11" },
+    { name = "upa-url", marker = "extra == 'full'", specifier = ">=1.1.0,<2" },
+    { name = "vegafusion", marker = "extra == 'full'", specifier = ">=2.0.3" },
+    { name = "viennarna", marker = "extra == 'full'", specifier = ">=2.7.2" },
+    { name = "vl-convert-python", marker = "extra == 'full'", specifier = ">=1.9.0" },
     { name = "wheel", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=0.48.0" },
-    { name = "xlrd" },
-    { name = "zstd", specifier = ">=1.5.7.2,!=1.5.7.3" },
+    { name = "xlrd", marker = "extra == 'full'" },
+    { name = "zstd", marker = "extra == 'full'", specifier = ">=1.5.7.2,!=1.5.7.3" },
 ]
-provides-extras = ["infer-evo2"]
+provides-extras = ["full", "infer-evo2"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -595,6 +604,7 @@ test = [
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-cov" },
 ]
+tools = [{ name = "dnadesign", extras = ["full"] }]
 
 [[package]]
 name = "docutils"

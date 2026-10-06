@@ -9,11 +9,5 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-from . import (  # noqa: F401
-    multistate_response_behavior_v1,
-    response_magnitude_feasibility_v1,
-    scalar_identity_v1,
-    sfxi_v1,
-    vector_channel_v1,
-    vector_target_similarity_v1,
-)
+# The objective registry discovers built-ins on demand. Importing a pure scoring
+# module must not initialize campaign plugins or their optional dependencies.

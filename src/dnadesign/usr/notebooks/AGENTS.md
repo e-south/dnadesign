@@ -3,6 +3,8 @@
 - Canonical marimo rules: `docs/notebooks/marimo-reference.md`.
 
 ### Setup
+The default `tools` group installs the `full` extra, including Marimo.
+
 ```bash
 uv sync --locked
 ```

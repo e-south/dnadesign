@@ -29,7 +29,10 @@ def test_notebook_agent_setup_uses_a_declared_locked_environment() -> None:
 
     assert "uv sync --locked" in agent_text
     assert "--group notebooks" not in agent_text
-    assert any(requirement.startswith("marimo>=") for requirement in project["project"]["dependencies"])
+    assert project["tool"]["uv"]["default-groups"] == ["tools"]
+    assert project["dependency-groups"]["tools"] == ["dnadesign[full]"]
+    full = project["project"]["optional-dependencies"]["full"]
+    assert any(requirement.startswith("marimo>=") for requirement in full)
 
 
 def test_explorer_plot_cell_replaces_the_displayed_output() -> None:

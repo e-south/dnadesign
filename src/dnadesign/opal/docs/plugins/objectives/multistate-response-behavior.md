@@ -5,7 +5,7 @@ short_name: MSRB
 objective_id: multistate_response_behavior_v1
 owner: dnadesign-maintainers
 status: available
-last_verified: 2026-08-09
+last_verified: 2026-10-06
 ---
 
 # Multistate Response Behavior (MSRB)
@@ -459,6 +459,32 @@ the score.
 The score consumes a point phenotype and emits no uncertainty channel.
 Bootstrap draws, event-time bounds, repeated observations, censoring, and
 model refits remain separate evidence.
+
+### Python scoring without a campaign
+
+The public scorer requires NumPy. It does not load campaign plugins, fit a model,
+read a dataset or select sequences. A base DNADesign wheel provides this API; the
+`full` extra provides the campaign and other tool dependencies.
+
+```python
+import numpy as np
+from dnadesign.opal import score_multistate_response_behavior
+
+# Four response values, followed by four reference-relative signal values.
+phenotype = np.array([[-1., 0., 2., 3., -2., -1., 1., 2.]])
+result = score_multistate_response_behavior(
+    phenotype,
+    state_ids=("00", "10", "01", "11"),
+    target_mask=(0, 0, 1, 1),
+    softmin_scale=0.3,
+)
+print(result.behavior_score)
+print(result.clearances.coordinate_clearances)
+```
+
+Keep the state order, measurement definitions and target explicit. Compare the
+individual clearances with zero when assessing directional attainment; the
+smooth score is a ranking, not a substitute for that inspection.
 
 ### Responsibility and sources
 
