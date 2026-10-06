@@ -321,9 +321,19 @@ assert result.behavior_score.tolist() == [0.0]
 
 
 def _check_full_install(repo_root: Path, tmp_path: Path, environment: Path, wheel: Path) -> None:
-    requirements = tmp_path / "full-requirements.txt"
+    requirements = tmp_path / "pylock.full.toml"
     subprocess.run(
-        ["uv", "export", "--locked", "--no-dev", "--no-emit-project", "--no-hashes", "-o", str(requirements)],
+        [
+            "uv",
+            "export",
+            "--locked",
+            "--no-dev",
+            "--no-emit-project",
+            "--format",
+            "pylock.toml",
+            "-o",
+            str(requirements),
+        ],
         cwd=repo_root,
         check=True,
         capture_output=True,
@@ -331,8 +341,18 @@ def _check_full_install(repo_root: Path, tmp_path: Path, environment: Path, whee
         timeout=60,
     )
     python = environment / "bin/python"
+    # Preserve package-specific URLs and hashes, including Linux CUDA wheels.
+    # A requirements.txt export drops their explicit-index binding.
     subprocess.run(
-        ["uv", "pip", "install", "--python", str(python), f"{wheel}[full]", "-r", str(requirements)],
+        ["uv", "pip", "install", "--python", str(python), "-r", str(requirements)],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    subprocess.run(
+        ["uv", "pip", "install", "--python", str(python), f"{wheel}[full]"],
         cwd=tmp_path,
         check=True,
         capture_output=True,
