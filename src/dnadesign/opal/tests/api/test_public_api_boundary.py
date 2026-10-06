@@ -16,6 +16,33 @@ import sys
 import dnadesign.opal as opal
 
 
+def test_public_scoring_requires_only_numpy_without_loading_plugins() -> None:
+    code = """
+import importlib.abc
+import sys
+import numpy as np
+
+class RejectToolDependencies(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split('.')[0] in {
+            'pandas', 'pydantic', 'rich', 'matplotlib', 'torch', 'scanpy',
+            'pymc', 'marimo', 'sklearn', 'pyarrow', 'yaml', 'scipy',
+        }:
+            raise AssertionError(f'Scoring loaded an unrelated dependency: {fullname}')
+
+sys.meta_path.insert(0, RejectToolDependencies())
+from dnadesign.opal import score_multistate_response_behavior
+result = score_multistate_response_behavior(
+    np.zeros((1, 8)), state_ids=('00', '10', '01', '11'),
+    target_mask=(0, 0, 1, 1), softmin_scale=0.3,
+)
+assert result.behavior_score.tolist() == [0.0]
+assert not any(name.endswith('_v1') and '.objectives.' in name for name in sys.modules)
+"""
+    proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+
+
 def test_package_root_defers_heavy_public_imports() -> None:
     code = """
 import json

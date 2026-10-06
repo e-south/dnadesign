@@ -1,4 +1,13 @@
-"""Explicit path-only repair of state after a whole campaign directory moves."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/storage/history_relocation/state_rebinding.py
+
+Explicit path-only repair of state after a whole campaign directory moves.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

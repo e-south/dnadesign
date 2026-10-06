@@ -1,7 +1,7 @@
 ## BU SCC Install: `dnadesign` Interactive Bootstrap (CPU + Evo2 GPU)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-09
+**Last verified:** 2026-10-06
 
 ### Purpose
 
@@ -350,7 +350,8 @@ uv sync --locked --extra infer-evo2 \
   - `uv sync --locked` installs base runtime only.
   - `uv sync --locked --extra infer-evo2` adds Evo2 GPU dependencies.
   - `uv sync --locked --group dev --extra infer-evo2` installs dev tooling and Evo2 GPU dependencies together.
-  - `pyproject.toml` sets `[tool.uv] default-groups = []`, so dev/test groups are opt-in.
+  - `pyproject.toml` defaults to the `tools` group for the full tool runtime;
+    dev/test groups remain opt-in.
   - use `uv add` / `uv remove` only for dependency declaration changes (`pyproject.toml` + `uv.lock` updates).
   - use `uv sync --reinstall-package <pkg>` for environment rebuilds without dependency graph changes.
   - each `uv sync` realizes exactly the requested groups/extras; if `--extra infer-evo2` is omitted later, GPU packages are removed from the environment.

@@ -115,7 +115,15 @@ _PUBLIC_EXPORTS = {
 def main() -> None:
     """Run the OPAL CLI entrypoint."""
 
-    from .src.cli import main as cli_main
+    try:
+        from .src.cli import main as cli_main
+    except ModuleNotFoundError as exc:
+        if not exc.name or exc.name.startswith("dnadesign"):
+            raise
+        raise SystemExit(
+            f"The OPAL campaign CLI requires dnadesign[full] (missing {exc.name}). "
+            "In a checkout, run `uv sync --locked` to install the default tools group."
+        ) from None
 
     cli_main()
 

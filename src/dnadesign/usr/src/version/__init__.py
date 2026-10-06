@@ -9,4 +9,4 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
-__version__ = "0.1.0"
+from dnadesign import __version__ as __version__

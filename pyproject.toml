@@ -4,65 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name            = "dnadesign"
-version         = "0.1.0"
+version         = "0.2.0"
 description     = "DNA sequence design pipelines and bioinformatics helpers."
 authors         = [{ name = "Eric South" }]
 readme          = "README.md"
 requires-python = ">=3.12,<3.13"
 
-dependencies = [
-  "arviz>=0.23.0",
-  "biopython>=1.87",
-  "click>=8.3.3",
-  "html5lib>=1.1,<2",
-  "igraph",
-  "leidenalg",
-  "logomaker",
-  "markdown-it-py>=4.0.0,<5",
-  "matplotlib",
-  "numpy",
-  "openpyxl",
-  "ortools>=9.9,<9.10",
-  "pandas",
-  "pillow>=12.3.0",
-  "pyarrow>=23.0.1",
-  "pydantic",
-  "pygments>=2.20.0",
-  "pymc",
-  "python-levenshtein",
-  "pyyaml",
-  "rich",
-  "scanpy==1.10.3",
-  "scipy>=1.17.0",
-  "seaborn",
-  "tqdm",
-  "typer",
-  "umap-learn>=0.5.11",
-  "upa-url>=1.1.0,<2",
-  "duckdb>=1.5.5,<2",
-  "xlrd",
-  # Keep the base and optional Evo2 environments on one supported Torch family.
-  "torch>=2.13,<2.14; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
-  "dense-arrays",
-  "polars>=1.36.1",
-  "altair>=6.0.0",
-  "vegafusion>=2.0.3",
-  "vl-convert-python>=1.9.0",
-  "pysam>=0.23.3",
-  "netcdf4>=1.7.3",
-  "certifi>=2025.11.12",
-  "keyring>=25.6.0",
-  "fastparquet>=2025.12.0",
-  "filelock>=3.20.3,<4",
-  "marimo>=0.23.16",
-  "openai>=2.14.0",
-  "viennarna>=2.7.2",
-  # 1.5.7.3 is yanked for a thread-safety regression.
-  "zstd>=1.5.7.2,!=1.5.7.3",
-  "py3dmol==2.5.5",
-  "plotly>=6.9.0",
-  "psutil>=7.2.1",
-]
+dependencies = ["numpy"]
 
 [project.scripts]
 usr        = "dnadesign.usr:main"
@@ -83,6 +31,63 @@ ops        = "dnadesign.ops.cli:main"
 dnadesign-storage = "dnadesign.contracts.storage_objects.cli:main"
 
 [project.optional-dependencies]
+# Preserve the complete tool runtime separately from the NumPy-only scoring API.
+full = [
+  "anyio>=4.14.2",
+  "arviz>=0.23.0",
+  "biopython>=1.87",
+  "click>=8.3.3",
+  "html5lib>=1.1,<2",
+  "igraph",
+  "leidenalg",
+  "logomaker",
+  "markdown-it-py>=4.0.0,<5",
+  "matplotlib",
+  "openpyxl",
+  "ortools>=9.9,<9.10",
+  "pandas",
+  "pillow>=12.3.0",
+  "pyarrow>=23.0.1",
+  "pydantic",
+  "pygments>=2.20.0",
+  "pymc",
+  "python-levenshtein",
+  "pyyaml",
+  "rich",
+  "scanpy==1.10.3",
+  "scikit-learn>=1.8,<2",
+  "scipy>=1.17.0",
+  "seaborn",
+  "tqdm",
+  "typer",
+  "umap-learn>=0.5.11",
+  "upa-url>=1.1.0,<2",
+  "duckdb>=1.5.5,<2",
+  "xlrd",
+  # Keep the full and optional Evo2 environments on one supported Torch family.
+  "torch>=2.13,<2.14; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  # Dense Arrays is not on PyPI; installed wheels need the same immutable source.
+  "dense-arrays @ git+https://github.com/e-south/dense-arrays@3f43ff9f73950224e6f89b50c126ee3f11eb5cbd", # pragma: allowlist secret
+  "polars>=1.36.1",
+  "altair>=6.0.0",
+  "vegafusion>=2.0.3",
+  "vl-convert-python>=1.9.0",
+  "pysam>=0.23.3",
+  "netcdf4>=1.7.3",
+  "certifi>=2025.11.12",
+  "keyring>=25.6.0",
+  "fastparquet>=2025.12.0",
+  "filelock>=3.20.3,<4",
+  "marimo>=0.23.16",
+  "openai>=2.14.0",
+  "viennarna>=2.7.2",
+  # 1.5.7.3 is yanked for a thread-safety regression.
+  "zstd>=1.5.7.2,!=1.5.7.3",
+  "py3dmol==2.5.5",
+  "plotly>=6.9.0",
+  "psutil>=7.2.1",
+]
+
 # GPU stack (Linux x86_64 only)
 infer-evo2 = [
   # --- torch (GPU wheels via uv sources below)
@@ -106,6 +111,8 @@ infer-evo2 = [
 ]
 
 [dependency-groups]
+# A checkout keeps the existing full tool environment; installed libraries opt in.
+tools = ["dnadesign[full]"]
 test = ["pytest>=9.0.3", "pytest-cov", "hypothesis>=6.100"]
 lint = ["ruff>=0.4", "pre-commit>=3.7"]
 dev  = [{ include-group = "test" }, { include-group = "lint" }]
@@ -260,7 +267,7 @@ known-first-party = ["dnadesign"]
 
 [tool.uv]
 required-version = ">=0.12.3,<0.13"
-default-groups = []
+default-groups = ["tools"]
 environments = [
   "sys_platform == 'darwin'",
   "sys_platform == 'linux' and platform_machine == 'x86_64'",
@@ -290,8 +297,6 @@ url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [tool.uv.sources]
-dense-arrays = { git = "https://github.com/e-south/dense-arrays", rev = "3f43ff9f73950224e6f89b50c126ee3f11eb5cbd" } # pragma: allowlist secret
-
 # When infer-evo2 is enabled, use CUDA 13.0 wheels for the Torch family.
 torch = [
   { index = "pytorch-cu130", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },

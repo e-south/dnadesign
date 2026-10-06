@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from dnadesign import __version__ as __version__
 from dnadesign.permuter.src.api import (
     CANONICAL_AMINO_ACIDS,
     ESMC_PSEUDOLIKELIHOOD_METHOD_ID,
@@ -54,8 +55,6 @@ from dnadesign.permuter.src.api import (
     write_masked_marginal_artifacts,
     write_pseudolikelihood_artifacts,
 )
-
-__version__ = "0.5.0"
 
 __all__ = [
     "CodingDnaDmsRequest",

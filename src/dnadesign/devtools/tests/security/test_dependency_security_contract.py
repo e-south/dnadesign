@@ -68,11 +68,12 @@ def _repository_source_files(
 
 def test_security_floors_are_published_by_their_owning_dependency_sets() -> None:
     project = _pyproject()["project"]
-    dependencies = tuple(project["dependencies"])
+    dependencies = tuple(project["dependencies"]) + tuple(project["optional-dependencies"]["full"])
     evo2_dependencies = tuple(project["optional-dependencies"]["infer-evo2"])
     build_dependencies = tuple(_pyproject()["build-system"]["requires"])
     constraint_dependencies = tuple(_pyproject()["tool"]["uv"]["constraint-dependencies"])
 
+    assert "anyio>=4.14.2" in dependencies
     assert "click>=8.3.3" in dependencies
     assert "marimo>=0.23.16" in dependencies
     assert "pillow>=12.3.0" in dependencies

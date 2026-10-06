@@ -13,10 +13,16 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
+import tarfile
 import tomllib
 import zipfile
+from email.parser import BytesParser
+from importlib import import_module
+from importlib.metadata import version
 from pathlib import Path
 
+from packaging.requirements import Requirement
 from setuptools import Distribution, find_namespace_packages
 from setuptools.config.pyprojecttoml import apply_configuration
 
@@ -226,7 +232,7 @@ def test_built_wheel_retains_runtime_resources_without_internal_shelves(tmp_path
     wheel_dir = tmp_path / "dist"
     _copy_build_source(repo_root, source_root)
     subprocess.run(
-        ["uv", "build", "--wheel", "--out-dir", str(wheel_dir)],
+        ["uv", "build", "--out-dir", str(wheel_dir)],
         cwd=source_root,
         check=True,
         capture_output=True,
@@ -235,9 +241,30 @@ def test_built_wheel_retains_runtime_resources_without_internal_shelves(tmp_path
     )
     wheels = list(wheel_dir.glob("*.whl"))
     assert len(wheels) == 1
+    sdists = list(wheel_dir.glob("*.tar.gz"))
+    assert len(sdists) == 1
+    with tarfile.open(sdists[0]) as source_archive:
+        source_members = [Path(member.name).parts[1:] for member in source_archive.getmembers()]
+    assert not any(".." in parts for parts in source_members)
+    assert not any(
+        {"workspaces", "campaigns"}.intersection(parts) and {"outputs", "runs"}.intersection(parts)
+        for parts in source_members
+    )
+    assert not any(
+        "/".join(parts).removeprefix("src/").startswith(_FORBIDDEN_WHEEL_PREFIXES) for parts in source_members
+    )
+    assert not any("/reader_spop_" in "/".join(parts) for parts in source_members)
 
     with zipfile.ZipFile(wheels[0]) as wheel:
         members = set(wheel.namelist())
+        metadata = BytesParser().parsebytes(wheel.read(next(m for m in members if m.endswith(".dist-info/METADATA"))))
+
+    requirements = [Requirement(value) for value in metadata.get_all("Requires-Dist", [])]
+    assert {r.name for r in requirements if r.marker is None or r.marker.evaluate({"extra": ""})} == {"numpy"}
+    dense_arrays = next(r for r in requirements if r.name == "dense-arrays")
+    assert dense_arrays.url is not None, "The full wheel must declare its unavailable-on-PyPI dependency source"
+    assert dense_arrays.url.startswith("git+https://github.com/e-south/dense-arrays@")
+    assert len(dense_arrays.url.rsplit("@", 1)[1]) == 40
 
     assert _REQUIRED_WHEEL_MEMBERS <= members
     assert members.isdisjoint(_FORBIDDEN_WHEEL_MEMBERS)
@@ -245,3 +272,141 @@ def test_built_wheel_retains_runtime_resources_without_internal_shelves(tmp_path
     assert not any("config.probe." in member for member in members)
     assert "dnadesign/usr/remotes.yaml" not in members
     assert not any("/reader_spop_" in member for member in members)
+
+    environment = tmp_path / "scoring-env"
+    subprocess.run(["uv", "venv", "--python", sys.executable, str(environment)], check=True, capture_output=True)
+    python = environment / "bin/python"
+    lock = tomllib.loads((repo_root / "uv.lock").read_text())
+    numpy_version = next(p["version"] for p in lock["package"] if p["name"] == "numpy")
+    subprocess.run(
+        ["uv", "pip", "install", "--python", str(python), str(wheels[0]), f"numpy=={numpy_version}"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    smoke = subprocess.run(
+        [
+            str(python),
+            "-I",
+            "-c",
+            """
+from importlib.util import find_spec
+import numpy as np
+from importlib.metadata import version
+from dnadesign import __version__
+from dnadesign.opal import score_multistate_response_behavior
+assert __version__ == version('dnadesign')
+assert find_spec('pandas') is None
+assert find_spec('sklearn') is None
+assert find_spec('marimo') is None
+result = score_multistate_response_behavior(
+    np.zeros((1, 8)), state_ids=('00', '10', '01', '11'),
+    target_mask=(0, 0, 1, 1), softmin_scale=0.3,
+)
+assert result.behavior_score.tolist() == [0.0]
+""",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert smoke.returncode == 0, smoke.stderr
+    cli = subprocess.run([str(environment / "bin/opal"), "--help"], cwd=tmp_path, capture_output=True, text=True)
+    assert cli.returncode != 0
+    assert "dnadesign[full]" in cli.stderr
+    assert "Traceback" not in cli.stderr
+    _check_full_install(repo_root, tmp_path, environment, wheels[0])
+
+
+def _check_full_install(repo_root: Path, tmp_path: Path, environment: Path, wheel: Path) -> None:
+    requirements = tmp_path / "full-requirements.txt"
+    subprocess.run(
+        ["uv", "export", "--locked", "--no-dev", "--no-emit-project", "--no-hashes", "-o", str(requirements)],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    python = environment / "bin/python"
+    subprocess.run(
+        ["uv", "pip", "install", "--python", str(python), f"{wheel}[full]", "-r", str(requirements)],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    subprocess.run(["uv", "pip", "check", "--python", str(python)], check=True, capture_output=True, text=True)
+    smoke = subprocess.run(
+        [
+            str(python),
+            "-I",
+            "-c",
+            """
+import sys
+from pathlib import Path
+from hashlib import sha256
+import dnadesign
+from dnadesign.construct import place_annotated_part
+from dnadesign.contracts.sequence import AnnotatedSequencePartV1
+assert Path(dnadesign.__file__).is_relative_to(sys.prefix)
+sequence = 'AACCGG'
+digest = 'sha256:' + sha256(sequence.encode()).hexdigest()
+part = AnnotatedSequencePartV1.model_validate({
+    'part_id': 'example', 'strandedness': 'double', 'topology': 'linear',
+    'sequence': sequence, 'sequence_digest': digest,
+    'source_refs': [{'kind': 'artifact', 'authority': 'example', 'identifier': 'example', 'digest': digest}],
+    'features': [{
+        'feature_id': 'example-feature', 'role': 'sequence_region', 'owner': 'example',
+        'start': 0, 'end': 2, 'orientation': 'forward', 'sequence': 'AA', 'source_digest': digest,
+    }],
+})
+result = place_annotated_part(
+    template_id='example', template_sequence='TTTTTT', part=part,
+    placement_kind='replace', start=2, end=4, orientation='reverse_complement',
+)
+assert result.sequence == 'TTCCGGTTTT'
+assert (result.part_start, result.part_end) == (2, 8)
+assert (result.features[0].realized_start, result.features[0].realized_end) == (6, 8)
+""",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert smoke.returncode == 0, smoke.stderr
+    for command in ("opal", "construct", "latentdna", "dense"):
+        help_result = subprocess.run(
+            [str(environment / "bin" / command), "--help"],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert help_result.returncode == 0, help_result.stderr
+
+
+def test_scoring_install_is_small_and_full_tools_remain_explicit() -> None:
+    project = tomllib.loads((_repo_root() / "pyproject.toml").read_text())
+    base = {Requirement(value).name for value in project["project"]["dependencies"]}
+    assert base == {"numpy"}
+    full = {Requirement(value).name for value in project["project"]["optional-dependencies"]["full"]}
+    assert {"pandas", "pyarrow", "pydantic", "typer", "scikit-learn", "dense-arrays", "torch", "marimo"} <= full
+    assert project["dependency-groups"]["tools"] == ["dnadesign[full]"]
+    assert project["tool"]["uv"]["default-groups"] == ["tools"]
+
+
+def test_tool_software_versions_follow_the_installed_distribution() -> None:
+    expected = version("dnadesign")
+    for module in (
+        "dnadesign",
+        "dnadesign.opal.src",
+        "dnadesign.usr.src.version",
+        "dnadesign.latentdna.src.version",
+        "dnadesign.permuter",
+    ):
+        assert import_module(module).__version__ == expected

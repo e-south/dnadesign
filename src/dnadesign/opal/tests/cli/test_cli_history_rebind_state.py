@@ -1,4 +1,13 @@
-"""Whole-directory moves must preserve history and reject different models/runs."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/cli/test_cli_history_rebind_state.py
+
+Whole-directory moves must preserve history and reject different models/runs.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 import json
 from pathlib import Path
