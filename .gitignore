@@ -125,6 +125,7 @@ src/dnadesign/usr/remotes.yaml
 # Images: ignore by default; allow curated exceptions
 # -----------------------------------------------------------------------------
 *.png
+!assets/dnadesign-banner.png
 *.jpg
 *.jpeg
 *.gif
