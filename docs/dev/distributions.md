@@ -1,7 +1,7 @@
 ## Distribution builds and verification
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-06
+**Last verified:** 2026-10-07
 
 DNADesign has one distribution version, declared in `pyproject.toml`. Runtime
 `dnadesign.__version__` reads installed metadata. Individual tools can version
@@ -90,7 +90,7 @@ Version-based wheel installation does not provide Git provenance. Downstream
 verification must bind retained artifact bytes to installed content rather than
 invent a Git commit from `direct_url.json`.
 
-### Current unreleased changes
+### Release 0.2.0
 
 - OPAL: NumPy-only public scoring installation, lazy runtime imports and moved
   campaign-state rebinding.
@@ -98,9 +98,14 @@ invent a Git commit from `direct_url.json`.
 - Package: one version authority, explicit full-runtime extra, clean build
   provenance and portable bundle verification.
 
-These are working changes at version 0.2.0, not a declaration of a public release
-or historical scientific equivalence. See the owning tools' existing docs and
-examples for their contracts.
+Version [0.2.0 is published on PyPI](https://pypi.org/project/dnadesign-tools/0.2.0/)
+from commit `784c0e52137560f60276c56c51e1d8e2fc63a19d`. Its
+[GitHub release](https://github.com/e-south/dnadesign/releases/tag/v0.2.0) retains
+wheel/source archives, build provenance and post-publication verification. Exact-main
+CI, registry artifact hashes, ordinary base/full installations and the rendered
+package-page banner passed. This does not establish historical scientific
+equivalence or advance downstream paper pins. See the owning tools' existing
+docs and examples for their contracts.
 
 ### Package-page images
 
