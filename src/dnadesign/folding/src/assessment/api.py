@@ -12,9 +12,9 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import os
-from importlib.metadata import version
 from pathlib import Path
 
+from dnadesign import __version__
 from dnadesign.artifacts import CreateOnlyDirectoryPublication, PublicationError
 from dnadesign.contracts.folding import (
     AssessmentProducerV1,
@@ -98,7 +98,7 @@ def publish_structure_assessment(
                 target=request.target,
                 prediction_digest=prediction_digest,
                 prediction=prediction,
-                producer=AssessmentProducerV1(version=version("dnadesign")),
+                producer=AssessmentProducerV1(version=__version__),
             )
             record_content = model_json_bytes(record)
             reader.write_new_bytes(_RECORD, record_content, label="assessment record")

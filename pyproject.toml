@@ -3,7 +3,7 @@ requires = ["setuptools>=84.0.0", "wheel>=0.48.0", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name            = "dnadesign"
+name            = "dnadesign-tools"
 version         = "0.2.0"
 description     = "DNA sequence design pipelines and bioinformatics helpers."
 authors         = [{ name = "Eric South" }]
@@ -66,8 +66,8 @@ full = [
   "xlrd",
   # Keep the full and optional Evo2 environments on one supported Torch family.
   "torch>=2.13,<2.14; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
-  # Dense Arrays is not on PyPI; installed wheels need the same immutable source.
-  "dense-arrays @ git+https://github.com/e-south/dense-arrays@3f43ff9f73950224e6f89b50c126ee3f11eb5cbd", # pragma: allowlist secret
+  # Qualified registry release; historical study runtimes keep their separate pins.
+  "dense-arrays==0.2.0",
   "polars>=1.36.1",
   "altair>=6.0.0",
   "vegafusion>=2.0.3",
@@ -112,7 +112,7 @@ infer-evo2 = [
 
 [dependency-groups]
 # A checkout keeps the existing full tool environment; installed libraries opt in.
-tools = ["dnadesign[full]"]
+tools = ["dnadesign-tools[full]"]
 test = ["pytest>=9.0.3", "pytest-cov", "hypothesis>=6.100"]
 lint = ["ruff>=0.4", "pre-commit>=3.7"]
 dev  = [{ include-group = "test" }, { include-group = "lint" }]

@@ -57,6 +57,11 @@ from dnadesign.devtools.docs.markdown_inventory import (
 )
 
 
+def _package_readme_target(link: str) -> str:
+    """Resolve our public README links without treating foreign URLs as local."""
+    return link.removeprefix("https://github.com/e-south/dnadesign/blob/main/")
+
+
 def _find_readme_tool_catalog_issues(repo_root: Path) -> list[str]:
     readme_path = repo_root / "README.md"
     src_root = repo_root / "src" / "dnadesign"
@@ -89,7 +94,7 @@ def _find_readme_tool_catalog_issues(repo_root: Path) -> list[str]:
             continue
 
         tool_name = match.group("tool")
-        tool_link = match.group("link")
+        tool_link = _package_readme_target(match.group("link"))
         if tool_name in declared_tools:
             issues.append(f"{readme_path}: duplicate tool row for '{tool_name}'.")
             continue
@@ -124,7 +129,7 @@ def _find_root_docs_entrypoint_issues(repo_root: Path) -> list[str]:
     text = readme_path.read_text(encoding="utf-8")
     linked_targets: set[str] = set()
     for raw in LINK_PATTERN.findall(text):
-        link = raw.strip().split()[0]
+        link = _package_readme_target(raw.strip().split()[0])
         if link.startswith(("http://", "https://", "mailto:", "#")):
             continue
         target_rel = link.split("#", 1)[0].strip()

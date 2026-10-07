@@ -32,6 +32,22 @@ from dnadesign.devtools.tests.docs.check_test_support import (
 )
 
 
+def test_package_readme_links_resolve_only_the_canonical_repository(tmp_path: Path) -> None:
+    _write(tmp_path / "src/dnadesign/alpha/README.md", "# Alpha\n")
+    _write(tmp_path / "docs/README.md", "## Documentation\n")
+    prefix = "https://github.com/e-south/dnadesign/blob/main/"
+    text = (
+        f"[Docs]({prefix}docs/README.md)\n\n## Available tools\n\n"
+        f"| Tool | Description |\n| --- | --- |\n| [**alpha**]({prefix}src/dnadesign/alpha/README.md) | Alpha |\n"
+    )
+    _write(tmp_path / "README.md", text)
+    assert _find_readme_tool_catalog_issues(tmp_path) == []
+    assert _find_root_docs_entrypoint_issues(tmp_path) == []
+    _write(tmp_path / "README.md", text.replace("github.com/e-south", "github.com/another-owner"))
+    assert _find_readme_tool_catalog_issues(tmp_path)
+    assert _find_root_docs_entrypoint_issues(tmp_path)
+
+
 def test_tool_readme_structure_check_requires_top_level_markdown_doc_link(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "alpha" / "README.md",

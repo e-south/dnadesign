@@ -121,7 +121,7 @@ def main() -> None:
         if not exc.name or exc.name.startswith("dnadesign"):
             raise
         raise SystemExit(
-            f"The OPAL campaign CLI requires dnadesign[full] (missing {exc.name}). "
+            f"The OPAL campaign CLI requires dnadesign-tools[full] (missing {exc.name}). "
             "In a checkout, run `uv sync --locked` to install the default tools group."
         ) from None
 

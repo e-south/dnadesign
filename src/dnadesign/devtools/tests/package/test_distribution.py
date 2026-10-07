@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
@@ -259,12 +260,13 @@ def test_built_wheel_retains_runtime_resources_without_internal_shelves(tmp_path
         members = set(wheel.namelist())
         metadata = BytesParser().parsebytes(wheel.read(next(m for m in members if m.endswith(".dist-info/METADATA"))))
 
+    assert metadata["Name"] == "dnadesign-tools"
     requirements = [Requirement(value) for value in metadata.get_all("Requires-Dist", [])]
     assert {r.name for r in requirements if r.marker is None or r.marker.evaluate({"extra": ""})} == {"numpy"}
     dense_arrays = next(r for r in requirements if r.name == "dense-arrays")
-    assert dense_arrays.url is not None, "The full wheel must declare its unavailable-on-PyPI dependency source"
-    assert dense_arrays.url.startswith("git+https://github.com/e-south/dense-arrays@")
-    assert len(dense_arrays.url.rsplit("@", 1)[1]) == 40
+    assert dense_arrays.url is None, "PyPI distributions must resolve through the package registry"
+    assert str(dense_arrays.specifier) == "==0.2.0"
+    assert all(requirement.url is None for requirement in requirements)
 
     assert _REQUIRED_WHEEL_MEMBERS <= members
     assert members.isdisjoint(_FORBIDDEN_WHEEL_MEMBERS)
@@ -296,7 +298,7 @@ import numpy as np
 from importlib.metadata import version
 from dnadesign import __version__
 from dnadesign.opal import score_multistate_response_behavior
-assert __version__ == version('dnadesign')
+assert __version__ == version('dnadesign-tools')
 assert find_spec('pandas') is None
 assert find_spec('sklearn') is None
 assert find_spec('marimo') is None
@@ -315,7 +317,7 @@ assert result.behavior_score.tolist() == [0.0]
     assert smoke.returncode == 0, smoke.stderr
     cli = subprocess.run([str(environment / "bin/opal"), "--help"], cwd=tmp_path, capture_output=True, text=True)
     assert cli.returncode != 0
-    assert "dnadesign[full]" in cli.stderr
+    assert "dnadesign-tools[full]" in cli.stderr
     assert "Traceback" not in cli.stderr
     _check_full_install(repo_root, tmp_path, environment, wheels[0])
 
@@ -412,16 +414,17 @@ assert (result.features[0].realized_start, result.features[0].realized_end) == (
 
 def test_scoring_install_is_small_and_full_tools_remain_explicit() -> None:
     project = tomllib.loads((_repo_root() / "pyproject.toml").read_text())
+    assert project["project"]["name"] == "dnadesign-tools"
     base = {Requirement(value).name for value in project["project"]["dependencies"]}
     assert base == {"numpy"}
     full = {Requirement(value).name for value in project["project"]["optional-dependencies"]["full"]}
     assert {"pandas", "pyarrow", "pydantic", "typer", "scikit-learn", "dense-arrays", "torch", "marimo"} <= full
-    assert project["dependency-groups"]["tools"] == ["dnadesign[full]"]
+    assert project["dependency-groups"]["tools"] == ["dnadesign-tools[full]"]
     assert project["tool"]["uv"]["default-groups"] == ["tools"]
 
 
 def test_tool_software_versions_follow_the_installed_distribution() -> None:
-    expected = version("dnadesign")
+    expected = version("dnadesign-tools")
     for module in (
         "dnadesign",
         "dnadesign.opal.src",
@@ -430,3 +433,21 @@ def test_tool_software_versions_follow_the_installed_distribution() -> None:
         "dnadesign.permuter",
     ):
         assert import_module(module).__version__ == expected
+
+
+def test_package_readme_uses_durable_images_and_absolute_links() -> None:
+    root = _repo_root()
+    project = tomllib.loads((root / "pyproject.toml").read_text())["project"]
+    assert project["readme"] == "README.md"
+    text = (root / "README.md").read_text()
+    targets = re.findall(r"\]\(([^)]+)\)", text)
+    assert all(target.startswith(("https://", "#")) for target in targets)
+    images = re.findall(r"!\[[^\]]*\]\(([^)]+)\)", text)
+    banner = images[0]
+    prefix = "https://raw.githubusercontent.com/e-south/dnadesign/"
+    assert banner.startswith(prefix)
+    revision, relative = banner.removeprefix(prefix).split("/", 1)
+    assert revision == "v" + project["version"] or re.fullmatch(r"[0-9a-f]{40}", revision)
+    assert relative.endswith(".png")
+    data = (root / relative).read_bytes()
+    assert data.startswith(b"\x89PNG\r\n\x1a\n") and len(data) < 10_000_000

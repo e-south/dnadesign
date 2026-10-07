@@ -24,7 +24,9 @@ Treat these as installation requirements:
 - Python: `>=3.12,<3.13` (`pyproject.toml` `[project] requires-python`)
 - uv: `>=0.12.3,<0.13` (`pyproject.toml` `[tool.uv] required-version`)
 
-DNADesign uses one distribution version for its tools. Python's
+The distribution name is `dnadesign-tools`; Python imports remain `dnadesign`
+and tool commands remain unchanged. Do not install the unrelated `dnadesign`
+PyPI project. DNADesign uses one distribution version for its tools. Python's
 `dnadesign.__version__` and tool software-version fields read installed package
 metadata; API and artifact schema versions remain independent. Version 0.2.0
 introduces the lightweight installed-library boundary below. A source version

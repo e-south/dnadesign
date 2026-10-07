@@ -159,9 +159,9 @@ def _analysis_id() -> str:
 
 def _get_version() -> str | None:
     try:
-        from importlib.metadata import version
+        from dnadesign import __version__
 
-        return version("dnadesign")
+        return __version__
     except Exception:
         return None
 

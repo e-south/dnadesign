@@ -23,7 +23,8 @@ ROOT_README_ALLOWED_BADGES = frozenset(
         "(https://github.com/e-south/dnadesign/actions/workflows/ci.yaml)",
         "[![Codecov](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg)]"
         "(https://codecov.io/gh/e-south/dnadesign)",
-        "[![MIT license](https://img.shields.io/badge/license-MIT-3D8068.svg)](LICENSE)",
+        "[![MIT license](https://img.shields.io/badge/license-MIT-3D8068.svg)]"
+        "(https://github.com/e-south/dnadesign/blob/main/LICENSE)",
     }
 )
 
