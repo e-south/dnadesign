@@ -193,13 +193,13 @@ def tool_svg(spec: BannerSpec) -> str:
     description_id = f"{spec.name}-banner-description"
     return f'''<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
   xmlns="http://www.w3.org/2000/svg" role="img"
-  aria-labelledby="{title_id} {description_id}" shape-rendering="crispEdges">
+  aria-labelledby="{title_id} {description_id}" shape-rendering="geometricPrecision">
   <title id="{title_id}">{spec.name}: {spec.capability.lower()}</title>
   <desc id="{description_id}">{spec.description}</desc>
-  <rect width="1200" height="180" fill="{BACKGROUND}"/>
+  <rect width="1200" height="180" rx="16" fill="{BACKGROUND}"/>
   <g font-family="{FONT_STACK}">
     <text x="48" y="78" fill="{INK}" font-size="42" font-weight="700" letter-spacing="-1">{spec.name}</text>
-    <text x="50" y="114" fill="{MUTED}" font-size="12" font-weight="700" letter-spacing="1.2">{spec.capability}</text>
+    <text x="50" y="114" fill="{MUTED}" font-size="17" font-weight="700" letter-spacing="1">{spec.capability}</text>
     <rect x="50" y="132" width="32" height="5" fill="{ACCENT}"/>
   </g>
   <path d="M510 34V146" stroke="#3F3C37" stroke-width="2"/>
