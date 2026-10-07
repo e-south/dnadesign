@@ -30,7 +30,7 @@ def test_notebook_agent_setup_uses_a_declared_locked_environment() -> None:
     assert "uv sync --locked" in agent_text
     assert "--group notebooks" not in agent_text
     assert project["tool"]["uv"]["default-groups"] == ["tools"]
-    assert project["dependency-groups"]["tools"] == ["dnadesign[full]"]
+    assert project["dependency-groups"]["tools"] == ["dnadesign-tools[full]"]
     full = project["project"]["optional-dependencies"]["full"]
     assert any(requirement.startswith("marimo>=") for requirement in full)
 

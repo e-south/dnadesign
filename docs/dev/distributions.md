@@ -85,7 +85,7 @@ and migration requirements in the release notes; a version increment alone does
 not qualify historical replay.
 
 The base install supports NumPy-only multistate scoring. Other current tool CLIs
-require `[full]`; Dense Arrays remains an immutable Git dependency of that extra.
+require `[full]`; the extra pins the qualified Dense Arrays 0.2.0 registry release.
 Version-based wheel installation does not provide Git provenance. Downstream
 verification must bind retained artifact bytes to installed content rather than
 invent a Git commit from `direct_url.json`.
@@ -101,3 +101,32 @@ invent a Git commit from `direct_url.json`.
 These are working changes at version 0.2.0, not a declaration of a public release
 or historical scientific equivalence. See the owning tools' existing docs and
 examples for their contracts.
+
+### Package-page images
+
+The README is also the PyPI description. Keep its links absolute and use a
+PNG banner at an immutable source commit or the matching `v<version>` tag.
+Never use a relative asset path or a mutable branch for a release image. Keep
+published tags and their assets; changing a new banner must not change older
+release pages. When incrementing the version, update a version-bound README
+image URL in the same change. The package tests enforce this relationship.
+
+Before publishing, fetch the banner URL after the tag exists and compare its
+bytes with the source PNG. Check the rendered PyPI page after upload. The PNG is
+a package-page export; its editable SVG remains the artwork source.
+
+### Publish a qualified release
+
+The PyPI distribution is `dnadesign-tools`; imports and tool commands keep their
+existing names. Merge the reviewed release changes and wait for successful CI on
+the exact main commit. Create an annotated `v<version>` tag and a GitHub release.
+The `release.yaml` workflow verifies main ancestry, exact main CI, the lock and
+the public banner, then calls the same maintained build command above. It tests
+the NumPy-only scoring install and ordinary `[full]` installation before the
+separate OIDC publishing job runs in the tag-restricted `pypi` environment.
+
+Keep the Trusted Publisher restricted to `e-south/dnadesign`, `release.yaml`, and
+`pypi`. Download the workflow's distributions and release-evidence artifacts,
+attach the distributions and provenance to the GitHub release, and compare both
+artifact hashes with PyPI. Verify an explicit registry installation and inspect
+the rendered package page. A successful source build alone is not publication.

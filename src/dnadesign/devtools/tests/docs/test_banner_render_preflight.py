@@ -25,7 +25,7 @@ from dnadesign.devtools.docs.banners.render import render_banners
 def _write_repo_markers(repo_root: Path) -> None:
     (repo_root / "src" / "dnadesign").mkdir(parents=True)
     (repo_root / "src" / "dnadesign" / "__init__.py").write_text("", encoding="utf-8")
-    (repo_root / "pyproject.toml").write_text('[project]\nname = "dnadesign"\n', encoding="utf-8")
+    (repo_root / "pyproject.toml").write_text('[project]\nname = "dnadesign-tools"\n', encoding="utf-8")
     (repo_root / "README.md").write_text("# dnadesign\n", encoding="utf-8")
     for spec in BANNERS:
         readme_path = repo_root / spec.readme_path

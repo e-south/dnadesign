@@ -33,7 +33,7 @@ def _resolve_repo_root(repo_root: Path) -> Path:
         project_name = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))["project"]["name"]
     except (KeyError, OSError, tomllib.TOMLDecodeError) as error:
         raise ValueError(f"Not a dnadesign repository root: {root}") from error
-    if project_name != "dnadesign":
+    if project_name != "dnadesign-tools":
         raise ValueError(f"Not a dnadesign repository root: {root}")
     return root
 

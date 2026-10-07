@@ -9,10 +9,12 @@ Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
 """
 
+DISTRIBUTION_NAME = "dnadesign-tools"
+
 
 def __getattr__(name: str) -> str:
     if name != "__version__":
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     from importlib.metadata import version
 
-    return version("dnadesign")
+    return version(DISTRIBUTION_NAME)

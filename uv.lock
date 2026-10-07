@@ -395,12 +395,16 @@ wheels = [
 [[package]]
 name = "dense-arrays"
 version = "0.2.0"
-source = { git = "https://github.com/e-south/dense-arrays?rev=3f43ff9f73950224e6f89b50c126ee3f11eb5cbd#3f43ff9f73950224e6f89b50c126ee3f11eb5cbd" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
     { name = "ortools" },
     { name = "rich" },
     { name = "typer" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cd/58/2ba7b35d2cc0f278d23cdca64539ba0ea89d7a8908bcad13476a602d63c9/dense_arrays-0.2.0.tar.gz", hash = "sha256:8d489c171e7150e70dba3393852a78e874465d6d67fee2d2b9674498a2097cd6", size = 203176, upload-time = "2026-10-07T02:21:15.048Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/85/01/68d3f8c96ec5765e2c47e0ccfd993baf0b54288fe7c85205ec3f188bfe8d/dense_arrays-0.2.0-py3-none-any.whl", hash = "sha256:c85297b6fb6b0a9a170050cc36f42cb151127a669023d718e695f612f6e5a9ab", size = 90110, upload-time = "2026-10-07T02:21:13.621Z" },
 ]
 
 [[package]]
@@ -422,7 +426,7 @@ wheels = [
 ]
 
 [[package]]
-name = "dnadesign"
+name = "dnadesign-tools"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [
@@ -516,7 +520,7 @@ test = [
     { name = "pytest-cov" },
 ]
 tools = [
-    { name = "dnadesign", extra = ["full"] },
+    { name = "dnadesign-tools", extra = ["full"] },
 ]
 
 [package.metadata]
@@ -528,7 +532,7 @@ requires-dist = [
     { name = "certifi", marker = "extra == 'full'", specifier = ">=2025.11.12" },
     { name = "click", marker = "extra == 'full'", specifier = ">=8.3.3" },
     { name = "cmake", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=3.18" },
-    { name = "dense-arrays", marker = "extra == 'full'", git = "https://github.com/e-south/dense-arrays?rev=3f43ff9f73950224e6f89b50c126ee3f11eb5cbd" },
+    { name = "dense-arrays", marker = "extra == 'full'", specifier = "==0.2.0" },
     { name = "duckdb", marker = "extra == 'full'", specifier = ">=1.5.5,<2" },
     { name = "evo2", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=0.5.3" },
     { name = "fastparquet", marker = "extra == 'full'", specifier = ">=2025.12.0" },
@@ -571,7 +575,7 @@ requires-dist = [
     { name = "seaborn", marker = "extra == 'full'" },
     { name = "setuptools", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=84.0.0" },
     { name = "torch", marker = "(platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'full') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'full')", specifier = ">=2.13,<2.14" },
-    { name = "torch", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=2.13,<2.14", index = "https://download.pytorch.org/whl/cu130", conflict = { package = "dnadesign", extra = "infer-evo2" } },
+    { name = "torch", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=2.13,<2.14", index = "https://download.pytorch.org/whl/cu130", conflict = { package = "dnadesign-tools", extra = "infer-evo2" } },
     { name = "tqdm", marker = "extra == 'full'" },
     { name = "transformer-engine", extras = ["pytorch"], marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=2.0,<3" },
     { name = "transformers", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'" },
@@ -604,7 +608,7 @@ test = [
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-cov" },
 ]
-tools = [{ name = "dnadesign", extras = ["full"] }]
+tools = [{ name = "dnadesign-tools", extras = ["full"] }]
 
 [[package]]
 name = "docutils"

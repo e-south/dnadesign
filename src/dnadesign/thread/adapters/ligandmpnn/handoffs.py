@@ -17,6 +17,8 @@ from importlib.metadata import distribution
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from dnadesign import DISTRIBUTION_NAME
+
 from ._regular_files import open_regular_file
 from .alphabets import materialize_residue_alphabet_sidecar
 from .commands import build_ligandmpnn_commands
@@ -34,7 +36,7 @@ __all__ = ["normalize_score_plan", "plan_scores", "score_request_document", "sco
 
 
 def producer_identity() -> dict:
-    installed = distribution("dnadesign")
+    installed = distribution(DISTRIBUTION_NAME)
     source = json.loads(installed.read_text("direct_url.json") or "{}")
     source["kind"] = (
         "git"
@@ -55,7 +57,7 @@ def producer_identity() -> dict:
     return {
         "schema_id": "thread.ligandmpnn.command_identity",
         "schema_version": 1,
-        "distribution": "dnadesign",
+        "distribution": DISTRIBUTION_NAME,
         "version": installed.version,
         "source": source,
         "adapter_source_sha256": document_digest(modules),
