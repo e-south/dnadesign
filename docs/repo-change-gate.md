@@ -1,10 +1,9 @@
 ## Repo Change Gate
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-17
+**Last verified:** 2026-10-25
 
-Use this page when an agent or maintainer needs the smallest validation route
-for a local `dnadesign` change. This is a router, not a second procedure tree.
+Choose validation for a local `dnadesign` change by the affected tool and behavior.
 
 ### Tactical Loop
 
@@ -30,8 +29,8 @@ uv run python -m dnadesign.devtools.ci.test_targets \
   --changed-files-file .ci_changed_files.txt
 ```
 
-When `studies` is affected, this helper includes the shared `studies/tests`
-suite plus the changed study-unit test suites.
+Study-specific tests run in their owning repository. DNADesign tests the public
+[integration contracts](integrations/study-workspaces.md) used by those studies.
 
 ### Authority
 

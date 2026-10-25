@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-10-25
 
 ## At a glance
 This file is the top-level map for change planning and decision capture.
@@ -14,10 +14,16 @@ Use it to navigate proposals, execution plans, accepted decisions, and implement
 - [How to promote a decision](#how-to-promote-a-decision)
 
 ## Planning lifecycle
+
+Small fixes and documentation updates use the task or PR description to record
+scope and validation. The following records are for substantial design changes
+or work that spans multiple implementation steps; routine edits do not require
+a proposal, execution plan, ADR or journal entry.
+
 1. Write or update a proposal for design intent and tradeoffs.
 2. Create an execution plan with atomic implementation steps and validation checks.
 3. Implement via PR with tests/docs updated together.
-4. Capture accepted architectural decisions in ADR form.
+4. Capture durable architectural decisions and their tradeoffs in ADR form when needed.
 5. Record notable implementation outcomes in the development journal.
 6. When cross-tool workflow contracts change, align `ARCHITECTURE.md`, `DESIGN.md`, `QUALITY_SCORE.md`, and `docs/operations/orchestration/runbooks.md` in the same change.
 7. When README or docs-index routing changes, keep top-level docs at the highest useful abstraction and move tool-specific procedures into the boundary-owning docs tree.

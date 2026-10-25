@@ -203,7 +203,6 @@ def test_top_level_docs_do_not_reference_removed_repo_local_sge_skill_path() -> 
 
 def test_top_level_install_doc_describes_uv_model_and_links_gpu_path() -> None:
     install_doc = _read(REPO_SETUP_DOCS / "installation.md")
-    assert "### 2a) UV dependency model" in install_doc
     assert "default `tools` dependency group" in install_doc
     assert "requires NumPy only" in install_doc
     assert "uv sync --locked --no-default-groups" in install_doc

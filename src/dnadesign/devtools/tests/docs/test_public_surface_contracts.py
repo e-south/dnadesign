@@ -48,6 +48,24 @@ def test_package_readme_links_resolve_only_the_canonical_repository(tmp_path: Pa
     assert _find_root_docs_entrypoint_issues(tmp_path)
 
 
+def test_tool_catalog_directory_links_require_the_matching_readme(tmp_path: Path) -> None:
+    readme = tmp_path / "src/dnadesign/alpha/README.md"
+    _write(readme, "# Alpha\n")
+    table = (
+        "## Available tools\n\n| Tool | Description |\n| --- | --- |\n| [**alpha**](src/dnadesign/alpha/) | Alpha |\n"
+    )
+    _write(tmp_path / "README.md", table)
+    assert _find_readme_tool_catalog_issues(tmp_path) == []
+    for invalid in ("../src/dnadesign/alpha/", "/src/dnadesign/alpha/"):
+        _write(tmp_path / "README.md", table.replace("src/dnadesign/alpha/", invalid))
+        assert _find_readme_tool_catalog_issues(tmp_path), invalid
+    _write(tmp_path / "README.md", table.replace("alpha/)", "other/)"))
+    assert _find_readme_tool_catalog_issues(tmp_path)
+    _write(tmp_path / "README.md", table)
+    readme.unlink()
+    assert _find_readme_tool_catalog_issues(tmp_path)
+
+
 def test_tool_readme_structure_check_requires_top_level_markdown_doc_link(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "alpha" / "README.md",

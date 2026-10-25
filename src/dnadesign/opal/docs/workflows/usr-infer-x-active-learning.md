@@ -11,7 +11,7 @@
 **Status-kind:** opal-campaign-state
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-10-25
 
 Use this workflow when a USR candidate table already contains one or more
 infer-derived feature columns and OPAL should own the label/train/select loop.
@@ -28,11 +28,9 @@ and round history are shared. Declare different setpoints or target masks as
 named `selection_views`; OPAL fits and predicts once, then scores each view.
 Create another campaign only when the learning lifecycle differs.
 
-The candidate universe is a contract, not "whatever rows happened to be in the
-upstream representation view." A study can use a dense generated subset from a
-larger LatentDNA review view as long as the generated `records.parquet` keeps
-stable IDs, preserves the view row order as an ordered subset, and carries the
-chosen fixed-length `X` column for every row.
+Choose the candidate rows before starting the campaign. A subset of a larger
+feature table must retain stable IDs, original row order and the chosen
+fixed-length `X` column. See the [candidate-record types](../reference/data-contracts.md#candidate-records).
 
 Set `labels.source.kind: usr_sidecar` to keep observed assay truth at a typed
 path such as `_opal/observed_labels.parquet` under the USR dataset. `ingest-y`
@@ -47,21 +45,6 @@ against that file without an external transaction or lease.
 If a campaign must be fully transient, copy the candidate table into a
 campaign-local `records.parquet` and point the campaign at
 `data.location.kind: local`.
-
-### Boundary decisions
-
-- upstream source assembly, optional construct expansion, and infer write-back remain outside OPAL
-- OPAL consumes one explicit `X` column; it does not decide which infer job or model lane produced that column
-- `data.location.kind: usr` is the contract for reading the USR dataset directly
-- no hidden orchestration exists between `infer` and `opal`; the handoff is a deliberate choice of dataset plus `x_column_name`
-- campaign-history labels and round state stay under OPAL namespaces; USR
-  campaigns keep primary labels in the sidecar and derived state in ledgers
-- explicit shared-record prediction writeback requires an operator-visible
-  records-path lock; the shared-label contract uses `ledger_only` and a
-  sidecar path lock by default
-- do not duplicate a USR dataset or campaign for target masks alone
-- prune campaign artifacts by campaign and round; do not treat shared USR
-  records as disposable OPAL output
 
 ### Preconditions
 
@@ -88,9 +71,18 @@ export OPAL_WORKDIR=/abs/path/to/opal_campaign # Keep OPAL campaign state and le
 
 ### 2) Point the OPAL campaign at the USR dataset
 
-Declare study ownership and the USR data contract in `campaign.yaml`:
+Create `$OPAL_WORKDIR/configs/campaign.yaml` by combining the YAML blocks below.
+Replace the example paths, study ID, dataset ID and feature column with your
+values. The shell variables above do not replace literal values in these examples.
 
 ```yaml
+schema_version: opal.campaign.v3 # Use the campaign configuration schema.
+
+campaign:
+  name: Promoter feature selection # Display name.
+  slug: promoter_feature_selection # Stable campaign identifier.
+  workdir: /abs/path/to/opal_campaign # Directory for campaign state and outputs.
+
 ownership:
   owner_scope: study_campaign # Bind execution to a routed study.
   study_id: promoter_feature_matrix_study # Identify the study source of truth.
@@ -118,9 +110,9 @@ The following RF and `top_n` blocks provide a deterministic baseline:
 
 ```yaml
 transforms_x: { name: identity, params: {} } # Pass the chosen infer-derived X column through unchanged.
-transforms_y: { name: scalar_from_table_v1, params: {} } # Parse scalar labels from the observed table.
+transforms_y: { name: scalar_from_table_v1, params: {sequence_column: sequence, y_column: measured_activity} } # Read the measurement column from the label file.
 
-model: # Use a cheap deterministic surrogate for the first tracer bullet.
+model: # Fit a random forest to the measured labels.
   name: random_forest # Select the RF baseline model plugin.
   params: { n_estimators: 100, random_state: 7 } # Keep the baseline model deterministic.
 
@@ -148,14 +140,19 @@ uv run opal init -c "$OPAL_WORKDIR/configs/campaign.yaml" # Initialize campaign 
 
 ### 4) Ingest the first label batch
 
+Use a CSV or workbook with `sequence` and numeric `measured_activity` columns.
+Each sequence must match a candidate record. `transforms_y.params.y_column`
+selects this input measurement column; `data.y_column_name` names the stored
+label. To preview without writing or prompting, run the command with `--json`
+and omit `--apply`.
+
 ```bash
 # Ingest the first observed label batch into the USR-backed campaign.
 uv run opal ingest-y \
   -c "$OPAL_WORKDIR/configs/campaign.yaml" \
   --round 0 \
   --csv "$OPAL_WORKDIR/inputs/r0_labels.xlsx" \
-  --unknown-sequences drop \
-  --if-exists replace \
+  --unknown-sequences error \
   --apply
 ```
 
@@ -176,14 +173,18 @@ uv run opal ctx audit -c "$OPAL_WORKDIR/configs/campaign.yaml" --round latest # 
 
 ### 7) Iterate as labels accumulate
 
+New measurements use the next round number. Re-ingesting an existing candidate
+and round fails by default; use `--if-exists replace` only for an intentional
+correction. Inspect or export the selected batch with the
+[campaign-round commands](campaign-round.md#run-one-round).
+
 ```bash
 # Ingest the next observed label batch before resuming the round loop.
 uv run opal ingest-y \
   -c "$OPAL_WORKDIR/configs/campaign.yaml" \
   --round 1 \
   --csv "$OPAL_WORKDIR/inputs/r1_labels.xlsx" \
-  --unknown-sequences drop \
-  --if-exists replace \
+  --unknown-sequences error \
   --apply
 uv run opal run -c "$OPAL_WORKDIR/configs/campaign.yaml" --round 1 --resume # Refit and reselection with labels visible through round 1.
 ```

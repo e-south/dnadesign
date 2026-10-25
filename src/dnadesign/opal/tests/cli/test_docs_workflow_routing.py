@@ -11,7 +11,13 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
+
+import pandas as pd
+
+from dnadesign.opal.src.config.loader import load_config
+from dnadesign.opal.src.transforms_y.scalar_from_table_v1 import scalar_from_table_v1
 
 
 def _repo_root() -> Path:
@@ -30,11 +36,9 @@ def test_opal_docs_index_routes_to_usr_infer_x_workflow() -> None:
     docs_index = _read("src/dnadesign/opal/docs/index.md")
     top_readme = _read("src/dnadesign/opal/README.md")
 
-    assert "### Start here" in docs_index
     assert "./workflows/usr-infer-x-active-learning.md" in docs_index
     assert "docs/index.md" in top_readme
     assert "docs/workflows/usr-infer-x-active-learning.md" in top_readme
-    assert "If Infer has already written the chosen feature column into USR" in docs_index
     assert "../../../cluster/docs/workflows/exploratory-clustering.md" in _read(
         "src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md"
     )
@@ -54,6 +58,17 @@ def test_opal_usr_infer_x_workflow_keeps_upstream_preconditions_explicit() -> No
     assert "x_column_name" in workflow
     assert "infer-derived `X` column" in workflow
     assert "../../../usr/docs/operations/promoter/characterization-feature-matrix.md" in workflow
+
+
+def test_usr_workflow_yaml_loads_and_maps_its_measurement_column(tmp_path: Path) -> None:
+    workflow = _read("src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md")
+    blocks = re.findall(r"```yaml\n(.*?)```", workflow, flags=re.DOTALL)
+    config_path = tmp_path / "campaign.yaml"
+    config_path.write_text("\n".join(blocks), encoding="utf-8")
+    config = load_config(config_path)
+    labels = pd.DataFrame({"sequence": ["ACGT"], "measured_activity": [1.25]})
+    transformed = scalar_from_table_v1(labels, config.data.transforms_y.params)
+    assert transformed["y"].tolist() == [[1.25]]
 
 
 def test_opal_cli_reference_documents_the_explicit_usr_coordinate() -> None:

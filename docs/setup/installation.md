@@ -1,11 +1,12 @@
 ## Installation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-06
+**Last verified:** 2026-10-25
 
-This guide is the first-run setup sequence for local development and CLI usage: confirm platform/version contracts, run the required install and baseline verification, then run additional sections only when required by the workload.
+For CLI use, clone the repository and run `uv sync --locked`. This installs the
+tool runtime. Add `--group dev` when running tests or lint checks.
 
-### 1) Platform support
+### Platform support
 
 | Environment | Status | Notes |
 | --- | --- | --- |
@@ -18,22 +19,38 @@ Reason:
 - `pyproject.toml` `[tool.uv] environments` targets `darwin` and `linux x86_64`.
 - `pixi.toml` `[workspace] platforms` targets `osx-arm64`, `osx-64`, and `linux-64`.
 
-### 2) Confirm version contracts
-Treat these as installation requirements:
+### Required versions
 
 - Python: `>=3.12,<3.13` (`pyproject.toml` `[project] requires-python`)
 - uv: `>=0.12.3,<0.13` (`pyproject.toml` `[tool.uv] required-version`)
 
-The distribution name is `dnadesign-tools`; Python imports remain `dnadesign`
-and tool commands remain unchanged. Do not install the unrelated `dnadesign`
-PyPI project. DNADesign uses one distribution version for its tools. Python's
-`dnadesign.__version__` and tool software-version fields read installed package
-metadata; API and artifact schema versions remain independent. Version 0.2.0
-introduces the lightweight installed-library boundary below. A source version
-alone is not a release receipt: consumers must pin a qualified source revision
-or built artifact and retain its checksum.
+The distribution name is `dnadesign-tools`; Python imports use `dnadesign`.
+Do not install the unrelated `dnadesign` PyPI project.
 
-### 2a) UV dependency model
+### Install and verify
+Run this full block in order:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# If uv is not on PATH yet, start a new shell session.
+
+git clone https://github.com/e-south/dnadesign.git
+cd dnadesign
+
+uv --version
+uv python install 3.12
+uv sync --locked
+
+# Baseline verification.
+uv run python -c "import dnadesign, pandas, pyarrow; print('ok')"
+uv run usr --help
+```
+
+You are done with checkout installation when:
+- the import check prints `ok`
+- `uv run usr --help` exits successfully
+
+### UV dependency model
 
 - Checkout install (`uv sync --locked`):
   - installs the full tool runtime through the default `tools` dependency group.
@@ -57,40 +74,14 @@ or built artifact and retain its checksum.
   - each `uv sync` realizes exactly the requested groups/extras.
   - if you run `uv sync --locked --group dev` on a GPU env, it removes `infer-evo2` extras unless `--extra infer-evo2` is also included.
 
-The lightweight library and full tool installation use the same distribution and
-scoring implementation. Installing the lightweight library does not qualify
-campaign fitting, sequence inference or rendering. See the
+The lightweight library supports scoring; campaign fitting, sequence inference
+and rendering require the full tool runtime. See the
 [MSRB Python example](../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md#python-scoring-without-a-campaign).
-The `full` extra declares the same immutable Dense Arrays Git source used by the
-checkout, because that dependency is not on PyPI. Full installs require Git and
-access to that source. These distributions can be shared as versioned build
-artifacts; PyPI publication requires replacing the direct Git requirement with
-a qualified published dependency first.
+The `full` extra includes DenseArrays from PyPI. Checkout installs resolve its
+version through `uv.lock`. For dependency changes, use
+[dependency maintenance](dependencies.md).
 
-### 3) Required path: install and baseline verify
-Run this full block in order:
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-# If uv is not on PATH yet, start a new shell session.
-
-git clone https://github.com/e-south/dnadesign.git
-cd dnadesign
-
-uv --version
-uv python install 3.12
-uv sync --locked
-
-# Baseline verification.
-uv run python -c "import dnadesign, pandas, pyarrow; print('ok')"
-uv run usr --help
-```
-
-You are done with checkout installation when:
-- the import check prints `ok`
-- `uv run usr --help` exits successfully
-
-### 4) Development tools (when needed)
+### Development tools (when needed)
 Run this when you will lint or test locally.
 
 ```bash
@@ -105,7 +96,7 @@ If this same environment also needs Evo2 infer:
 uv sync --locked --group dev --extra infer-evo2
 ```
 
-### 5) System binaries with pixi (when needed)
+### System binaries with pixi (when needed)
 Run this when a workflow needs pixi-managed tools such as MEME/FIMO.
 
 ```bash
@@ -116,7 +107,7 @@ pixi run -- fimo --version
 
 Dependency maintenance operations are documented in **[Dependency maintenance](dependencies.md)**.
 
-### 6) GPU extra (`infer-evo2`)
+### GPU extra (`infer-evo2`)
 This command is Linux `x86_64` only.
 
 ```bash
@@ -144,7 +135,7 @@ Current lock behavior note:
 - flash-attn is currently sdist-only in `uv.lock`, so SCC `infer-evo2` setup compiles flash-attn from source.
 - infer currently supports `evo2_7b`, `evo2_20b`, and `evo2_40b`; 400B is not a supported `model.id`.
 
-### 7) Troubleshooting quick checks
+### Troubleshooting quick checks
 Use these checks before deeper debugging:
 
 - If `uv` is not found after install, start a new shell and rerun `uv --version`.
@@ -156,7 +147,7 @@ export MPLCONFIGDIR="${TMPDIR:-/tmp}/matplotlib"
 
 - If you are on Windows, confirm commands are running inside WSL2 (`uname -a` should report Linux).
 
-### 8) Continue with workflow docs
+### Continue with workflow docs
 - If you want the shortest shell-first route after baseline verification, start with `uv run ops catalog list --simple`.
 - For workflow execution from the docs map, use [docs/README.md](../README.md).
 - For BU SCC workflows, follow this order: [BU SCC quickstart](../bu-scc/setup/quickstart.md), [BU SCC install bootstrap](../bu-scc/setup/install.md), then [BU SCC batch plus Notify runbook](../bu-scc/runbooks/batch-notify.md).

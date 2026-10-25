@@ -101,12 +101,15 @@ def _find_readme_tool_catalog_issues(repo_root: Path) -> list[str]:
         declared_tools.add(tool_name)
 
         expected_rel = Path("src") / "dnadesign" / tool_name / "README.md"
-        if _normalize_relative_markdown_path(tool_link) != expected_rel.as_posix():
+        target_rel = tool_link.removeprefix("./").rstrip("/")
+        if target_rel.rstrip("/") == expected_rel.parent.as_posix():
+            target_rel = expected_rel.as_posix()
+        if target_rel != expected_rel.as_posix():
             issues.append(
                 f"{readme_path}: tool '{tool_name}' must link to '{expected_rel.as_posix()}' (found '{tool_link}')."
             )
 
-        tool_readme = (repo_root / tool_link).resolve()
+        tool_readme = (repo_root / target_rel).resolve()
         if not tool_readme.exists() or not tool_readme.is_file():
             issues.append(
                 f"{readme_path}: tool '{tool_name}' link target does not exist as a markdown file: {tool_link}."

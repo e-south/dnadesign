@@ -1,7 +1,7 @@
 ## Infer Pressure Test: Agnostic Model Namespaces + USR Write-Back
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-25
 
 This guide pressure-tests infer as a model-agnostic extraction engine with explicit namespace contracts and USR write-back.
 
@@ -38,6 +38,27 @@ export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets" # Point USR tooling at wo
 export DATASET_ID="infer_pressure_demo" # Set target dataset id once for repeatable CLI calls.
 ```
 
+
+The scaffold creates directories and a config, but no input dataset. First
+prepare the USR registry from the configured output types:
+
+```bash
+# Print the namespace registration command for this config.
+uv run infer validate usr-registry --config "$INFER_CONFIG"
+```
+
+Run the command printed after `register:` to create the registry. Then create
+the dataset and import the included sequences:
+
+```bash
+# Create the dataset under the registered USR root.
+uv run usr --root "$USR_ROOT" init "$DATASET_ID" --source "infer demo"
+# Import the included DNA sequences.
+uv run usr --root "$USR_ROOT" import "$DATASET_ID" --from csv \
+  --path src/dnadesign/usr/assets/demo_material/demo_sequences.csv \
+  --bio-type dna --alphabet dna_4
+```
+
 ### 2) Contract preflight
 
 ```bash
@@ -46,7 +67,7 @@ uv run infer validate usr-registry --config "$INFER_CONFIG" # Derive/verify name
 uv run infer run --config "$INFER_CONFIG" --dry-run # Exercise execution-path contracts without mutating datasets; USR jobs still preflight the resolved dataset.
 ```
 
-If the dataset or `infer` namespace is fresh, run the rendered `uv run usr --root ... namespace register infer --columns '...'` command before the first non-dry infer write-back.
+If output definitions change, rerun namespace registration before inference.
 
 ### 3) Execute local pressure test
 
@@ -82,7 +103,6 @@ uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr # Re-ru
 # Keep Ops runbooks workspace-scoped under the workspace logs tree.
 export OPS_RUNBOOK="$WORKSPACE_ROOT/outputs/logs/ops/runbooks/infer-pressure.runbook.yaml" # Reuse one stable workspace-scoped Ops runbook path.
 # Generate the infer workflow runbook at that workspace-scoped path.
-# Generate infer workflow runbook in this workspace.
 uv run ops runbook init \
   --runbook "$OPS_RUNBOOK" \
   --workflow infer \

@@ -1,10 +1,13 @@
 ## OPAL Internal Notes Archive
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-09
+**Last verified:** 2026-10-25
 
 
-Use `docs/dev/journal.md` for active development notes. This file is retained as historical archive.
+These dated records describe earlier implementations and are not operating
+instructions. Use the [campaign workflow](../workflows/campaign-round.md) and
+[data contracts](../reference/data-contracts.md) for current behavior. Later
+investigations are recorded in the [development journal](journal.md).
 
 ### 2026-02-12
 - Starting RoundCtx stage-buffer hardening for batched `model.predict` writes.

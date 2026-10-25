@@ -1,7 +1,7 @@
 ## infer end-to-end pressure-test demo (usr + ops + notify)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-25
 
 This demo executes infer in an end-to-end pressure-test loop that can run standalone or via ops orchestration.
 
@@ -23,6 +23,27 @@ export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets" # Point USR tools at work
 export DATASET_ID="infer_pressure_demo" # Set dataset id for repeatable commands.
 ```
 
+
+The scaffold creates directories and a config, but no input dataset. First
+prepare the USR registry from the configured output types:
+
+```bash
+# Print the namespace registration command for this config.
+uv run infer validate usr-registry --config "$INFER_CONFIG"
+```
+
+Run the command printed after `register:` to create the registry. Then create
+the dataset and import the included sequences:
+
+```bash
+# Create the dataset under the registered USR root.
+uv run usr --root "$USR_ROOT" init "$DATASET_ID" --source "infer demo"
+# Import the included DNA sequences.
+uv run usr --root "$USR_ROOT" import "$DATASET_ID" --from csv \
+  --path src/dnadesign/usr/assets/demo_material/demo_sequences.csv \
+  --bio-type dna --alphabet dna_4
+```
+
 ### 2) Validate infer contract surface
 
 ```bash
@@ -31,7 +52,7 @@ uv run infer validate usr-registry --config "$INFER_CONFIG" # Derive the exact i
 uv run infer run --config "$INFER_CONFIG" --dry-run # Exercise run path without mutation.
 ```
 
-If the dataset or `infer` namespace is fresh, run the rendered `uv run usr --root ... namespace register infer --columns '...'` command before the first non-dry infer write-back.
+If output definitions change, rerun namespace registration before inference.
 
 ### 3) Execute infer pressure job locally
 

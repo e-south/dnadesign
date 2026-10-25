@@ -27,13 +27,11 @@ Treat this file as a navigation map; canonical policy and operational detail liv
   - `uv sync --locked`
   - `uv sync --locked --group dev`
 - Validate changes:
-  - This repo does not ship `./scripts/agent-verify`.
-    If external router guidance points at that script, use the repo-local checks below instead.
-  - `uv run ruff check .`
-  - `uv run ruff format --check .`
-  - `uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .`
-  - `uv run pytest -q`
-  - `uv run python -m dnadesign.devtools.docs.checks`
+  - Start with the affected tool's tests and the matching static checks in
+    [Repo change gate](docs/repo-change-gate.md).
+  - Full-repository pytest is for broad behavior changes or merge-depth validation.
+    Documentation-only changes use documentation and routing checks.
+  - This repo does not ship `./scripts/agent-verify`; use the repo change gate instead.
 - Discover CLIs:
   - check `[project.scripts]` in `pyproject.toml`
   - run `uv run <script> --help`

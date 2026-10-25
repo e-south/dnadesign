@@ -35,9 +35,12 @@ uv run opal selection-set show \
   --view primary --round latest
 ```
 
-For your own campaign, prepare a candidate table with sequence features, measured
-labels and a configuration defining the prediction and selection task. Continue
-with the campaign round below for the individual commands.
+For your own campaign, prepare a Parquet candidate table with unique string IDs,
+DNA sequences, `bio_type`, `alphabet` and a fixed-length numeric feature column.
+Measurements arrive separately as label batches. The
+[candidate-record contract](./reference/data-contracts.md#candidate-records)
+defines the required Arrow types; the [campaign round](./workflows/campaign-round.md)
+starts from a complete configuration example and takes you through batch export.
 
 ### Start here
 

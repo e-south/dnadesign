@@ -1,7 +1,7 @@
 ## Developer Documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-06
+**Last verified:** 2026-10-25
 
 Use this index to find maintainer workflows, checks, and planning records.
 
@@ -53,9 +53,10 @@ execution order and diagnostic precedence.
 
 ### Day-to-day tasks
 
-1. Record implementation notes in [`journal.md`](journal.md).
-2. Track structure and IA risks in [`audits/monorepo-organization.md`](audits/monorepo-organization.md).
-3. Create or update proposals in [`plans/`](plans/).
+1. Keep routine scope and validation in the task or PR description.
+2. Record notable implementation outcomes in [`journal.md`](journal.md) and
+   substantial navigation or structure risks in [`audits/monorepo-organization.md`](audits/monorepo-organization.md).
+3. Use [planning guidance](../../PLANS.md) when a change needs a proposal or execution plan.
 4. Run docs checks before merging docs updates:
 `uv run python -m dnadesign.devtools.docs.checks --repo-root .`
 5. Run boundary checks when changing cross-tool imports:
@@ -66,7 +67,7 @@ execution order and diagnostic precedence.
 `bash .agents/skills/sge-hpc-ops/scripts/audit-sge-hpc-ops-skill.sh`
 7. Run the subtree routing contract checks when changing critical `AGENTS.md` surfaces or repo-local workflow skills:
 `uv run pytest -q src/dnadesign/notify/tests/docs/test_progressive_disclosure_contracts.py`
-`uv run pytest -q src/dnadesign/usr/tests/test_usr_docs_contract.py`
+`uv run pytest -q src/dnadesign/usr/tests/docs_contract`
 8. Run the OPS subprocess failure suite when changing console wiring or CLI contract text:
 `uv run pytest -q src/dnadesign/ops/tests/test_cli_failure_contract.py`
 9. Run the native gate stderr regression when changing `dnadesign.ops.orchestrator.gates` or any audit-fidelity path that executes those commands:

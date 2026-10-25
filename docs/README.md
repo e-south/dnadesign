@@ -2,13 +2,13 @@
 doc_id: documentation-index
 surface: docs-router
 owner: dnadesign-maintainers
-last_verified: 2026-08-27
+last_verified: 2026-10-25
 ---
 
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-27
+**Last verified:** 2026-10-25
 
 Find the next task, command, or reference doc from the routes below.
 
@@ -53,6 +53,7 @@ Use these when one tool owns the next step.
 | Design a sequence library in a workspace | [DenseGen docs overview](../src/dnadesign/densegen/docs/README.md) | Verify generated artifacts and metadata with [DenseGen outputs reference](../src/dnadesign/densegen/docs/reference/outputs.md). |
 | Build DNA constructs from templates or multiple parts into derived datasets | [Construct docs overview](../src/dnadesign/construct/docs/README.md) | Verify resulting lineage and sequence identity in [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
 | Compose declared linear ssDNA parts into a local artifact bundle | [Construct linear ssDNA composition](../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md) | Verify the bundle manifest, optional Folding plot artifacts, and optional BaseRender review handoff. |
+| Select candidates from measured labels and sequence features | [OPAL demo and campaign workflow](../src/dnadesign/opal/docs/index.md) | Inspect and export the selected batch with [OPAL selection commands](../src/dnadesign/opal/docs/reference/cli.md#selection-batch). |
 | Run model inference and write outputs back to datasets | [Infer docs index](../src/dnadesign/infer/docs/README.md) | Verify write-back columns and types with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
 | Set up the SCC Evo2 infer GPU environment | [BU SCC install bootstrap](bu-scc/setup/install.md#gpu-setup-and-verification-runbook) | Verify infer model capabilities with [infer SCC Evo2 GPU runbook](../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md). |
 | Run Notify for local event watching and webhook setup | [Notify docs index](notify/README.md) | Verify mode and delivery contracts in [Notify command contracts](../src/dnadesign/notify/docs/reference/command-contracts.md). |
@@ -84,10 +85,8 @@ Use these when the next step is orchestration, environment setup, or audit outpu
 
 ### Tool docs
 
-These sections keep unlike package surfaces separate without adding more
-columns. Prefer workspace/dataset routers for user work; call artifact services
-such as `folding` only when a producer has already emitted the required
-contract artifacts or bundle manifest.
+Choose a tool below. Artifact services such as `folding` read bundles or job
+files produced by other tools; their guides describe the required inputs.
 
 #### Design, workspace, and analysis tools
 

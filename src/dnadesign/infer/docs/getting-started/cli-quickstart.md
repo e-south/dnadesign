@@ -1,9 +1,11 @@
 ## infer CLI quickstart
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-25
 
-This quickstart validates the infer command surface before full pressure-test workflows.
+These checks validate configuration and output requests without loading a model
+or producing predictions. Run them from the repository root after
+[installation](../../../../../docs/setup/installation.md).
 
 ### 1) Validate a config contract
 
@@ -29,6 +31,10 @@ uv run infer generate \
   --max-new-tokens 4 \
   --dry-run
 ```
+
+Success prints `Config validated.`, `Extract validated (dry run).`, and
+`Generate validated (dry run).`. These checks do not download model weights or
+verify that inference can run on this machine.
 
 ### 4) Next route
 

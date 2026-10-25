@@ -1,10 +1,12 @@
 ## OPAL Dev Journal
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-10-25
 
 
-This journal tracks ongoing Elm_UQ analysis, refactor notes, and merge-readiness decisions for OPAL.
+These dated investigations preserve design history, including superseded
+proposals. For current behavior, use the [objective references](../plugins/objectives/README.md)
+and [campaign workflow](../workflows/campaign-round.md).
 
 ### 2026-07-10 SFXI uncertainty clipping correction
 

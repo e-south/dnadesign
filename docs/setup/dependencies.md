@@ -1,7 +1,7 @@
 ## Dependency maintenance
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-15
+**Last verified:** 2026-10-25
 
 This document is the canonical home for dependency management, including Python packages (`uv`) and system binaries (`pixi`).
 
@@ -24,17 +24,18 @@ This section covers Python package lifecycle operations managed by `uv`.
 # Sync from lockfile (baseline environment).
 uv sync --locked
 
-# Add a runtime dependency to the default dependency set.
-uv add <package>
+# Add a dependency used by tool APIs or CLIs.
+uv add --optional full <package>
 
 # Add a dependency to a named group (for example, dev tools).
 uv add --group dev <package>
 
-# Remove a dependency from pyproject and lockfile.
-uv remove <package>
+# Remove a tool dependency from pyproject and lockfile.
+uv remove --optional full <package>
 ```
 
-If you edit `pyproject.toml` directly, regenerate the lockfile:
+Use unqualified `uv add` only when the lightweight installed scoring API needs
+the dependency. If you edit `pyproject.toml` directly, regenerate the lockfile:
 
 ```bash
 # Recompute uv.lock from pyproject constraints.

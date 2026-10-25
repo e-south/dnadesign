@@ -27,36 +27,19 @@ Supplement to repo-root `AGENTS.md` with `opal`-specific navigation + artifact r
 - A campaign owns one shared learning lifecycle. Target-specific objectives
   and selectors belong under named `selection_views`.
 
-### Commands
+### Run and inspect a campaign
 
-Check available commands and flags:
+Follow the [campaign-round workflow](docs/workflows/campaign-round.md) for input
+preparation, validation, label ingestion, selection and output verification.
+For commands resolved from an existing config, run:
+
 ```bash
-uv run opal --help
+uv run opal guide -c /path/to/campaign/configs/campaign.yaml --format markdown
 ```
 
-Initialize and validate a campaign:
-```bash
-uv run opal init     -c src/dnadesign/opal/campaigns/<campaign>/configs/campaign.yaml
-uv run opal validate -c src/dnadesign/opal/campaigns/<campaign>/configs/campaign.yaml
-```
-
-Ingest observed labels for a round and execute training/scoring/selection:
-```bash
-uv run opal ingest-y  -c src/dnadesign/opal/campaigns/<campaign>/configs/campaign.yaml \
-  --round 0 --csv <labels.xlsx> --apply
-uv run opal run       -c src/dnadesign/opal/campaigns/<campaign>/configs/campaign.yaml \
-  --round 0
-
-uv run opal status      -c src/dnadesign/opal/campaigns/<campaign>/configs/campaign.yaml
-uv run opal record-show -c src/dnadesign/opal/campaigns/<campaign>/configs/campaign.yaml --id <id>
-uv run opal explain     -c src/dnadesign/opal/campaigns/<campaign>/configs/campaign.yaml --round 1
-uv run opal plot        -c src/dnadesign/opal/campaigns/<campaign>/configs/campaign.yaml
-uv run opal predict     -c src/dnadesign/opal/campaigns/<campaign>/configs/campaign.yaml --round latest
-uv run opal selection-set show -c src/dnadesign/opal/campaigns/<campaign>/configs/campaign.yaml \
-  --view <selection-view-id> --round latest
-uv run opal selection-batch show -c src/dnadesign/opal/campaigns/<campaign>/configs/campaign.yaml \
-  --round latest
-```
+Use the [CLI reference](docs/reference/cli.md) for inspection and export options.
+Start with the [isolated demo](docs/index.md#try-a-complete-selection-round) when
+checking the workflow without changing an existing campaign.
 
 ### Tests
 

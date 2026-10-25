@@ -48,11 +48,11 @@ def test_densegen_tutorials_keep_progressive_disclosure_flow() -> None:
     for name in RUNBOOK_TUTORIALS:
         path = TUTORIALS / name
         text = _read(path)
+        assert "### Prerequisites" in text
+        assert "### Runbook command" in text
         _assert_token_order(
             text,
             [
-                "### Runbook command",
-                "### Prerequisites",
                 "### Key config sections",
                 "### Step-by-step commands",
                 "### Expected outputs",

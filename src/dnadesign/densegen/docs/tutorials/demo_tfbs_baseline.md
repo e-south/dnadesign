@@ -1,36 +1,40 @@
 ## DenseGen TFBS baseline tutorial
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-10-25
 
 
 Use this tutorial to run the smallest DenseGen workspace end to end. You validate the config, generate sequences from TFBS inputs, and render analysis artifacts from local outputs.
 
-### Runbook command
+### Prerequisites
 
-Use the workspace runbook sequence from [demo_tfbs_baseline/runbook.md](../../workspaces/demo_tfbs_baseline/runbook.md). This command runs a clean pass from validation through notebook generation.
+From the repository root, install dependencies and enter the packaged workspace
+once. The remaining commands run from that directory.
 
 ```bash
-# Enter the workspace directory so relative paths resolve correctly.
+# Install the locked tool dependencies.
+uv sync --locked
+# Enter the packaged workspace.
 cd src/dnadesign/densegen/workspaces/demo_tfbs_baseline
-# Run the packaged flow in explicit fresh mode.
+# Reuse this config for the individual commands below.
+CONFIG="$PWD/config.yaml"
+# Validate the input and check solver availability.
+uv run dense validate-config --probe-solver -c "$CONFIG"
+```
+
+### Runbook command
+
+The [workspace runbook](../../workspaces/demo_tfbs_baseline/runbook.md) validates
+inputs, generates sequences, and creates plots and a notebook:
+
+```bash
+# Run validation, generation and analysis.
 ./runbook.sh --mode fresh
 ```
 
-Use `--mode resume` to continue generation, or `--mode analysis` when you only need plots/notebook refresh.
-
-### Prerequisites
-
-Run these once to install dependencies and confirm the CLI and solver path are available.
-
-```bash
-# Install locked Python dependencies for reproducible execution.
-uv sync --locked
-# Confirm the DenseGen CLI is installed and discoverable.
-uv run dense --help
-# Validate config schema and probe solver availability.
-uv run dense validate-config --probe-solver -c src/dnadesign/densegen/workspaces/demo_tfbs_baseline/config.yaml
-```
+Choose this runbook or the individual commands below. Use `--mode resume` to
+continue generation, or `--mode analysis` to update plots and the notebook from
+existing outputs.
 
 ### Key config sections
 
@@ -64,14 +68,7 @@ densegen:                                   # DenseGen runtime settings root.
 
 ### Step-by-step commands
 
-Set the config path once so every command in this section runs against the same workspace.
-
-```bash
-# Enter the workspace directory so relative paths resolve correctly.
-cd src/dnadesign/densegen/workspaces/demo_tfbs_baseline
-# Pin config path for repeated CLI calls.
-CONFIG="$PWD/config.yaml"
-```
+Use the `CONFIG` path set above.
 
 Run generation first, then inspect progress. Plot and notebook steps come after generation succeeds.
 
@@ -106,8 +103,6 @@ uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
 ### If outputs already exist (analysis mode)
 
 ```bash
-# Enter the workspace directory so relative paths resolve correctly.
-cd src/dnadesign/densegen/workspaces/demo_tfbs_baseline
 # Rebuild plots/notebook from existing run artifacts without regenerating sequences.
 ./runbook.sh --mode analysis
 # Open the generated notebook in marimo app mode.
@@ -115,6 +110,10 @@ uv run dense notebook run -c "$PWD/config.yaml"
 ```
 
 ### Expected outputs
+
+The configuration requests 50 sequences for each of two plans, all 100 bases
+long. `baseline_sigma70` also requires the specified sigma70 promoter elements.
+Use `dense inspect run` to check the achieved counts before interpreting plots.
 
 - `outputs/tables/records.parquet`
 - `outputs/meta/events.jsonl`
