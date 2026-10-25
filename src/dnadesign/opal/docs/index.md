@@ -3,13 +3,41 @@ doc_id: opal-docs
 title: OPAL documentation
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-10-25
 ---
 
 # OPAL documentation
 
-Start with the campaign round for command order. Objective pages describe
-individual scoring plugins; they are not alternate OPAL lifecycles.
+Start with the [runnable demo](#try-a-complete-selection-round) to see
+measured labels become a selected batch. Then follow the campaign round to use
+your own data. Objective pages explain the scoring choices within that workflow.
+
+### Try a complete selection round
+
+After [installing the DNADesign checkout](../../../../docs/setup/installation.md),
+run the following from the repository root:
+
+```bash
+uv run opal demo-matrix --rounds 0 --keep
+```
+
+This uses included synthetic data in fresh temporary campaign copies. It runs
+random-forest and Gaussian-process examples, selects five candidates per example,
+and checks the selections against the saved predictions. Success ends with
+`overall_ok: True` and zero mismatches for each example. The printed `tmp_root`
+contains the retained runs and their `outputs/` folders.
+
+To inspect the random-forest selection, substitute that printed directory below:
+
+```bash
+uv run opal selection-set show \
+  -c /path/to/tmp_root/demo_rf_topn/configs/campaign.yaml \
+  --view primary --round latest
+```
+
+For your own campaign, prepare a candidate table with sequence features, measured
+labels and a configuration defining the prediction and selection task. Continue
+with the campaign round below for the individual commands.
 
 ### Start here
 

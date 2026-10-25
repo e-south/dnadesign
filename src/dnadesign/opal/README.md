@@ -1,19 +1,20 @@
 ![OPAL banner](assets/opal-banner.svg)
 
-OPAL runs repeatable sequence-candidate campaigns. A campaign declares its
-data, features, labels, objective plugin, model, selection policy, and ledger.
-Named views can select against the same fitted predictions without creating a
-second campaign lifecycle. Start with the [documentation index](docs/index.md).
+OPAL (Optimization with Active Learning) uses measured outcomes and sequence
+features to choose which designs to test next. It fits a predictive model, ranks
+candidates against your objective and selects a batch. Add new measurements to
+repeat the cycle. The [documentation](docs/index.md) explains setup and outputs.
 
 ## Documentation
 
-- [Campaign round](docs/workflows/campaign-round.md): the complete command path.
-- [Architecture](docs/concepts/architecture.md): campaign, view, round, and
-  selection-batch ownership.
-- [Configuration](docs/reference/configuration.md): strict v3 schema.
-- [Campaign routes](campaigns/README.md): maintained demos and placement rules
-  for external campaigns.
-- [USR infer-derived X workflow](docs/workflows/usr-infer-x-active-learning.md):
-  active learning when Infer has already written the feature column.
-- [CLI reference](docs/reference/cli.md): command contracts and flags.
-- [Repository docs index](../../../docs/README.md): cross-tool workflow routing.
+- **Try a selection round:** from a configured checkout, run
+  `uv run opal demo-matrix --rounds 0 --keep`. Included synthetic examples select
+  five candidates each in fresh temporary directories. Success ends with
+  `overall_ok: True`. [Inspect the outputs and use your own data](docs/index.md#try-a-complete-selection-round).
+- [Campaign round](docs/workflows/campaign-round.md): initialize, ingest labels, fit, select and verify.
+- [Configuration](docs/reference/configuration.md): candidate data, features, objectives and selection settings.
+- [Campaign routes](campaigns/README.md): maintained examples and external campaign placement.
+- [USR feature workflow](docs/workflows/usr-infer-x-active-learning.md): use features already written by Infer.
+- [Architecture](docs/concepts/architecture.md): campaigns, views, rounds and selection batches.
+- [CLI reference](docs/reference/cli.md): commands and flags.
+- [Repository docs](../../../docs/README.md): cross-tool workflows.

@@ -28,6 +28,7 @@ def _line(path: str, stroke: str = INK, width: int = 4, dash: str | None = None)
 
 def glyph(name: str) -> str:
     """Return one deliberately small, crisp capability mark."""
+    selected = {(0, 48), (20, 8), (40, 28)}
     marks = {
         "align": _line("M0 18H72M0 42H72", MUTED, 3) + _rect(12, 13, 20, 10) + _rect(38, 37, 20, 10, ACCENT),
         "render": _line("M0 8H66V52H0Z", MUTED, 3) + _line("M12 20H54M12 30H42M12 40H48", INK, 4),
@@ -72,9 +73,15 @@ def glyph(name: str) -> str:
         + _rect(82, 8, 10, 44, INK)
         + _rect(102, 8, 10, 44, ACCENT),
         "notify": _line("M0 33H18L28 12L42 48L54 24L68 33H106", INK, 4) + _rect(102, 29, 8, 8, ACCENT),
-        "select": _line("M0 45L25 34L48 38L74 17L108 8", MUTED, 3)
-        + '<circle cx="74" cy="17" r="7" fill="#D97757"/>'
-        + _line("M98 1L108 8L98 15", INK, 3),
+        "select": '<g stroke-linecap="round" stroke-linejoin="round">'
+        + "".join(
+            f'<circle cx="{x}" cy="{y}" r="4" fill="{ACCENT if (x, y) in selected else DIM}"/>'
+            for x in (0, 20, 40)
+            for y in (8, 28, 48)
+        )
+        + _line("M60 28H92M86 22L92 28L86 34", MUTED, 2)
+        + "".join(f'<circle cx="112" cy="{y}" r="5" fill="{ACCENT}"/>' for y in (8, 28, 48))
+        + "</g>",
         "route": _line("M0 28H26M26 28L50 10M26 28L50 46M50 10H102M50 46H84", INK, 3) + _rect(96, 6, 10, 8, ACCENT),
         "permute": _line("M0 14H104M0 30H104M0 46H104", DIM, 3)
         + _rect(22, 9, 18, 10)

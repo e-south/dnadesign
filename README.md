@@ -4,9 +4,29 @@
 [![Codecov](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg)](https://codecov.io/gh/e-south/dnadesign)
 [![MIT license](https://img.shields.io/badge/license-MIT-3D8068.svg)](https://github.com/e-south/dnadesign/blob/main/LICENSE)
 
-The PyPI distribution is `dnadesign-tools`; Python imports remain `dnadesign`.
+`dnadesign` is a modular bioinformatics toolkit for designing sequence libraries,
+assembling DNA constructs, running sequence models and analyzing their outputs.
+The distribution is `dnadesign-tools`; Python imports use `dnadesign`.
 
-`dnadesign` is a modular bioinformatics toolkit for designing sequence libraries, assembling DNA constructs, running sequence models, and analyzing the resulting datasets.
+## Start with a working example
+
+[Install the checkout](https://github.com/e-south/dnadesign/blob/main/docs/setup/installation.md), then run a complete candidate-selection round:
+
+```bash
+uv run opal demo-matrix --rounds 0 --keep
+```
+
+[OPAL](https://github.com/e-south/dnadesign/tree/main/src/dnadesign/opal) uses included
+synthetic measurements to fit predictive models, select the next five candidates
+and verify the saved selections. The examples run in fresh temporary directories
+and print where to inspect the results. Success ends with `overall_ok: True`.
+The [OPAL walkthrough](https://github.com/e-south/dnadesign/blob/main/src/dnadesign/opal/docs/index.md#try-a-complete-selection-round)
+shows how to inspect a selection and move to your own data. For another task,
+choose a tool below or use the [workflow index](https://github.com/e-south/dnadesign/blob/main/docs/README.md).
+
+For code changes, start with the [agent guide](https://github.com/e-south/dnadesign/blob/main/AGENTS.md)
+and the chosen tool's local instructions. They identify the owning code, runnable
+examples and checks to use before broadening the work.
 
 ---
 
