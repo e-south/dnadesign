@@ -7,10 +7,23 @@ repeat the cycle. The [documentation](docs/index.md) explains setup and outputs.
 
 ## Documentation
 
-- **Try a selection round:** from a configured checkout, run
-  `uv run opal demo-matrix --rounds 0 --keep`. Included synthetic examples select
-  five candidates each in fresh temporary directories. Success ends with
-  `overall_ok: True`. [Inspect the outputs and use your own data](docs/index.md#try-a-complete-selection-round).
+### Try a selection round
+
+After [installing the checkout](../../../docs/setup/installation.md), run this
+from the repository root:
+
+```bash
+uv run opal demo-matrix --rounds 0 --keep
+```
+
+The included synthetic examples fit predictive models, select five candidates
+each and verify the saved selections. They run in fresh temporary directories
+and print where to inspect the results. Success ends with `overall_ok: True`.
+The [walkthrough](docs/index.md#try-a-complete-selection-round) shows how to
+inspect a selected batch and start a campaign with your own data.
+
+### Guides and reference
+
 - [Campaign round](docs/workflows/campaign-round.md): initialize, ingest labels, fit, select and verify.
 - [Configuration](docs/reference/configuration.md): candidate data, features, objectives and selection settings.
 - [Campaign routes](campaigns/README.md): maintained examples and external campaign placement.
