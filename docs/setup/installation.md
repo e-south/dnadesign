@@ -24,9 +24,6 @@ Reason:
 - Python: `>=3.12,<3.13` (`pyproject.toml` `[project] requires-python`)
 - uv: `>=0.12.3,<0.13` (`pyproject.toml` `[tool.uv] required-version`)
 
-The distribution name is `dnadesign-tools`; Python imports use `dnadesign`.
-Do not install the unrelated `dnadesign` PyPI project.
-
 ### Install and verify
 Run this full block in order:
 
@@ -51,6 +48,9 @@ You are done with checkout installation when:
 - `uv run usr --help` exits successfully
 
 ### UV dependency model
+
+For Python library use, install `dnadesign-tools` from PyPI and import it as
+`dnadesign`. The PyPI project named `dnadesign` is unrelated.
 
 - Checkout install (`uv sync --locked`):
   - installs the full tool runtime through the default `tools` dependency group.

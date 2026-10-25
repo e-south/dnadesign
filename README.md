@@ -6,7 +6,6 @@
 
 `dnadesign` is a modular bioinformatics toolkit for designing sequence libraries,
 assembling DNA constructs, running sequence models and analyzing their outputs.
-The distribution is `dnadesign-tools`; Python imports use `dnadesign`.
 
 ## Start with a working example
 
