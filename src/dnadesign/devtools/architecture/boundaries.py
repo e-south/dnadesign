@@ -17,25 +17,9 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from dnadesign.devtools.architecture.lifecycle import find_installation_issues, load_lifecycle
+
 TOP_LEVEL_ROOT_MODULES = {"__init__.py"}
-TOP_LEVEL_TOOL_BOUNDARY_PACKAGES = {
-    "aligner",
-    "baserender",
-    "cluster",
-    "construct",
-    "cruncher",
-    "densegen",
-    "folding",
-    "infer",
-    "latentdna",
-    "notify",
-    "opal",
-    "ops",
-    "permuter",
-    "thread",
-    "junction",
-    "usr",
-}
 TOP_LEVEL_SHARED_INFRA_PACKAGES = {"artifacts", "contracts", "devtools"}
 _IGNORED_TOP_LEVEL_DIRECTORIES = {"__pycache__"}
 _NON_TOOL_DIRS = TOP_LEVEL_SHARED_INFRA_PACKAGES | _IGNORED_TOP_LEVEL_DIRECTORIES
@@ -407,7 +391,9 @@ def find_top_level_layout_violations(*, repo_root: Path) -> list[TopLevelLayoutV
     if not src_root.exists():
         raise FileNotFoundError(f"Expected dnadesign source root at {src_root}")
 
-    required_directories = TOP_LEVEL_TOOL_BOUNDARY_PACKAGES | TOP_LEVEL_SHARED_INFRA_PACKAGES
+    required_directories = {
+        name for name, component in load_lifecycle(resolved_repo_root).items() if component.status != "retired"
+    }
     allowed_directories = required_directories
     actual_directories = {
         path.name
@@ -553,6 +539,7 @@ def main(argv: list[str] | None = None) -> int:
         legacy_surface_violations = find_legacy_surface_violations(repo_root=args.repo_root)
         top_level_layout_violations = find_top_level_layout_violations(repo_root=args.repo_root)
         external_study_violations = find_external_study_boundary_violations(repo_root=args.repo_root)
+        installation_issues = find_installation_issues(args.repo_root)
     except (FileNotFoundError, ValueError) as exc:
         print(str(exc))
         return 1
@@ -563,6 +550,7 @@ def main(argv: list[str] | None = None) -> int:
         or legacy_surface_violations
         or top_level_layout_violations
         or external_study_violations
+        or installation_issues
     ):
         print("Architecture boundary checks passed.")
         return 0
@@ -581,6 +569,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f" - {item.reason}: {item.path}")
     for item in external_study_violations:
         print(f" - {item.reason}: {item.path}")
+    for issue in installation_issues:
+        print(f" - {issue}")
     return 1
 
 

@@ -28,7 +28,6 @@ TOOL_README_SELF_REFERENTIAL_INTRO_PATTERN = re.compile(
     r"\b[A-Za-z0-9_-]+\s+is\s+(?:the|a)\s+[^.]*\b(?:package|tool|layer)\b[^.]*\b(?:in|for)\s+`?dnadesign`?",
     flags=re.IGNORECASE,
 )
-README_TOOL_CATALOG_EXCLUDED_TOOLS = {"studies"}
 MARKDOWN_HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 TOOL_README_TOP_LINK_SCAN_LINES = 80
 RUNBOOK_DEMO_SHELL_LANGS = {"bash", "sh", "zsh"}

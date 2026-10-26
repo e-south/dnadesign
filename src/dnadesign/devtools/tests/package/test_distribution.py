@@ -28,6 +28,8 @@ from packaging.requirements import Requirement
 from setuptools import Distribution, find_namespace_packages
 from setuptools.config.pyprojecttoml import apply_configuration
 
+from dnadesign.devtools.architecture.lifecycle import load_lifecycle, wheel_issues
+
 _DISTRIBUTION_EXCLUDES = [
     "dnadesign.*.tests",
     "dnadesign.*.tests.*",
@@ -331,6 +333,8 @@ def test_built_wheel_retains_runtime_resources_without_internal_shelves(tmp_path
     assert all(requirement.url is None for requirement in requirements)
 
     assert _REQUIRED_WHEEL_MEMBERS <= members
+    assert wheel_issues(load_lifecycle(repo_root), members) == []
+    assert not any(member.endswith("tool-lifecycle.toml") for member in members)
     assert members.isdisjoint(_FORBIDDEN_WHEEL_MEMBERS)
     assert not any(member.startswith(_FORBIDDEN_WHEEL_PREFIXES) for member in members)
     assert not any("config.probe." in member for member in members)

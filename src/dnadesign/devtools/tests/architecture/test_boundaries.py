@@ -19,8 +19,6 @@ import pytest
 
 from dnadesign.devtools.architecture.boundaries import (
     TOP_LEVEL_ROOT_MODULES,
-    TOP_LEVEL_SHARED_INFRA_PACKAGES,
-    TOP_LEVEL_TOOL_BOUNDARY_PACKAGES,
     find_external_study_boundary_violations,
     find_legacy_surface_violations,
     find_review_surface_private_imports,
@@ -28,6 +26,7 @@ from dnadesign.devtools.architecture.boundaries import (
     find_undeclared_cross_tool_imports,
     main,
 )
+from dnadesign.devtools.architecture.lifecycle import LIFECYCLE_PATH, load_lifecycle
 
 
 def _write(path: Path, text: str) -> None:
@@ -40,8 +39,11 @@ def _scaffold_top_level_layout(tmp_path: Path) -> None:
     src_root.mkdir(parents=True, exist_ok=True)
     for name in TOP_LEVEL_ROOT_MODULES:
         _write(src_root / name, "")
-    for name in TOP_LEVEL_TOOL_BOUNDARY_PACKAGES | TOP_LEVEL_SHARED_INFRA_PACKAGES:
-        _write(src_root / name / "__init__.py", "")
+    _write(tmp_path / LIFECYCLE_PATH, Path(LIFECYCLE_PATH).read_text())
+    _write(tmp_path / "pyproject.toml", "[project.scripts]\n")
+    for name, component in load_lifecycle(tmp_path).items():
+        if component.status != "retired":
+            _write(src_root / name / "__init__.py", "")
 
 
 @pytest.mark.parametrize("shelf", ["archived", "prototypes"])
@@ -785,8 +787,11 @@ def test_find_top_level_layout_violations_accepts_missing_optional_legacy_dirs(t
     src_root = tmp_path / "src" / "dnadesign"
     for name in TOP_LEVEL_ROOT_MODULES:
         _write(src_root / name, "")
-    for name in TOP_LEVEL_TOOL_BOUNDARY_PACKAGES | TOP_LEVEL_SHARED_INFRA_PACKAGES:
-        _write(src_root / name / "__init__.py", "")
+    _write(tmp_path / LIFECYCLE_PATH, Path(LIFECYCLE_PATH).read_text())
+    _write(tmp_path / "pyproject.toml", "[project.scripts]\n")
+    for name, component in load_lifecycle(tmp_path).items():
+        if component.status != "retired":
+            _write(src_root / name / "__init__.py", "")
 
     violations = find_top_level_layout_violations(repo_root=tmp_path)
 

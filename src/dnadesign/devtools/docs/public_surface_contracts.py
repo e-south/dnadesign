@@ -15,6 +15,7 @@ from pathlib import Path
 
 import yaml
 
+from dnadesign.devtools.architecture.lifecycle import MAINTENANCE_SECTION, load_lifecycle
 from dnadesign.devtools.ci.changes import discover_repo_tools
 from dnadesign.devtools.docs.banner_contracts import (
     _top_rendered_readme_banner,
@@ -36,7 +37,6 @@ from dnadesign.devtools.docs.check_contracts import (
     LEGACY_CONTRACT_SURFACE_DOC_PATTERNS,
     LINK_PATTERN,
     PUBLIC_INTERFACE_DOC_PATHS,
-    README_TOOL_CATALOG_EXCLUDED_TOOLS,
     README_TOOL_COMPONENT_COVERAGE_PATTERN,
     README_TOOL_LINK_PATTERN,
     TOOL_README_SELF_REFERENTIAL_INTRO_PATTERN,
@@ -67,14 +67,17 @@ def _find_readme_tool_catalog_issues(repo_root: Path) -> list[str]:
     if not readme_path.exists() or not src_root.exists():
         return []
 
-    repo_tools = discover_repo_tools(repo_root=repo_root) - README_TOOL_CATALOG_EXCLUDED_TOOLS
-    if not repo_tools:
-        return []
-
+    try:
+        components = load_lifecycle(repo_root)
+    except (OSError, ValueError) as exc:
+        return [str(exc)]
+    repo_tools = {name for name, component in components.items() if component.catalog}
     readme_text = readme_path.read_text(encoding="utf-8")
     rows = _readme_tool_table_rows(readme_text)
     if not rows:
-        return [f"{readme_path}: section '## Available tools' must include a markdown tool table."]
+        return (
+            [f"{readme_path}: section '## Available tools' must include a markdown tool table."] if repo_tools else []
+        )
 
     issues: list[str] = []
     available_tools_text = "\n".join(_extract_level2_section_lines(readme_text, "Available tools"))
@@ -119,7 +122,24 @@ def _find_readme_tool_catalog_issues(repo_root: Path) -> list[str]:
     if missing_tools:
         issues.append(f"{readme_path}: missing tool rows for: {', '.join(missing_tools)}.")
     if extra_tools:
-        issues.append(f"{readme_path}: unknown tool rows not found in src/dnadesign: {', '.join(extra_tools)}.")
+        issues.append(f"{readme_path}: tool rows not declared for the catalog: {', '.join(extra_tools)}.")
+    section = ""
+    maintenance_rows: set[str] = set()
+    for line in _extract_level2_section_lines(readme_text, "Available tools"):
+        if line.startswith("### "):
+            section = line[4:].strip()
+        match = README_TOOL_LINK_PATTERN.search(line)
+        if match and section == MAINTENANCE_SECTION:
+            maintenance_rows.add(match.group("tool"))
+    expected_maintenance = {name for name in repo_tools if components[name].status == "maintenance"}
+    for name in sorted(expected_maintenance - maintenance_rows):
+        issues.append(f"{readme_path}: maintenance tool {name} must appear under '{MAINTENANCE_SECTION}'.")
+    for name in sorted(maintenance_rows - expected_maintenance):
+        issues.append(f"{readme_path}: {name} is not declared as a maintenance tool.")
+    for name in sorted(expected_maintenance):
+        replacement = components[name].replacement
+        if replacement and replacement not in LINK_PATTERN.findall(readme_text):
+            issues.append(f"{readme_path}: maintenance tool {name} must link to its replacement: {replacement}.")
     return issues
 
 

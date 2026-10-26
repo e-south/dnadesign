@@ -94,8 +94,9 @@ This file is the architecture map: it names system boundaries, major flows, and 
   `owner_tool`, overlays, event metadata, and study records rather than nested
   tool-routing folders.
 - Cross-dataset USR overlay transfer is explicit-only: maintenance merge defaults to base-row merge, while any overlay carry must be opt-in, namespace-scoped, schema-compatible, and auditable in events.
-- Curated study-facing workspaces that enable USR sinks should default those
-  sinks to an explicit shared USR root such as `src/dnadesign/usr/datasets`.
+- Workspaces that enable USR sinks must select an external dataset root explicitly.
+  USR's standalone default is `./usr_datasets`; installed package resources are
+  not writable dataset locations.
 - Workspace-local export roots remain allowed only as explicit opt-in producer
   mirrors, self-contained demos, or handoff surfaces named directly in a study
   record or runbook.
@@ -135,6 +136,13 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - Developer workflow -> core CI lane (lint/docs/standard tests + coverage gate) and external integration lane (FIMO/integration) when required.
 
 ## Architecture invariants
+- Component support status is declared in `.github/tool-lifecycle.toml`.
+  Active and maintenance components remain installed; retired components have
+  retrieval references and must not enter source, commands or distributions.
+  Catalog checks use these declarations. Directory discovery identifies
+  unclassified source rather than granting it supported status.
+  `pyproject.toml` owns entrypoints, dependencies and runtime resources.
+  Installed tool commands do not read repository lifecycle metadata.
 - No silent fallbacks: missing required inputs/dependencies must fail fast with actionable errors.
 - Boundary contracts are explicit: CI scope, tool coverage baselines, and marker-based external integration tests are enforced in code.
 - Docs are layered: root docs are maps and deep procedures stay in runbooks/reference docs.

@@ -36,7 +36,7 @@ contracts.
 
 | Tool | What it owns | First command | Next doc |
 | --- | --- | --- | --- |
-| `densegen` | packaged workspaces and their current output state | `uv run dense workspace list` | [DenseGen workspaces](../src/dnadesign/densegen/workspaces/README.md) |
+| `densegen` | existing workspaces and their current output state | `uv run dense workspace list` | [DenseGen workspaces](../src/dnadesign/densegen/workspaces/README.md) |
 | `construct` | packaged workspaces and their current output state | `uv run construct workspace list` | [Construct workspaces](../src/dnadesign/construct/workspaces/README.md) |
 | `infer` | packaged workspaces and their current output state | `uv run infer workspace list` | [infer workspaces](../src/dnadesign/infer/workspaces/README.md) |
 | `cluster` | packaged workspaces and their current output state | `uv run cluster workspace list` | [Cluster workspaces](../src/dnadesign/cluster/workspaces/README.md) |
@@ -96,7 +96,6 @@ files produced by other tools; their guides describe the required inputs.
 | `aligner` | n/a | [aligner docs](../src/dnadesign/aligner/docs/README.md) |
 | `cluster` | `uv run cluster --help` | [cluster README](../src/dnadesign/cluster/README.md) |
 | `cruncher` | `uv run cruncher --help` | [cruncher README](../src/dnadesign/cruncher/README.md) |
-| `densegen` | `uv run dense --help` | [densegen README](../src/dnadesign/densegen/README.md) |
 | `construct` | `uv run construct --help` | [construct README](../src/dnadesign/construct/README.md) |
 | `junction` | `uv run junction --help` | [junction docs](../src/dnadesign/junction/docs/README.md); plans oligos directly from a request file |
 | `infer` | `uv run infer --help` | [infer README](../src/dnadesign/infer/README.md) |
@@ -104,6 +103,12 @@ files produced by other tools; their guides describe the required inputs.
 | `opal` | `uv run opal --help` | [opal README](../src/dnadesign/opal/README.md) |
 | `permuter` | `uv run permuter --help` | [permuter docs](../src/dnadesign/permuter/docs/README.md) |
 | `usr` | `uv run usr --help` | [usr README](../src/dnadesign/usr/README.md) |
+
+#### Existing and historical workflows
+
+| Tool | CLI | Docs |
+| --- | --- | --- |
+| `densegen` | `uv run dense --help` | [DenseGen maintained workflows](../src/dnadesign/densegen/README.md) |
 
 #### Artifact services
 

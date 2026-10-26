@@ -1,0 +1,27 @@
+schema_version = 1
+
+# Support status for repository components. pyproject.toml owns installation.
+[components]
+aligner = {status = "active", catalog = true}
+baserender = {status = "active", catalog = true}
+cluster = {status = "active", catalog = true}
+construct = {status = "active", catalog = true}
+cruncher = {status = "active", catalog = true}
+densegen = {status = "maintenance", catalog = true, replacement = "https://github.com/e-south/dense-arrays"}
+folding = {status = "active", catalog = true}
+infer = {status = "active", catalog = true}
+junction = {status = "active", catalog = true}
+latentdna = {status = "active", catalog = true}
+notify = {status = "active", catalog = true}
+opal = {status = "active", catalog = true}
+ops = {status = "active", catalog = true}
+permuter = {status = "active", catalog = true}
+thread = {status = "active", catalog = true}
+usr = {status = "active", catalog = true}
+contracts = {status = "active", catalog = true}
+artifacts = {status = "active", catalog = false}
+devtools = {status = "active", catalog = false}
+billboard = {status = "retired", catalog = false, retrieval = "docs/historical-tools.md"}
+libshuffle = {status = "retired", catalog = false, retrieval = "docs/historical-tools.md"}
+nmf = {status = "retired", catalog = false, retrieval = "docs/historical-tools.md"}
+tfkdanalysis = {status = "retired", catalog = false, retrieval = "docs/historical-tools.md"}

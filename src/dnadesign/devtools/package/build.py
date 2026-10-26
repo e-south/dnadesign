@@ -26,6 +26,8 @@ from email.parser import BytesParser
 from pathlib import Path
 from zipfile import ZipFile
 
+from dnadesign.devtools.architecture.lifecycle import find_installation_issues, load_lifecycle, wheel_issues
+
 from .provenance import file_record, sha256, verify_bundle
 
 
@@ -80,6 +82,10 @@ def build_bundle(repo_root: Path, output: Path, *, build_lock: Path | None = Non
         identity = export_source(repo_root, source)
         project = tomllib.loads((source / "pyproject.toml").read_text())
         name, version = project["project"]["name"], project["project"]["version"]
+        if name == "dnadesign-tools":
+            issues = find_installation_issues(source)
+            if issues:
+                raise ValueError("Lifecycle check failed: " + "; ".join(issues))
         citation = (source / "CITATION.cff").read_text()
         output.mkdir(parents=True)
         env["SOURCE_DATE_EPOCH"] = str(identity["source_date_epoch"])
@@ -144,6 +150,10 @@ def build_bundle(repo_root: Path, output: Path, *, build_lock: Path | None = Non
             raise ValueError("Build must produce exactly one wheel and one source distribution")
         wheel, sdist = wheels[0], sdists[0]
         with ZipFile(wheel) as archive:
+            if name == "dnadesign-tools":
+                issues = wheel_issues(load_lifecycle(source), archive.namelist())
+                if issues:
+                    raise ValueError("Lifecycle check failed: " + "; ".join(issues))
             metadata = [item for item in archive.namelist() if item.endswith(".dist-info/METADATA")]
             if len(metadata) != 1:
                 raise ValueError("Wheel must contain one metadata record")

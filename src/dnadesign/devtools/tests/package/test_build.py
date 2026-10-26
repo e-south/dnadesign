@@ -106,6 +106,31 @@ def test_build_records_reusable_lock_source_and_distribution_bytes(source: Path,
     assert repeated["files"][0] == receipt["files"][0]
 
 
+def test_release_builder_rejects_retired_command_before_building(source: Path, tmp_path: Path, monkeypatch) -> None:
+    from dnadesign.devtools.package import build
+
+    project = source / "pyproject.toml"
+    project.write_text(
+        project.read_text().replace('name="build-fixture"', 'name="dnadesign-tools"')
+        + '\n[project.scripts]\nold="dnadesign.old:main"\n'
+    )
+    (source / ".github").mkdir()
+    (source / ".github/tool-lifecycle.toml").write_text(
+        'schema_version=1\n[components]\nold={status="retired", catalog=false, retrieval="history.md"}\n'
+    )
+    (source / "history.md").write_text("Retained source reference.\n")
+    _git(source, "add", ".")
+    _git(source, "-c", "user.name=Test", "-c", "user.email=test@example.org", "commit", "-qm", "retired command")
+
+    def unexpected_build(*args, **kwargs):
+        pytest.fail("invalid lifecycle reached build subprocesses")
+
+    monkeypatch.setattr(build, "_run", unexpected_build)
+    with pytest.raises(ValueError, match="retired"):
+        build.build_bundle(source, tmp_path / "rejected")
+    assert not (tmp_path / "rejected").exists()
+
+
 @pytest.fixture
 def bundle(tmp_path: Path) -> Path:
     root = tmp_path / "download"

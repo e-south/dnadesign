@@ -51,6 +51,16 @@ exported source must produce identical wheel contents. Tests, agent instructions
 journals and retired source shelves are excluded from runtime wheels. The package
 suite also runs OPAL's built-in demo from the installed wheel.
 
+Component status is declared in
+[tool-lifecycle.toml](../../.github/tool-lifecycle.toml). Active components support
+current work; maintenance components retain existing workflows; retired components
+are available only through their retrieval references. Catalog and architecture
+checks validate these states against source and commands. The release builder
+checks the emitted wheel as well, rejecting retired or unclassified components
+and missing retained components. This metadata is a repository check input,
+not an installed-tool configuration file. Update it with the relevant source,
+entrypoints and routes when a component changes status.
+
 ### Verify a retained or downloaded bundle
 
 ```bash

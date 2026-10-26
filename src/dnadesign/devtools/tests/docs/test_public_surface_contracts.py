@@ -32,7 +32,15 @@ from dnadesign.devtools.tests.docs.check_test_support import (
 )
 
 
+def _write_lifecycle(root: Path, *names: str) -> None:
+    _write(
+        root / ".github/tool-lifecycle.toml",
+        "schema_version=1\n[components]\n" + "".join(f'{name}={{status="active", catalog=true}}\n' for name in names),
+    )
+
+
 def test_package_readme_links_resolve_only_the_canonical_repository(tmp_path: Path) -> None:
+    _write_lifecycle(tmp_path, "alpha")
     _write(tmp_path / "src/dnadesign/alpha/README.md", "# Alpha\n")
     _write(tmp_path / "docs/README.md", "## Documentation\n")
     prefix = "https://github.com/e-south/dnadesign/blob/main/"
@@ -49,6 +57,7 @@ def test_package_readme_links_resolve_only_the_canonical_repository(tmp_path: Pa
 
 
 def test_tool_catalog_directory_links_require_the_matching_readme(tmp_path: Path) -> None:
+    _write_lifecycle(tmp_path, "alpha")
     readme = tmp_path / "src/dnadesign/alpha/README.md"
     _write(readme, "# Alpha\n")
     table = (
@@ -466,6 +475,7 @@ def test_main_fails_when_readme_tool_catalog_missing_repo_tool(tmp_path: Path) -
 
 
 def test_readme_tool_catalog_does_not_require_studies_row(tmp_path: Path) -> None:
+    _write_lifecycle(tmp_path, "aligner")
     _write(tmp_path / "src" / "dnadesign" / "aligner" / "__init__.py", "")
     _write(tmp_path / "src" / "dnadesign" / "studies" / "__init__.py", "")
     _write(tmp_path / "src" / "dnadesign" / "aligner" / "README.md", "# aligner\n")
@@ -492,6 +502,7 @@ def test_readme_tool_catalog_does_not_require_studies_row(tmp_path: Path) -> Non
 
 
 def test_main_fails_when_readme_tool_catalog_row_has_too_few_columns(tmp_path: Path) -> None:
+    _write_lifecycle(tmp_path, "aligner")
     today = dt.date.today().isoformat()
     _write(tmp_path / "docs" / "index.md", "## Index\n")
     _write(
@@ -522,6 +533,7 @@ def test_main_fails_when_readme_tool_catalog_row_has_too_few_columns(tmp_path: P
 
 
 def test_main_fails_when_readme_tool_catalog_has_an_extra_column(tmp_path: Path) -> None:
+    _write_lifecycle(tmp_path, "aligner")
     today = dt.date.today().isoformat()
     _write(tmp_path / "docs" / "index.md", "## Index\n")
     _write(
@@ -552,6 +564,7 @@ def test_main_fails_when_readme_tool_catalog_has_an_extra_column(tmp_path: Path)
 
 
 def test_readme_tool_catalog_rejects_component_coverage_badges(tmp_path: Path) -> None:
+    _write_lifecycle(tmp_path, "aligner")
     _write(tmp_path / "src" / "dnadesign" / "aligner" / "__init__.py", "")
     _write(tmp_path / "src" / "dnadesign" / "aligner" / "README.md", "# aligner\n")
     _write(
@@ -576,6 +589,7 @@ def test_readme_tool_catalog_rejects_component_coverage_badges(tmp_path: Path) -
 
 
 def test_main_passes_when_readme_tool_catalog_matches_repo_tools(tmp_path: Path) -> None:
+    _write_lifecycle(tmp_path, "aligner", "notify")
     today = dt.date.today().isoformat()
     _write(tmp_path / "docs" / "README.md", f"## Index\n\n**Owner:** maintainers\n**Last verified:** {today}\n")
     _write(
@@ -1013,6 +1027,7 @@ def test_broken_link_check_includes_top_level_tool_readmes(tmp_path: Path) -> No
 
 
 def test_main_passes_when_codecov_components_match_repo_tools(tmp_path: Path) -> None:
+    _write_lifecycle(tmp_path, "aligner", "notify")
     today = dt.date.today().isoformat()
     _write(tmp_path / "docs" / "README.md", f"## Index\n\n**Owner:** maintainers\n**Last verified:** {today}\n")
     _write(
