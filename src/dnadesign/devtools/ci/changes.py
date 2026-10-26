@@ -52,11 +52,27 @@ _NON_TOOL_DIRS = {
 }
 _GENERATED_ARTIFACT_DIRS = {"__pycache__", ".pytest_cache"}
 _GENERATED_ARTIFACT_SUFFIXES = {".pyc", ".pyo"}
+_RUNTIME_EXAMPLE_DOCS = {
+    # test_docs_workflow_routing executes this document's YAML and transforms labels.
+    "src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md",
+}
 
 
-def is_documentation_path(path: str) -> bool:
-    """Markdown changes retain documentation checks without selecting runtime suites."""
-    return Path(path).suffix.lower() == ".md"
+def is_documentation_path(path: str, *, tool_names: set[str] | None = None) -> bool:
+    """Recognize human documentation, excluding fixtures and installed resources."""
+    candidate = Path(path)
+    if path in _RUNTIME_EXAMPLE_DOCS:
+        return False
+    if candidate.suffix.lower() != ".md" or candidate.is_absolute() or ".." in candidate.parts:
+        return False
+    parts = candidate.parts
+    if len(parts) == 1 or parts[0] in {"docs", ".agents", ".github"}:
+        return True
+    if len(parts) < 4 or parts[:2] != ("src", "dnadesign"):
+        return False
+    if tool_names is not None and parts[2] not in tool_names | {"artifacts", "devtools"}:
+        return False
+    return (len(parts) == 4 and parts[3] in {"README.md", "AGENTS.md"}) or parts[3] == "docs"
 
 
 @dataclass(frozen=True)
@@ -65,6 +81,7 @@ class ChangeScope:
     run_full_core: bool
     affected_tools: list[str]
     external_integration_tools: list[str]
+    documentation_only: bool = False
 
     @property
     def run_coverage_gate(self) -> bool:
@@ -244,6 +261,12 @@ def determine_scope(
             external_integration_tools=sorted_external_integration_tools,
         )
 
+    changed_files = [path.strip() for path in changed_files if path.strip()]
+    if not changed_files:
+        raise ValueError("No changed files detected for pull_request event; refusing to infer empty CI scope.")
+    if all(is_documentation_path(path, tool_names=tool_names) for path in changed_files):
+        return ChangeScope(False, False, [], [], documentation_only=True)
+
     run_external_integration = False
     run_full_core = False
     affected_tools: set[str] = set()
@@ -252,7 +275,7 @@ def determine_scope(
         path = path.strip()
         if not path:
             continue
-        if is_documentation_path(path):
+        if is_documentation_path(path, tool_names=tool_names):
             continue
         parts = Path(path).parts
 
@@ -278,6 +301,10 @@ def determine_scope(
             else:
                 run_full_core = True
                 run_external_integration = True
+        elif path not in _FULL_CORE_EXACT_FILES:
+            # Unknown non-documentation paths must never select the lightweight lane.
+            run_full_core = True
+            run_external_integration = True
 
     if run_full_core:
         affected_tools = set(sorted_tools)
@@ -319,6 +346,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _emit_outputs(scope: ChangeScope, github_output: Path | None) -> None:
     outputs = {
+        "documentation_only": str(scope.documentation_only).lower(),
         "run_external_integration": str(scope.run_external_integration).lower(),
         "run_full_core": str(scope.run_full_core).lower(),
         "run_coverage_gate": str(scope.run_coverage_gate).lower(),

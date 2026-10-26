@@ -15,6 +15,7 @@ import subprocess
 from pathlib import Path
 
 from dnadesign.devtools.ci.changed_files import collect_changed_files, main
+from dnadesign.devtools.ci.changes import determine_scope
 
 
 def _run_git(repo_root: Path, *args: str) -> str:
@@ -77,6 +78,48 @@ def test_collect_changed_files_returns_pr_diff(tmp_path: Path) -> None:
     )
 
     assert files == ["README.md"]
+
+
+def test_code_renamed_to_markdown_preserves_both_paths_for_scope(tmp_path: Path) -> None:
+    root, _, _, _ = _create_repo_with_pr_merge(tmp_path)
+    (root / "script.py").write_text("print('example')\n")
+    _run_git(root, "add", "script.py")
+    _run_git(root, "commit", "-m", "source")
+    base = _run_git(root, "rev-parse", "HEAD")
+    _run_git(root, "switch", "-c", "rename")
+    _run_git(root, "mv", "script.py", "example.md")
+    _run_git(root, "commit", "-m", "rename")
+    _run_git(root, "switch", "main")
+    _run_git(root, "merge", "--no-ff", "--no-edit", "rename")
+    files = collect_changed_files(
+        event_name="pull_request", repo_root=root, base_sha=base, head_sha=_run_git(root, "rev-parse", "HEAD")
+    )
+    assert files == ["example.md", "script.py"]
+    scope = determine_scope(
+        event_name="pull_request", changed_files=files, tool_names={"opal"}, external_integration_tool_names=set()
+    )
+    assert scope.run_full_core
+
+
+def test_deleted_source_is_not_lost_from_scope(tmp_path: Path) -> None:
+    root, _, _, _ = _create_repo_with_pr_merge(tmp_path)
+    (root / "old.py").write_text("print('old')\n")
+    _run_git(root, "add", "old.py")
+    _run_git(root, "commit", "-m", "source")
+    base = _run_git(root, "rev-parse", "HEAD")
+    _run_git(root, "switch", "-c", "delete")
+    _run_git(root, "rm", "old.py")
+    _run_git(root, "commit", "-m", "delete")
+    _run_git(root, "switch", "main")
+    _run_git(root, "merge", "--no-ff", "--no-edit", "delete")
+    files = collect_changed_files(
+        event_name="pull_request", repo_root=root, base_sha=base, head_sha=_run_git(root, "rev-parse", "HEAD")
+    )
+    assert files == ["old.py"]
+    scope = determine_scope(
+        event_name="pull_request", changed_files=files, tool_names={"opal"}, external_integration_tool_names=set()
+    )
+    assert scope.run_full_core
 
 
 def test_collect_changed_files_rejects_non_merge_head(tmp_path: Path) -> None:

@@ -150,6 +150,10 @@ tools = ["dnadesign-tools[full]"]
 test = ["pytest>=9.0.3", "pytest-cov", "hypothesis>=6.100", "filelock>=4.2.4,<5"]
 lint = ["ruff>=0.4", "pre-commit>=3.7"]
 dev  = [{ include-group = "test" }, { include-group = "lint" }]
+ci-docs = [
+  { include-group = "dev" },
+  "html5lib>=1.1,<2", "markdown-it-py>=4.0.0,<5", "upa-url>=1.1.0,<2", "pyyaml", "pydantic",
+]
 
 [tool.setuptools]
 # Runtime resources are explicit so Git checkouts and exported source build alike.

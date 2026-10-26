@@ -255,11 +255,14 @@ def _find_agents_path_reference_issues(repo_root: Path) -> list[str]:
         ".venv",
         ".worktrees",
         "__pycache__",
+        "build",
+        "dist",
     }
-    for agents_path in sorted(resolved_repo_root.rglob("AGENTS.md")):
-        relative_agents_path = agents_path.relative_to(resolved_repo_root)
-        if any(part in skipped_dir_names for part in relative_agents_path.parts):
+    for directory, subdirectories, filenames in resolved_repo_root.walk():
+        subdirectories[:] = sorted(name for name in subdirectories if name not in skipped_dir_names)
+        if "AGENTS.md" not in filenames:
             continue
+        agents_path = directory / "AGENTS.md"
         for line_no, line in enumerate(agents_path.read_text(encoding="utf-8").splitlines(), start=1):
             line_lower = line.lower()
             if any(marker in line_lower for marker in AGENTS_NEGATIVE_LINE_MARKERS):

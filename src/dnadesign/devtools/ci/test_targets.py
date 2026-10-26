@@ -71,7 +71,7 @@ def resolve_test_targets(
         if not tool_root.is_dir():
             raise ValueError(f"Unknown tool in affected set: {tool_name}")
         tool_changes = [path for path in changed_files if path.startswith(f"src/dnadesign/{tool_name}/")]
-        if tool_changes and all(is_documentation_path(path) for path in tool_changes):
+        if tool_changes and all(is_documentation_path(path, tool_names={tool_name}) for path in tool_changes):
             for test in sorted((tool_root / "tests").rglob("test_*.py")):
                 if "docs" in test.relative_to(tool_root / "tests").parts or test.name.startswith("test_docs_"):
                     _append_existing_target(targets, test)

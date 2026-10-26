@@ -65,7 +65,7 @@ def collect_changed_files(*, event_name: str, repo_root: Path, base_sha: str | N
 
     diff_output = _run_git(
         repo_root=repo_root,
-        args=["diff", "--name-only", f"{resolved_base}...{resolved_head}"],
+        args=["diff", "--no-renames", "--name-only", f"{resolved_base}...{resolved_head}"],
         context="git diff failed",
     )
     return [line.strip() for line in diff_output.splitlines() if line.strip()]

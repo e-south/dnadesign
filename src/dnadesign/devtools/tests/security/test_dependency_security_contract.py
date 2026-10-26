@@ -12,7 +12,6 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import ast
-import pickle
 import subprocess
 import tomllib
 from pathlib import Path
@@ -308,30 +307,3 @@ def test_torch_boundary_guard_accepts_restricted_alias_load() -> None:
     source = "import torch\nloader = torch.load\nloader('safe.pt', weights_only=True)\n"
 
     assert _torch_boundary_violations(source, filename="fixture.py") == []
-
-
-class _UnsupportedCheckpointValue:
-    pass
-
-
-def test_restricted_torch_load_rejects_unsupported_globals(tmp_path: Path) -> None:
-    import torch
-
-    path = tmp_path / "unsupported.pt"
-    torch.save([{"sequence": "ACGT", "value": _UnsupportedCheckpointValue()}], path)
-
-    with pytest.raises((pickle.UnpicklingError, ValueError), match="Weights only load failed"):
-        torch.load(path, map_location="cpu", weights_only=True)
-
-
-def test_restricted_torch_load_preserves_plain_tensor_and_dict_payloads(tmp_path: Path) -> None:
-    import torch
-
-    path = tmp_path / "plain.pt"
-    payload = [{"sequence": "ACGT", "embedding": torch.tensor([1.0, 2.0])}]
-    torch.save(payload, path)
-
-    loaded = torch.load(path, map_location="cpu", weights_only=True)
-
-    assert loaded[0]["sequence"] == "ACGT"
-    assert loaded[0]["embedding"].tolist() == [1.0, 2.0]

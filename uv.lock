@@ -544,6 +544,19 @@ usr = [
 ]
 
 [package.dev-dependencies]
+ci-docs = [
+    { name = "filelock" },
+    { name = "html5lib" },
+    { name = "hypothesis" },
+    { name = "markdown-it-py" },
+    { name = "pre-commit" },
+    { name = "pydantic" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pyyaml" },
+    { name = "ruff" },
+    { name = "upa-url" },
+]
 dev = [
     { name = "filelock" },
     { name = "hypothesis" },
@@ -674,6 +687,19 @@ requires-dist = [
 provides-extras = ["usr", "infer", "permuter", "opal", "opal-notebook", "full", "infer-evo2"]
 
 [package.metadata.requires-dev]
+ci-docs = [
+    { name = "filelock", specifier = ">=4.2.4,<5" },
+    { name = "html5lib", specifier = ">=1.1,<2" },
+    { name = "hypothesis", specifier = ">=6.100" },
+    { name = "markdown-it-py", specifier = ">=4.0.0,<5" },
+    { name = "pre-commit", specifier = ">=3.7" },
+    { name = "pydantic" },
+    { name = "pytest", specifier = ">=9.0.3" },
+    { name = "pytest-cov" },
+    { name = "pyyaml" },
+    { name = "ruff", specifier = ">=0.4" },
+    { name = "upa-url", specifier = ">=1.1.0,<2" },
+]
 dev = [
     { name = "filelock", specifier = ">=4.2.4,<5" },
     { name = "hypothesis", specifier = ">=6.100" },

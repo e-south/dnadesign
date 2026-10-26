@@ -41,6 +41,38 @@ def test_ci_workflow_uses_core_and_external_integration_lane_ids() -> None:
     assert "ci-gate" in jobs
 
 
+def test_documentation_preparation_requires_an_explicit_scope_output() -> None:
+    jobs = _workflow()["jobs"]
+    assert "documentation-only" in jobs["detect-ci-scope"]["outputs"]
+    steps = jobs["core-lint-test-build"]["steps"]
+    full = next(step for step in steps if step.get("name") == "Install dependencies (locked)")
+    minimal = next(step for step in steps if step.get("name") == "Install documentation dependencies (locked)")
+    assert full["if"] == "needs.detect-ci-scope.outputs.documentation-only != 'true'"
+    assert minimal["if"] == "needs.detect-ci-scope.outputs.documentation-only == 'true'"
+    assert minimal["run"] == "uv sync --locked --only-group ci-docs --no-install-project"
+
+
+def test_documentation_commands_cannot_implicitly_install_the_full_runtime() -> None:
+    steps = _workflow()["jobs"]["core-lint-test-build"]["steps"]
+    for step in steps:
+        for command in re.findall(r"uv run[^\n]*", str(step.get("run", ""))):
+            assert command.startswith("uv run --no-sync "), step.get("name")
+
+
+def test_documentation_contracts_replace_runtime_tests_only_for_documentation() -> None:
+    steps = _workflow()["jobs"]["core-lint-test-build"]["steps"]
+    docs = next(step for step in steps if step.get("name") == "Documentation contracts")
+    assert docs["if"] == "needs.detect-ci-scope.outputs.documentation-only == 'true'"
+    for target in ("docs", "architecture", "ci"):
+        assert f"src/dnadesign/devtools/tests/{target}" in docs["run"]
+    for name in ("Package layout contracts", "Tests (core lane) + coverage report"):
+        step = next(step for step in steps if step.get("name") == name)
+        assert step["if"] == "needs.detect-ci-scope.outputs.documentation-only != 'true'"
+    checkpoint = next(step for step in steps if step.get("name") == "Checkpoint loading safety")
+    assert checkpoint["if"] == "needs.detect-ci-scope.outputs.documentation-only != 'true'"
+    assert "test_checkpoint_loading.py" in checkpoint["run"]
+
+
 def test_core_lane_installs_ffmpeg() -> None:
     workflow = _workflow()
     steps = workflow["jobs"]["core-lint-test-build"]["steps"]
@@ -118,7 +150,7 @@ def test_core_lane_always_runs_dependency_security_contract() -> None:
     security_step = next(step for step in steps if step.get("name") == "Dependency security contracts")
 
     assert security_step["run"] == (
-        "uv run pytest -q src/dnadesign/devtools/tests/security/test_dependency_security_contract.py"
+        "uv run --no-sync pytest -q src/dnadesign/devtools/tests/security/test_dependency_security_contract.py"
     )
 
 
@@ -128,7 +160,7 @@ def test_core_lane_fails_fast_on_package_layout_contracts() -> None:
     step_names = [str(step.get("name", "")) for step in steps]
     layout_step = next(step for step in steps if step.get("name") == "Package layout contracts")
 
-    assert layout_step["run"] == "uv run pytest -q src/dnadesign/devtools/tests/package"
+    assert layout_step["run"] == "uv run --no-sync pytest -q src/dnadesign/devtools/tests/package"
     assert step_names.index("Package layout contracts") < step_names.index("Tests (core lane) + coverage report")
 
 
@@ -332,7 +364,7 @@ def test_scoped_core_lanes_run_workflow_contract_before_target_resolution() -> N
         "src/dnadesign/devtools/tests/ci/test_precommit_contract.py",
         "src/dnadesign/devtools/tests/ci/test_workflow_contract.py",
     ]
-    invariant_run = 'uv run pytest -q --durations=25 "${invariant_targets[@]}"'
+    invariant_run = 'uv run --no-sync pytest -q --durations=25 "${invariant_targets[@]}"'
     assert invariant_run in run_script
     assert run_script.index(invariant_run) < run_script.index('affected_csv="')
 

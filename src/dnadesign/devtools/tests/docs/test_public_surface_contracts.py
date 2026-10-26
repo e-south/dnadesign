@@ -14,6 +14,8 @@ from __future__ import annotations
 import datetime as dt
 from pathlib import Path
 
+import pytest
+
 from dnadesign.devtools.docs.checks import (
     _find_agents_path_reference_issues,
     _find_densegen_disallowed_term_issues,
@@ -383,6 +385,12 @@ def test_agents_path_reference_check_ignores_local_worktrees(tmp_path: Path) -> 
     issues = _find_agents_path_reference_issues(tmp_path)
 
     assert issues == []
+
+
+@pytest.mark.parametrize("directory", ["build", "dist"])
+def test_agents_path_reference_check_ignores_build_dependencies(tmp_path: Path, directory: str) -> None:
+    _write(tmp_path / directory / "dependency" / "AGENTS.md", "- Run `tests/missing.py`.\n")
+    assert _find_agents_path_reference_issues(tmp_path) == []
 
 
 def test_densegen_docs_language_check_flags_canonical_term(tmp_path: Path) -> None:

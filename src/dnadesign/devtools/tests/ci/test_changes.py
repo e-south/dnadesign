@@ -24,6 +24,85 @@ from dnadesign.devtools.ci.changes import (
 )
 
 
+@pytest.mark.parametrize(
+    "path", ["README.md", "docs/dev/README.md", "src/dnadesign/opal/README.md", ".agents/skills/example/SKILL.md"]
+)
+def test_documentation_preparation_is_explicit(path: str) -> None:
+    scope = determine_scope(
+        event_name="pull_request",
+        changed_files=[path],
+        tool_names={"opal", "densegen"},
+        external_integration_tool_names={"densegen"},
+    )
+    assert scope.documentation_only
+    assert not scope.run_full_core
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ".github/tool-lifecycle.toml",
+        "unknown.py",
+        ".github/workflows/other.yaml",
+        "src/dnadesign/unclassified/README.md",
+    ],
+)
+def test_unclassified_and_lifecycle_changes_keep_broad_checks(path: str) -> None:
+    scope = determine_scope(
+        event_name="pull_request",
+        changed_files=[path],
+        tool_names={"opal", "densegen"},
+        external_integration_tool_names={"densegen"},
+    )
+    assert scope.run_full_core
+    assert not scope.documentation_only
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "src/dnadesign/opal/src/main.py",
+        "src/dnadesign/opal/tests/fixtures/input.md",
+        "src/dnadesign/opal/campaigns/demo/README.md",
+    ],
+)
+def test_mixed_or_packaged_inputs_do_not_use_documentation_preparation(path: str) -> None:
+    scope = determine_scope(
+        event_name="pull_request",
+        changed_files=["README.md", path],
+        tool_names={"opal", "densegen"},
+        external_integration_tool_names={"densegen"},
+    )
+    assert scope.affected_tools == ["opal"]
+    assert not scope.documentation_only
+
+
+def test_empty_pr_scope_cannot_select_documentation_preparation() -> None:
+    with pytest.raises(ValueError, match="changed files"):
+        determine_scope(
+            event_name="pull_request", changed_files=[], tool_names={"opal"}, external_integration_tool_names=set()
+        )
+
+
+def test_non_pr_documentation_changes_still_run_full_validation() -> None:
+    scope = determine_scope(
+        event_name="push", changed_files=["README.md"], tool_names={"opal"}, external_integration_tool_names=set()
+    )
+    assert scope.run_full_core
+    assert not scope.documentation_only
+
+
+def test_executable_documentation_keeps_its_runtime_contract() -> None:
+    scope = determine_scope(
+        event_name="pull_request",
+        changed_files=["src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md"],
+        tool_names={"opal", "usr"},
+        external_integration_tool_names=set(),
+    )
+    assert scope.affected_tools == ["opal"]
+    assert not scope.documentation_only
+
+
 def test_determine_scope_non_pr_runs_full_core_and_external_integration() -> None:
     result = determine_scope(
         event_name="push",

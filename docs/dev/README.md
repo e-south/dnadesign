@@ -109,6 +109,18 @@ public contracts and extension points those repositories consume.
 
 ### CI and quality checks
 
+Documentation-only pull requests use the `ci-docs` dependency group without
+installing the scientific tool runtime. They run documentation, routing,
+architecture and static security contracts, lint and distribution builds.
+Executable examples with runtime contracts retain their owning tool's tests.
+Markdown fixtures and packaged resources are treated as tool changes.
+
+Lifecycle metadata, packaging, dependency, workflow and unrecognized changes
+retain broader checks. Renames contribute both their old and new paths to scope
+detection. Main-branch runs retain full validation, and secrets checks run for
+every change. An empty or unavailable change list does not qualify as
+documentation-only.
+
 - Core lane test expression: `-m "not fimo and not integration"`
 - External integration test expression: `-m "fimo or integration"`
 - Core lane local parity:

@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
+      documentation-only: ${{ steps.scope.outputs.documentation_only }}
       run-external-integration: ${{ steps.scope.outputs.run_external_integration }}
       run-full-core: ${{ steps.scope.outputs.run_full_core }}
       run-coverage-gate: ${{ steps.scope.outputs.run_coverage_gate }}
@@ -99,6 +100,7 @@ jobs:
     env:
       COVERAGE_CORE: sysmon
       MPLCONFIGDIR: ${{ github.workspace }}/.tmp/matplotlib
+      PYTHONPATH: src
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -126,18 +128,34 @@ jobs:
           prune-cache: true
 
       - name: Install dependencies (locked)
+        if: needs.detect-ci-scope.outputs.documentation-only != 'true'
         run: uv sync --locked --dev
+
+      - name: Install documentation dependencies (locked)
+        if: needs.detect-ci-scope.outputs.documentation-only == 'true'
+        run: uv sync --locked --only-group ci-docs --no-install-project
 
       - name: Docs checks (links + naming)
         run: |
-          uv run python -m dnadesign.devtools.docs.checks \
+          uv run --no-sync python -m dnadesign.devtools.docs.checks \
             --changed-files-file .ci_changed_files.txt
 
       - name: Architecture boundary checks
-        run: uv run python -m dnadesign.devtools.architecture.boundaries
+        run: uv run --no-sync python -m dnadesign.devtools.architecture.boundaries
 
       - name: Package layout contracts
-        run: uv run pytest -q src/dnadesign/devtools/tests/package
+        if: needs.detect-ci-scope.outputs.documentation-only != 'true'
+        run: uv run --no-sync pytest -q src/dnadesign/devtools/tests/package
+
+      - name: Documentation contracts
+        if: needs.detect-ci-scope.outputs.documentation-only == 'true'
+        run: |
+          uv run --no-sync pytest -q \
+            src/dnadesign/devtools/tests/docs \
+            src/dnadesign/devtools/tests/architecture/test_boundaries.py \
+            src/dnadesign/devtools/tests/architecture/test_lifecycle.py \
+            src/dnadesign/devtools/tests/ci \
+            src/dnadesign/devtools/tests/package/test_layout.py
 
       - name: Pre-commit (non-Ruff hooks)
         env:
@@ -145,22 +163,26 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" != "pull_request" ]; then
-            uv run pre-commit run --all-files
+            uv run --no-sync pre-commit run --all-files
             exit 0
           fi
 
           base_sha="${{ github.event.pull_request.base.sha }}"
           git cat-file -e "${base_sha}^{commit}"
-          uv run pre-commit run --from-ref "${base_sha}" --to-ref "${{ github.sha }}"
+          uv run --no-sync pre-commit run --from-ref "${base_sha}" --to-ref "${{ github.sha }}"
 
       - name: Lint
-        run: uv run ruff check .
+        run: uv run --no-sync ruff check .
 
       - name: Format check
-        run: uv run ruff format --check .
+        run: uv run --no-sync ruff format --check .
 
       - name: Dependency security contracts
-        run: uv run pytest -q src/dnadesign/devtools/tests/security/test_dependency_security_contract.py
+        run: uv run --no-sync pytest -q src/dnadesign/devtools/tests/security/test_dependency_security_contract.py
+
+      - name: Checkpoint loading safety
+        if: needs.detect-ci-scope.outputs.documentation-only != 'true'
+        run: uv run --no-sync pytest -q src/dnadesign/devtools/tests/security/test_checkpoint_loading.py
 
       - name: Install FFmpeg
         if: >
@@ -182,6 +204,7 @@ jobs:
           echo "FFmpeg install timed out or failed; continuing without video-output coverage."
 
       - name: Tests (core lane) + coverage report
+        if: needs.detect-ci-scope.outputs.documentation-only != 'true'
         shell: bash
         run: |
           marker_expr="not fimo and not integration"
@@ -201,14 +224,14 @@ jobs:
           )
 
           if [ "${{ needs.detect-ci-scope.outputs.run-full-core }}" = "true" ]; then
-            uv run pytest -q -m "$marker_expr" --durations=25 \
+            uv run --no-sync pytest -q -m "$marker_expr" --durations=25 \
               --cov=src/dnadesign \
               --cov-report=json:coverage-core.json \
               --cov-report=xml:coverage-core.xml
             exit 0
           fi
 
-          uv run pytest -q --durations=25 "${invariant_targets[@]}"
+          uv run --no-sync pytest -q --durations=25 "${invariant_targets[@]}"
 
           affected_csv="${{ needs.detect-ci-scope.outputs.affected-tools-csv }}"
           if [ -z "$affected_csv" ]; then
@@ -217,7 +240,7 @@ jobs:
               exit 1
             fi
             echo "No affected tools in PR scope; running core-lane smoke tests without coverage upload."
-            uv run pytest -q --durations=25 "${smoke_targets[@]}"
+            uv run --no-sync pytest -q --durations=25 "${smoke_targets[@]}"
             exit 0
           fi
 
@@ -230,14 +253,14 @@ jobs:
 
           if [ "${#targets[@]}" -eq 0 ]; then
             echo "No test directories found for affected tools: $affected_csv; running core-lane smoke tests."
-            uv run pytest -q --durations=25 "${smoke_targets[@]}" \
+            uv run --no-sync pytest -q --durations=25 "${smoke_targets[@]}" \
               --cov=src/dnadesign \
               --cov-report=json:coverage-core.json \
               --cov-report=xml:coverage-core.xml
             exit 0
           fi
 
-          uv run pytest -q -m "$marker_expr" --durations=25 "${targets[@]}" \
+          uv run --no-sync pytest -q -m "$marker_expr" --durations=25 "${targets[@]}" \
             --cov=src/dnadesign \
             --cov-report=json:coverage-core.json \
             --cov-report=xml:coverage-core.xml
@@ -247,7 +270,7 @@ jobs:
         shell: bash
         run: |
           cmd=(
-            uv run python -m dnadesign.devtools.quality.tool_coverage
+            uv run --no-sync python -m dnadesign.devtools.quality.tool_coverage
             --coverage-json coverage-core.json
             --baseline-json .github/tool-coverage-baseline.json
           )
@@ -260,7 +283,7 @@ jobs:
         if: needs.detect-ci-scope.outputs.run-full-core == 'true'
         shell: bash
         run: |
-          uv run python -m dnadesign.devtools.quality.coverage_summary \
+          uv run --no-sync python -m dnadesign.devtools.quality.coverage_summary \
             --coverage-json coverage-core.json \
             --baseline-json .github/tool-coverage-baseline.json \
             --output-json quality-score-coverage-summary.json
