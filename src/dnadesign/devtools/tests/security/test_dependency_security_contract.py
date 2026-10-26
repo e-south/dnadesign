@@ -78,6 +78,7 @@ def test_security_floors_are_published_by_their_owning_dependency_sets() -> None
     assert "marimo>=0.23.16" in dependencies
     assert "pillow>=13.0.0" in dependencies
     assert "certifi>=2026.10.19" in dependencies
+    assert "filelock>=4.2.4,<5" in dependencies
     assert "filelock>=4.2.4" in constraint_dependencies
     assert "virtualenv>=21.14.9" in constraint_dependencies
     assert "zstd>=1.5.7.2,!=1.5.7.3" in dependencies
