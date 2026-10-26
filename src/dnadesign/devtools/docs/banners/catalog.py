@@ -22,6 +22,8 @@ class BannerSpec:
     capability: str
     description: str
     glyph: str
+    glyph_transform: str = "translate(720 48)"
+    subtitle_size: int = 17
 
 
 REPOSITORY_BANNER_PATH = "assets/dnadesign-banner.svg"
@@ -43,14 +45,6 @@ BANNERS = (
         "DRAW SEQUENCE MAPS",
         "Draw annotated sequence diagrams from saved job files.",
         "render",
-    ),
-    BannerSpec(
-        "src/dnadesign/billboard/assets/billboard-banner.svg",
-        "src/dnadesign/billboard/README.md",
-        "billboard",
-        "MEASURE DIVERSITY",
-        "Measure binding-site diversity in generated libraries.",
-        "diversity",
     ),
     BannerSpec(
         "src/dnadesign/cluster/assets/cluster-banner.svg",
@@ -125,22 +119,6 @@ BANNERS = (
         "latent",
     ),
     BannerSpec(
-        "src/dnadesign/libshuffle/assets/libshuffle-banner.svg",
-        "src/dnadesign/libshuffle/README.md",
-        "libshuffle",
-        "SELECT DIVERSE SETS",
-        "Select representative subsets from dense sequence libraries.",
-        "shuffle",
-    ),
-    BannerSpec(
-        "src/dnadesign/nmf/assets/nmf-banner.svg",
-        "src/dnadesign/nmf/README.md",
-        "nmf",
-        "FIND MOTIF PATTERNS",
-        "Find recurring combinations in motif tables.",
-        "factor",
-    ),
-    BannerSpec(
         "src/dnadesign/notify/assets/notify-banner.svg",
         "src/dnadesign/notify/README.md",
         "notify",
@@ -155,6 +133,8 @@ BANNERS = (
         "SELECT NEXT DESIGNS",
         "Choose the next designs from measured sequence results.",
         "select",
+        glyph_transform="translate(774 34) scale(1.6)",
+        subtitle_size=21,
     ),
     BannerSpec(
         "src/dnadesign/ops/assets/ops-banner.svg",
@@ -171,14 +151,6 @@ BANNERS = (
         "MAKE AND SCORE VARIANTS",
         "Generate sequence variants and score them with chosen tools.",
         "permute",
-    ),
-    BannerSpec(
-        "src/dnadesign/tfkdanalysis/assets/tfkdanalysis-banner.svg",
-        "src/dnadesign/tfkdanalysis/README.md",
-        "tfkdanalysis",
-        "SUMMARIZE KNOCKDOWNS",
-        "Summarize transcription-factor knockdown responses.",
-        "knockdown",
     ),
     BannerSpec(
         "src/dnadesign/thread/assets/thread-banner.svg",

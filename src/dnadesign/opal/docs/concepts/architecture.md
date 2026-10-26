@@ -1,7 +1,7 @@
 ## OPAL Architecture and Data Flow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-15
+**Last verified:** 2026-10-26
 
 OPAL executes each round through the stages below.
 
@@ -22,7 +22,7 @@ OPAL executes each round through the stages below.
 9. Build one deterministic `selection_batch`. The default is the exact logical
    union. A declared round-robin allocator may instead assign each view its
    next-best unallocated candidates until every exact quota is full.
-10. Persist final per-view allocations, the sequence-unique batch, and the
+10. Persist final per-view allocations, the batch deduplicated by its configured key, and the
     allocation trace before appending the run ledger.
 
 ### Runtime surfaces

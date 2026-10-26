@@ -35,6 +35,17 @@ def test_resolve_test_targets_skips_tools_without_tests(tmp_path: Path) -> None:
     assert targets == []
 
 
+def test_docs_only_targets_keep_example_checks_without_full_runtime_suite(tmp_path: Path) -> None:
+    tests = tmp_path / "src/dnadesign/opal/tests/cli"
+    tests.mkdir(parents=True)
+    (tests / "test_docs_workflow.py").touch()
+    (tests / "test_runtime.py").touch()
+    targets = resolve_test_targets(
+        repo_root=tmp_path, tool_names=["opal"], changed_files=["src/dnadesign/opal/README.md"]
+    )
+    assert targets == [str(tests / "test_docs_workflow.py")]
+
+
 def test_resolve_test_targets_includes_cluster_owned_cli_tests(tmp_path: Path) -> None:
     cluster_tests = tmp_path / "src" / "dnadesign" / "cluster" / "tests"
     cluster_cli_tests = tmp_path / "src" / "dnadesign" / "cluster" / "src" / "cli" / "tests"

@@ -2,13 +2,13 @@
 doc_id: documentation-index
 surface: docs-router
 owner: dnadesign-maintainers
-last_verified: 2026-10-25
+last_verified: 2026-10-26
 ---
 
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-25
+**Last verified:** 2026-10-26
 
 Find the next task, command, or reference doc from the routes below.
 
@@ -93,7 +93,6 @@ files produced by other tools; their guides describe the required inputs.
 | Tool | CLI | Docs |
 | --- | --- | --- |
 | `aligner` | n/a | [aligner docs](../src/dnadesign/aligner/docs/README.md) |
-| `billboard` | n/a | [billboard docs](../src/dnadesign/billboard/docs/README.md) |
 | `cluster` | `uv run cluster --help` | [cluster README](../src/dnadesign/cluster/README.md) |
 | `cruncher` | `uv run cruncher --help` | [cruncher README](../src/dnadesign/cruncher/README.md) |
 | `densegen` | `uv run dense --help` | [densegen README](../src/dnadesign/densegen/README.md) |
@@ -101,11 +100,8 @@ files produced by other tools; their guides describe the required inputs.
 | `junction` | `uv run junction --help` | [junction docs](../src/dnadesign/junction/docs/README.md); plans oligos directly from a request file |
 | `infer` | `uv run infer --help` | [infer README](../src/dnadesign/infer/README.md) |
 | `latentdna` | `uv run latentdna --help` | [latentdna README](../src/dnadesign/latentdna/README.md) |
-| `libshuffle` | n/a | [libshuffle docs](../src/dnadesign/libshuffle/docs/README.md) |
-| `nmf` | n/a | [nmf docs](../src/dnadesign/nmf/docs/README.md) |
 | `opal` | `uv run opal --help` | [opal README](../src/dnadesign/opal/README.md) |
 | `permuter` | `uv run permuter --help` | [permuter docs](../src/dnadesign/permuter/docs/README.md) |
-| `tfkdanalysis` | n/a | [tfkdanalysis docs](../src/dnadesign/tfkdanalysis/docs/README.md) |
 | `usr` | `uv run usr --help` | [usr README](../src/dnadesign/usr/README.md) |
 
 #### Artifact services
@@ -163,3 +159,5 @@ files produced by other tools; their guides describe the required inputs.
 - [Templates index](templates/README.md): reusable templates for runbooks, plans, and records.
 - [Architecture decisions index](architecture/decisions/README.md): ADR catalog and decision history.
 - [Quality docs index](quality/README.md): quality gates, audits, and measurement references.
+
+[Historical tools](historical-tools.md) provides retrieval instructions for retired modules.

@@ -196,6 +196,7 @@ jobs:
             src/dnadesign/devtools/tests/docs/test_markdown_inventory.py
             src/dnadesign/devtools/tests/docs/test_operations_contracts.py
             src/dnadesign/devtools/tests/docs/test_public_surface_contracts.py
+            src/dnadesign/opal/tests/cli/test_docs_workflow_routing.py
             src/dnadesign/usr/tests/cli/test_cli_command_surface.py
           )
 

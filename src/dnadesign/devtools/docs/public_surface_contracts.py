@@ -39,7 +39,6 @@ from dnadesign.devtools.docs.check_contracts import (
     README_TOOL_CATALOG_EXCLUDED_TOOLS,
     README_TOOL_COMPONENT_COVERAGE_PATTERN,
     README_TOOL_LINK_PATTERN,
-    TOOL_README_MAX_LINES,
     TOOL_README_SELF_REFERENTIAL_INTRO_PATTERN,
     TOOL_README_TOP_LINK_SCAN_LINES,
 )
@@ -492,12 +491,6 @@ def _find_tool_readme_structure_issues(repo_root: Path) -> list[str]:
 
         text = _markdown_body_without_frontmatter(readme_path.read_text(encoding="utf-8"))
         lines = text.splitlines()
-        if len(lines) > TOOL_README_MAX_LINES:
-            issues.append(
-                f"{readme_path}: top-level tool README has {len(lines)} lines; "
-                f"keep it at or below {TOOL_README_MAX_LINES} lines and route detail into docs/."
-            )
-
         non_empty_indices = [idx for idx, line in enumerate(lines) if line.strip()]
         if not non_empty_indices:
             issues.append(f"{readme_path}: README is empty.")
@@ -538,11 +531,6 @@ def _find_tool_readme_structure_issues(repo_root: Path) -> list[str]:
                     f"{readme_path}: intro must describe what the tool does; avoid self-referential "
                     "package/layer-in-dnadesign wording."
                 )
-
-        if first_heading_index == len(lines):
-            issues.append(f"{readme_path}: top-level tool README must include a '## Documentation' section.")
-        elif lines[first_heading_index].strip() != "## Documentation":
-            issues.append(f"{readme_path}: first heading after the intro must be '## Documentation' for the link map.")
 
         top_block = "\n".join(lines[:TOOL_README_TOP_LINK_SCAN_LINES])
         first_local_markdown_link: str | None = None

@@ -48,7 +48,7 @@ def maybe_print_hints(
         ]
     elif command_name == "validate":
         lines = [
-            f"opal ingest-y -c {cfg} --round 0 --csv <labels.xlsx> --apply",
+            f"opal guide next -c {cfg}",
             f"opal guide -c {cfg} --format markdown",
         ]
     elif command_name == "ingest":

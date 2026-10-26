@@ -14,14 +14,17 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from dnadesign.usr import require_explicit_usr_root
-
 
 def resolve_notebook_usr_root(serialized_root: str | Path | None) -> Path | None:
     """Verify that a marimo invocation agrees with the notebook's USR coordinate."""
 
-    notebook_root = None if serialized_root is None else require_explicit_usr_root(serialized_root)
     invocation_text = os.environ.get("OPAL_NOTEBOOK_USR_ROOT")
+    if serialized_root is None and invocation_text is None:
+        return None
+
+    from dnadesign.usr import require_explicit_usr_root
+
+    notebook_root = None if serialized_root is None else require_explicit_usr_root(serialized_root)
     if invocation_text is None:
         return notebook_root
     invocation_root = require_explicit_usr_root(invocation_text)

@@ -9,12 +9,19 @@ repeat the cycle. The [documentation](docs/index.md) explains setup and outputs.
 
 ### Try a selection round
 
-After [installing the checkout](../../../docs/setup/installation.md), run this
-from the repository root:
+OPAL accepts an ordinary Parquet table of candidate sequences and numerical
+features, plus batches of measured outcomes. USR is an optional data integration.
+From the DNADesign checkout, install only the OPAL runtime and try a round:
 
 ```bash
-uv run opal demo-matrix --rounds 0 --keep
+uv sync --locked --no-default-groups --extra opal
+source .venv/bin/activate
+opal demo-matrix --rounds 0 --keep
 ```
+
+The activated `opal` command also works outside the checkout. See
+[installation choices](../../../docs/setup/installation.md) for the scoring API,
+notebook dependencies and other tools.
 
 The included synthetic examples fit predictive models, select five candidates
 each and verify the saved selections. They run in fresh temporary directories

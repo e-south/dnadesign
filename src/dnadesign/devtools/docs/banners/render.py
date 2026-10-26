@@ -189,6 +189,7 @@ def repository_svg() -> str:
 
 
 def tool_svg(spec: BannerSpec) -> str:
+    size = spec.subtitle_size
     title_id = f"{spec.name}-banner-title"
     description_id = f"{spec.name}-banner-description"
     return f'''<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
@@ -199,12 +200,12 @@ def tool_svg(spec: BannerSpec) -> str:
   <rect width="1200" height="180" rx="16" fill="{BACKGROUND}"/>
   <g font-family="{FONT_STACK}">
     <text x="48" y="78" fill="{INK}" font-size="42" font-weight="700" letter-spacing="-1">{spec.name}</text>
-    <text x="50" y="114" fill="{MUTED}" font-size="17" font-weight="700" letter-spacing="1">{spec.capability}</text>
+    <text x="50" y="114" fill="{MUTED}" font-size="{size}" font-weight="700" letter-spacing="1">{spec.capability}</text>
     <rect x="50" y="132" width="32" height="5" fill="{ACCENT}"/>
   </g>
   <path d="M510 34V146" stroke="#3F3C37" stroke-width="2"/>
   <path d="M584 124H1144" stroke="{DIM}" stroke-width="2"/>
-  <g transform="translate(720 48)">
+  <g transform="{spec.glyph_transform}">
     {glyph(spec.glyph)}
   </g>
 </svg>

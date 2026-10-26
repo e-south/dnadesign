@@ -19,8 +19,6 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Optional
 
-from dnadesign.usr import require_explicit_usr_root
-
 from ...analysis.campaign import CampaignAnalysis
 from ...core.pretty import console_out
 from ...core.utils import ExitCodes, OpalError, print_stdout
@@ -207,6 +205,8 @@ def marimo_subprocess_environment(
 
     environment = dict(os.environ if base_environment is None else base_environment)
     if usr_root is not None:
+        from dnadesign.usr import require_explicit_usr_root
+
         environment["OPAL_NOTEBOOK_USR_ROOT"] = str(require_explicit_usr_root(usr_root))
     return environment
 

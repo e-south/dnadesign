@@ -75,18 +75,6 @@ component_management:
       name: cluster
       paths:
         - src/dnadesign/cluster/**
-    - component_id: billboard
-      name: billboard
-      paths:
-        - src/dnadesign/billboard/**
-    - component_id: libshuffle
-      name: libshuffle
-      paths:
-        - src/dnadesign/libshuffle/**
-    - component_id: nmf
-      name: nmf
-      paths:
-        - src/dnadesign/nmf/**
     - component_id: latentdna
       name: latentdna
       paths:
@@ -95,10 +83,6 @@ component_management:
       name: cruncher
       paths:
         - src/dnadesign/cruncher/**
-    - component_id: tfkdanalysis
-      name: tfkdanalysis
-      paths:
-        - src/dnadesign/tfkdanalysis/**
     - component_id: aligner
       name: aligner
       paths:

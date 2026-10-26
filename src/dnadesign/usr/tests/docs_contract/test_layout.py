@@ -66,7 +66,9 @@ def test_usr_archive_and_assets_docs_use_canonical_paths() -> None:
     assert "canonical location for archived datasets" in datasets_index
     assert "sanctioned location for archived usr datasets" in archive_readme.lower()
     assert "src/dnadesign/usr/assets/demo_material/demo_sequences.csv" in quickstart
-    assert "uv run usr validate usr_demo_cli_examples --strict" in quickstart
+    assert 'uv run usr --root "$ROOT" init "$DATASET"' in quickstart
+    assert 'uv run usr --root "$ROOT" validate "$DATASET" --strict' in quickstart
+    assert "usr_demo_cli_examples" not in quickstart
     assert "USR_SHOW_DEV_COMMANDS=1 uv run usr dev make-mock --help" in quickstart
     assert "src/dnadesign/usr/demo_material/demo_sequences.csv" not in quickstart
     assert not (repo_root() / "src" / "dnadesign" / "usr" / "demo_material").exists()

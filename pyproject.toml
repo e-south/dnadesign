@@ -7,7 +7,7 @@ name            = "dnadesign-tools"
 version         = "0.2.0"
 description     = "DNA sequence design pipelines and bioinformatics helpers."
 authors         = [{ name = "Eric South" }]
-readme          = "README.md"
+dynamic         = ["readme"]
 requires-python = ">=3.12,<3.13"
 
 dependencies = ["numpy"]
@@ -31,6 +31,31 @@ ops        = "dnadesign.ops.cli:main"
 dnadesign-storage = "dnadesign.contracts.storage_objects.cli:main"
 
 [project.optional-dependencies]
+opal = [
+  "pandas",
+  "pyarrow>=23.0.1",
+  "polars>=1.36.1",
+  "scikit-learn>=1.8,<2",
+  "scipy>=1.17.0",
+  "joblib",
+  "pydantic",
+  "pyyaml",
+  "rich",
+  "typer",
+  "typing-extensions",
+  "matplotlib",
+  "openpyxl",
+]
+opal-notebook = [
+  "dnadesign-tools[opal]",
+  "marimo>=0.23.16",
+  "altair>=6.0.0",
+  "plotly>=6.9.0",
+  "vegafusion>=2.0.3",
+  "vl-convert-python>=1.9.0",
+  "pillow>=12.3.0",
+]
+
 # Preserve the complete tool runtime separately from the NumPy-only scoring API.
 full = [
   "anyio>=4.14.2",

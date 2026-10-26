@@ -14,6 +14,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from .changes import is_documentation_path
+
 _ADDITIONAL_TOOL_TEST_DIRS = {
     "cluster": ("src/cli/tests",),
 }
@@ -68,6 +70,12 @@ def resolve_test_targets(
         tool_root = src_root / tool_name
         if not tool_root.is_dir():
             raise ValueError(f"Unknown tool in affected set: {tool_name}")
+        tool_changes = [path for path in changed_files if path.startswith(f"src/dnadesign/{tool_name}/")]
+        if tool_changes and all(is_documentation_path(path) for path in tool_changes):
+            for test in sorted((tool_root / "tests").rglob("test_*.py")):
+                if "docs" in test.relative_to(tool_root / "tests").parts or test.name.startswith("test_docs_"):
+                    _append_existing_target(targets, test)
+            continue
         _append_existing_target(targets, tool_root / "tests")
         for relative_test_dir in _ADDITIONAL_TOOL_TEST_DIRS.get(tool_name, ()):
             _append_existing_target(targets, tool_root / relative_test_dir)

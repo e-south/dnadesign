@@ -19,8 +19,6 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from typing_extensions import Literal
 
-from dnadesign.usr import require_explicit_usr_root
-
 from ..core.config_resolve import resolve_campaign_root
 from ..core.utils import ConfigError
 from .plugin_schemas import validate_params
@@ -424,6 +422,8 @@ def _validate_registered_plugin_names(pyd: PRoot) -> None:
 
 
 def _resolve_explicit_usr_root(value: Path | str) -> Path:
+    from dnadesign.usr import require_explicit_usr_root
+
     try:
         return require_explicit_usr_root(value)
     except ValueError as exc:

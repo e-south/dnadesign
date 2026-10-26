@@ -3,7 +3,7 @@ id: opal-campaign-round
 title: OPAL campaign round
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-10-25
+last_verified: 2026-10-26
 ---
 
 # Campaign round
@@ -46,30 +46,32 @@ objective. OPAL stops if the channel is absent or incompatible.
 
 ## Run one round
 
-From the campaign directory:
+With the [OPAL environment activated](../index.md#try-a-complete-selection-round),
+run these commands from your campaign directory. The campaign does not need its
+own Python project or USR dataset:
 
 ```bash
 # Check the config and input records without writing campaign state.
-uv run opal validate -c configs/campaign.yaml
+opal validate -c configs/campaign.yaml
 # Create the campaign state and output directories.
-uv run opal init -c configs/campaign.yaml
+opal init -c configs/campaign.yaml
 # Record the labels observed for round zero.
-uv run opal ingest-y -c configs/campaign.yaml --round 0 --csv <labels-file> --unknown-sequences error --apply
+opal ingest-y -c configs/campaign.yaml --round 0 --csv <labels-file> --unknown-sequences error --apply
 # Fit, score, and select for the same label cutoff.
-uv run opal run -c configs/campaign.yaml --round 0
+opal run -c configs/campaign.yaml --round 0
 # Check the saved view against the prediction ledger.
-uv run opal verify-outputs -c configs/campaign.yaml --view primary --round latest
+opal verify-outputs -c configs/campaign.yaml --view primary --round latest
 # Inspect and export the selected candidates for the next experiment.
-uv run opal selection-batch show -c configs/campaign.yaml --round latest
-# Save candidate identities and ranks as CSV.
-uv run opal selection-batch export -c configs/campaign.yaml --round latest --out selected.csv --format csv
+opal selection-batch show -c configs/campaign.yaml --round latest
+# Save DNA sequences, identities, ranks and scores for this selection view.
+opal selection-set export -c configs/campaign.yaml --view primary --round latest --out selected.csv --format csv
 ```
 
 `validate` is read-only. `init` creates campaign state. `ingest-y` records the
 labels visible to a round. `run` fits, scores, and selects. `verify-outputs`
 checks the persisted selection against the ledger. Replace `primary` if you
 renamed the selection view. If a round contains multiple runs, pass `--run-id`
-to inspect or export the intended run. The exported batch is a candidate proposal
+to inspect or export the intended run. The exported selection is a candidate proposal
 for experimental review.
 
 Use `opal guide -c configs/campaign.yaml --format markdown` for commands and

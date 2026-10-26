@@ -1,7 +1,7 @@
 ## Developer Documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-25
+**Last verified:** 2026-10-26
 
 Use this index to find maintainer workflows, checks, and planning records.
 
@@ -144,3 +144,5 @@ uv run python -m dnadesign.devtools.runtime.pytest_gate --junit-xml external-int
 - Prefix plan docs with `YYYY-MM-DD-`.
 - Keep current design proposals in semantic lanes under `plans/tools/` or
   `plans/cross-tool/`; keep archived plans under `plans/archive/`.
+
+[Tool lifecycle plan](plans/tool-lifecycle-20261026.md) tracks tool ownership, independent installation and retirement checks.

@@ -1,7 +1,7 @@
 ## OPAL Campaign Configuration v3
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-09
+**Last verified:** 2026-10-26
 
 `campaign.yaml` uses the strict schema `opal.campaign.v3`. OPAL rejects v2
 keys. There is no compatibility parser.
@@ -16,8 +16,10 @@ The central invariant is:
   history shared by one learning loop.
 - **Selection view:** one objective instance, objective parameters, selector,
   and top-k policy evaluated from the campaign's shared predictions.
-- **Round:** one immutable label snapshot, one model fit, one prediction pass,
-  and all declared selection views.
+- **Round:** the observation cutoff used to choose training labels. Multiple
+  runs can use the same round.
+- **Run:** one saved execution of fitting, prediction and all declared selection
+  views, identified by its immutable `run_id`.
 - **Selection set:** rows selected by one view.
 - **Selection batch:** final proposal deduplicated by the configured candidate
   field. It is the logical union by default or an explicitly coordinated set of

@@ -81,6 +81,17 @@ def test_tool_readme_structure_check_requires_top_level_markdown_doc_link(tmp_pa
     assert any("top section must include a local markdown link" in issue for issue in issues)
 
 
+def test_tool_readme_allows_runnable_intro_and_wrapped_source_lines(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src/dnadesign/alpha/README.md",
+        "![Alpha banner](assets/alpha-banner.svg)\n\nShort narrative.\n\n"
+        "## Get started\n\n[Guide](docs/README.md)\n\n" + "\n" * 40,
+    )
+    _write(tmp_path / "src/dnadesign/alpha/assets/alpha-banner.svg", VALID_TOOL_BANNER_SVG)
+    _write(tmp_path / "src/dnadesign/alpha/docs/README.md", "## Alpha docs\n")
+    assert _find_tool_readme_structure_issues(tmp_path) == []
+
+
 def test_tool_readme_structure_check_rejects_multi_paragraph_intro(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "alpha" / "README.md",
@@ -137,7 +148,7 @@ def test_tool_readme_structure_check_rejects_self_referential_intro(tmp_path: Pa
     assert any("avoid self-referential package/layer-in-dnadesign wording" in issue for issue in issues)
 
 
-def test_tool_readme_structure_check_requires_documentation_heading(tmp_path: Path) -> None:
+def test_tool_readme_structure_allows_task_specific_heading(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "alpha" / "README.md",
         "\n".join(
@@ -161,10 +172,10 @@ def test_tool_readme_structure_check_requires_documentation_heading(tmp_path: Pa
 
     issues = _find_tool_readme_structure_issues(tmp_path)
 
-    assert any("first heading after the intro must be '## Documentation'" in issue for issue in issues)
+    assert issues == []
 
 
-def test_tool_readme_structure_check_rejects_overlong_tool_readmes(tmp_path: Path) -> None:
+def test_tool_readme_structure_does_not_limit_source_line_count(tmp_path: Path) -> None:
     body_lines = [
         "![Alpha banner](assets/alpha-banner.svg)",
         "",
@@ -184,7 +195,7 @@ def test_tool_readme_structure_check_rejects_overlong_tool_readmes(tmp_path: Pat
 
     issues = _find_tool_readme_structure_issues(tmp_path)
 
-    assert any("top-level tool README has" in issue for issue in issues)
+    assert issues == []
 
 
 def test_tool_readme_structure_check_requires_docs_index_first_when_present(

@@ -1,10 +1,22 @@
 ## Installation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-25
+**Last verified:** 2026-10-26
 
-For CLI use, clone the repository and run `uv sync --locked`. This installs the
-tool runtime. Add `--group dev` when running tests or lint checks.
+Choose the runtime for the tools you need. A checkout can install OPAL alone or
+the complete toolkit. Add `--group dev` when running tests or lint checks.
+
+| Use | Checkout command |
+| --- | --- |
+| NumPy-only scoring API | `uv sync --locked --no-default-groups` |
+| OPAL campaigns and plots | `uv sync --locked --no-default-groups --extra opal` |
+| OPAL with interactive notebooks | `uv sync --locked --no-default-groups --extra opal-notebook` |
+| Complete toolkit | `uv sync --locked` |
+
+Activate the chosen environment with `source .venv/bin/activate`. Its installed
+commands then work from a campaign or data directory outside the checkout.
+When using `uv run` instead, repeat the same group/extra flags to preserve the
+selected dependency scope.
 
 ### Platform support
 
@@ -57,8 +69,8 @@ For Python library use, install `dnadesign-tools` from PyPI and import it as
   - test/lint tools still require the `dev` group.
 - Installed library (`pip install <dnadesign-wheel>`):
   - requires NumPy only; supports the public MSRB scoring API.
-  - install the wheel with its `full` extra for campaign execution, other tool
-    APIs and CLIs. This retains the complete tool dependency set.
+  - install the wheel with `opal` for campaigns or `opal-notebook` for interactive
+    analysis. The `full` extra installs the complete toolkit.
   - use `uv sync --locked --no-default-groups` only for a scoring-only checkout.
 - Development tools (`uv sync --locked --group dev`):
   - installs test/lint tooling.
@@ -74,8 +86,8 @@ For Python library use, install `dnadesign-tools` from PyPI and import it as
   - each `uv sync` realizes exactly the requested groups/extras.
   - if you run `uv sync --locked --group dev` on a GPU env, it removes `infer-evo2` extras unless `--extra infer-evo2` is also included.
 
-The lightweight library supports scoring; campaign fitting, sequence inference
-and rendering require the full tool runtime. See the
+The base library supports scoring. OPAL campaign fitting and plots use the
+`opal` extra; other tool runtimes currently use `full`. See the
 [MSRB Python example](../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md#python-scoring-without-a-campaign).
 The `full` extra includes DenseArrays from PyPI. Checkout installs resolve its
 version through `uv.lock`. For dependency changes, use

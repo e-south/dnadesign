@@ -5,6 +5,9 @@ inputs and configuration, then writes reproducible outputs for downstream tools.
 
 ## Documentation
 
+New library construction should use [DenseArrays](https://github.com/e-south/dense-arrays).
+DenseGen remains available for existing workflows and version-pinned replay.
+
 - [DenseGen docs index](docs/README.md): tutorials, concepts, references, and
   downstream handoffs.
 - [Workspaces guide](workspaces/README.md): packaged workspaces and expected

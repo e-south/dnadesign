@@ -26,6 +26,7 @@ _EXTERNAL_INTEGRATION_GLOBAL_FILES = {
     "pixi.toml",
     "pixi.lock",
     "pyproject.toml",
+    "setup.py",
     "uv.lock",
 }
 _FULL_CORE_EXACT_FILES = {
@@ -34,6 +35,7 @@ _FULL_CORE_EXACT_FILES = {
     "pixi.toml",
     "pixi.lock",
     "pyproject.toml",
+    "setup.py",
     "uv.lock",
     ".github/tool-coverage-baseline.json",
 }
@@ -50,6 +52,11 @@ _NON_TOOL_DIRS = {
 }
 _GENERATED_ARTIFACT_DIRS = {"__pycache__", ".pytest_cache"}
 _GENERATED_ARTIFACT_SUFFIXES = {".pyc", ".pyo"}
+
+
+def is_documentation_path(path: str) -> bool:
+    """Markdown changes retain documentation checks without selecting runtime suites."""
+    return Path(path).suffix.lower() == ".md"
 
 
 @dataclass(frozen=True)
@@ -244,6 +251,8 @@ def determine_scope(
     for path in changed_files:
         path = path.strip()
         if not path:
+            continue
+        if is_documentation_path(path):
             continue
         parts = Path(path).parts
 

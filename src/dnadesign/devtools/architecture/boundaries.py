@@ -21,7 +21,6 @@ TOP_LEVEL_ROOT_MODULES = {"__init__.py"}
 TOP_LEVEL_TOOL_BOUNDARY_PACKAGES = {
     "aligner",
     "baserender",
-    "billboard",
     "cluster",
     "construct",
     "cruncher",
@@ -29,14 +28,11 @@ TOP_LEVEL_TOOL_BOUNDARY_PACKAGES = {
     "folding",
     "infer",
     "latentdna",
-    "libshuffle",
-    "nmf",
     "notify",
     "opal",
     "ops",
     "permuter",
     "thread",
-    "tfkdanalysis",
     "junction",
     "usr",
 }
@@ -60,7 +56,6 @@ _REVIEW_SURFACE_PATH_SEGMENTS = {"tests", "notebooks", "docs", "jobs"}
 _REVIEW_SURFACE_CHECKED_OWNERS = {"ops", "devtools"}
 _TEST_SUPPORT_IMPORT_PREFIXES = ("dnadesign.devtools.tests.support", "dnadesign.testsupport")
 _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
-    ("billboard", "aligner"),
     ("cluster", "aligner"),
     ("cluster", "ops"),
     ("cluster", "usr"),
@@ -72,9 +67,6 @@ _ALLOWED_CROSS_TOOL_IMPORTS: set[tuple[str, str]] = {
     ("densegen", "usr"),
     ("infer", "usr"),
     ("latentdna", "usr"),
-    ("libshuffle", "aligner"),
-    ("libshuffle", "billboard"),
-    ("libshuffle", "nmf"),
     ("notify", "construct"),
     ("notify", "densegen"),
     ("notify", "infer"),

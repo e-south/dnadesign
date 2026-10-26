@@ -11,11 +11,27 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import subprocess
 import sys
 
 import pytest
 
 from dnadesign.usr.src.cli.support.presentation import stderr_filter
+
+
+@pytest.mark.parametrize("suffix", ["", "\n"])
+def test_filter_preserves_short_diagnostics_at_process_exit(suffix) -> None:
+    script = r"""
+import os
+from dnadesign.usr.src.cli.support.presentation.stderr_filter import _install_stderr_filter
+_install_stderr_filter(("arrow/util/cpu_info.cc", "sysctlbyname failed for"))
+os.write(2, b"arrow/util/cpu_info.cc: sysctlbyname failed for hw.cache\n")
+os.write(2, PAYLOAD)
+raise SystemExit(2)
+""".replace("PAYLOAD", repr(("missing dataset" + suffix).encode()))
+    result = subprocess.run([sys.executable, "-c", script], capture_output=True, timeout=20)
+    assert result.returncode == 2
+    assert result.stderr == ("missing dataset" + suffix).encode()
 
 
 @pytest.mark.parametrize(

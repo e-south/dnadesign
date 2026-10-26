@@ -17,7 +17,15 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from dnadesign.opal.src.cli.app import _build
+from dnadesign.opal.src.cli.guidance_hints import maybe_print_hints
 from dnadesign.opal.tests._cli_helpers import write_campaign_yaml, write_records
+
+
+def test_validate_hint_does_not_prescribe_an_observation_round(tmp_path: Path, capsys) -> None:
+    maybe_print_hints(command_name="validate", cfg_path=tmp_path / "campaign.yaml", no_hints=False, json_output=False)
+    text = capsys.readouterr().out
+    assert "guide next" in text
+    assert "ingest-y" not in text
 
 
 def _setup_workspace(tmp_path: Path) -> tuple[Path, Path]:

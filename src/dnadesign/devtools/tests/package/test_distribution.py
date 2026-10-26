@@ -80,6 +80,10 @@ _REQUIRED_WHEEL_MEMBERS = {
     "dnadesign/usr/datasets/registry.yaml",
 }
 _FORBIDDEN_WHEEL_PREFIXES = (
+    "dnadesign/libshuffle/",
+    "dnadesign/billboard/",
+    "dnadesign/nmf/",
+    "dnadesign/tfkdanalysis/",
     "dnadesign/archived/",
     "dnadesign/prototypes/",
     "dnadesign/usr/archived/",
@@ -95,6 +99,13 @@ _FORBIDDEN_WHEEL_MEMBERS = {
 def _repo_root() -> Path:
     current = Path(__file__).resolve()
     return next(parent for parent in current.parents if (parent / "pyproject.toml").exists())
+
+
+def test_opal_install_does_not_require_other_tool_runtimes() -> None:
+    project = tomllib.loads((_repo_root() / "pyproject.toml").read_text())["project"]
+    requirements = {Requirement(value).name for value in project["optional-dependencies"]["opal"]}
+    assert {"pandas", "pyarrow", "polars", "scikit-learn", "typer", "pyyaml"} <= requirements
+    assert requirements.isdisjoint({"torch", "pymc", "scanpy", "ortools", "dense-arrays", "marimo"})
 
 
 def _copy_build_source(repo_root: Path, destination: Path) -> None:
@@ -183,7 +194,9 @@ def test_distribution_contains_no_ignored_python_sources() -> None:
 
 def test_distribution_excludes_private_and_generated_package_data() -> None:
     repo_root = _repo_root()
-    distribution = Distribution()
+    # setup.py supplies the README during a real build; this test exercises
+    # package-data rules directly. Wheel metadata is checked separately.
+    distribution = Distribution({"long_description": "", "long_description_content_type": "text/markdown"})
     distribution.script_name = "pyproject.toml"
     apply_configuration(distribution, repo_root / "pyproject.toml")
     command = distribution.get_command_obj("build_py")
@@ -261,6 +274,8 @@ def test_built_wheel_retains_runtime_resources_without_internal_shelves(tmp_path
         metadata = BytesParser().parsebytes(wheel.read(next(m for m in members if m.endswith(".dist-info/METADATA"))))
 
     assert metadata["Name"] == "dnadesign-tools"
+    assert metadata["Description-Content-Type"] == "text/markdown"
+    assert all(target.startswith(("https://", "#")) for target in re.findall(r"\]\(([^)]+)\)", metadata.get_payload()))
     requirements = [Requirement(value) for value in metadata.get_all("Requires-Dist", [])]
     assert {r.name for r in requirements if r.marker is None or r.marker.evaluate({"extra": ""})} == {"numpy"}
     dense_arrays = next(r for r in requirements if r.name == "dense-arrays")
@@ -317,9 +332,59 @@ assert result.behavior_score.tolist() == [0.0]
     assert smoke.returncode == 0, smoke.stderr
     cli = subprocess.run([str(environment / "bin/opal"), "--help"], cwd=tmp_path, capture_output=True, text=True)
     assert cli.returncode != 0
-    assert "dnadesign-tools[full]" in cli.stderr
+    assert "dnadesign-tools[opal]" in cli.stderr
     assert "Traceback" not in cli.stderr
+    _check_opal_install(repo_root, tmp_path, environment, wheels[0])
     _check_full_install(repo_root, tmp_path, environment, wheels[0])
+
+
+def _check_opal_install(repo_root: Path, tmp_path: Path, environment: Path, wheel: Path) -> None:
+    requirements = tmp_path / "pylock.opal.toml"
+    subprocess.run(
+        [
+            "uv",
+            "export",
+            "--locked",
+            "--no-default-groups",
+            "--extra",
+            "opal",
+            "--no-emit-project",
+            "--format",
+            "pylock.toml",
+            "-o",
+            str(requirements),
+        ],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    python = environment / "bin/python"
+    subprocess.run(
+        ["uv", "pip", "install", "--python", str(python), "-r", str(requirements)],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    subprocess.run(
+        ["uv", "pip", "install", "--python", str(python), f"{wheel}[opal]"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    smoke = subprocess.run(
+        [str(python), "-I", str(Path(__file__).with_name("opal_smoke.py")), str(tmp_path / "opal-campaign")],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    assert smoke.returncode == 0, smoke.stdout + smoke.stderr
 
 
 def _check_full_install(repo_root: Path, tmp_path: Path, environment: Path, wheel: Path) -> None:
@@ -435,13 +500,15 @@ def test_tool_software_versions_follow_the_installed_distribution() -> None:
         assert import_module(module).__version__ == expected
 
 
-def test_package_readme_uses_durable_images_and_absolute_links() -> None:
+def test_source_readme_uses_local_routes_and_durable_package_image() -> None:
     root = _repo_root()
     project = tomllib.loads((root / "pyproject.toml").read_text())["project"]
-    assert project["readme"] == "README.md"
+    assert "readme" in project["dynamic"]
     text = (root / "README.md").read_text()
     targets = re.findall(r"\]\(([^)]+)\)", text)
-    assert all(target.startswith(("https://", "#")) for target in targets)
+    local_targets = [target for target in targets if not target.startswith(("https://", "#"))]
+    assert local_targets
+    assert all((root / target.split("#", 1)[0]).exists() for target in local_targets)
     images = re.findall(r"!\[[^\]]*\]\(([^)]+)\)", text)
     banner = images[0]
     prefix = "https://raw.githubusercontent.com/e-south/dnadesign/"

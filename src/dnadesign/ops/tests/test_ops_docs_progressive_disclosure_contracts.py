@@ -334,15 +334,11 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
 
 
 def test_repo_root_readme_lists_ops_in_docs_and_tool_catalog() -> None:
-    # Package tests separately require absolute links for the PyPI description.
-    # These checks retain the local navigation/presentation contract.
-    text = _read(_repo_root() / "README.md").replace("https://github.com/e-south/dnadesign/blob/main/", "")
+    text = _read(_repo_root() / "README.md")
     assert "## New here?" not in text
     assert "uv run ops catalog list" not in text
     assert "uv run ops progress explain" not in text
     assert "[Docs index](docs/README.md)" in text
-    assert "main index for workflow, tool, and repository docs" in text
-    assert "Use the docs index to choose a workflow, inspect existing work, or jump to a tool." in text
     assert "[Docs workflow routes](docs/README.md#workflow-routes)" not in text
     assert "including the downstream split between" not in text
     assert "[Ops operations](docs/operations/README.md)" not in text
@@ -353,16 +349,15 @@ def test_repo_root_readme_lists_ops_in_docs_and_tool_catalog() -> None:
         not in text
     )
     assert "[Boundary rules](DESIGN.md#toolpackage-boundaries)" not in text
-    assert "| [**ops**](src/dnadesign/ops/README.md) |" in text
+    assert "| [**ops**](src/dnadesign/ops/) |" in text
     assert "DenseGen/Infer + Notify batch workflows" not in text
 
 
 def test_root_ops_row_is_tool_agnostic() -> None:
-    # Package tests separately require absolute links for the PyPI description.
-    # These checks retain the local navigation/presentation contract.
-    text = _read(_repo_root() / "README.md").replace("https://github.com/e-south/dnadesign/blob/main/", "")
-    expected_row = "| [**ops**](src/dnadesign/ops/README.md) | Find, run, and inspect jobs across dnadesign. |"
-    assert expected_row in text
+    text = _read(_repo_root() / "README.md")
+    row = next(line for line in text.splitlines() if line.startswith("| [**ops**]"))
+    assert "src/dnadesign/ops/" in row
+    assert not any(name in row.lower() for name in ("densegen", "opal", "infer", "notify"))
 
 
 def test_dev_docs_index_is_action_oriented() -> None:

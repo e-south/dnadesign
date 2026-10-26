@@ -3,7 +3,7 @@ doc_id: opal-docs
 title: OPAL documentation
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-10-25
+last_verified: 2026-10-26
 ---
 
 # OPAL documentation
@@ -14,12 +14,17 @@ your own data. Objective pages explain the scoring choices within that workflow.
 
 ### Try a complete selection round
 
-After [installing the DNADesign checkout](../../../../docs/setup/installation.md),
-run the following from the repository root:
+From the DNADesign checkout, install the OPAL runtime and activate it:
 
 ```bash
-uv run opal demo-matrix --rounds 0 --keep
+uv sync --locked --no-default-groups --extra opal
+source .venv/bin/activate
+opal demo-matrix --rounds 0 --keep
 ```
+
+This installation supports local Parquet candidate tables without a USR dataset.
+Add `--extra opal-notebook` when using interactive notebooks. See
+[installation choices](../../../../docs/setup/installation.md) for other tools.
 
 This uses included synthetic data in fresh temporary campaign copies. It runs
 random-forest and Gaussian-process examples, selects five candidates per example,
@@ -30,7 +35,7 @@ contains the retained runs and their `outputs/` folders.
 To inspect the random-forest selection, substitute that printed directory below:
 
 ```bash
-uv run opal selection-set show \
+opal selection-set show \
   -c /path/to/tmp_root/demo_rf_topn/configs/campaign.yaml \
   --view primary --round latest
 ```

@@ -66,10 +66,11 @@ def test_determine_scope_pr_densegen_change_triggers_external_integration_lane()
     assert result.external_integration_tools == ["densegen"]
 
 
-def test_determine_scope_pr_lockfile_change_triggers_full_core_and_external_integration() -> None:
+@pytest.mark.parametrize("path", ["pyproject.toml", "uv.lock", "setup.py"])
+def test_package_configuration_change_triggers_full_core_and_external_integration(path) -> None:
     result = determine_scope(
         event_name="pull_request",
-        changed_files=["pyproject.toml"],
+        changed_files=[path],
         tool_names={"densegen", "usr"},
         external_integration_tool_names={"densegen"},
     )
@@ -107,6 +108,19 @@ def test_determine_scope_pr_docs_only_skips_tool_coverage_gate() -> None:
     assert result.affected_tools == []
     assert result.external_integration_tools == []
     assert result.run_coverage_gate is False
+
+
+@pytest.mark.parametrize("tool", ["densegen", "opal"])
+def test_tool_readme_edit_does_not_trigger_runtime_or_external_tests(tool) -> None:
+    result = determine_scope(
+        event_name="pull_request",
+        changed_files=[f"src/dnadesign/{tool}/README.md"],
+        tool_names={"densegen", "opal"},
+        external_integration_tool_names={"densegen"},
+    )
+    assert not result.run_full_core
+    assert not result.run_coverage_gate
+    assert not result.run_external_integration
 
 
 def test_determine_scope_pr_shared_code_change_triggers_full_core_and_external_integration() -> None:

@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import atexit
 import os
 import sys
 import threading
@@ -47,7 +48,7 @@ def _install_stderr_filter(needles: Iterable[str]) -> None:
         try:
             with os.fdopen(r_fd, "rb", closefd=True) as r:
                 while True:
-                    chunk = r.read(1024)
+                    chunk = r.read1(1024)
                     if not chunk:
                         break
                     buf += chunk
@@ -67,6 +68,17 @@ def _install_stderr_filter(needles: Iterable[str]) -> None:
 
     t = threading.Thread(target=_reader, daemon=True, name="usr-stderr-filter")
     t.start()
+
+    def _cleanup() -> None:
+        # Closing the pipe writer delivers EOF, including diagnostics shorter
+        # than the read buffer or lacking a trailing newline.
+        sys.stderr.flush()
+        os.dup2(orig_fd, 2)
+        t.join(timeout=5.0)
+        if not t.is_alive():
+            os.close(orig_fd)
+
+    atexit.register(_cleanup)
     setattr(sys, "_usr_stderr_filter_installed", True)
 
 
