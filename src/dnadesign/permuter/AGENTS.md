@@ -33,8 +33,8 @@ uv run permuter workspace list --root src/dnadesign/permuter/workspaces
 uv run permuter workspace validate --workspace src/dnadesign/permuter/workspaces/nt_scan_demo
 
 uv run permuter run --workspace nt_scan_demo --ref <ref_name>
-uv run permuter evaluate --workspace nt_scan_demo --ref <ref_name> --with smoke:placeholder:log_likelihood
-uv run permuter plot --workspace nt_scan_demo --ref <ref_name> --metric-id smoke
+uv run permuter evaluate --workspace nt_scan_demo --ref <ref_name> --with ll:evo2_ll:log_likelihood
+uv run permuter plot --workspace nt_scan_demo --ref <ref_name> --metric-id ll
 uv run permuter validate --data src/dnadesign/permuter/workspaces/nt_scan_demo/outputs/records.parquet
 ```
 

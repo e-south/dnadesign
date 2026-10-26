@@ -22,14 +22,16 @@ def test_explicit_operator_root_contract_is_owned_by_usr_contracts() -> None:
     assert usr_roots.require_explicit_usr_root.__module__ == "dnadesign.usr.src.contracts.roots"
 
 
-def test_default_usr_root_matches_packaged_usr_datasets_dir() -> None:
-    expected = (usr_roots.pkg_usr_root() / "datasets").resolve()
+def test_default_usr_root_is_project_local_and_outside_the_package(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    expected = tmp_path / "usr_datasets"
     assert usr_roots.default_usr_root() == expected
+    assert not expected.exists()
 
 
 def test_resolve_usr_root_from_env_normalizes_usr_package_root(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DNADESIGN_USR_ROOT", str(usr_roots.pkg_usr_root()))
-    assert usr_roots.resolve_usr_root_from_env() == usr_roots.default_usr_root()
+    assert usr_roots.resolve_usr_root_from_env() == usr_roots.pkg_usr_root() / "datasets"
 
 
 def test_resolve_usr_root_from_config_normalizes_relative_usr_package_root(tmp_path: Path) -> None:

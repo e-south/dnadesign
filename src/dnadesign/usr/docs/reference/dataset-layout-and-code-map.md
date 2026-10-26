@@ -1,7 +1,7 @@
 # USR dataset layout and code map
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-26
 
 
 ## Dataset layout
@@ -236,10 +236,10 @@ Coordinator packages should stay thin and compose the helper packages instead of
 sibling flat files. When a helper cluster becomes internally cohesive, prefer a nested helper
 package over another root-level or first-level flat file.
 
-Internal archive tooling:
+Internal maintenance tooling:
 
-- `src/dnadesign/usr/scripts/archived_pytorch_manager.py`
-  - USR-owned maintenance helper for the legacy `datasets/archived/promoter_misc_pytorch/` bucket; not a public cross-tool API surface.
+- The former study-specific PyTorch manager is available through the
+  [historical-tools record](../../../../../docs/historical-tools.md).
 - `src/dnadesign/usr/ops/sync_audit_drill.py`
   - stable ops-facing deterministic sync drill entrypoint behind `uv run usr-sync-audit-drill`.
 

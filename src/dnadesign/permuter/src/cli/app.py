@@ -105,7 +105,7 @@ def evaluate(
         "--with",
         help="Repeatable: id:evaluator[:metric] (e.g., llr:evo2_llr:log_likelihood_ratio)",
     ),
-    metric: List[str] = typer.Option(None, "--metric", help="Convenience: metric ids scored by placeholder evaluator"),
+    metric: List[str] = typer.Option(None, "--metric", hidden=True),
     workspace: str = typer.Option(
         None,
         "--workspace",

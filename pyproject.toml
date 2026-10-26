@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=84.0.0", "wheel>=0.48.0", "setuptools_scm"]
+requires = ["setuptools>=84.1.0", "wheel>=0.48.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -13,24 +13,33 @@ requires-python = ">=3.12,<3.13"
 dependencies = ["numpy"]
 
 [project.scripts]
-usr        = "dnadesign.usr:main"
-usr-sync-audit-drill = "dnadesign.usr.ops.sync_audit_drill:main"
-opal       = "dnadesign.opal:main"
-dense      = "dnadesign.densegen:app"
-notify     = "dnadesign.notify.cli:app"
-infer      = "dnadesign.infer.cli:app"
-construct  = "dnadesign.construct:main"
-folding    = "dnadesign.folding.cli:main"
-cluster    = "dnadesign.cluster.cli:main"
-latentdna  = "dnadesign.latentdna.src:main"
-permuter   = "dnadesign.permuter:main"
-baserender = "dnadesign.baserender:app"
-cruncher   = "dnadesign.cruncher.cli.app:app"
-junction = "dnadesign.junction.cli:main"
-ops        = "dnadesign.ops.cli:main"
+usr        = "dnadesign.devtools.package.entrypoints:usr"
+usr-sync-audit-drill = "dnadesign.devtools.package.entrypoints:usr_sync_audit_drill"
+opal       = "dnadesign.devtools.package.entrypoints:opal"
+dense      = "dnadesign.devtools.package.entrypoints:dense"
+notify     = "dnadesign.devtools.package.entrypoints:notify"
+infer      = "dnadesign.devtools.package.entrypoints:infer"
+construct  = "dnadesign.devtools.package.entrypoints:construct"
+folding    = "dnadesign.devtools.package.entrypoints:folding"
+cluster    = "dnadesign.devtools.package.entrypoints:cluster"
+latentdna  = "dnadesign.devtools.package.entrypoints:latentdna"
+permuter   = "dnadesign.devtools.package.entrypoints:permuter"
+baserender = "dnadesign.devtools.package.entrypoints:baserender"
+cruncher   = "dnadesign.devtools.package.entrypoints:cruncher"
+junction = "dnadesign.devtools.package.entrypoints:junction"
+ops        = "dnadesign.devtools.package.entrypoints:ops"
 dnadesign-storage = "dnadesign.contracts.storage_objects.cli:main"
 
 [project.optional-dependencies]
+usr = [
+  "biopython>=1.87", "duckdb>=1.5.5,<2", "pandas", "pyarrow>=23.0.1",
+  "pydantic", "pyyaml", "rich", "typer", "psutil>=7.2.1",
+]
+infer = ["dnadesign-tools[usr]", "tqdm"]
+permuter = [
+  "pandas", "pyarrow>=23.0.1", "pydantic", "pyyaml", "rich", "typer",
+  "matplotlib", "seaborn", "psutil>=7.2.1",
+]
 opal = [
   "pandas",
   "pyarrow>=23.0.1",
@@ -53,7 +62,7 @@ opal-notebook = [
   "plotly>=6.9.0",
   "vegafusion>=2.0.3",
   "vl-convert-python>=1.9.0",
-  "pillow>=12.3.0",
+  "pillow>=13.0.0",
 ]
 
 # Preserve the complete tool runtime separately from the NumPy-only scoring API.
@@ -71,7 +80,7 @@ full = [
   "openpyxl",
   "ortools>=9.9,<9.10",
   "pandas",
-  "pillow>=12.3.0",
+  "pillow>=13.0.0",
   "pyarrow>=23.0.1",
   "pydantic",
   "pygments>=2.20.0",
@@ -98,12 +107,10 @@ full = [
   "vl-convert-python>=1.9.0",
   "pysam>=0.23.3",
   "netcdf4>=1.7.3",
-  "certifi>=2025.11.12",
+  "certifi>=2026.10.19",
   "keyring>=25.6.0",
   "fastparquet>=2025.12.0",
-  "filelock>=3.20.3,<4",
   "marimo>=0.23.16",
-  "openai>=2.14.0",
   "viennarna>=2.7.2",
   # 1.5.7.3 is yanked for a thread-safety regression.
   "zstd>=1.5.7.2,!=1.5.7.3",
@@ -114,11 +121,12 @@ full = [
 
 # GPU stack (Linux x86_64 only)
 infer-evo2 = [
+  "dnadesign-tools[infer]",
   # --- torch (GPU wheels via uv sources below)
   "torch>=2.13,<2.14; sys_platform == 'linux' and platform_machine == 'x86_64'",
   # --- build helpers (required because we disable build isolation for flash-attn + TE-torch)
   "pip>=26.1.2; sys_platform == 'linux' and platform_machine == 'x86_64'",
-  "setuptools>=84.0.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "setuptools>=84.1.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "wheel>=0.48.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "packaging; sys_platform == 'linux' and platform_machine == 'x86_64'",
   "ninja; sys_platform == 'linux' and platform_machine == 'x86_64'",
@@ -137,18 +145,23 @@ infer-evo2 = [
 [dependency-groups]
 # A checkout keeps the existing full tool environment; installed libraries opt in.
 tools = ["dnadesign-tools[full]"]
-test = ["pytest>=9.0.3", "pytest-cov", "hypothesis>=6.100"]
+test = ["pytest>=9.0.3", "pytest-cov", "hypothesis>=6.100", "filelock>=4.2.4,<5"]
 lint = ["ruff>=0.4", "pre-commit>=3.7"]
 dev  = [{ include-group = "test" }, { include-group = "lint" }]
 
 [tool.setuptools]
-# Runtime-owned resource trees rely on Git-backed package data in addition to
-# the targeted package-data declarations below.
-include-package-data = true
+# Runtime resources are explicit so Git checkouts and exported source build alike.
+include-package-data = false
 
 [tool.setuptools.packages.find]
 where = ["src"]
 exclude = [
+  "dnadesign.*.tests",
+  "dnadesign.*.tests.*",
+  "dnadesign.*.prototypes",
+  "dnadesign.*.prototypes.*",
+  "dnadesign.*.archived",
+  "dnadesign.*.archived.*",
   "dnadesign.archived",
   "dnadesign.archived.*",
   "dnadesign.prototypes",
@@ -173,9 +186,16 @@ exclude = [
   "assets/overlays/*.png",
   "assets/overlays/*.svg",
   "styles/*/*.yaml",
+  "workspaces/*/.baserender-workspace",
+  "workspaces/*/job.yaml",
+  "workspaces/*/inputs/*.parquet",
 ]
 "dnadesign.cruncher" = [
   "resources/cassette/catalogs/*.yaml",
+  "src/ingest/certs/*.pem",
+  "workspaces/*/configs/*.yaml",
+  "workspaces/*/configs/*/*.yaml",
+  "workspaces/*/inputs/local_motifs/*",
 ]
 "dnadesign.cluster" = [
   "ops/status.registry.yaml",
@@ -188,7 +208,6 @@ exclude = [
   "workspaces/*/*",
   "workspaces/*/inputs/*",
 ]
-"dnadesign.cruncher.ingest.certs" = ["*.pem"]
 "dnadesign.densegen" = [
   "workspaces/_shared/*.sh",
   "workspaces/*/*.md",
@@ -218,6 +237,7 @@ exclude = [
 "dnadesign.opal" = [
   "campaigns/*/configs/*.yaml",
   "campaigns/_fixtures/scalar-regression/records.parquet",
+  "campaigns/_fixtures/scalar-regression/labels.csv",
   "src/ops/status.registry.yaml",
 ]
 "dnadesign.permuter" = [
@@ -231,6 +251,8 @@ exclude = [
   "runbooks/templates/*.qsub",
 ]
 "dnadesign.usr" = [
+  "assets/demo_material/*.csv",
+  "remotes.example.yaml",
   "datasets/registry.yaml",
   "ops/status.registry.yaml",
 ]
@@ -297,11 +319,14 @@ environments = [
   "sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 constraint-dependencies = [
+  "filelock>=4.2.4",
+  "setuptools>=84.1.0",
+  "virtualenv>=21.14.9",
   "cryptography>=50.0.0",
   "click>=8.3.3",
   "idna>=3.15",
   "onnx>=1.22.0",
-  "pillow>=12.3.0",
+  "pillow>=13.0.0",
   "pymdown-extensions>=11.0.1",
   "starlette>=1.3.1",
 ]

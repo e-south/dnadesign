@@ -42,7 +42,8 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
   - `src/dnadesign/usr/ops/sync_audit_drill.py` owns the stable deterministic sync drill entrypoint exposed as `uv run usr-sync-audit-drill`.
 - Internal drills and harness helpers: `src/dnadesign/usr/scripts/`
   - These scripts may import `dnadesign.usr.src.*` because they are USR-owned internal tooling, not a public cross-tool API surface.
-- Datasets root: `src/dnadesign/usr/datasets/`
+- Default datasets root: `./usr_datasets/`; `--root` or `DNADESIGN_USR_ROOT` selects existing storage.
+  - The checkout-era `src/dnadesign/usr/datasets/` root remains accessible explicitly during migration.
   - Dataset layout (recommended):
     - `datasets/<dataset_id>/records.parquet` (canonical base table)
     - `datasets/<dataset_id>/_derived/` (derived overlays)
@@ -60,8 +61,7 @@ Supplement to repo-root `AGENTS.md` with `usr`-specific contracts + navigation.
 - Docs and media assets: `src/dnadesign/usr/assets/`
   - Static documentation/supporting assets only.
 - Notebooks: `src/dnadesign/usr/notebooks/`
-- Archived PyTorch manager: `src/dnadesign/usr/scripts/archived_pytorch_manager.py`
-  - Inspects and updates the legacy PyTorch archive bucket under `datasets/archived/promoter_misc_pytorch/`.
+- Historical PyTorch maintenance: see [retired utilities](../../../docs/historical-tools.md).
 - Remote sync config: copy `remotes.example.yaml` to an untracked local path,
   replace its example values, and pass that path with
   `uv run usr --remotes-config <remotes.yaml> ...`; `USR_REMOTES_PATH` is the

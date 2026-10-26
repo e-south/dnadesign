@@ -6,4 +6,4 @@ This bucket stores historical `.pt` artifact directories plus their progress and
 
 - Dense batch, sequence batch, shuffle batch, latent-DNA batch, and similar legacy PyTorch artifacts live here.
 - This bucket is not a `records.parquet` dataset root.
-- Use `src/dnadesign/usr/scripts/archived_pytorch_manager.py` when you need to validate or inspect these `.pt` files.
+- The retired maintenance utility is preserved at DNADesign revision `3235d502d5f24af386b1ee3a7a1bf2fc445766fc`. Restore it in a separate recovery checkout when inspecting these historical files.

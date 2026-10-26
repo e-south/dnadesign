@@ -1,7 +1,7 @@
 # Permuter CLI And Data Contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-26
 
 Permuter mutates biological sequences, scores variants with pluggable
 evaluators, and writes one scoped dataset per workspace run.
@@ -62,10 +62,15 @@ uv run permuter --help
 uv run permuter workspace list --root src/dnadesign/permuter/workspaces
 uv run permuter workspace validate --workspace src/dnadesign/permuter/workspaces/rnaseh1_nt_scan
 uv run permuter run --workspace rnaseh1_nt_scan --ref BL21_RNase_H1_wt
-uv run permuter evaluate --workspace rnaseh1_nt_scan --ref BL21_RNase_H1_wt --with smoke:placeholder:log_likelihood
-uv run permuter plot --workspace rnaseh1_nt_scan --ref BL21_RNase_H1_wt --metric-id smoke
+uv run permuter evaluate --workspace rnaseh1_nt_scan --ref BL21_RNase_H1_wt --with ll:evo2_ll:log_likelihood
+uv run permuter plot --workspace rnaseh1_nt_scan --ref BL21_RNase_H1_wt --metric-id ll
 uv run permuter validate --data src/dnadesign/permuter/workspaces/rnaseh1_nt_scan/outputs/records.parquet --strict
 ```
+
+Evaluation requires a named evaluator and its runtime. The Evo2 example above
+requires the Linux GPU installation described in the [Infer runbook](../../infer/docs/operations/scc-evo2-gpu-uv-runbook.md).
+A metric name alone does not select an evaluator; Permuter does not substitute
+synthetic scores when inference is unavailable.
 
 `--workspace` accepts a workspace directory, a `config.yaml` path, or a scope id
 searched under `$PERMUTER_WORKSPACES`, `./workspaces`, and the packaged

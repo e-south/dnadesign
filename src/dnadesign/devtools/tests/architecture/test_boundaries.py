@@ -18,7 +18,6 @@ from pathlib import Path
 import pytest
 
 from dnadesign.devtools.architecture.boundaries import (
-    TOP_LEVEL_LEGACY_DIRECTORIES,
     TOP_LEVEL_ROOT_MODULES,
     TOP_LEVEL_SHARED_INFRA_PACKAGES,
     TOP_LEVEL_TOOL_BOUNDARY_PACKAGES,
@@ -43,8 +42,15 @@ def _scaffold_top_level_layout(tmp_path: Path) -> None:
         _write(src_root / name, "")
     for name in TOP_LEVEL_TOOL_BOUNDARY_PACKAGES | TOP_LEVEL_SHARED_INFRA_PACKAGES:
         _write(src_root / name / "__init__.py", "")
-    for name in TOP_LEVEL_LEGACY_DIRECTORIES:
-        (src_root / name).mkdir(parents=True, exist_ok=True)
+
+
+@pytest.mark.parametrize("shelf", ["archived", "prototypes"])
+def test_historical_source_shelves_cannot_return_to_the_runtime_tree(tmp_path: Path, shelf: str) -> None:
+    _scaffold_top_level_layout(tmp_path)
+    path = tmp_path / "src" / "dnadesign" / shelf
+    _write(path / "old_tool.py", "VALUE = 1\n")
+    violations = find_legacy_surface_violations(repo_root=tmp_path)
+    assert path in {item.path for item in violations}
 
 
 def test_dnadesign_source_does_not_import_external_reader_packages() -> None:
@@ -653,7 +659,7 @@ def test_find_review_surface_private_imports_allows_public_cross_tool_review_imp
     assert violations == []
 
 
-def test_find_undeclared_cross_tool_imports_ignores_archived_and_prototypes(tmp_path: Path) -> None:
+def test_retired_directory_names_do_not_exempt_cross_tool_imports(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "dnadesign" / "foo" / "api.py", "def run():\n    return 1\n")
     _write(tmp_path / "src" / "dnadesign" / "bar" / "api.py", "def run():\n    return 1\n")
     _write(
@@ -670,7 +676,7 @@ def test_find_undeclared_cross_tool_imports_ignores_archived_and_prototypes(tmp_
         allowed_edges=set(),
     )
 
-    assert violations == []
+    assert {item.owner_tool for item in violations} == {"archived", "prototypes"}
 
 
 def test_find_legacy_surface_violations_flags_removed_repo_root_contract_paths(tmp_path: Path) -> None:

@@ -3,12 +3,15 @@
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-26
 
-Choose the runtime for the tools you need. A checkout can install OPAL alone or
-the complete toolkit. Add `--group dev` when running tests or lint checks.
+Choose the runtime for the tools you need. Focused profiles support sequence storage, variant generation, inference setup,
+and OPAL campaigns without installing the complete toolkit. Add `--group dev` when running tests or lint checks.
 
 | Use | Checkout command |
 | --- | --- |
 | NumPy-only scoring API | `uv sync --locked --no-default-groups` |
+| Sequence datasets and overlays | `uv sync --locked --no-default-groups --extra usr` |
+| Variant generation and plots | `uv sync --locked --no-default-groups --extra permuter` |
+| Inference configuration and dry runs | `uv sync --locked --no-default-groups --extra infer` |
 | OPAL campaigns and plots | `uv sync --locked --no-default-groups --extra opal` |
 | OPAL with interactive notebooks | `uv sync --locked --no-default-groups --extra opal-notebook` |
 | Complete toolkit | `uv sync --locked` |
@@ -86,8 +89,9 @@ For Python library use, install `dnadesign-tools` from PyPI and import it as
   - each `uv sync` realizes exactly the requested groups/extras.
   - if you run `uv sync --locked --group dev` on a GPU env, it removes `infer-evo2` extras unless `--extra infer-evo2` is also included.
 
-The base library supports scoring. OPAL campaign fitting and plots use the
-`opal` extra; other tool runtimes currently use `full`. See the
+The base library supports scoring. Use the named profiles above for individual
+tools and `full` for the remaining toolkit. Model execution also needs its backend
+runtime; the `infer` profile supports configuration and dry runs without GPU libraries. See the
 [MSRB Python example](../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md#python-scoring-without-a-campaign).
 The `full` extra includes DenseArrays from PyPI. Checkout installs resolve its
 version through `uv.lock`. For dependency changes, use

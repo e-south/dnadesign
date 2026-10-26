@@ -9,7 +9,7 @@ last_verified: 2026-08-27
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-27
+**Last verified:** 2026-10-26
 
 ## At a glance
 `dnadesign` is a uv-managed monorepo of modular bioinformatics tools under `src/dnadesign/`, with shared CI/devtools and operator runbooks in `docs/`.
@@ -26,7 +26,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
 
 ## Repository shape
 - Code: `src/dnadesign/`
-- Top-level `src/dnadesign/` is a controlled namespace: boundary-owning packages plus shared infrastructure (`artifacts`, `contracts`, `devtools`) and reserved legacy buckets (`archived`, `prototypes`) only.
+- Top-level `src/dnadesign/` contains supported tool packages and shared infrastructure (`artifacts`, `contracts`, `devtools`). Historical source belongs in versioned retrieval records or verified external recovery archives, outside the runtime namespace.
 - Runbooks and references: `docs/`
 - CI/test/devtool orchestration: `.github/workflows/ci.yaml` and `src/dnadesign/devtools/`
 - Package/dependency contracts: `pyproject.toml`, `uv.lock`, `pixi.toml`, `pixi.lock`

@@ -19,6 +19,7 @@ import tarfile
 import tomllib
 import zipfile
 from email.parser import BytesParser
+from hashlib import sha256
 from importlib import import_module
 from importlib.metadata import version
 from pathlib import Path
@@ -28,6 +29,12 @@ from setuptools import Distribution, find_namespace_packages
 from setuptools.config.pyprojecttoml import apply_configuration
 
 _DISTRIBUTION_EXCLUDES = [
+    "dnadesign.*.tests",
+    "dnadesign.*.tests.*",
+    "dnadesign.*.prototypes",
+    "dnadesign.*.prototypes.*",
+    "dnadesign.*.archived",
+    "dnadesign.*.archived.*",
     "dnadesign.archived",
     "dnadesign.archived.*",
     "dnadesign.prototypes",
@@ -77,6 +84,8 @@ _REQUIRED_WHEEL_MEMBERS = {
     "dnadesign/junction/examples/gene-scale/jobs/junction-detail.yaml",
     "dnadesign/opal/campaigns/demo_gp_topn/configs/campaign.yaml",
     "dnadesign/opal/campaigns/_fixtures/scalar-regression/records.parquet",
+    "dnadesign/opal/campaigns/_fixtures/scalar-regression/labels.csv",
+    "dnadesign/cruncher/src/ingest/certs/globalsign_rsa_ov_ssl_ca_2018.pem",
     "dnadesign/usr/datasets/registry.yaml",
 }
 _FORBIDDEN_WHEEL_PREFIXES = (
@@ -129,13 +138,51 @@ def _copy_build_source(repo_root: Path, destination: Path) -> None:
         shutil.copy2(source, target, follow_symlinks=False)
 
 
+def test_wheel_payload_is_independent_of_git_and_excludes_development_material(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    _copy_build_source(_repo_root(), source)
+    prototype = source / "src/dnadesign/permuter/prototypes"
+    prototype.mkdir()
+    (prototype / "__init__.py").write_text("")
+    (prototype / "retired_probe.py").write_text("CANARY_ONLY = True\n")
+
+    def build(label: str) -> dict[str, str]:
+        output = tmp_path / label
+        subprocess.run(
+            ["uv", "build", "--out-dir", str(output)],
+            cwd=source,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        with zipfile.ZipFile(next(output.glob("*.whl"))) as wheel:
+            return {name: sha256(wheel.read(name)).hexdigest() for name in wheel.namelist()}
+
+    exported = build("exported")
+    for command in (
+        ["git", "init", "-q"],
+        ["git", "add", "."],
+        ["git", "-c", "user.name=Test", "-c", "user.email=test@example.org", "commit", "-qm", "fixture"],
+    ):
+        subprocess.run(command, cwd=source, check=True, capture_output=True)
+    checkout = build("checkout")
+    assert exported == checkout
+    assert _REQUIRED_WHEEL_MEMBERS <= exported.keys()
+    assert not any(
+        {"tests", "prototypes", "archived"}.intersection(Path(name).parts)
+        or name.endswith(("/AGENTS.md", "/journal.md", "/archived_pytorch_manager.py"))
+        for name in exported
+    )
+
+
 def test_distribution_excludes_internal_source_shelves(tmp_path: Path) -> None:
     repo_root = _repo_root()
     project = tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8"))
     discovery = project["tool"]["setuptools"]["packages"]["find"]
     excluded = discovery["exclude"]
 
-    assert project["tool"]["setuptools"]["include-package-data"] is True
+    assert project["tool"]["setuptools"]["include-package-data"] is False
     assert excluded == _DISTRIBUTION_EXCLUDES
     assert project["tool"]["setuptools"]["exclude-package-data"]["*"] == _DISTRIBUTION_DATA_EXCLUDES
     assert project["tool"]["setuptools"]["exclude-package-data"]["dnadesign.densegen"] == _DENSEGEN_DATA_EXCLUDES
@@ -330,12 +377,102 @@ assert result.behavior_score.tolist() == [0.0]
         timeout=30,
     )
     assert smoke.returncode == 0, smoke.stderr
-    cli = subprocess.run([str(environment / "bin/opal"), "--help"], cwd=tmp_path, capture_output=True, text=True)
-    assert cli.returncode != 0
-    assert "dnadesign-tools[opal]" in cli.stderr
-    assert "Traceback" not in cli.stderr
+    scripts = tomllib.loads((repo_root / "pyproject.toml").read_text())["project"]["scripts"]
+    for command in scripts:
+        cli = subprocess.run(
+            [str(environment / f"bin/{command}"), "--help"], cwd=tmp_path, capture_output=True, text=True, timeout=30
+        )
+        if command == "dnadesign-storage":
+            assert cli.returncode == 0, cli.stderr
+        else:
+            assert cli.returncode != 0, command
+            assert "dnadesign-tools[" in cli.stderr, (command, cli.stderr)
+            assert "Traceback" not in cli.stderr, (command, cli.stderr)
+    _check_focused_installs(repo_root, tmp_path, wheels[0])
     _check_opal_install(repo_root, tmp_path, environment, wheels[0])
     _check_full_install(repo_root, tmp_path, environment, wheels[0])
+
+
+def _check_focused_installs(repo_root: Path, tmp_path: Path, wheel: Path) -> None:
+    for profile, arguments in (
+        ("usr", ["--help"]),
+        ("permuter", ["workspace", "list"]),
+        ("infer", ["adapters", "list"]),
+    ):
+        environment = tmp_path / f"{profile}-env"
+        requirements = tmp_path / f"pylock.{profile}.toml"
+        subprocess.run(
+            [
+                "uv",
+                "export",
+                "--locked",
+                "--no-default-groups",
+                "--extra",
+                profile,
+                "--no-emit-project",
+                "--format",
+                "pylock.toml",
+                "-o",
+                str(requirements),
+            ],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        subprocess.run(["uv", "venv", "--python", sys.executable, str(environment)], check=True, capture_output=True)
+        python = environment / "bin/python"
+        subprocess.run(
+            ["uv", "pip", "install", "--python", str(python), "-r", str(requirements)],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+        subprocess.run(
+            ["uv", "pip", "install", "--python", str(python), "--no-deps", str(wheel)],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        result = subprocess.run(
+            [str(environment / f"bin/{profile}"), *arguments], cwd=tmp_path, capture_output=True, text=True, timeout=60
+        )
+        assert result.returncode == 0, (profile, result.stdout, result.stderr)
+        if profile == "infer":
+            dry_run = subprocess.run(
+                [
+                    str(environment / "bin/infer"),
+                    "extract",
+                    "--model-id",
+                    "evo2_7b",
+                    "--device",
+                    "cpu",
+                    "--precision",
+                    "fp32",
+                    "--fn",
+                    "evo2.log_likelihood",
+                    "--format",
+                    "float",
+                    "--seq",
+                    "ACGT",
+                    "--dry-run",
+                ],
+                cwd=tmp_path,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            assert dry_run.returncode == 0, dry_run.stdout + dry_run.stderr
+            assert "dry run" in dry_run.stdout
+        subprocess.run(
+            [str(python), "-I", "-c", "from importlib.util import find_spec; assert find_spec('torch') is None"],
+            check=True,
+            capture_output=True,
+        )
+        shutil.rmtree(environment)
 
 
 def _check_opal_install(repo_root: Path, tmp_path: Path, environment: Path, wheel: Path) -> None:
@@ -385,6 +522,15 @@ def _check_opal_install(repo_root: Path, tmp_path: Path, environment: Path, whee
         timeout=180,
     )
     assert smoke.returncode == 0, smoke.stdout + smoke.stderr
+    demo = subprocess.run(
+        [str(environment / "bin/opal"), "demo-matrix", "--rounds", "0"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    assert demo.returncode == 0, demo.stdout + demo.stderr
+    assert "overall_ok: True" in demo.stdout
 
 
 def _check_full_install(repo_root: Path, tmp_path: Path, environment: Path, wheel: Path) -> None:
@@ -466,7 +612,7 @@ assert (result.features[0].realized_start, result.features[0].realized_end) == (
         timeout=30,
     )
     assert smoke.returncode == 0, smoke.stderr
-    for command in ("opal", "construct", "latentdna", "dense"):
+    for command in tomllib.loads((repo_root / "pyproject.toml").read_text())["project"]["scripts"]:
         help_result = subprocess.run(
             [str(environment / "bin" / command), "--help"],
             cwd=tmp_path,

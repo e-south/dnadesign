@@ -40,8 +40,8 @@ def _load(group: str) -> dict[str, Type]:
 
 def _builtins(group: str) -> dict[str, Type]:
     """
-    Load built-ins. Core items (protocol: scan_dna; evaluator: placeholder)
-    are hard requirements; optional ones are best-effort with DEBUG logs.
+    Load the core scan_dna protocol and available evaluator adapters.
+    Optional adapters are best-effort with DEBUG logs.
     """
     out: Dict[str, Type] = {}
     if group == "protocols":
@@ -82,14 +82,6 @@ def _builtins(group: str) -> dict[str, Type]:
             )
         return out
     else:
-        try:
-            from dnadesign.permuter.src.evaluators.placeholder import (
-                PlaceholderEvaluator,
-            )
-        except Exception as e:
-            # core evaluator must be present
-            raise RuntimeError(f"[registry] core builtin evaluator 'placeholder' failed to import: {e}") from e
-        out["placeholder"] = PlaceholderEvaluator
         try:
             from dnadesign.permuter.src.evaluators.evo2_ll import (
                 Evo2LogLikelihoodEvaluator,

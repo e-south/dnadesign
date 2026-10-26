@@ -47,6 +47,9 @@ jobs:
             > build/release-evidence/checks.json
       - name: Verify lockfile
         run: uv lock --check
+      - name: Audit all release dependency profiles
+        run: |
+          uv audit --locked --output-format json > build/release-evidence/dependency-audit.json
       - name: Verify immutable package-page banner
         run: |
           python - <<'PYBANNER'
@@ -68,6 +71,11 @@ jobs:
           mkdir -p dist
           cp "$RUNNER_TEMP/dnadesign-release/"*.whl dist/
           cp "$RUNNER_TEMP/dnadesign-release/"*.tar.gz dist/
+      - name: Audit resolved build dependencies
+        run: |
+          uvx --from pip-audit==2.10.1 pip-audit --strict --no-deps --disable-pip --vulnerability-service osv \
+            -r "$RUNNER_TEMP/dnadesign-release/build-requirements.lock" --format json \
+            --output build/release-evidence/build-dependency-audit.json
       - name: Smoke-test ordinary registry installation
         run: |
           python -m venv build/wheel-smoke
@@ -89,11 +97,15 @@ jobs:
           for command in opal construct dense latentdna; do
             "build/wheel-smoke/bin/$command" --help > /dev/null
           done
+          site_packages="$(build/wheel-smoke/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"
+          uvx --from pip-audit==2.10.1 pip-audit --strict --no-deps --disable-pip --vulnerability-service osv \
+            --path "$site_packages" --format json \
+            --output build/release-evidence/installed-dependency-audit.json
       - name: Verify distribution metadata
         run: uvx --from twine==7.0.0 twine check dist/*
       - name: Retain publication context
         run: |
-          cp build/release-evidence/checks.json "$RUNNER_TEMP/dnadesign-release/checks.json"
+          cp build/release-evidence/*.json "$RUNNER_TEMP/dnadesign-release/"
           python - <<'PY'
           import hashlib, json, os, pathlib
           root = pathlib.Path('.')
@@ -103,6 +115,7 @@ jobs:
               'readme_sha256': sha(root / 'README.md'),
               'banner_sha256': sha(root / 'assets/dnadesign-banner.png'),
               'checks_sha256': sha(root / 'build/release-evidence/checks.json'),
+              'dependency_audits': {p.name: sha(p) for p in (root / 'build/release-evidence').glob('*audit.json')},
           }
           output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'dnadesign-release'
           (output / 'publication.json').write_text(json.dumps(record, indent=2) + '\n')

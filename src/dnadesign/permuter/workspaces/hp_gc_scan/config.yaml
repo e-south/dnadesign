@@ -56,9 +56,6 @@ scope:
     #       precision: bf16
     #       alphabet: dna
     #       reduction: sum
-      # - id: fake_ll
-      #   evaluator: placeholder
-      #   metric: log_likelihood
 
   output:
     dir: "${WORKSPACE_DIR}/outputs"

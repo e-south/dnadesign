@@ -1,7 +1,7 @@
 ## Dependency maintenance
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-25
+**Last verified:** 2026-10-26
 
 This document is the canonical home for dependency management, including Python packages (`uv`) and system binaries (`pixi`).
 
@@ -82,3 +82,26 @@ This section ensures dependency changes are reproducible for other operators.
 - Commit `pyproject.toml` and `uv.lock` for Python dependency changes.
 - Commit `pixi.toml` and `pixi.lock` for system dependency changes.
 - Run `uv sync --locked` after pulling dependency updates.
+
+### Release security gate
+
+The release workflow runs `uv audit --locked` across every extra and dependency
+group, including platform-specific pins. It also audits the resolved build
+requirements and installed release environment with `pip-audit`. Known
+vulnerabilities and audit errors block publication. PR dependency review remains
+a separate check on changed dependencies.
+
+```bash
+uv audit --locked
+```
+
+The [uv audit command](https://docs.astral.sh/uv/reference/cli/#uv-audit) checks
+published advisories and adverse package statuses without installing GPU runtimes.
+Its JSON output is retained as release evidence. This does not establish that every
+reported vulnerability is reachable through DNADesign.
+
+The optional `infer-evo2` profile currently includes FlashAttention 2.8.3, affected
+by [GHSA-7g5w-pq96-8c5w](https://github.com/advisories/GHSA-7g5w-pq96-8c5w)
+in its checkpoint-loading code. The advisory lists no patched release. The release
+gate remains closed until an upstream fix or a reviewed mitigation is qualified;
+no advisory exclusion is configured.

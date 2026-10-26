@@ -14,7 +14,6 @@ from __future__ import annotations
 import time
 from typing import Dict, List
 
-import torch
 import yaml
 
 from ..errors import WriteBackError
@@ -30,6 +29,8 @@ def write_back_pt_file(
     columnar: Dict[str, List[object]],
     overwrite: bool,
 ) -> None:
+    import torch
+
     write_back_records(
         records,
         model_id=model_id,

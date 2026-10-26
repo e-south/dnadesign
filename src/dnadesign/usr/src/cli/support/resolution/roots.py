@@ -21,9 +21,12 @@ def pkg_usr_root() -> Path:
 
 
 def default_usr_root(*, pkg_root: Path | None = None) -> Path:
-    """Return the canonical USR datasets root."""
-    base = Path(pkg_root).resolve() if pkg_root is not None else pkg_usr_root()
-    return (base / "datasets").resolve()
+    """Return the project-local data root without creating it.
+
+    ``pkg_root`` is retained for callers sharing root-resolution options; package
+    location no longer determines the default writable data location.
+    """
+    return (Path.cwd() / "usr_datasets").resolve()
 
 
 def normalize_usr_root(root: str | Path | None, *, pkg_root: Path | None = None) -> Path:
@@ -31,14 +34,13 @@ def normalize_usr_root(root: str | Path | None, *, pkg_root: Path | None = None)
     Accept either the package root (.../dnadesign/usr) or the datasets root
     (.../dnadesign/usr/datasets) and normalize to the canonical datasets root.
     """
-    datasets_root = default_usr_root(pkg_root=pkg_root)
     if root is None:
-        return datasets_root
+        return default_usr_root(pkg_root=pkg_root)
 
     target = Path(root).expanduser().resolve()
     base = Path(pkg_root).resolve() if pkg_root is not None else pkg_usr_root()
     if target == base:
-        return datasets_root
+        return (base / "datasets").resolve()
     if (target / "__init__.py").exists():
         return (target / "datasets").resolve()
     return target

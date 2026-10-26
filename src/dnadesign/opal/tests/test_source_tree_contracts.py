@@ -123,10 +123,16 @@ def test_opal_code_lives_under_source_or_declared_nonruntime_surfaces() -> None:
     assert leaked == []
 
 
-def test_opal_console_script_targets_public_package_entrypoint() -> None:
+def test_opal_console_script_calls_public_package_entrypoint(monkeypatch) -> None:
+    from importlib import import_module
+
+    import dnadesign.opal as public
+
     pyproject = tomllib.loads(Path("pyproject.toml").read_text())
 
-    assert pyproject["project"]["scripts"]["opal"] == "dnadesign.opal:main"
+    monkeypatch.setattr(public, "main", lambda: 7)
+    module, name = pyproject["project"]["scripts"]["opal"].split(":")
+    assert getattr(import_module(module), name)() == 7
 
 
 def test_opal_large_entrypoints_are_explicitly_budget_guarded() -> None:

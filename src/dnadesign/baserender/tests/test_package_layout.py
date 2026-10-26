@@ -116,10 +116,16 @@ def test_src_nested_ia_packages_exist() -> None:
         assert (root / rel / "__init__.py").exists(), rel
 
 
-def test_console_script_targets_src_cli_app() -> None:
+def test_console_script_calls_public_cli_app(monkeypatch) -> None:
+    from importlib import import_module
+
+    import dnadesign.baserender as public
+
     with Path("pyproject.toml").open("rb") as handle:
         pyproject = tomllib.load(handle)
-    assert pyproject["project"]["scripts"]["baserender"] == "dnadesign.baserender:app"
+    monkeypatch.setattr(public, "app", lambda: 7)
+    module, name = pyproject["project"]["scripts"]["baserender"].split(":")
+    assert getattr(import_module(module), name)() == 7
 
 
 def test_no_tracked_generated_baserender_artifacts() -> None:

@@ -15,8 +15,6 @@ import json
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-import torch
-
 from dnadesign.usr import normalize_usr_root, resolve_usr_root_from_env
 
 from .._logging import get_logger
@@ -61,6 +59,8 @@ def load_records_jsonl_input(path: str, field: str) -> Tuple[List[str], List[Dic
 
 
 def load_pt_file_input(path: str, field: str) -> Tuple[List[str], List[Dict]]:
+    import torch
+
     data = torch.load(path, map_location="cpu", weights_only=True)
     if not isinstance(data, list) or not all(isinstance(x, dict) for x in data):
         raise ValidationError(".pt file must contain list[dict]")

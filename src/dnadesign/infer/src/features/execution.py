@@ -17,9 +17,10 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Dict, List, Mapping, Optional
+from typing import TYPE_CHECKING, Callable, Dict, List, Mapping, Optional
 
-import torch
+if TYPE_CHECKING:
+    import torch
 
 from ..contracts import infer_usr_column_name
 from ..errors import CapabilityError, RuntimeOOMError

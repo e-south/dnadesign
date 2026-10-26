@@ -149,6 +149,11 @@ def evaluate(
     out: Optional[Path] = None,
     as_json: bool = False,
 ) -> dict[str, object]:
+    if metric_ids:
+        raise ValueError(
+            "--metric does not select an evaluator. Use --with id:evaluator:metric "
+            "or configure evaluate.metrics in the workspace."
+        )
     # Resolve records path from either --data or --workspace/--ref
     if data is not None:
         records = normalize_data_path(data)
@@ -183,10 +188,6 @@ def evaluate(
     metrics = [] if (with_spec or metric_ids) else _load_workspace_metrics(workspace)
     if with_spec:
         metrics.extend(_parse_cli_with(with_spec))
-    if metric_ids:
-        # convenience: if only ids given, assume placeholder with metric==id
-        for mid in metric_ids:
-            metrics.append({"id": mid, "evaluator": "placeholder", "metric": mid, "params": {}})
     if not metrics:
         raise ValueError(
             "No metrics specified. Use --with id:evaluator[:metric] or provide a workspace config with evaluate.metrics"

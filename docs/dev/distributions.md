@@ -1,7 +1,7 @@
 ## Distribution builds and verification
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-07
+**Last verified:** 2026-10-26
 
 DNADesign has one distribution version, declared in `pyproject.toml`. Runtime
 `dnadesign.__version__` reads installed metadata. Individual tools can version
@@ -46,6 +46,11 @@ This requires the same source commit, Python/uv toolchain and retained build
 requirements. Runtime dependencies remain separately declared in `uv.lock`.
 Python and system-tool/platform compatibility require their own execution checks.
 
+Runtime resources are selected explicitly in `pyproject.toml`. Git checkouts and
+exported source must produce identical wheel contents. Tests, agent instructions,
+journals and retired source shelves are excluded from runtime wheels. The package
+suite also runs OPAL's built-in demo from the installed wheel.
+
 ### Verify a retained or downloaded bundle
 
 ```bash
@@ -84,8 +89,8 @@ changes and a patch version for compatible corrections. Describe affected tools
 and migration requirements in the release notes; a version increment alone does
 not qualify historical replay.
 
-The base install supports NumPy-only multistate scoring. Other current tool CLIs
-require `[full]`; the extra pins the qualified Dense Arrays 0.2.0 registry release.
+The base install supports NumPy-only multistate scoring. Focused CLI profiles are `usr`, `permuter`, `infer`, and `opal`;
+`[full]` installs the complete runtime, including Dense Arrays 0.2.0.
 Version-based wheel installation does not provide Git provenance. Downstream
 verification must bind retained artifact bytes to installed content rather than
 invent a Git commit from `direct_url.json`.

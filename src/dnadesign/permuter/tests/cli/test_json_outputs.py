@@ -38,7 +38,7 @@ def test_run_evaluate_validate_and_plot_emit_json(tmp_path: Path) -> None:
             "--ref",
             "toy",
             "--with",
-            "smoke:placeholder:log_likelihood",
+            "smoke:test_fixture:log_likelihood",
             "--json",
         ],
     )
@@ -88,7 +88,7 @@ def test_plot_rejects_unsupported_ids_without_traceback(tmp_path: Path) -> None:
             "--ref",
             "toy",
             "--with",
-            "smoke:placeholder:log_likelihood",
+            "smoke:test_fixture:log_likelihood",
         ],
     )
     assert result.exit_code == 0, result.output

@@ -379,7 +379,7 @@ def test_public_api_scores_materializes_and_validates_dataset(tmp_path) -> None:
             metrics=(
                 MetricSpec(
                     id="smoke",
-                    evaluator="placeholder",
+                    evaluator="test_fixture",
                     metric="log_likelihood",
                 ),
             )
@@ -520,7 +520,7 @@ def test_public_api_refuses_metric_overwrite_without_contract() -> None:
         metrics=(
             MetricSpec(
                 id="smoke",
-                evaluator="placeholder",
+                evaluator="test_fixture",
                 metric="log_likelihood",
             ),
         )

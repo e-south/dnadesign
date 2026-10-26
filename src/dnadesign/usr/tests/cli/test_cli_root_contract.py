@@ -74,6 +74,23 @@ def test_cli_uses_external_usr_root_from_environment(tmp_path: Path, monkeypatch
     assert '"dataset":"external_demo"' in result.output
 
 
+def test_cli_defaults_to_project_datasets_without_creating_directories(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("DNADESIGN_USR_ROOT", raising=False)
+    result = CliRunner().invoke(cli_module.app, ["ls"])
+    assert result.exit_code != 0
+    assert "usr_datasets" in result.output
+    assert "Create" in result.output
+    assert not (tmp_path / "usr_datasets").exists()
+
+    ensure_registry(tmp_path / "usr_datasets")
+    ds = Dataset(tmp_path / "usr_datasets", "local_demo")
+    ds.init(source="test")
+    result = CliRunner().invoke(cli_module.app, ["ls", "--format", "json"])
+    assert result.exit_code == 0, result.output
+    assert '"dataset":"local_demo"' in result.output
+
+
 def test_cli_rejects_missing_external_usr_root_from_environment(
     tmp_path: Path,
     monkeypatch,

@@ -76,18 +76,21 @@ def test_security_floors_are_published_by_their_owning_dependency_sets() -> None
     assert "anyio>=4.14.2" in dependencies
     assert "click>=8.3.3" in dependencies
     assert "marimo>=0.23.16" in dependencies
-    assert "pillow>=12.3.0" in dependencies
+    assert "pillow>=13.0.0" in dependencies
+    assert "certifi>=2026.10.19" in dependencies
+    assert "filelock>=4.2.4" in constraint_dependencies
+    assert "virtualenv>=21.14.9" in constraint_dependencies
     assert "zstd>=1.5.7.2,!=1.5.7.3" in dependencies
     assert "idna>=3.15" in constraint_dependencies
     assert "pymdown-extensions>=11.0.1" in constraint_dependencies
     assert any(requirement.startswith("onnx>=1.22.0;") for requirement in evo2_dependencies)
     assert any(requirement.startswith("pip>=26.1.2;") for requirement in evo2_dependencies)
-    assert any(requirement.startswith("setuptools>=84.0.0;") for requirement in evo2_dependencies)
+    assert any(requirement.startswith("setuptools>=84.1.0;") for requirement in evo2_dependencies)
     assert any(requirement.startswith("wheel>=0.48.0;") for requirement in evo2_dependencies)
     assert any(requirement.startswith("torch>=2.13,<2.14;") for requirement in dependencies)
     assert any(requirement.startswith("torch>=2.13,<2.14;") for requirement in evo2_dependencies)
     assert all(not requirement.startswith(("torchaudio", "torchvision")) for requirement in evo2_dependencies)
-    assert "setuptools>=84.0.0" in build_dependencies
+    assert "setuptools>=84.1.0" in build_dependencies
     assert "wheel>=0.48.0" in build_dependencies
     assert all("email" not in author for author in project["authors"])
 

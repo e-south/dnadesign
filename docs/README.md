@@ -50,7 +50,8 @@ Use these when one tool owns the next step.
 
 | Need | Primary workflow | Verify next |
 | --- | --- | --- |
-| Design a sequence library in a workspace | [DenseGen docs overview](../src/dnadesign/densegen/docs/README.md) | Verify generated artifacts and metadata with [DenseGen outputs reference](../src/dnadesign/densegen/docs/reference/outputs.md). |
+| Design a new constrained sequence library | [DenseArrays](https://github.com/e-south/dense-arrays) | Use its standalone generation workflow and output contracts. |
+| Maintain an existing DenseGen workspace | [DenseGen docs overview](../src/dnadesign/densegen/docs/README.md) | Verify retained workflows with [DenseGen outputs reference](../src/dnadesign/densegen/docs/reference/outputs.md). |
 | Build DNA constructs from templates or multiple parts into derived datasets | [Construct docs overview](../src/dnadesign/construct/docs/README.md) | Verify resulting lineage and sequence identity in [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
 | Compose declared linear ssDNA parts into a local artifact bundle | [Construct linear ssDNA composition](../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md) | Verify the bundle manifest, optional Folding plot artifacts, and optional BaseRender review handoff. |
 | Select candidates from measured labels and sequence features | [OPAL demo and campaign workflow](../src/dnadesign/opal/docs/index.md) | Inspect and export the selected batch with [OPAL selection commands](../src/dnadesign/opal/docs/reference/cli.md#selection-batch). |

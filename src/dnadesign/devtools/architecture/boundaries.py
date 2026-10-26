@@ -37,9 +37,8 @@ TOP_LEVEL_TOOL_BOUNDARY_PACKAGES = {
     "usr",
 }
 TOP_LEVEL_SHARED_INFRA_PACKAGES = {"artifacts", "contracts", "devtools"}
-TOP_LEVEL_LEGACY_DIRECTORIES = {"archived", "prototypes"}
 _IGNORED_TOP_LEVEL_DIRECTORIES = {"__pycache__"}
-_NON_TOOL_DIRS = TOP_LEVEL_SHARED_INFRA_PACKAGES | TOP_LEVEL_LEGACY_DIRECTORIES | _IGNORED_TOP_LEVEL_DIRECTORIES
+_NON_TOOL_DIRS = TOP_LEVEL_SHARED_INFRA_PACKAGES | _IGNORED_TOP_LEVEL_DIRECTORIES
 _SKIPPED_PATH_SEGMENTS = {
     "tests",
     "notebooks",
@@ -100,6 +99,8 @@ _ALLOWED_CROSS_TOOL_IMPORT_TARGET_PREFIXES: dict[tuple[str, str], tuple[str, ...
     ("usr", "cruncher"): ("dnadesign.cruncher.ingest.promoters",),
 }
 _FORBIDDEN_LEGACY_SURFACE_PATHS = (
+    Path("src/dnadesign/archived"),
+    Path("src/dnadesign/prototypes"),
     Path("src/dnadesign/_contracts"),
     Path("src/dnadesign/usr_roots.py"),
     Path("src/dnadesign/usr/src/roots.py"),
@@ -407,7 +408,7 @@ def find_top_level_layout_violations(*, repo_root: Path) -> list[TopLevelLayoutV
         raise FileNotFoundError(f"Expected dnadesign source root at {src_root}")
 
     required_directories = TOP_LEVEL_TOOL_BOUNDARY_PACKAGES | TOP_LEVEL_SHARED_INFRA_PACKAGES
-    allowed_directories = required_directories | TOP_LEVEL_LEGACY_DIRECTORIES
+    allowed_directories = required_directories
     actual_directories = {
         path.name
         for path in src_root.iterdir()

@@ -1,7 +1,7 @@
 # USR sync setup
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-30
+**Last verified:** 2026-10-26
 
 
 Use this page for one-time setup and periodic key hygiene.
@@ -10,9 +10,9 @@ Use this page for one-time setup and periodic key hygiene.
 
 Recommended storage layout:
 
-- Shared repo-local datasets should live under `src/dnadesign/usr/datasets`.
-- External dataset roots are still allowed for ad-hoc sync or mirror workflows, for example `~/data/usr_datasets/` or another explicit operator-owned location.
-- SCC dataset roots should stay in project storage for long-lived runs, for example `/project/$USER/dnadesign/src/dnadesign/usr/datasets`.
+- Keep shared datasets outside the installed package, for example `~/data/usr_datasets/`, and select that location with `--root` or `DNADESIGN_USR_ROOT`.
+- Without an explicit root, USR uses `./usr_datasets` relative to the working directory. Create the directory before using it.
+- SCC dataset roots should stay in project storage for long-lived runs, for example `/project/$USER/usr_datasets`.
 
 Notes:
 
@@ -20,8 +20,7 @@ Notes:
 - Keep curated tool configs and logs in their tool workspaces.
 - Treat a tool workspace USR sink as explicit in the study record, whether it
   writes to a workspace-local export root or directly to the shared root.
-- Keep shared USR datasets under the package USR root unless the study record
-  makes another shared root explicit.
+- Record the shared root explicitly in study configs and remote profiles.
 - Keep code in git, keep datasets in USR roots, and sync with `uv run usr diff/pull/push`.
 
 ## Prepare SSH keys (one-time)

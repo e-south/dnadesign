@@ -11,6 +11,20 @@ Universal Sequence Record (USR) stores sequence datasets with explicit overlay a
 - [Architecture introspection](docs/architecture-introspection.md): package lifecycle, component boundaries, and interaction map.
 - [Repository docs index](../../../docs/README.md): cross-tool workflows that connect USR with DenseGen, Infer, and Notify.
 
+## Dataset location
+
+USR uses `./usr_datasets` relative to the working directory by default. Create
+that directory before starting a new collection, or select an existing root with
+`--root /path/to/datasets` or `DNADESIGN_USR_ROOT`. Installation and upgrades do
+not move datasets.
+
+If you previously used `src/dnadesign/usr/datasets`, pass that root explicitly
+while migrating. Copy the **whole** root, including `registry.yaml`, overlays,
+views, event logs, and snapshots, to a directory outside the checkout. Validate
+the copy with `usr --root /new/root validate <dataset> --strict` and verify all
+files before changing configured paths or removing the original. Update remote
+profiles and workflow configs to the new root together.
+
 ## Remote configuration
 
 Remote profiles are local operator configuration, not repository data. Copy

@@ -1,7 +1,7 @@
 # USR sync quickstart
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-01
+**Last verified:** 2026-10-26
 
 
 Use this page for the minimum reliable loop: preflight diff, transfer, verify.
@@ -10,7 +10,7 @@ Use this page for the minimum reliable loop: preflight diff, transfer, verify.
 
 1. One-time setup: [setup.md](setup.md).
 2. Every run: `diff` -> `pull`/`push`.
-3. The canonical repo-local datasets root is `src/dnadesign/usr/datasets`; `usr --root src/dnadesign/usr ...` is accepted and normalized to that canonical datasets root.
+3. Set `DNADESIGN_USR_ROOT` to the existing local dataset root, or pass `--root` on each command. The default is `./usr_datasets`. See [dataset location and migration](../../../README.md#dataset-location) for older checkout-local datasets.
 
 ## Minimum command loop
 

@@ -30,7 +30,18 @@ from ...commands.sync.cli import register_sync_commands
 from .surface import CliApps
 
 
-def ctx_args(ctx: typer.Context, **kwargs) -> NS:
+def ctx_args(ctx: typer.Context, *, require_root: bool = True, **kwargs) -> NS:
+    root = ctx.obj["root"]
+    if require_root:
+        if not root.is_dir():
+            raise typer.BadParameter(
+                f"USR root is not an existing directory: {root}. "
+                "Create that directory for a new collection, or select existing data with "
+                "--root or DNADESIGN_USR_ROOT.",
+                param_hint="--root",
+            )
+        if not os.access(root, os.R_OK | os.X_OK):
+            raise typer.BadParameter(f"USR root is not readable: {root}", param_hint="--root")
     base = {
         "root": ctx.obj["root"],
         "rich": ctx.obj["rich"],
@@ -52,7 +63,7 @@ def build_root_callback(
         root: Path | None = typer.Option(
             None,
             "--root",
-            help="Datasets root folder; defaults to DNADESIGN_USR_ROOT, then packaged datasets",
+            help="Datasets root folder; defaults to DNADESIGN_USR_ROOT, then ./usr_datasets",
             readable=True,
             exists=True,
             dir_okay=True,
@@ -74,10 +85,6 @@ def build_root_callback(
         try:
             selected_root = root or resolve_usr_root_from_env() or default_usr_root()
             normalized_root = normalize_usr_root(selected_root)
-            if not normalized_root.is_dir():
-                raise SequencesError(f"USR root is not an existing directory: {normalized_root}")
-            if not os.access(normalized_root, os.R_OK | os.X_OK):
-                raise SequencesError(f"USR root is not readable: {normalized_root}")
             assert_supported_root(normalized_root)
         except (OSError, RuntimeError, ValueError, SequencesError) as exc:
             raise typer.BadParameter(str(exc), param_hint="--root") from exc
@@ -162,7 +169,7 @@ def register_cli_surface(*, apps: CliApps, root_callback: Callable[..., None], c
 
     register_remotes_commands(
         apps.remotes_app,
-        ctx_args_builder=ctx_args_builder,
+        ctx_args_builder=lambda ctx, **kwargs: ctx_args_builder(ctx, require_root=False, **kwargs),
         cmd_remotes_list=bindings.cmd_remotes_list,
         cmd_remotes_show=bindings.cmd_remotes_show,
         cmd_remotes_add=bindings.cmd_remotes_add,

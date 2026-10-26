@@ -15,9 +15,26 @@ import hashlib
 from pathlib import Path
 
 import pandas as pd
+import pytest
 from typer.testing import CliRunner
 
 from dnadesign.permuter.src.cli.app import app
+from dnadesign.permuter.src.core.registry import get_evaluator
+
+
+def test_metric_name_alone_cannot_write_fabricated_scores(tmp_path: Path) -> None:
+    records = tmp_path / "records.parquet"
+    pd.DataFrame({"sequence": ["ACGT"], "bio_type": ["dna"]}).to_parquet(records)
+    before = records.read_bytes()
+    result = CliRunner().invoke(app, ["evaluate", "--data", str(records), "--metric", "log_likelihood"])
+    assert result.exit_code != 0
+    assert "--with" in str(result.exception) + result.output
+    assert records.read_bytes() == before
+
+
+def test_placeholder_is_not_an_installed_evaluator() -> None:
+    with pytest.raises((ValueError, KeyError), match="placeholder"):
+        get_evaluator("placeholder")
 
 
 def test_evaluate_explicit_with_replaces_workspace_metrics(tmp_path: Path) -> None:
@@ -73,7 +90,7 @@ scope:
 
     result = CliRunner().invoke(
         app,
-        ["evaluate", "--workspace", str(workspace), "--ref", "toy", "--with", "smoke:placeholder:log_likelihood"],
+        ["evaluate", "--workspace", str(workspace), "--ref", "toy", "--with", "smoke:test_fixture:log_likelihood"],
     )
 
     assert result.exit_code == 0, result.output
