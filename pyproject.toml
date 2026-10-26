@@ -77,7 +77,6 @@ full = [
   "certifi>=2025.11.12",
   "keyring>=25.6.0",
   "fastparquet>=2025.12.0",
-  "filelock>=3.20.3,<4",
   "marimo>=0.23.16",
   "openai>=2.14.0",
   "viennarna>=2.7.2",
@@ -113,7 +112,7 @@ infer-evo2 = [
 [dependency-groups]
 # A checkout keeps the existing full tool environment; installed libraries opt in.
 tools = ["dnadesign-tools[full]"]
-test = ["pytest>=9.0.3", "pytest-cov", "hypothesis>=6.100"]
+test = ["pytest>=9.0.3", "pytest-cov", "hypothesis>=6.100", "filelock>=4.2.4,<5"]
 lint = ["ruff>=0.4", "pre-commit>=3.7"]
 dev  = [{ include-group = "test" }, { include-group = "lint" }]
 
