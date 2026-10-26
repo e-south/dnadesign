@@ -120,6 +120,14 @@ jobs:
           output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'dnadesign-release'
           (output / 'publication.json').write_text(json.dumps(record, indent=2) + '\n')
           PY
+      - name: Upload dependency audit diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dependency-audit-diagnostics
+          path: build/release-evidence/*audit.json
+          if-no-files-found: warn
+          retention-days: 90
       - name: Upload release evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:

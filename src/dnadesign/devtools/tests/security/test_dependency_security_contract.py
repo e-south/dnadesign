@@ -110,6 +110,22 @@ def test_dependabot_covers_each_tracked_dependency_surface() -> None:
         assert tuple(entry["groups"].values())[0]["patterns"] == ["*"]
 
 
+def test_release_audits_block_publication_and_retain_failure_evidence() -> None:
+    workflow = yaml.safe_load((_repo_root() / ".github/workflows/release.yaml").read_text(encoding="utf-8"))
+    jobs = workflow["jobs"]
+    steps = jobs["build"]["steps"]
+    audits = [step for step in steps if "uv audit --locked" in step.get("run", "")]
+    assert len(audits) == 1
+    assert not audits[0].get("continue-on-error", False)
+    assert "--ignore" not in audits[0]["run"]
+    assert "--no-extra" not in audits[0]["run"]
+    assert jobs["publish"]["needs"] == ["build"]
+    receipts = [step for step in steps if step.get("with", {}).get("name") == "dependency-audit-diagnostics"]
+    assert len(receipts) == 1
+    assert receipts[0]["if"] == "always()"
+    assert receipts[0]["with"]["path"] == "build/release-evidence/*audit.json"
+
+
 def test_unsupported_torch_execution_does_not_enter_supported_code() -> None:
     repo_root = _repo_root()
     forbidden = ("torch.jit." + "script",)
