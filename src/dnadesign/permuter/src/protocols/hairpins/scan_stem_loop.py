@@ -19,7 +19,6 @@ from typing import Dict, Iterable, List, Tuple
 
 import numpy as np
 
-from dnadesign.permuter.src.protocols import register
 from dnadesign.permuter.src.protocols.base import Protocol
 
 _LOG = logging.getLogger("permuter.protocol.scan_stem_loop")
@@ -153,7 +152,6 @@ def _preview_line(original: str, s: int, e: int, up: str, cap: str, down: str) -
     return f"match: …{left5} | {up_vis} | {cap.lower()} | {rc_vis} | {right5}…"
 
 
-@register
 class ScanStemLoop(Protocol):
     id = "scan_stem_loop"
     version = "1.0"

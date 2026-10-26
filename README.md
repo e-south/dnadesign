@@ -70,5 +70,5 @@ a standalone tool for preparing parts, generating arrays and exporting sequences
 
 - [Docs index](docs/README.md): workflow and tool documentation.
 - [Architecture](ARCHITECTURE.md), [Design](DESIGN.md) and [Reliability](RELIABILITY.md): boundaries and operating principles.
-- [Agent guide](AGENTS.md) and [Developer docs](docs/dev/README.md): find the owning tool and run checks.
+- [Developer docs](docs/dev/README.md): contribute changes and run validation checks.
 - [Security](SECURITY.md), [Plans](PLANS.md) and [Quality score](QUALITY_SCORE.md): security policy and maintenance.

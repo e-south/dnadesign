@@ -35,8 +35,6 @@ def register_defaults() -> None:
     register_model("evo2_7b", Evo2Adapter)
     register_model("evo2_20b", Evo2Adapter)
     register_model("evo2_1b_base", Evo2Adapter)  # convenience
-    # ESM2 is stubbed but keep an example for future
-    # register_model("esm2_t33_650M_UR50D", ESM2Adapter)
 
     # Register functions (namespaced)
     register_fn("evo2.logits", "logits")
@@ -45,7 +43,4 @@ def register_defaults() -> None:
     register_fn("evo2.generate", "generate")
     register_default_embedding_layer("evo2", EVO2_DEFAULT_EMBEDDING_LAYER)
 
-    # ESM2 (to be implemented later)
-    # register_fn("esm2.embedding", "embedding")
-    # register_fn("esm2.log_likelihood", "log_likelihood")
     _REGISTERED = True

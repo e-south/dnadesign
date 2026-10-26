@@ -75,7 +75,6 @@ full = [
   "pyarrow>=23.0.1",
   "pydantic",
   "pygments>=2.20.0",
-  "pymc",
   "python-levenshtein",
   "pyyaml",
   "rich",

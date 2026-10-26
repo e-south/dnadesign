@@ -108,7 +108,7 @@ uv run usr densegen repair --dedupe keep-first
 uv run usr export <dataset> --fmt csv --out /tmp/out.csv
 uv run usr materialize <dataset>
 
-# Remote sync (see docs/operations/sync.md)
+# Remote sync (see docs/operations/sync/README.md)
 uv run usr --remotes-config <remotes.yaml> diff <dataset-or-path> <remote-name>
 uv run usr --remotes-config <remotes.yaml> pull <dataset-or-path> <remote-name> -y
 uv run usr --remotes-config <remotes.yaml> push <dataset-or-path> <remote-name> -y
@@ -118,7 +118,7 @@ export USR_REMOTES_PATH=<remotes.yaml>
 
 ### Notes
 - macOS: PyArrow sysctl warnings are suppressed by default. Set `USR_SHOW_PYARROW_SYSCTL=1` to re-enable.
-- The `datasets/demo` dataset is tracked. Copy it before running attach/materialize/snapshot if you want a scratch run.
+- Demo inputs are tracked under `assets/demo_material/`. Import them into a scratch dataset before running attach, materialize, or snapshot commands.
 - Update policy: base records are append-only; overlays are the only supported update path. Base rewrites are maintenance operations. In the library, use `with ds.maintenance(reason=...): ds.materialize(...)`.
 - Reserved state overlay: `usr_state__masked`, `usr_state__qc_status`, `usr_state__split`, `usr_state__supersedes`, `usr_state__lineage` are standardized and registry-governed.
 - Registry auto-freeze: when a registry exists, the first dataset mutation snapshots `_registry/registry.<hash>.yaml`.
@@ -126,8 +126,13 @@ export USR_REMOTES_PATH=<remotes.yaml>
 
 ### Tests
 
-If you modify `usr`, run:
+Start with the affected test family and the matching static checks in the
+[repository change gate](../../../docs/repo-change-gate.md). For example, changes
+to CLI presentation use:
 
 ```bash
-uv run pytest -q
+uv run pytest -q src/dnadesign/usr/tests/cli/support
 ```
+
+Use the complete USR suite for changes spanning multiple USR subsystems. Reserve
+the repository-wide suite for cross-tool behavior changes or merge verification.
