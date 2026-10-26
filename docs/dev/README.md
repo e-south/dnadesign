@@ -121,6 +121,9 @@ detection. Main-branch runs retain full validation, and secrets checks run for
 every change. An empty or unavailable change list does not qualify as
 documentation-only.
 
+After installing `ci-docs`, use `uv run --no-sync` for checks to preserve that
+environment instead of restoring the default tool dependencies.
+
 - Core lane test expression: `-m "not fimo and not integration"`
 - External integration test expression: `-m "fimo or integration"`
 - Core lane local parity:
