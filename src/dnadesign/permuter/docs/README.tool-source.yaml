@@ -1,0 +1,17 @@
+schema_version: 1
+catalog_order: 13
+tool: permuter
+summary: Tool-owned variant generation, workspace execution, plotting, and handoff contracts for USR, Construct, Infer, and study-owned promotion.
+keywords:
+  - variants
+  - perturbations
+  - dms
+  - handoff
+  - infer
+routes:
+  - id: architecture
+    path: architecture.md
+    summary: Permuter ownership boundary, identity semantics, and fail-fast rules.
+  - id: handoffs
+    path: handoffs.md
+    summary: USR materialization, non-executing Infer feature requests, and study-owned candidate promotion boundaries.

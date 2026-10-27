@@ -1,0 +1,565 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/cli/test_cli_workspace_init.py
+
+Workspace init and Stage-B guardrail tests.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import textwrap
+from contextlib import contextmanager
+from pathlib import Path
+
+import pytest
+import yaml
+from typer.testing import CliRunner
+
+from dnadesign.densegen.src.cli import workspace as workspace_commands
+from dnadesign.densegen.src.cli import workspace_sources
+from dnadesign.densegen.src.cli.main import app
+
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
+def _normalized_output(text: str) -> str:
+    return " ".join(_ANSI_ESCAPE_RE.sub("", text).split())
+
+
+def _write_source_config(path: Path) -> None:
+    path.write_text(
+        textwrap.dedent(
+            """
+            densegen:
+              schema_version: "2.9"
+              run:
+                id: demo
+                root: "."
+              inputs:
+                - name: demo
+                  type: binding_sites
+                  path: inputs/sites.csv
+            """
+        ).strip()
+        + "\n"
+    )
+
+
+def _write_min_config(path: Path) -> None:
+    path.write_text(
+        textwrap.dedent(
+            """
+            densegen:
+              schema_version: "2.9"
+              run:
+                id: demo
+                root: "."
+              inputs:
+                - name: demo
+                  type: binding_sites
+                  path: inputs.csv
+
+              output:
+                targets: [parquet]
+                schema:
+                  bio_type: dna
+                  alphabet: dna_4
+                parquet:
+                  path: outputs/tables/records.parquet
+
+              generation:
+                sequence_length: 10
+                plan:
+                  - name: default
+                    sequences: 1
+                    sampling:
+                      include_inputs: [demo]
+                    regulator_constraints:
+                      groups: []
+
+              solver:
+                backend: CBC
+                strategy: iterate
+
+              logging:
+                log_dir: outputs/logs
+            """
+        ).strip()
+        + "\n"
+    )
+
+
+def test_workspace_init_warns_on_relative_inputs_without_copy(tmp_path: Path) -> None:
+    source_path = tmp_path / "source.yaml"
+    _write_source_config(source_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_run",
+            "--root",
+            str(tmp_path),
+            "--from-config",
+            str(source_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Workspace uses file-based inputs with relative paths" in result.output
+    assert (tmp_path / "demo_run" / "config.yaml").exists()
+
+
+def test_stage_b_reports_missing_pool_manifest(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.yaml"
+    _write_min_config(cfg_path)
+    pool_dir = tmp_path / "outputs" / "pools"
+    pool_dir.mkdir(parents=True)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "stage-b",
+            "build-libraries",
+            "-c",
+            str(cfg_path),
+            "--pool",
+            str(pool_dir),
+        ],
+    )
+    assert result.exit_code != 0, result.output
+    assert "Pool manifest not found" in result.output
+    normalized = _normalized_output(result.output)
+    assert "dense stage-a build-pool" in normalized
+
+
+def test_workspace_init_supports_binding_sites_demo_workspace(tmp_path: Path) -> None:
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_tfbs_baseline",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "demo_run" / "config.yaml").exists()
+    assert not (tmp_path / "demo_run" / "outputs" / "report").exists()
+
+
+def test_workspace_init_supports_dense_array_showcase_workspace(tmp_path: Path) -> None:
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "showcase_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_dense_array_showcase",
+            "--copy-inputs",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "showcase_run" / "config.yaml").exists()
+    assert (tmp_path / "showcase_run" / "inputs" / "sites.csv").exists()
+
+
+def test_workspace_init_rejects_archived_source_workspace(tmp_path: Path) -> None:
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "archived",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "Unknown source workspace" in result.output
+
+
+def test_workspace_init_uses_env_workspace_root_when_root_not_provided(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace_root = tmp_path / "central_workspaces"
+    monkeypatch.setenv("DENSEGEN_WORKSPACE_ROOT", str(workspace_root))
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_run",
+            "--from-workspace",
+            "demo_tfbs_baseline",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert (workspace_root / "demo_run" / "config.yaml").exists()
+
+
+def test_workspace_init_output_mode_usr_sets_usr_target(tmp_path: Path) -> None:
+    shared_usr_root = tmp_path / "usr_root"
+    workspace_dir = tmp_path / "demo_run"
+    runner = CliRunner()
+    expected_root = workspace_commands._shared_usr_root_for_workspace(workspace_dir, usr_root=shared_usr_root)
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_tfbs_baseline",
+            "--output-mode",
+            "usr",
+            "--usr-root",
+            str(shared_usr_root),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    cfg = yaml.safe_load((tmp_path / "demo_run" / "config.yaml").read_text())
+    output = cfg["densegen"]["output"]
+    assert output["targets"] == ["usr"]
+    assert output["usr"]["root"] == expected_root
+    assert output["usr"]["dataset"] == "densegen_demo_run"
+    assert not (shared_usr_root / "registry.yaml").exists()
+    assert "Shared USR registry is not present yet" in result.output
+
+
+def test_workspace_init_output_mode_usr_rewrites_template_usr_dataset_to_owner_first_id(tmp_path: Path) -> None:
+    shared_usr_root = tmp_path / "usr_root"
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "sampling_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_sampling_baseline",
+            "--output-mode",
+            "usr",
+            "--usr-root",
+            str(shared_usr_root),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    cfg = yaml.safe_load((tmp_path / "sampling_run" / "config.yaml").read_text())
+    output = cfg["densegen"]["output"]
+    assert output["targets"] == ["usr"]
+    assert output["usr"]["dataset"] == "densegen_sampling_run"
+
+
+def test_workspace_init_output_mode_both_sets_both_targets(tmp_path: Path) -> None:
+    shared_usr_root = tmp_path / "usr_root"
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_tfbs_baseline",
+            "--output-mode",
+            "both",
+            "--usr-root",
+            str(shared_usr_root),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    cfg = yaml.safe_load((tmp_path / "demo_run" / "config.yaml").read_text())
+    output = cfg["densegen"]["output"]
+    assert set(output["targets"]) == {"parquet", "usr"}
+    assert output["parquet"]["path"] == "outputs/tables/records.parquet"
+    assert output["usr"]["root"] == workspace_commands._shared_usr_root_for_workspace(
+        tmp_path / "demo_run",
+        usr_root=shared_usr_root,
+    )
+    assert not (shared_usr_root / "registry.yaml").exists()
+    assert "Shared USR registry is not present yet" in result.output
+
+
+def test_workspace_init_output_mode_both_rewrites_template_usr_dataset_to_owner_first_id(tmp_path: Path) -> None:
+    shared_usr_root = tmp_path / "usr_root"
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "sampling_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_sampling_baseline",
+            "--output-mode",
+            "both",
+            "--usr-root",
+            str(shared_usr_root),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    cfg = yaml.safe_load((tmp_path / "sampling_run" / "config.yaml").read_text())
+    output = cfg["densegen"]["output"]
+    assert set(output["targets"]) == {"parquet", "usr"}
+    assert output["usr"]["dataset"] == "densegen_sampling_run"
+
+
+def test_workspace_init_output_mode_usr_requires_explicit_or_env_shared_root_outside_repo(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("DNADESIGN_USR_ROOT", raising=False)
+    monkeypatch.setattr(workspace_commands, "_repo_root_from", lambda _start: None)
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_tfbs_baseline",
+            "--output-mode",
+            "usr",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Shared USR root is ambiguous outside a dnadesign checkout" in result.output
+    assert "--usr-root" in result.output
+    assert "DNADESIGN_USR_ROOT" in result.output
+
+
+def test_workspace_init_output_mode_usr_uses_env_shared_root_when_explicit_not_passed(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    shared_usr_root = tmp_path / "usr_root"
+    monkeypatch.setenv("DNADESIGN_USR_ROOT", str(shared_usr_root))
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_tfbs_baseline",
+            "--output-mode",
+            "usr",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    cfg = yaml.safe_load((tmp_path / "demo_run" / "config.yaml").read_text())
+    output = cfg["densegen"]["output"]
+    assert output["usr"]["root"] == workspace_commands._shared_usr_root_for_workspace(
+        tmp_path / "demo_run",
+        usr_root=shared_usr_root,
+    )
+
+
+def test_workspace_init_existing_workspace_dir_shows_actionable_error(tmp_path: Path) -> None:
+    existing = tmp_path / "demo_run"
+    existing.mkdir(parents=True, exist_ok=True)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "workspace",
+            "init",
+            "--id",
+            "demo_run",
+            "--root",
+            str(tmp_path),
+            "--from-workspace",
+            "demo_tfbs_baseline",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Workspace directory already exists" in result.output
+    assert "Choose a new --id or remove the existing workspace directory" in result.output
+
+
+def test_workspace_where_json_reports_roots(tmp_path: Path, monkeypatch) -> None:
+    workspace_root = tmp_path / "flat_runs"
+    monkeypatch.setenv("DENSEGEN_WORKSPACE_ROOT", str(workspace_root))
+    runner = CliRunner()
+    result = runner.invoke(app, ["workspace", "where", "--format", "json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["workspace_root"] == str(workspace_root)
+    assert payload["workspace_root_source"] == "env:DENSEGEN_WORKSPACE_ROOT"
+    assert payload["workspace_source_root"].endswith("src/dnadesign/densegen/workspaces")
+
+
+def test_workspace_where_json_reports_repo_workspace_root_not_runs(monkeypatch) -> None:
+    repo_root = Path("/tmp/repo")
+    monkeypatch.delenv("DENSEGEN_WORKSPACE_ROOT", raising=False)
+    monkeypatch.setattr(workspace_commands, "_repo_root_from", lambda _start: repo_root)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["workspace", "where", "--format", "json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["workspace_root"] == str(repo_root / "src" / "dnadesign" / "densegen" / "workspaces")
+
+
+def test_workspace_where_requires_explicit_root_outside_repo(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("DENSEGEN_WORKSPACE_ROOT", raising=False)
+    monkeypatch.setattr(workspace_commands, "_repo_root_from", lambda _start: None)
+    runner = CliRunner()
+    result = runner.invoke(app, ["workspace", "where"])
+    assert result.exit_code == 1
+    assert "Unable to determine workspace root" in result.output
+    assert "DENSEGEN_WORKSPACE_ROOT" in result.output
+
+
+def test_workspace_list_json_reports_packaged_workspace_state(tmp_path: Path, monkeypatch) -> None:
+    package_root = tmp_path / "package_root"
+    workspaces_root = package_root / "workspaces"
+    workspaces_root.mkdir(parents=True, exist_ok=True)
+    for workspace_id in ("demo_tfbs_baseline", "study_constitutive_sigma_panel"):
+        (workspaces_root / workspace_id).mkdir(parents=True, exist_ok=True)
+        (workspaces_root / workspace_id / "config.yaml").write_text("densegen: {}\n", encoding="utf-8")
+    (workspaces_root / "demo_tfbs_baseline" / "outputs" / "logs").mkdir(parents=True, exist_ok=True)
+    (workspaces_root / "demo_tfbs_baseline" / "outputs" / "logs" / "run.log").write_text("ok\n", encoding="utf-8")
+
+    monkeypatch.setattr(workspace_sources.resources, "files", lambda _name: package_root)
+    monkeypatch.setattr(
+        workspace_commands,
+        "list_packaged_workspace_inventory",
+        workspace_sources.list_packaged_workspace_inventory,
+    )
+    monkeypatch.setattr(
+        workspace_sources,
+        "PACKAGED_WORKSPACE_IDS",
+        ("demo_tfbs_baseline", "study_constitutive_sigma_panel"),
+    )
+
+    @contextmanager
+    def _as_file(path):
+        yield Path(path)
+
+    monkeypatch.setattr(workspace_sources.resources, "as_file", _as_file)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["workspace", "list", "--format", "json"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    by_id = {entry["workspace_id"]: entry for entry in payload}
+    assert by_id["demo_tfbs_baseline"]["workspace_state"] == "attention"
+    assert by_id["demo_tfbs_baseline"]["output_files"] == 1
+    assert by_id["demo_tfbs_baseline"]["latest_output_mtime"] is not None
+    assert by_id["study_constitutive_sigma_panel"]["workspace_state"] == "clean"
+    assert by_id["study_constitutive_sigma_panel"]["output_files"] == 0
+
+
+def test_list_packaged_workspace_ids_returns_only_declared_templates(tmp_path: Path, monkeypatch) -> None:
+    package_root = tmp_path / "package_root"
+    workspaces_root = package_root / "workspaces"
+    workspaces_root.mkdir(parents=True, exist_ok=True)
+
+    declared = ("demo_tfbs_baseline", "study_constitutive_sigma_panel")
+    for workspace_id in declared:
+        (workspaces_root / workspace_id).mkdir(parents=True, exist_ok=True)
+        (workspaces_root / workspace_id / "config.yaml").write_text("densegen: {}\n")
+
+    # Local ad-hoc directories can exist during editable development and should
+    # not leak into the packaged template list.
+    (workspaces_root / "scratch_run").mkdir(parents=True, exist_ok=True)
+    (workspaces_root / "scratch_run" / "config.yaml").write_text("densegen: {}\n")
+
+    monkeypatch.setattr(workspace_sources.resources, "files", lambda _name: package_root)
+    monkeypatch.setattr(workspace_sources, "PACKAGED_WORKSPACE_IDS", declared)
+
+    @contextmanager
+    def _as_file(path):
+        yield Path(path)
+
+    monkeypatch.setattr(workspace_sources.resources, "as_file", _as_file)
+
+    ids = workspace_sources.list_packaged_workspace_ids()
+    assert ids == list(declared)
+
+
+def test_list_packaged_workspace_ids_fails_when_declared_template_missing_config(tmp_path: Path, monkeypatch) -> None:
+    package_root = tmp_path / "package_root"
+    workspaces_root = package_root / "workspaces"
+    workspaces_root.mkdir(parents=True, exist_ok=True)
+
+    declared = ("demo_tfbs_baseline", "study_constitutive_sigma_panel")
+    (workspaces_root / "demo_tfbs_baseline").mkdir(parents=True, exist_ok=True)
+    (workspaces_root / "demo_tfbs_baseline" / "config.yaml").write_text("densegen: {}\n")
+    (workspaces_root / "study_constitutive_sigma_panel").mkdir(parents=True, exist_ok=True)
+    # Missing config.yaml on purpose for the second declared template.
+
+    monkeypatch.setattr(workspace_sources.resources, "files", lambda _name: package_root)
+    monkeypatch.setattr(workspace_sources, "PACKAGED_WORKSPACE_IDS", declared)
+
+    @contextmanager
+    def _as_file(path):
+        yield Path(path)
+
+    monkeypatch.setattr(workspace_sources.resources, "as_file", _as_file)
+
+    with pytest.raises(RuntimeError, match="missing config.yaml"):
+        workspace_sources.list_packaged_workspace_ids()
+
+
+def test_workspace_init_help_states_required_source_options() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["workspace", "init", "--help"])
+    assert result.exit_code == 0, result.output
+    normalized = _normalized_output(result.output)
+    assert "Use exactly one of --from-workspace or --from-config." in normalized

@@ -1,0 +1,385 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/src/viz/plot_stage_a_strata.py
+
+Stage-A pool tier overview figure builder.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.gridspec import SubplotSpec
+from matplotlib.patches import Patch
+
+from ..utils.plot_style import format_regulator_label, stage_a_rcparams
+from .plot_common import _apply_style, _draw_tier_markers, _style
+from .plot_stage_a_common import (
+    _pastelize_color,
+    _stage_a_non_background_sampling_rows,
+    _stage_a_pool_regulator_column,
+    _stage_a_pool_tfbs_column,
+    _stage_a_regulator_colors,
+    _stage_a_text_sizes,
+)
+
+
+def _percentile_from_hist(score: float, *, edges: list[float], counts: list[int]) -> float:
+    total = float(sum(int(v) for v in counts))
+    if total <= 0.0:
+        raise ValueError("Eligible score histogram must have positive total count.")
+    value = float(score)
+    cdf = 0.0
+    for idx, count in enumerate(counts):
+        left = float(edges[idx])
+        right = float(edges[idx + 1])
+        bin_count = float(int(count))
+        if value >= right:
+            cdf += bin_count
+            continue
+        if value <= left:
+            break
+        width = right - left
+        if width <= 0:
+            cdf += bin_count
+            break
+        frac = (value - left) / width
+        frac = min(1.0, max(0.0, frac))
+        cdf += bin_count * frac
+        break
+    return min(1.0, max(0.0, cdf / total))
+
+
+def _draw_solid_marker(ax: mpl.axes.Axes, *, value: float, label: str, ymax_fraction: float, fontsize: float) -> None:
+    ax.axvline(
+        float(value),
+        ymin=0.0,
+        ymax=float(ymax_fraction),
+        linestyle="-",
+        linewidth=1.2,
+        alpha=0.9,
+        color="#222222",
+    )
+    y_min, y_max = ax.get_ylim()
+    y_top = y_min + (y_max - y_min) * float(ymax_fraction)
+    ax.scatter([float(value)], [y_top], s=16, color="#222222", edgecolors="none", zorder=4)
+    ax.annotate(
+        str(label),
+        (float(value), y_top),
+        xytext=(0, 4),
+        textcoords="offset points",
+        ha="center",
+        va="bottom",
+        fontsize=float(fontsize),
+        color="#222222",
+    )
+
+
+def _build_stage_a_strata_overview_figure(
+    *,
+    input_name: str,
+    pool_df: pd.DataFrame,
+    sampling: dict,
+    style: dict,
+    fig: mpl.figure.Figure | None = None,
+    slot: SubplotSpec | None = None,
+    title: str | None = None,
+    show_column_titles: bool = True,
+) -> tuple[mpl.figure.Figure, list[mpl.axes.Axes], mpl.axes.Axes]:
+    style = _style(style)
+    style["seaborn_style"] = False
+    rc = stage_a_rcparams(style)
+    text_sizes = _stage_a_text_sizes(style)
+    font_size = float(style.get("font_size", 13.0))
+    label_size = float(style.get("label_size", font_size))
+    tick_size = float(style.get("tick_size", label_size))
+    title_pad = 9
+    if "backend" not in sampling:
+        raise ValueError(f"Stage-A sampling missing backend for input '{input_name}'.")
+    if sampling["backend"] != "fimo":
+        raise ValueError(f"Stage-A strata overview requires FIMO sampling (input '{input_name}').")
+    if "eligible_score_hist" not in sampling:
+        raise ValueError(f"Stage-A sampling missing eligible score histogram for input '{input_name}'.")
+    tf_col = _stage_a_pool_regulator_column(pool_df, input_name=input_name)
+    tfbs_col = _stage_a_pool_tfbs_column(pool_df, input_name=input_name)
+    if "best_hit_score" not in pool_df.columns:
+        raise ValueError(f"Stage-A pool missing best_hit_score for input '{input_name}'.")
+
+    eligible_rows = _stage_a_non_background_sampling_rows(input_name, sampling)
+    regulators = [str(row["regulator"]) for row in eligible_rows]
+    hist_by_reg: dict[str, tuple[list[float], list[int], float | None, float | None, float | None]] = {}
+    tier_labels_by_reg: dict[str, list[str]] = {}
+    global_scores: list[float] = []
+    for row in eligible_rows:
+        reg = str(row["regulator"])
+        if "edges" not in row or "counts" not in row:
+            raise ValueError(f"Stage-A eligible score histogram missing edges/counts for '{input_name}' ({reg}).")
+        edges = [float(v) for v in row["edges"]]
+        counts = [int(v) for v in row["counts"]]
+        if "tier0_score" not in row or "tier1_score" not in row or "tier2_score" not in row:
+            raise ValueError(f"Stage-A eligible score histogram missing tier scores for '{input_name}' ({reg}).")
+        tier0_score = row["tier0_score"]
+        tier1_score = row["tier1_score"]
+        tier2_score = row["tier2_score"]
+        if "tier_fractions" not in row:
+            raise ValueError(f"Stage-A eligible score histogram missing tier fractions for '{input_name}' ({reg}).")
+        tier_fractions = [float(v) for v in row["tier_fractions"]]
+        if len(tier_fractions) < 3:
+            raise ValueError(f"Stage-A tier fractions require at least 3 values for '{input_name}' ({reg}).")
+        if not edges:
+            raise ValueError(f"Stage-A eligible score histogram empty for input '{input_name}' ({reg}).")
+        if len(counts) != len(edges) - 1:
+            raise ValueError(f"Eligible score histogram length mismatch for '{input_name}' ({reg}).")
+        for val in edges:
+            global_scores.append(float(val))
+        for val in (tier0_score, tier1_score, tier2_score):
+            if val is not None:
+                global_scores.append(float(val))
+
+        def _format_frac(frac: float) -> str:
+            label = f"{float(frac) * 100:.3f}".rstrip("0").rstrip(".")
+            return f"{label}%"
+
+        tier_labels_by_reg[reg] = [_format_frac(frac) for frac in tier_fractions[:3]]
+        hist_by_reg[reg] = (
+            edges,
+            counts,
+            float(tier0_score) if tier0_score is not None else None,
+            float(tier1_score) if tier1_score is not None else None,
+            float(tier2_score) if tier2_score is not None else None,
+        )
+
+    base_colors = _stage_a_regulator_colors(regulators, style)
+    color_by_reg = {reg: _pastelize_color(color, amount=0.35) for reg, color in base_colors.items()}
+
+    n_regs = max(1, len(regulators))
+    fig_width = float(style.get("figsize", (11.6, 3.8))[0])
+    fig_height = max(2.45, 0.9 * n_regs + 0.6)
+    with mpl.rc_context(rc):
+        if fig is None:
+            fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=False)
+        if slot is None:
+            panel = fig.add_gridspec(nrows=1, ncols=1)[0, 0]
+        else:
+            panel = slot
+        gs = panel.subgridspec(
+            nrows=n_regs,
+            ncols=2,
+            width_ratios=[2.2, 1.1],
+            hspace=0.22,
+            wspace=0.24,
+        )
+        axes_left: list[mpl.axes.Axes] = []
+        for idx in range(n_regs):
+            ax = fig.add_subplot(gs[idx, 0], sharex=axes_left[0] if axes_left else None)
+            axes_left.append(ax)
+        ax_right = fig.add_subplot(gs[:, 1])
+
+        retained_tiers = {}
+        core_lengths: dict[str, int] = {}
+        if "tfbs_core" in pool_df.columns:
+            core_series = pool_df["tfbs_core"].astype(str)
+            for reg, core in zip(pool_df[tf_col].astype(str).to_list(), core_series.to_list()):
+                core_lengths.setdefault(reg, []).append(len(core))
+            core_lengths = {reg: int(np.median(vals)) for reg, vals in core_lengths.items() if vals}
+        if "tier" in pool_df.columns:
+            tier_counts = pool_df.groupby([tf_col, "tier"], dropna=False).size().rename("count").reset_index()
+            for _, row in tier_counts.iterrows():
+                retained_tiers.setdefault(str(row[tf_col]), {})[int(row["tier"])] = int(row["count"])
+
+        if not global_scores:
+            raise ValueError(f"Stage-A eligible score histogram empty for input '{input_name}'.")
+        global_min = float(min(global_scores))
+        global_max = float(max(global_scores))
+        pad = max(0.25, (global_max - global_min) * 0.03) if global_max > global_min else 0.25
+        global_min -= pad
+        global_max += pad
+        retained_values_by_reg: dict[str, np.ndarray] = {}
+        retained_min_score_by_reg: dict[str, float] = {}
+        retained_min_percentile_by_reg: dict[str, float] = {}
+        for reg in regulators:
+            if reg not in hist_by_reg:
+                raise ValueError(f"Stage-A eligible score histogram missing for '{input_name}' ({reg}).")
+            edges, counts, _tier0_score, _tier1_score, _tier2_score = hist_by_reg[reg]
+            retained_vals = pd.to_numeric(
+                pool_df.loc[pool_df[tf_col].astype(str) == reg, "best_hit_score"],
+                errors="coerce",
+            ).dropna()
+            if retained_vals.empty:
+                raise ValueError(f"Stage-A retained scores missing for '{input_name}' ({reg}).")
+            retained_arr = retained_vals.to_numpy(dtype=float)
+            retained_values_by_reg[reg] = retained_arr
+            retained_min = float(np.min(retained_arr))
+            retained_min_score_by_reg[reg] = retained_min
+            retained_min_percentile_by_reg[reg] = _percentile_from_hist(retained_min, edges=edges, counts=counts)
+        worst_reg = min(regulators, key=lambda reg: (retained_min_percentile_by_reg[reg], reg))
+        worst_reg_score = float(retained_min_score_by_reg[worst_reg])
+        worst_reg_percentile = float(retained_min_percentile_by_reg[worst_reg])
+        for idx, reg in enumerate(regulators):
+            ax = axes_left[idx]
+            if reg not in hist_by_reg:
+                raise ValueError(f"Stage-A eligible score histogram missing for '{input_name}' ({reg}).")
+            edges, counts, tier0_score, tier1_score, tier2_score = hist_by_reg[reg]
+            if not edges:
+                raise ValueError(f"Stage-A eligible score histogram missing for '{input_name}' ({reg}).")
+            counts_arr = np.asarray(counts, dtype=float)
+            if counts_arr.size == 0:
+                raise ValueError(f"Stage-A eligible score histogram empty for '{input_name}' ({reg}).")
+            max_count = float(counts_arr.max()) if counts_arr.size else 0.0
+            scale = max_count if max_count > 0 else 1.0
+            density = counts_arr / scale
+            centers = (np.asarray(edges[:-1]) + np.asarray(edges[1:])) / 2.0
+            hue = color_by_reg[reg]
+            ax.fill_between(centers, 0.0, density, color=hue, alpha=0.22, zorder=1)
+            ax.plot(centers, density, color=hue, linewidth=1.15, zorder=3)
+            retained_values = retained_values_by_reg.get(reg)
+            if retained_values is None or retained_values.size == 0:
+                raise ValueError(f"Stage-A retained scores missing for '{input_name}' ({reg}).")
+            retained_counts, _ = np.histogram(retained_values, bins=np.asarray(edges))
+            retained_arr = np.asarray(retained_counts, dtype=float)
+            if retained_arr.max() <= 0:
+                raise ValueError(f"Stage-A retained score histogram empty for '{input_name}' ({reg}).")
+            retained_density = retained_arr / scale
+            ax.fill_between(centers, 0.0, retained_density, color=hue, alpha=0.4, zorder=2)
+            retained = retained_tiers.get(reg, {})
+            if reg not in tier_labels_by_reg:
+                raise ValueError(f"Stage-A tier labels missing for '{input_name}' ({reg}).")
+            tier_labels = tier_labels_by_reg[reg]
+            _draw_tier_markers(
+                ax,
+                [
+                    (tier_labels[0], tier0_score, str(retained.get(0, 0))),
+                    (tier_labels[1], tier1_score, str(retained.get(1, 0))),
+                    (tier_labels[2], tier2_score, str(retained.get(2, 0))),
+                ],
+                ymax_fraction=0.58,
+                label_mode="box",
+                loc="upper left",
+                fontsize=text_sizes["annotation"] * 0.95,
+            )
+            if reg == worst_reg:
+                marker_label = f"min retained ({worst_reg_percentile * 100:.1f}%)"
+                _draw_solid_marker(
+                    ax,
+                    value=worst_reg_score,
+                    label=marker_label,
+                    ymax_fraction=0.86,
+                    fontsize=text_sizes["annotation"] * 0.85,
+                )
+            ax.set_ylim(0, 1.05)
+            ax.set_yticks([])
+            label = format_regulator_label(reg)
+            core_len = core_lengths.get(reg)
+            ax.set_ylabel("")
+            ax.text(
+                -0.015,
+                0.64,
+                label,
+                transform=ax.transAxes,
+                ha="right",
+                va="center",
+                fontsize=text_sizes["regulator_label"],
+                color="#111111",
+                clip_on=False,
+            )
+            if core_len:
+                ax.text(
+                    -0.015,
+                    0.34,
+                    f"(core {core_len} bp)",
+                    transform=ax.transAxes,
+                    ha="right",
+                    va="center",
+                    fontsize=text_sizes["sublabel"],
+                    color="#111111",
+                    clip_on=False,
+                )
+        for ax in axes_left:
+            ax.set_xlim(global_min, global_max)
+
+        if axes_left and show_column_titles:
+            axes_left[0].set_title(
+                "Score distribution of unique cores",
+                fontsize=text_sizes["annotation"],
+                color="#111111",
+                pad=title_pad,
+                loc="center",
+            )
+        if axes_left:
+            axes_left[-1].set_xlabel("FIMO log-odds score")
+            axes_left[-1].xaxis.set_major_locator(mpl.ticker.MaxNLocator(nbins=5))
+
+        lengths_by_reg: dict[str, list[int]] = {}
+        allowed_regs = set(regulators)
+        for reg, seq in pool_df[[tf_col, tfbs_col]].itertuples(index=False):
+            reg_label = str(reg)
+            if reg_label not in allowed_regs:
+                continue
+            lengths_by_reg.setdefault(reg_label, []).append(len(str(seq)))
+        for reg in regulators:
+            if not lengths_by_reg.get(reg):
+                raise ValueError(f"Stage-A pool missing TFBS lengths for '{input_name}' ({reg}).")
+        all_lengths = [val for vals in lengths_by_reg.values() for val in vals]
+        if not all_lengths:
+            raise ValueError(f"Stage-A pool missing TFBS lengths for input '{input_name}'.")
+        min_len = int(min(all_lengths))
+        max_len = int(max(all_lengths))
+        bins = np.arange(min_len - 0.5, max_len + 1.5, 1.0)
+        for reg, lengths in lengths_by_reg.items():
+            if not lengths:
+                continue
+            hue = color_by_reg[reg]
+            ax_right.hist(
+                lengths,
+                bins=bins,
+                density=False,
+                alpha=0.18,
+                color=hue,
+                edgecolor=hue,
+                linewidth=0.7,
+            )
+        span = max_len - min_len
+        pad = max(5, int(round(span * 0.05))) if span > 0 else 5
+        ax_right.set_xlim(min_len - pad, max_len + pad)
+        ax_right.xaxis.set_major_locator(mpl.ticker.MaxNLocator(integer=True, nbins=5))
+        ax_right.set_xlabel("TFBS length (nt)")
+        ax_right.set_ylabel("Count")
+        if show_column_titles:
+            ax_right.set_title(
+                "Retained TFBS length counts",
+                fontsize=text_sizes["annotation"],
+                color="#111111",
+                pad=title_pad,
+            )
+
+        legend_handles = [
+            Patch(
+                facecolor=color_by_reg[reg],
+                edgecolor=color_by_reg[reg],
+                label=format_regulator_label(reg),
+                alpha=0.35,
+            )
+            for reg in regulators
+        ]
+        if legend_handles:
+            ax_right.legend(
+                handles=legend_handles,
+                loc="upper left",
+                frameon=False,
+                fontsize=text_sizes["annotation"] * 0.95,
+            )
+
+        for ax in axes_left + [ax_right]:
+            _apply_style(ax, style)
+
+    ax_left = axes_left[-1]
+    ax_left.tick_params(axis="x", labelsize=tick_size)
+    ax_right.tick_params(axis="x", labelsize=tick_size)
+    ax_right.tick_params(axis="y", labelsize=tick_size)
+    return fig, axes_left, ax_right

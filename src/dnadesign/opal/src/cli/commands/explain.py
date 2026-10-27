@@ -1,0 +1,89 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/cli/commands/explain.py
+
+CLI wiring for explain OPAL CLI commands.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import typer
+
+from ...core.utils import ExitCodes, OpalError, print_stdout
+from ...runtime.explain import explain_round
+from ..formatting import render_explain_text
+from ..guidance_hints import maybe_print_hints
+from ..registry import cli_command
+from ._common import (
+    internal_error,
+    json_out,
+    load_cli_config,
+    opal_error,
+    print_config_context,
+    resolve_config_path,
+    store_from_cfg,
+)
+
+
+@cli_command("explain", help="Dry-run planner for a round; prints counts and plan (no writes).")
+def cmd_explain(
+    config: Path = typer.Option(None, "--config", "-c", envvar="OPAL_CONFIG", help="campaign.yaml"),
+    round: int = typer.Option(
+        ...,
+        "--round",
+        "-r",
+        help="Labels cutoff (same as run --round).",
+    ),
+    json: bool = typer.Option(
+        False,
+        "--json/--text",
+        help="Output as JSON (default: text).",
+    ),
+    no_hints: bool = typer.Option(False, "--no-hints", help="Disable next-step hints in text output."),
+):
+    try:
+        cfg_path = resolve_config_path(config)
+        cfg = load_cli_config(cfg_path)
+        store = store_from_cfg(cfg)
+        df = store.load()
+        info = explain_round(store, df, cfg, round)
+        if json:
+            json_out(info)
+        else:
+            print_config_context(cfg_path, cfg=cfg, records_path=store.records_path)
+            print_stdout(render_explain_text(info))
+            preflight = dict(info.get("preflight") or {})
+            if preflight:
+                lines = ["Run preflight"]
+                lines.append(f"- observed_round: {preflight.get('observed_round_definition', '')}")
+                lines.append(f"- labels_as_of: {preflight.get('labels_as_of_definition', '')}")
+                if "sfxi_current_round_labels" in preflight:
+                    lines.append(
+                        "- sfxi current-round labels: "
+                        f"{int(preflight.get('sfxi_current_round_labels', 0))} "
+                        f"(min_n={int(preflight.get('sfxi_scaling_min_n', 0))})"
+                    )
+                if bool(preflight.get("sfxi_run_will_fail")):
+                    lines.append("- warning: this run will fail until current-round labels satisfy min_n.")
+                    lines.append(f"- fix: {preflight.get('sfxi_fix_command')}")
+                print_stdout("\n".join([""] + lines))
+            maybe_print_hints(
+                command_name="explain",
+                cfg_path=cfg_path,
+                no_hints=no_hints,
+                json_output=json,
+                labels_as_of=int(round),
+                explain_info=dict(info),
+            )
+    except OpalError as e:
+        opal_error("explain", e)
+        raise typer.Exit(code=e.exit_code)
+    except Exception as e:
+        internal_error("explain", e)
+        raise typer.Exit(code=ExitCodes.INTERNAL_ERROR)

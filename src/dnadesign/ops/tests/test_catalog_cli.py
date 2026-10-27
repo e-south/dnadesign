@@ -1,0 +1,1053 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/ops/tests/test_catalog_cli.py
+
+Contract tests for the read-only ops catalog discovery surface.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import tomllib
+from dataclasses import asdict
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+from typer.testing import CliRunner
+
+from dnadesign.ops.catalog import CatalogQuery, filter_runbook_catalog, load_runbook_catalog, metadata, provider_sources
+from dnadesign.ops.catalog.metadata import _load_registry_metadata_file, _load_tool_source_metadata_file
+from dnadesign.ops.cli import app
+
+
+def _repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    raise RuntimeError("repo root not found")
+
+
+_ANSI_ESCAPE_RE = re.compile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
+
+
+def _write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def _fake_distribution(name: str, *owned_paths: Path) -> SimpleNamespace:
+    return SimpleNamespace(
+        name=name,
+        files=tuple(owned_paths),
+        locate_file=lambda path: Path(path),
+        read_text=lambda filename: None,
+    )
+
+
+def test_load_runbook_catalog_reads_shared_registry() -> None:
+    catalog = load_runbook_catalog(repo_root=_repo_root())
+
+    assert catalog.procedures
+    assert catalog.tool_sources
+    assert catalog.find_procedure("ops.control-plane.orchestration") is not None
+    assert catalog.find_procedure("cluster.downstream.exploratory-clustering") is not None
+    assert catalog.find_tool_source("usr") is not None
+    assert catalog.find_tool_source("latentdna") is not None
+    junction_review_route = catalog.find_tool_route(tool="baserender", route_id="junction-review")
+    assert junction_review_route is not None
+    assert junction_review_route.doc_path == "../../src/dnadesign/baserender/docs/integrations/junction.md"
+
+
+def test_catalog_registry_metadata_rejects_unknown_top_level_keys(tmp_path: Path) -> None:
+    doc_path = tmp_path / "docs" / "operations" / "demo.md"
+    metadata_path = doc_path.with_name("demo.registry.yaml")
+    catalog_path = tmp_path / "docs" / "runbooks" / "README.md"
+    _write(doc_path, "# Demo Procedure\n")
+    _write(catalog_path, "# Runbooks\n")
+    _write(
+        metadata_path,
+        """
+schema_version: 1
+catalog_order: 1
+registry_id: demo.procedure
+type: runbook
+plane: control-plane
+owner_boundary: ops
+entry_artifact: demo.yaml
+exit_artifact: audit.json
+execution_kind: executable
+status_kind: ops-audit-json
+summary: Demo procedure.
+legacy_alias: stale
+""",
+    )
+
+    with pytest.raises(ValueError, match="registry metadata has unknown key\\(s\\): legacy_alias"):
+        _load_registry_metadata_file(metadata_path=metadata_path, repo_root=tmp_path, catalog_path=catalog_path)
+
+
+def test_catalog_registry_metadata_can_live_under_operations_catalog_contracts_directory(tmp_path: Path) -> None:
+    doc_path = tmp_path / "docs" / "studies" / "demo_study" / "operations" / "catalog" / "contracts" / "preflight.md"
+    metadata_path = doc_path.parent / "registry" / "preflight.registry.yaml"
+    catalog_path = tmp_path / "docs" / "runbooks" / "README.md"
+    _write(doc_path, "# Demo Preflight\n")
+    _write(catalog_path, "# Runbooks\n")
+    _write(
+        metadata_path,
+        """
+schema_version: 1
+catalog_order: 1
+registry_id: studies.demo.preflight
+type: contract
+plane: data-plane
+owner_boundary: studies
+entry_artifact: demo study record
+exit_artifact: demo preflight summary
+execution_kind: iterative
+status_kind: demo-preflight
+summary: Demo preflight contract.
+""",
+    )
+
+    entry, relations = _load_registry_metadata_file(
+        metadata_path=metadata_path,
+        repo_root=tmp_path,
+        catalog_path=catalog_path,
+    )
+
+    assert entry.title == "Demo Preflight"
+    assert entry.doc_path == "../studies/demo_study/operations/catalog/contracts/preflight.md"
+    assert relations == ()
+
+
+def test_external_catalog_registry_entry_point_is_owner_confined(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package_root = tmp_path / "research_studies"
+    doc_path = package_root / "studies" / "demo" / "operations" / "catalog" / "contracts" / "status.md"
+    metadata_path = doc_path.parent / "registry" / "status.registry.yaml"
+    local_doc_path = tmp_path / "dnadesign" / "docs" / "operations" / "local.md"
+    local_metadata_path = local_doc_path.with_name("local.registry.yaml")
+    catalog_path = tmp_path / "dnadesign" / "docs" / "runbooks" / "README.md"
+    _write(doc_path, "# Demo Study Status\n")
+    _write(local_doc_path, "# Local Procedure\n")
+    _write(catalog_path, "# Runbooks\n")
+    _write(
+        metadata_path,
+        """
+schema_version: 1
+catalog_order: 55
+registry_id: studies.demo.status
+type: contract
+plane: data-plane
+owner_boundary: studies
+entry_artifact: demo study record
+exit_artifact: demo status
+execution_kind: iterative
+status_kind: demo-status
+summary: Read the demo study status.
+""",
+    )
+    _write(
+        local_metadata_path,
+        """
+schema_version: 1
+catalog_order: 55
+registry_id: ops.local.procedure
+type: runbook
+plane: control-plane
+owner_boundary: ops
+entry_artifact: local request
+exit_artifact: local result
+execution_kind: executable
+status_kind: local-status
+summary: Run the local procedure.
+""",
+    )
+    entry_point = SimpleNamespace(
+        name="research-studies",
+        value="research_studies.integrations.dnadesign_ops:catalog_registry_paths",
+        dist=_fake_distribution("research-studies", metadata_path, doc_path),
+        load=lambda: lambda: (metadata_path,),
+    )
+    monkeypatch.setattr(provider_sources, "entry_points", lambda *, group: (entry_point,))
+    monkeypatch.setattr(
+        provider_sources,
+        "find_spec",
+        lambda module: SimpleNamespace(
+            submodule_search_locations=None,
+            origin=str(package_root / "integrations" / "dnadesign_ops.py"),
+        ),
+    )
+
+    sources = provider_sources.discover_external_catalog_registry_sources()
+    assert sources[0].provider_id == "research-studies:research-studies"
+    procedures, relations = metadata.load_catalog_procedures(
+        repo_root=tmp_path / "dnadesign",
+        catalog_path=catalog_path,
+        metadata_paths=(local_metadata_path,),
+        external_sources=sources,
+    )
+
+    assert [entry.registry_id for entry in procedures] == ["ops.local.procedure", "studies.demo.status"]
+    external = next(entry for entry in procedures if entry.registry_id == "studies.demo.status")
+    assert Path(catalog_path.parent, external.doc_path).resolve() == doc_path.resolve()
+    assert relations == {"ops.local.procedure": (), "studies.demo.status": ()}
+
+
+def test_catalog_order_remains_unique_within_one_provider(tmp_path: Path) -> None:
+    catalog_path = tmp_path / "docs" / "runbooks" / "README.md"
+    _write(catalog_path, "# Runbooks\n")
+    metadata_paths: list[Path] = []
+    for registry_id in ("demo.first", "demo.second"):
+        doc_path = tmp_path / "docs" / "operations" / f"{registry_id}.md"
+        metadata_path = doc_path.with_suffix(".registry.yaml")
+        _write(doc_path, f"# {registry_id}\n")
+        _write(
+            metadata_path,
+            f"""
+schema_version: 1
+catalog_order: 7
+registry_id: {registry_id}
+type: runbook
+plane: control-plane
+owner_boundary: ops
+entry_artifact: request
+exit_artifact: result
+execution_kind: executable
+status_kind: demo-status
+summary: Demo procedure.
+""",
+        )
+        metadata_paths.append(metadata_path)
+
+    with pytest.raises(ValueError, match="duplicate catalog_order within one registry provider"):
+        metadata.load_catalog_procedures(
+            repo_root=tmp_path,
+            catalog_path=catalog_path,
+            metadata_paths=tuple(metadata_paths),
+        )
+
+
+def test_catalog_order_scope_uses_provider_identity_not_package_root(tmp_path: Path) -> None:
+    catalog_path = tmp_path / "catalog" / "README.md"
+    _write(catalog_path, "# Runbooks\n")
+    shared_root = tmp_path / "shared_namespace"
+    sources: list[provider_sources.CatalogRegistrySource] = []
+    for provider_id, registry_id in (("dist-a:provider-a", "a.status"), ("dist-b:provider-b", "b.status")):
+        doc_path = shared_root / provider_id.split(":", 1)[1] / "status.md"
+        metadata_path = doc_path.with_suffix(".registry.yaml")
+        _write(doc_path, f"# {registry_id}\n")
+        _write(
+            metadata_path,
+            f"""
+schema_version: 1
+catalog_order: 4
+registry_id: {registry_id}
+type: contract
+plane: data-plane
+owner_boundary: studies
+entry_artifact: record
+exit_artifact: status
+execution_kind: iterative
+status_kind: demo-status
+summary: Provider status.
+""",
+        )
+        sources.append(
+            provider_sources.CatalogRegistrySource(
+                provider_id=provider_id,
+                path=metadata_path,
+                package_root=shared_root,
+            )
+        )
+
+    procedures, _ = metadata.load_catalog_procedures(
+        repo_root=tmp_path,
+        catalog_path=catalog_path,
+        metadata_paths=(),
+        external_sources=tuple(sources),
+    )
+
+    assert [entry.registry_id for entry in procedures] == ["a.status", "b.status"]
+
+
+def test_one_provider_cannot_reuse_order_across_package_roots(tmp_path: Path) -> None:
+    catalog_path = tmp_path / "catalog" / "README.md"
+    _write(catalog_path, "# Runbooks\n")
+    sources: list[provider_sources.CatalogRegistrySource] = []
+    for index in (1, 2):
+        package_root = tmp_path / f"namespace-root-{index}"
+        doc_path = package_root / "status.md"
+        metadata_path = doc_path.with_suffix(".registry.yaml")
+        _write(doc_path, f"# Provider status {index}\n")
+        _write(
+            metadata_path,
+            f"""
+schema_version: 1
+catalog_order: 4
+registry_id: provider.status-{index}
+type: contract
+plane: data-plane
+owner_boundary: studies
+entry_artifact: record
+exit_artifact: status
+execution_kind: iterative
+status_kind: demo-status
+summary: Provider status.
+""",
+        )
+        sources.append(
+            provider_sources.CatalogRegistrySource(
+                provider_id="one-dist:one-provider",
+                path=metadata_path,
+                package_root=package_root,
+            )
+        )
+
+    with pytest.raises(ValueError, match="duplicate catalog_order within one registry provider"):
+        metadata.load_catalog_procedures(
+            repo_root=tmp_path,
+            catalog_path=catalog_path,
+            metadata_paths=(),
+            external_sources=tuple(sources),
+        )
+
+
+def test_external_catalog_registry_entry_point_rejects_path_outside_package(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package_root = tmp_path / "research_studies"
+    package_root.mkdir()
+    external_metadata = tmp_path / "status.registry.yaml"
+    external_metadata.write_text("schema_version: 1\n", encoding="utf-8")
+    entry_point = SimpleNamespace(
+        name="research-studies",
+        value="research_studies.integrations.dnadesign_ops:catalog_registry_paths",
+        dist=_fake_distribution("research-studies", external_metadata),
+        load=lambda: lambda: (external_metadata,),
+    )
+    monkeypatch.setattr(provider_sources, "entry_points", lambda *, group: (entry_point,))
+    monkeypatch.setattr(
+        provider_sources,
+        "find_spec",
+        lambda module: SimpleNamespace(
+            submodule_search_locations=None,
+            origin=str(package_root / "integrations" / "dnadesign_ops.py"),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="path must stay under its entry-point package"):
+        provider_sources.discover_external_catalog_registry_sources()
+
+
+def test_external_catalog_registry_rejects_a_sibling_namespace_provider_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    namespace_root = tmp_path / "shared_namespace"
+    provider_module = namespace_root / "provider_a" / "registry.py"
+    sibling_doc = namespace_root / "provider_b" / "status.md"
+    sibling_metadata = sibling_doc.with_suffix(".registry.yaml")
+    _write(provider_module, "def catalog_registry_paths(): return ()\n")
+    _write(sibling_doc, "# Sibling status\n")
+    _write(sibling_metadata, "schema_version: 1\n")
+    entry_point = SimpleNamespace(
+        name="provider-a",
+        value="shared_namespace.provider_a.registry:catalog_registry_paths",
+        dist=_fake_distribution("provider-a", provider_module),
+        load=lambda: lambda: (sibling_metadata,),
+    )
+    monkeypatch.setattr(provider_sources, "entry_points", lambda *, group: (entry_point,))
+    monkeypatch.setattr(
+        provider_sources,
+        "find_spec",
+        lambda module: SimpleNamespace(submodule_search_locations=None, origin=str(provider_module)),
+    )
+
+    with pytest.raises(ValueError, match="artifact must belong to its entry-point distribution"):
+        provider_sources.discover_external_catalog_registry_sources()
+
+
+def test_external_catalog_registry_requires_distribution_owned_documentation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package_root = tmp_path / "provider_a"
+    provider_module = package_root / "registry.py"
+    doc_path = package_root / "status.md"
+    metadata_path = doc_path.with_suffix(".registry.yaml")
+    _write(provider_module, "def catalog_registry_paths(): return ()\n")
+    _write(doc_path, "# Provider status\n")
+    _write(metadata_path, "schema_version: 1\n")
+    entry_point = SimpleNamespace(
+        name="provider-a",
+        value="provider_a.registry:catalog_registry_paths",
+        dist=_fake_distribution("provider-a", provider_module, metadata_path),
+        load=lambda: lambda: (metadata_path,),
+    )
+    monkeypatch.setattr(provider_sources, "entry_points", lambda *, group: (entry_point,))
+    monkeypatch.setattr(
+        provider_sources,
+        "find_spec",
+        lambda module: SimpleNamespace(submodule_search_locations=None, origin=str(provider_module)),
+    )
+
+    with pytest.raises(ValueError, match="artifact must belong to its entry-point distribution"):
+        provider_sources.discover_external_catalog_registry_sources()
+
+
+def test_catalog_tool_source_metadata_rejects_unknown_route_keys(tmp_path: Path) -> None:
+    doc_path = tmp_path / "src" / "dnadesign" / "demo" / "docs" / "README.md"
+    route_path = doc_path.with_name("workflow.md")
+    metadata_path = doc_path.with_suffix(".tool-source.yaml")
+    catalog_path = tmp_path / "docs" / "runbooks" / "README.md"
+    _write(doc_path, "# Demo Tool\n")
+    _write(route_path, "# Demo Workflow\n")
+    _write(catalog_path, "# Runbooks\n")
+    _write(
+        metadata_path,
+        """
+schema_version: 1
+catalog_order: 1
+tool: demo
+summary: Demo docs.
+routes:
+  - id: workflow
+    path: workflow.md
+    summary: Demo workflow.
+    legacy: stale
+""",
+    )
+
+    with pytest.raises(ValueError, match="route 1 has unknown key\\(s\\): legacy"):
+        _load_tool_source_metadata_file(metadata_path=metadata_path, repo_root=tmp_path, catalog_path=catalog_path)
+
+
+def test_ops_package_data_declares_registry_and_runbook_templates() -> None:
+    repo_root = _repo_root()
+    project = tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8"))
+    paths = project["tool"]["setuptools"]["package-data"]["dnadesign.ops"]
+    required = {
+        "catalog/builtin.json",
+        "providers/builtin/status.registry.yaml",
+        "runbooks/templates/densegen-analysis.qsub",
+        "runbooks/templates/evo2-gpu-infer.qsub",
+    }
+    assert required <= set(paths)
+    assert all(not any(token in path for token in "*?[") for path in paths)
+    assert not any(path.startswith("runbooks/presets/") for path in paths)
+
+
+def test_catalog_query_filters_procedures_without_touching_registry_ownership() -> None:
+    catalog = load_runbook_catalog(repo_root=_repo_root())
+
+    procedures, tool_sources = filter_runbook_catalog(
+        catalog,
+        query=CatalogQuery(plane="data-plane", query="infer"),
+    )
+
+    assert procedures
+    assert all(entry.plane == "data-plane" for entry in procedures)
+    assert any(entry.registry_id == "usr.data-plane.promoter-feature-matrix" for entry in procedures)
+    assert tool_sources == ()
+
+
+def test_cli_catalog_list_emits_grouped_text_inventory() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["catalog", "list", "--repo-root", str(_repo_root())])
+
+    assert result.exit_code == 0
+    assert "Catalog inventory" in result.output
+    assert "Counts:" in result.output
+    assert "Cross-tool procedures" in result.output
+    assert "ops.control-plane.orchestration" in result.output
+    assert "cluster.downstream.exploratory-clustering" in result.output
+    assert "Tool docs" in result.output
+    assert "densegen: DenseGen documentation" in result.output
+    assert "usr: USR docs" in result.output
+    assert "Suggested next steps" in result.output
+    assert "uv run ops catalog list --query <term>" in result.output
+    assert "uv run ops catalog list --simple" in result.output
+    assert "uv run ops catalog show ops.control-plane.orchestration" in result.output
+    assert "uv run ops progress explain ops.control-plane.orchestration" in result.output
+    assert "uv run ops progress scaffold ops.control-plane.orchestration" in result.output
+
+
+def test_cli_help_points_new_users_to_task_first_catalog_list() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["--help"])
+
+    assert result.exit_code == 0
+    normalized_output = " ".join(_ANSI_ESCAPE_RE.sub("", result.output).split())
+    assert "Start with `uv run ops catalog list --simple` to browse routes from the terminal." in normalized_output
+
+
+def test_cli_catalog_list_supports_json_and_section_filter() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--section",
+            "procedures",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["section"] == "procedures"
+    assert payload["view"] == "full"
+    assert payload["filters"] == {}
+    assert payload["counts"]["procedures"] >= 1
+    assert "procedures" in payload
+    assert "tool_sources" not in payload
+    assert any(entry["registry_id"] == "opal.downstream.usr-infer-x-active-learning" for entry in payload["procedures"])
+
+
+def test_cli_catalog_list_supports_queryable_filters() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--plane",
+            "downstream-tool",
+            "--query",
+            "active learning",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["filters"] == {"plane": "downstream-tool", "query": "active learning"}
+    assert payload["counts"] == {"procedures": 1, "tool_sources": 0}
+    assert [entry["registry_id"] for entry in payload["procedures"]] == ["opal.downstream.usr-infer-x-active-learning"]
+    assert payload["tool_sources"] == []
+
+
+def test_cli_catalog_list_matches_procedure_keywords_for_promoter_alias_queries() -> None:
+    runner = CliRunner()
+
+    for query in ("wildtype promoter", "evo2 promoter"):
+        result = runner.invoke(
+            app,
+            [
+                "catalog",
+                "list",
+                "--repo-root",
+                str(_repo_root()),
+                "--section",
+                "procedures",
+                "--query",
+                query,
+                "--json",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert any(
+            entry["registry_id"] == "usr.data-plane.promoter-feature-matrix" for entry in payload["procedures"]
+        ), query
+
+
+def test_cli_catalog_list_supports_simple_text_view() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--simple",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Task-first procedures" in result.output
+    assert "Tool docs" in result.output
+    assert "Registry id: ops.control-plane.orchestration" in result.output
+    assert "Inspect: uv run ops catalog show ops.control-plane.orchestration" in result.output
+    assert "[runbook | control-plane | executable | ops-audit-json]" not in result.output
+
+
+def test_cli_catalog_list_supports_tool_source_queries_for_promoter_path() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--section",
+            "tool-sources",
+            "--query",
+            "promoter feature matrix",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["filters"] == {"query": "promoter feature matrix"}
+    tools = {entry["tool"] for entry in payload["tool_sources"]}
+    assert {"usr", "infer", "opal"}.issubset(tools)
+    assert "procedures" not in payload
+
+
+def test_cli_catalog_list_supports_related_tool_sources() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--section",
+            "tool-sources",
+            "--related-to",
+            "usr.data-plane.promoter-feature-matrix",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["filters"] == {"related_to": "usr.data-plane.promoter-feature-matrix"}
+    assert payload["counts"] == {"tool_sources": 5}
+    assert [entry["tool"] for entry in payload["tool_sources"]] == [
+        "densegen",
+        "construct",
+        "infer",
+        "cluster",
+        "opal",
+    ]
+    assert "procedures" not in payload
+
+
+def test_cli_catalog_list_supports_related_to_filter() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--section",
+            "procedures",
+            "--related-to",
+            "usr.data-plane.promoter-feature-matrix",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["filters"] == {"related_to": "usr.data-plane.promoter-feature-matrix"}
+    assert payload["counts"] == {"procedures": 4}
+    assert [entry["registry_id"] for entry in payload["procedures"]] == [
+        "usr.data-plane.multi-source-source-of-truth",
+        "usr.data-plane.construct-infer-source-of-truth",
+        "cluster.downstream.exploratory-clustering",
+        "opal.downstream.usr-infer-x-active-learning",
+    ]
+    assert "tool_sources" not in payload
+
+
+def test_cli_catalog_list_tool_sources_suggests_tool_source_specific_next_steps() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--section",
+            "tool-sources",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Narrow the docs by topic" in result.output
+    assert "uv run ops catalog list --section tool-sources --query <term>" in result.output
+    assert "Browse all registered procedures" in result.output
+    assert "Inspect the first matching procedure" not in result.output
+
+
+def test_cli_catalog_show_emits_registered_entry() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "show",
+            "usr.data-plane.promoter-feature-matrix",
+            "--repo-root",
+            str(_repo_root()),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Registry id: usr.data-plane.promoter-feature-matrix" in result.output
+    assert "Owner boundary: usr" in result.output
+    assert "Entry artifact: one or more USR-backed promoter datasets" in result.output
+    assert "Exit artifact: infer-annotated USR feature matrix ready for cluster or OPAL" in result.output
+    assert "Status kind: usr-dataset-state" in result.output
+    assert "Owner docs:" in result.output
+    assert "- usr: USR docs" in result.output
+    assert "Related tool docs:" in result.output
+    assert "- densegen: DenseGen documentation" in result.output
+    assert "- construct: Construct documentation" in result.output
+    assert "- infer: infer docs" in result.output
+    assert "- cluster: Cluster docs" in result.output
+    assert "- opal: OPAL documentation" in result.output
+    assert "Related deep docs:" in result.output
+    assert "- construct/template-contexts: Construct template contexts" in result.output
+    assert "- infer/architecture: Infer Architecture" in result.output
+    assert "- infer/evo2-provider: Evo2 Provider Reference" in result.output
+    assert "- infer/evo2-sequence-features: Evo2 Sequence-Feature Runbook" in result.output
+    assert "- cluster/exploratory-clustering: Exploratory clustering workflow" in result.output
+    assert "- opal/usr-infer-x-active-learning: USR Dataset With Infer-Derived X -> OPAL Active Learning" in (
+        result.output
+    )
+    assert "Required status inputs:" in result.output
+    assert "--usr-root <usr-root>" in result.output
+    assert "--dataset <dataset>" in result.output
+    assert "Related procedures:" in result.output
+    assert "depends-on: usr.data-plane.multi-source-source-of-truth" in result.output
+    assert "depends-on: usr.data-plane.construct-infer-source-of-truth" in result.output
+    assert "handoff-to: cluster.downstream.exploratory-clustering" in result.output
+    assert "handoff-to: opal.downstream.usr-infer-x-active-learning" in result.output
+    assert "Next commands:" in result.output
+    assert "uv run ops progress explain usr.data-plane.promoter-feature-matrix" in result.output
+    assert (
+        "uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>"
+    ) in result.output
+    assert "uv run ops progress scaffold usr.data-plane.promoter-feature-matrix" in result.output
+    assert "uv run ops catalog list --section tool-sources --tool usr" in result.output
+    assert "uv run ops catalog list --section tool-sources --related-to usr.data-plane.promoter-feature-matrix" in (
+        result.output
+    )
+    assert (
+        "uv run ops catalog list --section procedures --related-to usr.data-plane.promoter-feature-matrix"
+    ) in result.output
+    assert "uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix" in result.output
+
+
+def test_cli_catalog_show_json_includes_related_procedures() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "show",
+            "usr.data-plane.promoter-feature-matrix",
+            "--repo-root",
+            str(_repo_root()),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["owner_boundary"] == "usr"
+    assert payload["entry_artifact"].startswith("one or more USR-backed promoter datasets")
+    assert payload["exit_artifact"] == "infer-annotated USR feature matrix ready for cluster or OPAL"
+    assert payload["owner_tool_source"]["tool"] == "usr"
+    assert payload["owner_tool_source"]["doc_path"] == "src/dnadesign/usr/docs/README.md"
+    assert [entry["tool"] for entry in payload["related_tool_sources"]] == [
+        "densegen",
+        "construct",
+        "infer",
+        "cluster",
+        "opal",
+    ]
+    assert [(entry["tool"], entry["route_id"]) for entry in payload["related_tool_routes"]] == [
+        ("construct", "template-contexts"),
+        ("infer", "architecture"),
+        ("infer", "evo2-provider"),
+        ("infer", "evo2-sequence-features"),
+        ("cluster", "exploratory-clustering"),
+        ("opal", "usr-infer-x-active-learning"),
+    ]
+    assert payload["related_tool_routes"][0]["doc_path"] == (
+        "src/dnadesign/construct/docs/reference/template-contexts.md"
+    )
+    assert payload["related_tool_routes"][1]["doc_path"] == "src/dnadesign/infer/docs/architecture/README.md"
+    assert payload["required_status_inputs"] == [
+        {
+            "cli_flag": "--usr-root",
+            "manifest_key": "usr_root",
+            "placeholder": "<usr-root>",
+            "summary": "USR root containing the target dataset directory.",
+        },
+        {
+            "cli_flag": "--dataset",
+            "manifest_key": "dataset",
+            "placeholder": "<dataset>",
+            "summary": "USR dataset id to summarize.",
+        },
+    ]
+    assert payload["next_commands"]["progress_explain"] == (
+        "uv run ops progress explain usr.data-plane.promoter-feature-matrix"
+    )
+    assert payload["next_commands"]["progress_show"] == (
+        "uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>"
+    )
+    assert payload["next_commands"]["progress_scaffold"] == (
+        "uv run ops progress scaffold usr.data-plane.promoter-feature-matrix"
+    )
+    assert payload["next_commands"]["catalog_owner_tool_source"] == (
+        "uv run ops catalog list --section tool-sources --tool usr"
+    )
+    assert payload["next_commands"]["catalog_related_tool_sources"] == (
+        "uv run ops catalog list --section tool-sources --related-to usr.data-plane.promoter-feature-matrix"
+    )
+    assert payload["next_commands"]["catalog_related"] == (
+        "uv run ops catalog list --section procedures --related-to usr.data-plane.promoter-feature-matrix"
+    )
+    assert payload["next_commands"]["progress_scaffold_related"] == (
+        "uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix"
+    )
+    assert [(entry["relation_type"], entry["registry_id"]) for entry in payload["related_procedures"]] == [
+        ("depends-on", "usr.data-plane.multi-source-source-of-truth"),
+        ("depends-on", "usr.data-plane.construct-infer-source-of-truth"),
+        ("handoff-to", "cluster.downstream.exploratory-clustering"),
+        ("handoff-to", "opal.downstream.usr-infer-x-active-learning"),
+    ]
+
+
+def test_cli_catalog_show_rejects_unknown_registry_id() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "show",
+            "missing.registry.id",
+            "--repo-root",
+            str(_repo_root()),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "unknown registry id: missing.registry.id" in result.output
+
+
+def test_cli_catalog_show_suggests_close_registry_ids() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "show",
+            "usr.data-plane.promoter-feature",
+            "--repo-root",
+            str(_repo_root()),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "Did you mean:" in result.output
+    assert "usr.data-plane.promoter-feature-matrix" in result.output
+
+
+def test_cli_catalog_list_rejects_unknown_related_to_registry_id() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--related-to",
+            "usr.data-plane.promoter-feature",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "Catalog contract error: unknown --related-to registry id:" in result.output
+    assert "usr.data-plane.promoter-feature" in result.output
+    assert "usr.data-plane.promoter-feature-matrix" in result.output
+
+
+def test_cli_catalog_list_emits_recovery_steps_for_empty_results() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "catalog",
+            "list",
+            "--repo-root",
+            str(_repo_root()),
+            "--query",
+            "no-such-catalog-entry",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "No matching catalog entries. Try:" in result.output
+    assert "uv run ops catalog list" in result.output
+    assert "uv run ops catalog list --section tool-sources" in result.output
+
+
+def test_cli_catalog_uses_module_checkout_when_cwd_is_outside_repo(tmp_path: Path, monkeypatch) -> None:
+    outside_dir = tmp_path / "outside"
+    outside_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(outside_dir)
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["catalog", "list"])
+
+    assert result.exit_code == 0
+    assert "Cross-tool procedures" in result.output
+
+
+def test_cli_catalog_rejects_bad_explicit_repo_root(tmp_path: Path) -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["catalog", "list", "--repo-root", str(tmp_path)])
+
+    assert result.exit_code == 2
+    assert "docs/runbooks/README.md" in result.output
+
+
+def test_catalog_uses_packaged_metadata_without_checkout(tmp_path: Path, monkeypatch) -> None:
+    from dnadesign.ops.catalog import loader, paths
+
+    source = load_runbook_catalog(repo_root=_repo_root())
+    payload = {
+        "schema_version": 1,
+        "procedures": [asdict(entry) for entry in source.procedures],
+        "tool_sources": [asdict(entry) for entry in source.tool_sources],
+        "procedure_relations": {
+            key: [asdict(rel) for rel in values] for key, values in source.procedure_relations.items()
+        },
+    }
+    for entry in payload["procedures"] + payload["tool_sources"]:
+        entry["doc_path"] = "https://example.org/docs/" + entry["doc_path"].split("/")[-1]
+        for route in entry.get("routes", []):
+            route["doc_path"] = "https://example.org/docs/" + route["doc_path"].split("/")[-1]
+    packaged = tmp_path / "builtin.json"
+    packaged.write_text(json.dumps(payload))
+    monkeypatch.setattr(paths, "discover_repo_root", lambda start: None)
+    monkeypatch.setattr(loader, "packaged_catalog_path", lambda: packaged, raising=False)
+    monkeypatch.setattr(loader, "discover_external_catalog_registry_sources", lambda: ())
+    monkeypatch.chdir(tmp_path)
+
+    catalog = load_runbook_catalog()
+    assert catalog.repo_root is None
+    assert set(catalog.procedure_index) == set(source.procedure_index)
+    entry = catalog.procedures[0]
+    assert paths.repo_relative_catalog_doc_path(
+        repo_root=catalog.repo_root, catalog_path=catalog.catalog_path, doc_path=entry.doc_path
+    ).startswith("https://example.org/")
+    result = CliRunner().invoke(app, ["catalog", "list", "--simple"])
+    assert result.exit_code == 0, result.output
+    assert "usr.data-plane.promoter-feature-matrix" in result.output
+    result = CliRunner().invoke(app, ["progress", "explain", "usr.data-plane.promoter-feature-matrix"])
+    assert result.exit_code == 0, result.output
+    assert "--usr-root" in result.output
+
+
+def test_catalog_build_excludes_external_providers_and_preserves_public_routes(tmp_path: Path, monkeypatch) -> None:
+    from dnadesign.ops.catalog import loader
+    from dnadesign.ops.catalog.packaged import compile_catalog, read_catalog
+
+    def unexpected_discovery():
+        raise AssertionError("build must not load installed external providers")
+
+    monkeypatch.setattr(loader, "discover_external_catalog_registry_sources", unexpected_discovery)
+    content = compile_catalog(_repo_root(), version="0.2.0")
+    assert str(_repo_root()) not in content
+    target = tmp_path / "builtin.json"
+    target.write_text(content)
+    procedures, tool_sources, relations = read_catalog(target)
+    source = load_runbook_catalog(repo_root=_repo_root(), include_external=False)
+    assert {entry.registry_id for entry in procedures} == set(source.procedure_index)
+    assert {entry.tool for entry in tool_sources} == set(source.tool_source_index)
+    assert relations == source.procedure_relations
+    assert all(entry.doc_path.startswith("https://github.com/e-south/dnadesign/blob/v0.2.0/") for entry in procedures)
+
+
+def test_packaged_catalog_merges_external_relations(tmp_path: Path, monkeypatch) -> None:
+    from dnadesign.ops.catalog import loader, paths
+    from dnadesign.ops.catalog.packaged import compile_catalog
+    from dnadesign.ops.catalog.provider_sources import CatalogRegistrySource
+
+    packaged = tmp_path / "builtin.json"
+    packaged.write_text(compile_catalog(_repo_root(), version="0.2.0"))
+    external_root = tmp_path / "provider"
+    doc = external_root / "status.md"
+    metadata_path = external_root / "status.registry.yaml"
+    _write(doc, "# Example Status\n")
+    _write(
+        metadata_path,
+        """
+schema_version: 1
+catalog_order: 1
+registry_id: example.status
+type: contract
+plane: data-plane
+owner_boundary: example
+entry_artifact: records
+exit_artifact: status
+execution_kind: iterative
+status_kind: example-status
+summary: Read example status.
+relations:
+  - type: depends-on
+    target: usr.data-plane.promoter-feature-matrix
+""",
+    )
+    monkeypatch.setattr(paths, "discover_repo_root", lambda start: None)
+    monkeypatch.setattr(loader, "packaged_catalog_path", lambda: packaged)
+    monkeypatch.setattr(
+        loader,
+        "discover_external_catalog_registry_sources",
+        lambda: (CatalogRegistrySource(provider_id="example", path=metadata_path, package_root=external_root),),
+    )
+    catalog = load_runbook_catalog()
+    assert catalog.find_procedure("example.status") is not None
+    assert (
+        catalog.procedure_relations["example.status"][0].target_registry_id == "usr.data-plane.promoter-feature-matrix"
+    )

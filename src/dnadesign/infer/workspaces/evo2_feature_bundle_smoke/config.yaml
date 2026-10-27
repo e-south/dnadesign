@@ -1,0 +1,35 @@
+model:
+  id: evo2_7b
+  device: cpu
+  precision: fp32
+  alphabet: dna
+  batch_size: 2
+
+jobs:
+  - id: anchor_only_7b_bundle
+    operation: extract
+    ingest:
+      source: records
+      path: inputs/anchor_only_records.jsonl
+      field: sequence
+    feature_bundle:
+      intermediate_block: 26
+      context:
+        kind: anchor_only
+      pooling:
+        seq_mean: true
+        anchor_mean_for_templated: true
+
+  - id: template_1kb_7b_bundle
+    operation: extract
+    ingest:
+      source: records
+      path: inputs/template_1kb_records.jsonl
+      field: sequence
+    feature_bundle:
+      intermediate_block: 26
+      context:
+        kind: template_1kb
+      pooling:
+        seq_mean: true
+        anchor_mean_for_templated: true

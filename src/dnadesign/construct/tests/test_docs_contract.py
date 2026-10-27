@@ -1,0 +1,86 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/construct/tests/test_docs_contract.py
+
+Documentation placement contracts for construct cross-tool workflow routing.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+
+def _repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    raise RuntimeError("repo root not found")
+
+
+def _read(rel_path: str) -> str:
+    return (_repo_root() / rel_path).read_text(encoding="utf-8")
+
+
+def test_construct_docs_route_to_shared_source_of_truth_runbook() -> None:
+    top_readme = _read("src/dnadesign/construct/README.md")
+    readme = _read("src/dnadesign/construct/docs/README.md")
+    index_doc = _read("src/dnadesign/construct/docs/index.md")
+    config_doc = _read("src/dnadesign/construct/docs/reference/config.md")
+    outputs = _read("src/dnadesign/construct/docs/reference/outputs.md")
+    template_contexts = _read("src/dnadesign/construct/docs/reference/template-contexts.md")
+    workspaces = _read("src/dnadesign/construct/workspaces/README.md")
+    source_of_truth_workspace = _read(
+        "src/dnadesign/construct/workspaces/demo_anchor_template_shared_dataset/README.md"
+    )
+
+    token = "../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md"
+    multi_source_token = "../../usr/docs/operations/assembly/multi-source-shared-dataset.md"
+    feature_matrix_token = "../../usr/docs/operations/promoter/characterization-feature-matrix.md"
+    assert token in readme
+    assert multi_source_token in readme
+    assert feature_matrix_token in readme
+    assert "## Documentation" in top_readme
+    assert "docs/README.md" in top_readme
+    assert "docs/getting-started.md" in top_readme
+    assert "workspaces/README.md" in top_readme
+    assert "docs/reference/template-contexts.md" in top_readme
+    assert "../../../docs/README.md" in top_readme
+    assert "## Start here" not in top_readme
+    assert "## Boundary reminder" not in top_readme
+    assert "Construct places declared DNA parts into named slots in a sequence context" in top_readme
+    assert "route is specialized and does not define Construct's general" in top_readme
+    assert "reference/template-contexts.md" in readme
+    assert "template-contexts.md" in config_doc
+    assert "../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in outputs
+    assert "construct__anchor_start" in outputs
+    assert "construct__anchor_start" in template_contexts
+    assert "prefix-conditioned token" in config_doc
+    assert "### Key docs" in readme
+    assert "### Boundary reminders" in readme
+    assert "demo_anchor_template_shared_dataset" in readme
+    assert "demo_anchor_template_shared_dataset" in workspaces
+    assert "uv run construct workspace list" in workspaces
+    assert "downstream consumers" in source_of_truth_workspace
+    assert "promoter/characterization-feature-matrix.md" in source_of_truth_workspace
+    assert "unified [Construct docs](README.md) index" in index_doc
+    assert "Open the Construct docs index" in index_doc
+
+
+def test_construct_cli_reference_binds_the_explicit_usr_root_across_execution() -> None:
+    cli = _read("src/dnadesign/construct/docs/reference/cli.md")
+
+    for command in (
+        "construct run --config <path>",
+        "construct validate config --config <path>",
+        "construct workspace validate-project",
+        "construct workspace run-project",
+    ):
+        line = next(line for line in cli.splitlines() if command in line)
+        assert "--usr-root <absolute-path>" in line
+    assert "one coordinate for validation, dry-run, and persisted execution" in cli
+    assert "existing directory that is not a symbolic link" in cli

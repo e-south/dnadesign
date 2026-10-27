@@ -1,0 +1,189 @@
+## Developer Documentation
+
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-10-27
+
+Use this index to find maintainer workflows, checks, and planning records.
+
+### Documentation verification
+
+`Last verified` records the most recent substantive review. It does not expire
+after a fixed number of days. The docs gate fails when required metadata is
+missing or invalid, a date is in the future, or a changed document has a
+verification date older than that change. Local dirty Markdown files are
+detected automatically; CI supplies `.ci_changed_files.txt` so committed PR
+changes use their Git change dates. Scheduled review-age findings are advisory.
+
+Do not bump verification dates without reviewing the affected content.
+
+The documentation checker keeps one ordered CLI coordinator at
+`dnadesign.devtools.docs.checks`. Policy ownership is split by document
+contract:
+
+- `markdown_inventory`: Markdown discovery, headings, anchors, and links.
+- `document_metadata`: owner, verification, execution-plan, and catalog metadata.
+- `operations_contracts`: runbook examples, paths, transient artifacts, and operations terminology.
+- `public_surface_contracts`: root routes, tool catalogs, README structure, and public documentation language.
+- `banner_contracts`: banner catalog, placement, dimensions, and generated-source drift.
+
+`check_contracts` contains shared immutable policy values. New checks belong in
+the module that owns their document semantics; `checks.main()` only fixes their
+execution order and diagnostic precedence.
+
+### Start here
+
+1. Review [PLANS](../../PLANS.md) before changing architecture or execution flow.
+2. Use [architecture decisions index](../architecture/decisions/README.md) for approved decisions.
+3. Use [CI and quality checks](#ci-and-quality-checks) before merging maintainer changes.
+4. Use the repo-local gate here rather than `./scripts/agent-verify`. That script belongs to the external agent-hub repo and is not present in `dnadesign`.
+5. Use [distribution builds and verification](distributions.md) for clean-source artifacts, version policy and citation metadata.
+
+### Quick checks by change type
+
+| If you changed | Run this first |
+| --- | --- |
+| docs, READMEs, or runbooks | `uv run python -m dnadesign.devtools.docs.checks --repo-root .` |
+| cross-tool imports or ownership boundaries | `uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .` |
+| OPS CLI entrypoints, parsing, or error rendering | `uv run pytest -q src/dnadesign/ops/tests/test_cli_failure_contract.py` |
+| OPS native gate stderr or audit-fidelity behavior | `uv run pytest -q src/dnadesign/ops/tests/test_sge_gates.py -k run_native_gate_command_surfaces_failure_text_to_stderr` |
+| OPS orchestration state or active-job discovery | `uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "explicit_job_identity or discover_active_job_ids"` |
+| OPS status aggregation semantics | `uv run pytest -q src/dnadesign/ops/tests/test_state_semantics.py` |
+| external study integration seams | `uv run pytest -q src/dnadesign/contracts/tests/reader_records src/dnadesign/ops/tests` |
+| code in one tool | `uv run pytest -q <tool test path>` and then broaden to the repo-level checks when the slice is stable |
+
+### Day-to-day tasks
+
+1. Keep routine scope and validation in the task or PR description.
+2. Update the owning contract or runbook when behavior changes.
+3. Use [planning guidance](../../PLANS.md) when a change needs a proposal or execution plan.
+4. Run docs checks before merging docs updates:
+`uv run python -m dnadesign.devtools.docs.checks --repo-root .`
+5. Run boundary checks when changing cross-tool imports:
+`uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .`
+6. Run the repo-local skill audits when changing `.agents/skills/`:
+`bash .agents/skills/notify-ops/scripts/audit-notify-ops-skill.sh`
+`bash .agents/skills/bu-scc-usr-sync/scripts/audit-bu-scc-usr-sync-skill.sh`
+`bash .agents/skills/sge-hpc-ops/scripts/audit-sge-hpc-ops-skill.sh`
+7. Run the subtree routing contract checks when changing critical `AGENTS.md` surfaces or repo-local workflow skills:
+`uv run pytest -q src/dnadesign/notify/tests/docs/test_progressive_disclosure_contracts.py`
+`uv run pytest -q src/dnadesign/usr/tests/docs_contract`
+8. Run the OPS subprocess failure suite when changing console wiring or CLI contract text:
+`uv run pytest -q src/dnadesign/ops/tests/test_cli_failure_contract.py`
+9. Run the native gate stderr regression when changing `dnadesign.ops.orchestrator.gates` or any audit-fidelity path that executes those commands:
+`uv run pytest -q src/dnadesign/ops/tests/test_sge_gates.py -k run_native_gate_command_surfaces_failure_text_to_stderr`
+`uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k captures_gate_stderr_for_nonzero_native_gate_command`
+10. Run focused OPS contract suites when changing state aggregation, preflight, or active-job identity:
+`uv run pytest -q src/dnadesign/ops/tests/test_state_semantics.py`
+`uv run pytest -q src/dnadesign/ops/tests/test_runbook_orchestrator.py -k "explicit_job_identity or discover_active_job_ids"`
+
+### Repo-local maintainer gate
+
+Run this from the repo root for merge-depth validation of tracked changes in
+`dnadesign`:
+
+```bash
+uv sync --locked --group dev
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest -q
+uv run python -m dnadesign.devtools.docs.checks --repo-root .
+```
+
+For tactical agent work, start with the smallest targeted suite and then run the
+repo-level static gates that match the touched surface. Full `pytest -q` is a
+merge-depth check for broad or risky changes, not the default inner loop for
+every monorepo edit.
+
+To mirror CI scope locally from a known changed-file list:
+
+```bash
+uv run python -m dnadesign.devtools.ci.test_targets \
+  --repo-root . \
+  --affected-tools-csv "<tool1,tool2>" \
+  --changed-files-file .ci_changed_files.txt
+```
+
+Live study tests run in their owning repository. Dnadesign CI tests only the
+public contracts and extension points those repositories consume.
+
+### CI and quality checks
+
+Documentation-only pull requests use the `ci-docs` dependency group without
+installing the scientific tool runtime. They run documentation, routing,
+architecture and static security contracts, lint and distribution builds.
+Executable examples with runtime contracts retain their owning tool's tests.
+Markdown fixtures and packaged resources are treated as tool changes.
+
+Lifecycle metadata, packaging, dependency, workflow and unrecognized changes
+retain broader checks. Renames contribute both their old and new paths to scope
+detection. Main-branch runs retain full validation, and secrets checks run for
+every change. An empty or unavailable change list does not qualify as
+documentation-only.
+
+Runtime changes also select transitive consumers declared by the architecture
+dependency policy, including their external integration tests. The package
+suite runs once in its own step and is excluded from the full core invocation.
+
+CI records capability outcomes in the `ci-capabilities` artifact. Release
+qualification requires successful video-output validation from the same commit,
+run and attempt as the qualifying CI result. Skipped tests remain `not_run`;
+GPU qualification is recorded as deferred and is not required by this gate.
+
+After installing `ci-docs`, use `uv run --no-sync` for checks to preserve that
+environment instead of restoring the default tool dependencies.
+
+- Core lane test expression: `-m "not fimo and not integration"`
+- External integration test expression: `-m "fimo or integration"`
+- Core lane local parity:
+```bash
+export MPLCONFIGDIR="${TMPDIR:-/tmp}/matplotlib"
+uv run pytest -q -m "not fimo and not integration"
+uv run pytest -q -m "not fimo and not integration" --cov=src/dnadesign --cov-report=json:coverage-core.json
+uv run python -m dnadesign.devtools.quality.tool_coverage --coverage-json coverage-core.json --baseline-json .github/tool-coverage-baseline.json
+uv run python -m dnadesign.devtools.quality.coverage_summary --coverage-json coverage-core.json --baseline-json .github/tool-coverage-baseline.json --output-json quality-score-coverage-summary.json
+uv run python -m dnadesign.devtools.quality.score --coverage-summary-json quality-score-coverage-summary.json --baseline-json .github/tool-coverage-baseline.json --core-lane-result success --external-integration-lane-result skipped --publish-lane-result skipped --output-json quality-score-inputs.json
+```
+- External integration local parity:
+```bash
+pixi install --locked
+export MPLCONFIGDIR="${TMPDIR:-/tmp}/matplotlib"
+eval "$(PYTHONPATH=src python3 -m dnadesign.devtools.runtime.meme_env --repo-root . --print-shell-export)"
+fimo --version
+uv run pytest -q -m "fimo or integration" --junitxml external-integration-junit.xml
+uv run python -m dnadesign.devtools.runtime.pytest_gate --junit-xml external-integration-junit.xml --lane-name external-integration --required-tools-csv "<tool1,tool2>"
+```
+
+### Release qualification
+
+Qualify one committed revision before creating a release. Dispatch
+`ci.yaml` against its review branch and record the run's `headSha`; manual runs
+retain the full core and external-integration gates. The installed-wheel tests
+exercise workflows outside the checkout. Rebuild with
+`python -m dnadesign.devtools.package.build --repo-root . --output <external-directory>`
+to retain the source revision, build lock, artifact hashes and repeat-build
+comparison. The output directory must be new and outside the source checkout.
+
+Keep CI results and build provenance tied to the same revision. Run
+`uv audit --locked --output-format json` for all dependency profiles. GPU
+qualification additionally requires the supported Infer workflow on suitable
+hardware, including its installed extension versions, device and numerical
+outputs. Missing hardware is an outstanding check. These steps do not publish
+a package; the release workflow separately requires successful main-branch CI
+and passing dependency audits.
+
+### Planning and decisions
+
+1. Proposal lifecycle and promotion rules: [PLANS](../../PLANS.md)
+2. Execution plan indexes: [active plans](../exec-plans/active/README.md), [completed plans](../exec-plans/completed/README.md)
+3. Decision records: [architecture decisions](../architecture/decisions/README.md)
+4. Current tool and cross-tool proposals: [design proposal index](plans/README.md)
+5. Public sequence-composition boundary: [ADR-0002](../architecture/decisions/adr-0002-generic-linear-ssdna-composition.md)
+
+### Naming and file layout
+
+- Use kebab-case for markdown files.
+- Prefix plan docs with `YYYY-MM-DD-`.
+- Keep current design proposals in semantic lanes under `plans/tools/` or
+  `plans/cross-tool/`; keep archived plans under `plans/archive/`.
+
+[Tool lifecycle plan](plans/tool-lifecycle-20261026.md) tracks tool ownership, independent installation and retirement checks.

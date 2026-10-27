@@ -1,0 +1,875 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/artifacts/publication.py
+
+Publish create-only directory artifacts atomically and without replacement.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import ctypes
+import errno
+import os
+import stat
+import sys
+import tempfile
+import uuid
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from .errors import PublicationError, PublicationExistsError
+from .owned_directory import (
+    descriptor_matches_entry,
+    owner_matches_descriptor,
+    remove_descriptor_anchored_directory,
+    remove_owned_directory,
+    remove_owned_named_directory,
+)
+from .portable_paths import validate_publication_metadata_paths
+from .recovery import (
+    _OWNER_FILE,
+    _PUBLICATION_RECOVERY_SCHEMAS,
+    _ROLLBACK_OWNER_SCHEMA,
+    _ensure_owner_on_descriptor,
+    _open_recoverable_owned_directory,
+    _owner_payload,
+    _recover_owned_adjacent_directories,
+    _remove_owner_from_descriptor,
+    _rollback_owner_payload,
+    _write_owner,
+)
+
+_PRIVATE_DIRECTORY_MODE = 0o700
+_PRIVATE_FILE_MODE = 0o600
+_DEFAULT_PUBLISHED_ROOT_MODE = 0o755
+_PUBLICATION_SENSITIVITIES = frozenset({"public", "private"})
+_COPY_CHUNK_BYTES = 65_536
+
+
+@dataclass(slots=True)
+class _CopyBudget:
+    file_limit_bytes: int | None
+    aggregate_limit_bytes: int | None
+    entry_limit: int | None
+    copied_bytes: int = 0
+    copied_entries: int = 0
+
+    def charge_entry(self) -> None:
+        next_entries = self.copied_entries + 1
+        if self.entry_limit is not None and next_entries > self.entry_limit:
+            raise PublicationError(f"Bundle staging exceeded the {self.entry_limit}-entry copy limit")
+        self.copied_entries = next_entries
+
+    def charge(self, *, file_bytes: int, chunk_bytes: int, source_name: str) -> int:
+        next_file_bytes = file_bytes + chunk_bytes
+        next_total_bytes = self.copied_bytes + chunk_bytes
+        if self.file_limit_bytes is not None and next_file_bytes >= self.file_limit_bytes:
+            raise PublicationError(
+                f"Bundle staging file exceeded the {self.file_limit_bytes}-byte copy limit: {source_name}"
+            )
+        if self.aggregate_limit_bytes is not None and next_total_bytes >= self.aggregate_limit_bytes:
+            raise PublicationError(
+                f"Bundle staging exceeded the {self.aggregate_limit_bytes}-byte aggregate copy limit"
+            )
+        self.copied_bytes = next_total_bytes
+        return next_file_bytes
+
+
+def _validate_copy_limit(value: int | None, *, label: str) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise PublicationError(f"Artifact bundle {label} must be a positive integer")
+    return value
+
+
+def _validate_published_root_mode(mode: int) -> int:
+    if isinstance(mode, bool) or not isinstance(mode, int):
+        raise PublicationError("Artifact bundle published root mode must be an integer permission mode")
+    if mode < 0 or mode > 0o777:
+        raise PublicationError("Artifact bundle published root mode must contain only permission bits")
+    if mode & 0o700 != 0o700:
+        raise PublicationError("Artifact bundle published root mode must grant its owner read, write, and execute")
+    return mode
+
+
+def _validate_sensitivity(sensitivity: str) -> str:
+    if sensitivity not in _PUBLICATION_SENSITIVITIES:
+        allowed = ", ".join(sorted(_PUBLICATION_SENSITIVITIES))
+        raise PublicationError(f"Artifact bundle sensitivity must be one of: {allowed}")
+    return sensitivity
+
+
+def _lexical_absolute_path(path: Path) -> Path:
+    expanded = path.expanduser()
+    if ".." in expanded.parts:
+        raise PublicationError(f"Publication output path must not contain parent traversal: {path}")
+    return expanded if expanded.is_absolute() else Path.cwd() / expanded
+
+
+def _preflight_existing_path_components(path: Path) -> None:
+    """Reject redirects and non-directories before creating any missing parent."""
+    current = Path(path.anchor)
+    for part in path.parts[1:]:
+        current /= part
+        try:
+            entry_stat = current.lstat()
+        except FileNotFoundError:
+            return
+        if stat.S_ISLNK(entry_stat.st_mode):
+            raise PublicationError(f"Publication output contains a symlinked path component: {current}")
+        if not stat.S_ISDIR(entry_stat.st_mode):
+            raise PublicationError(f"Publication output parent component is not a directory: {current}")
+
+
+def preflight_create_only_directory_publication(bundle_root: str | Path) -> Path:
+    """Validate a create-only destination without changing the filesystem.
+
+    This is an early advisory check. Callers must still use
+    :meth:`CreateOnlyDirectoryPublication.prepare`, whose descriptor-anchored
+    checks handle races and recovery.
+    """
+
+    final = _lexical_absolute_path(Path(bundle_root))
+    try:
+        _preflight_existing_path_components(final.parent)
+        final.lstat()
+    except FileNotFoundError:
+        return final
+    except PublicationError:
+        raise
+    except OSError as exc:
+        raise PublicationError(f"Publication output could not be inspected safely: {final}") from exc
+    raise PublicationExistsError(f"Artifact bundle already exists; publication is create-only: {final}")
+
+
+def _open_or_create_directory(path: Path) -> int:
+    if not path.is_absolute():
+        raise PublicationError(f"Publication output parent must be absolute: {path}")
+    flags = os.O_RDONLY | os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path.anchor, flags)
+    try:
+        for part in path.parts[1:]:
+            try:
+                child = os.open(part, flags, dir_fd=descriptor)
+            except FileNotFoundError:
+                try:
+                    os.mkdir(part, dir_fd=descriptor)
+                except FileExistsError:
+                    pass
+                child = os.open(part, flags, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+    except Exception:
+        os.close(descriptor)
+        raise
+    return descriptor
+
+
+def _entry_exists_at(parent_descriptor: int, name: str) -> bool:
+    try:
+        os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def _descriptor_entry_name(parent_descriptor: int, descriptor: int) -> str | None:
+    """Return the current name for one anchored directory in its parent."""
+    anchored = os.fstat(descriptor)
+    for name in os.listdir(parent_descriptor):
+        try:
+            candidate = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+        except FileNotFoundError:
+            continue
+        if stat.S_ISDIR(candidate.st_mode) and (candidate.st_dev, candidate.st_ino) == (
+            anchored.st_dev,
+            anchored.st_ino,
+        ):
+            return name
+    return None
+
+
+def _source_directory_descriptor(source: Path | int) -> int:
+    if isinstance(source, int):
+        return os.dup(source)
+    flags = os.O_RDONLY | os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    return os.open(source, flags)
+
+
+def _copy_file(
+    source_parent_descriptor: int,
+    source_name: str,
+    parent_descriptor: int,
+    name: str,
+    *,
+    budget: _CopyBudget,
+) -> None:
+    source_flags = os.O_RDONLY
+    destination_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        source_flags |= os.O_NOFOLLOW
+        destination_flags |= os.O_NOFOLLOW
+    source_descriptor = os.open(source_name, source_flags, dir_fd=source_parent_descriptor)
+    try:
+        source_stat = os.fstat(source_descriptor)
+        if not stat.S_ISREG(source_stat.st_mode):
+            raise PublicationError(f"Bundle staging must contain regular files: {source_name}")
+        destination_descriptor = os.open(
+            name,
+            destination_flags,
+            _PRIVATE_FILE_MODE,
+            dir_fd=parent_descriptor,
+        )
+        try:
+            file_bytes = 0
+            with os.fdopen(os.dup(source_descriptor), "rb") as source_handle:
+                with os.fdopen(os.dup(destination_descriptor), "wb") as destination_handle:
+                    while chunk := source_handle.read(_COPY_CHUNK_BYTES):
+                        file_bytes = budget.charge(
+                            file_bytes=file_bytes,
+                            chunk_bytes=len(chunk),
+                            source_name=source_name,
+                        )
+                        destination_handle.write(chunk)
+        finally:
+            os.close(destination_descriptor)
+    finally:
+        os.close(source_descriptor)
+
+
+def _copy_directory(
+    source: Path | int,
+    parent_descriptor: int,
+    name: str,
+    *,
+    budget: _CopyBudget | None = None,
+) -> None:
+    active_budget = budget or _CopyBudget(
+        file_limit_bytes=None,
+        aggregate_limit_bytes=None,
+        entry_limit=None,
+    )
+    source_descriptor = _source_directory_descriptor(source)
+    try:
+        _copy_directory_from_descriptor(source_descriptor, parent_descriptor, name, budget=active_budget)
+    finally:
+        os.close(source_descriptor)
+
+
+def _copy_directory_from_descriptor(
+    source_descriptor: int,
+    parent_descriptor: int,
+    name: str,
+    *,
+    budget: _CopyBudget,
+) -> None:
+    os.mkdir(name, mode=_PRIVATE_DIRECTORY_MODE, dir_fd=parent_descriptor)
+    flags = os.O_RDONLY | os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    destination_descriptor = os.open(name, flags, dir_fd=parent_descriptor)
+    try:
+        entries = sorted(os.listdir(source_descriptor), key=lambda entry: (entry != _OWNER_FILE, entry))
+        for entry in entries:
+            budget.charge_entry()
+            entry_stat = os.stat(entry, dir_fd=source_descriptor, follow_symlinks=False)
+            if stat.S_ISLNK(entry_stat.st_mode):
+                raise PublicationError(f"Bundle staging must not contain symlinks: {entry}")
+            if stat.S_ISDIR(entry_stat.st_mode):
+                child_descriptor = os.open(entry, flags, dir_fd=source_descriptor)
+                try:
+                    _copy_directory_from_descriptor(
+                        child_descriptor,
+                        destination_descriptor,
+                        entry,
+                        budget=budget,
+                    )
+                finally:
+                    os.close(child_descriptor)
+            elif stat.S_ISREG(entry_stat.st_mode):
+                _copy_file(
+                    source_descriptor,
+                    entry,
+                    destination_descriptor,
+                    entry,
+                    budget=budget,
+                )
+            else:
+                raise PublicationError(f"Bundle staging contains an unsupported entry: {entry}")
+    finally:
+        os.close(destination_descriptor)
+
+
+def _restore_published_modes(source: Path | int, destination_descriptor: int) -> None:
+    """Restore staged modes while the renamed bundle root remains owner-only."""
+    source_descriptor = _source_directory_descriptor(source)
+    try:
+        _restore_published_modes_from_descriptor(source_descriptor, destination_descriptor)
+    finally:
+        os.close(source_descriptor)
+
+
+def _restore_published_modes_from_descriptor(
+    source_descriptor: int,
+    destination_descriptor: int,
+) -> None:
+    flags = os.O_RDONLY | os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    for entry in os.listdir(source_descriptor):
+        if entry == _OWNER_FILE:
+            continue
+        source_stat = os.stat(entry, dir_fd=source_descriptor, follow_symlinks=False)
+        mode = stat.S_IMODE(source_stat.st_mode) & 0o777
+        if stat.S_ISDIR(source_stat.st_mode):
+            source_child_descriptor = os.open(entry, flags, dir_fd=source_descriptor)
+            child_descriptor = os.open(entry, flags, dir_fd=destination_descriptor)
+            try:
+                _restore_published_modes_from_descriptor(source_child_descriptor, child_descriptor)
+                os.fchmod(child_descriptor, mode)
+            finally:
+                os.close(source_child_descriptor)
+                os.close(child_descriptor)
+        elif stat.S_ISREG(source_stat.st_mode):
+            os.chmod(entry, mode, dir_fd=destination_descriptor, follow_symlinks=False)
+        else:
+            raise PublicationError(f"Bundle staging contains an unsupported entry: {entry}")
+
+
+def _descriptor_entry_files(descriptor: int, prefix: Path = Path()) -> dict[Path, bool]:
+    flags = os.O_RDONLY | os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    entries: dict[Path, bool] = {}
+    for name in os.listdir(descriptor):
+        relative = prefix / name
+        entry_stat = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
+        if stat.S_ISLNK(entry_stat.st_mode):
+            raise PublicationError(f"Bundle staging must not contain symlinks: {relative}")
+        if stat.S_ISDIR(entry_stat.st_mode):
+            entries[relative] = False
+            child_descriptor = os.open(name, flags, dir_fd=descriptor)
+            try:
+                entries.update(_descriptor_entry_files(child_descriptor, relative))
+            finally:
+                os.close(child_descriptor)
+        elif stat.S_ISREG(entry_stat.st_mode):
+            entries[relative] = True
+        else:
+            raise PublicationError(f"Bundle staging contains an unsupported entry: {relative}")
+    return entries
+
+
+def _required_manifest_is_regular(descriptor: int, relative: Path) -> bool:
+    flags = os.O_RDONLY | os.O_NOFOLLOW
+    directory_flags = flags | os.O_DIRECTORY
+    current_descriptor = os.dup(descriptor)
+    try:
+        for part in relative.parts[:-1]:
+            next_descriptor = os.open(part, directory_flags, dir_fd=current_descriptor)
+            os.close(current_descriptor)
+            current_descriptor = next_descriptor
+        manifest_descriptor = os.open(relative.parts[-1], flags, dir_fd=current_descriptor)
+        try:
+            return stat.S_ISREG(os.fstat(manifest_descriptor).st_mode)
+        finally:
+            os.close(manifest_descriptor)
+    except OSError:
+        return False
+    finally:
+        os.close(current_descriptor)
+
+
+def _rename_create_only(parent_descriptor: int, source: str, destination: str) -> None:
+    libc = ctypes.CDLL(None, use_errno=True)
+    source_bytes = os.fsencode(source)
+    destination_bytes = os.fsencode(destination)
+    if sys.platform == "darwin" and hasattr(libc, "renameatx_np"):
+        rename = libc.renameatx_np
+        rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+        rename.restype = ctypes.c_int
+        result = rename(parent_descriptor, source_bytes, parent_descriptor, destination_bytes, 0x00000004)
+    elif sys.platform.startswith("linux") and hasattr(libc, "renameat2"):
+        rename = libc.renameat2
+        rename.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+        rename.restype = ctypes.c_int
+        result = rename(parent_descriptor, source_bytes, parent_descriptor, destination_bytes, 0x1)
+    else:
+        raise PublicationError("This platform does not support atomic create-only directory publication")
+    if result == 0:
+        return
+    error = ctypes.get_errno()
+    if error in {errno.EEXIST, errno.ENOTEMPTY}:
+        raise PublicationExistsError(f"Artifact bundle already exists; publication is create-only: {destination}")
+    raise OSError(error, os.strerror(error), destination)
+
+
+def _restore_entry_after_detachment_mismatch(
+    parent_descriptor: int,
+    rollback_name: str,
+    final_name: str,
+    published_descriptor: int,
+    *,
+    clear_owner: bool = True,
+) -> None:
+    restore_error: BaseException | None = None
+    try:
+        _rename_create_only(
+            parent_descriptor,
+            rollback_name,
+            final_name,
+        )
+    except BaseException as exc:
+        restore_error = exc
+    if clear_owner:
+        try:
+            _remove_owner_from_descriptor(published_descriptor)
+        except BaseException as owner_error:
+            raise PublicationError(
+                "Artifact bundle identity changed during atomic rollback detachment, "
+                "and its rollback owner sentinel could not be cleared"
+            ) from owner_error
+    if restore_error is not None:
+        raise PublicationError(
+            "Artifact bundle identity changed during atomic rollback detachment, "
+            "and the displaced entry could not be restored"
+        ) from restore_error
+    raise PublicationError(
+        "Artifact bundle identity changed during atomic rollback detachment; "
+        "the displaced entry was restored without cleanup"
+    )
+
+
+def _recover_final_directory(
+    parent_descriptor: int,
+    final: Path,
+    *,
+    uid: int | None,
+) -> bool:
+    owner_schemas = (*_PUBLICATION_RECOVERY_SCHEMAS, _ROLLBACK_OWNER_SCHEMA)
+    opened = _open_recoverable_owned_directory(
+        parent_descriptor,
+        final.name,
+        final=final,
+        uid=uid,
+        owner_schema=owner_schemas,
+    )
+    if opened is None:
+        return False
+    descriptor, owner = opened
+    try:
+        owner_pid = int(owner["pid"])
+        owner_uid = owner["uid"]
+        rollback_name = f".{final.name}.rollback-u{owner_uid}-p{owner_pid}-{uuid.uuid4().hex}"
+        if not descriptor_matches_entry(parent_descriptor, final.name, descriptor):
+            return False
+        _rename_create_only(parent_descriptor, final.name, rollback_name)
+        if not descriptor_matches_entry(parent_descriptor, rollback_name, descriptor):
+            _restore_entry_after_detachment_mismatch(
+                parent_descriptor,
+                rollback_name,
+                final.name,
+                descriptor,
+                clear_owner=False,
+            )
+        removed = remove_owned_directory(
+            parent_descriptor,
+            rollback_name,
+            descriptor,
+            owner,
+            owner_file=_OWNER_FILE,
+        )
+        if not removed:
+            raise PublicationError(f"Interrupted artifact bundle could not be recovered safely: {final}")
+        return True
+    finally:
+        os.close(descriptor)
+
+
+@dataclass
+class CreateOnlyDirectoryPublication:
+    """One bounded transaction that publishes a new directory without replacement."""
+
+    final: Path
+    stage: Path
+    stage_descriptor: int
+    _stage_parent_descriptor: int
+    adjacent_stage_name: str
+    parent_descriptor: int
+    _owner: dict[str, object]
+    published_root_mode: int = _DEFAULT_PUBLISHED_ROOT_MODE
+    sensitivity: str = "public"
+    _closed: bool = False
+    _published_descriptor: int | None = field(default=None, init=False, repr=False)
+    _rollback_name: str | None = field(default=None, init=False, repr=False)
+
+    @classmethod
+    def prepare(
+        cls,
+        bundle_root: str | Path,
+        *,
+        published_root_mode: int = _DEFAULT_PUBLISHED_ROOT_MODE,
+        sensitivity: str = "public",
+    ) -> CreateOnlyDirectoryPublication:
+        """Prepare private staging after validating the publication policy."""
+
+        validated_published_root_mode = _validate_published_root_mode(published_root_mode)
+        validated_sensitivity = _validate_sensitivity(sensitivity)
+        if validated_sensitivity == "private":
+            validated_published_root_mode = _PRIVATE_DIRECTORY_MODE
+        final = _lexical_absolute_path(Path(bundle_root))
+        owner = _owner_payload(final)
+        _preflight_existing_path_components(final.parent)
+        parent_descriptor = _open_or_create_directory(final.parent)
+        try:
+            uid = owner["uid"]
+            recovery_uid = uid if isinstance(uid, int) else None
+            _recover_final_directory(parent_descriptor, final, uid=recovery_uid)
+            if _entry_exists_at(parent_descriptor, final.name):
+                raise PublicationExistsError(f"Artifact bundle already exists; publication is create-only: {final}")
+            target_digest = str(owner["target_sha256"])
+            adjacent_prefix = f".{final.name}.staging-"
+            rollback_prefix = f".{final.name}.rollback-"
+            _recover_owned_adjacent_directories(
+                parent_descriptor,
+                final.parent,
+                prefix=adjacent_prefix,
+                final=final,
+                uid=recovery_uid,
+                owner_schema=_PUBLICATION_RECOVERY_SCHEMAS,
+            )
+            _recover_owned_adjacent_directories(
+                parent_descriptor,
+                final.parent,
+                prefix=rollback_prefix,
+                final=final,
+                uid=recovery_uid,
+                owner_schema=(*_PUBLICATION_RECOVERY_SCHEMAS, _ROLLBACK_OWNER_SCHEMA),
+            )
+            private_parent = Path(tempfile.gettempdir()) / f"dnadesign-artifact-publication-{uid}"
+            try:
+                private_parent.mkdir(mode=0o700)
+            except FileExistsError:
+                private_stat = private_parent.lstat()
+                if (
+                    not stat.S_ISDIR(private_stat.st_mode)
+                    or (isinstance(uid, int) and private_stat.st_uid != uid)
+                    or stat.S_IMODE(private_stat.st_mode) & 0o077
+                ):
+                    raise PublicationError(f"Private publication staging root is not owner-only: {private_parent}")
+            private_prefix = f"stage-{target_digest[:16]}-"
+            private_flags = os.O_RDONLY | os.O_DIRECTORY
+            if hasattr(os, "O_NOFOLLOW"):
+                private_flags |= os.O_NOFOLLOW
+            private_descriptor = os.open(private_parent, private_flags)
+            try:
+                _recover_owned_adjacent_directories(
+                    private_descriptor,
+                    private_parent,
+                    prefix=private_prefix,
+                    final=final,
+                    uid=recovery_uid,
+                    owner_schema=_PUBLICATION_RECOVERY_SCHEMAS,
+                )
+            finally:
+                os.close(private_descriptor)
+            stage = Path(tempfile.mkdtemp(prefix=private_prefix, dir=private_parent))
+            stage.chmod(_PRIVATE_DIRECTORY_MODE)
+            _write_owner(stage / _OWNER_FILE, owner)
+            stage_parent_descriptor = os.open(private_parent, private_flags)
+            try:
+                stage_descriptor = os.open(stage.name, private_flags, dir_fd=stage_parent_descriptor)
+            except BaseException:
+                os.close(stage_parent_descriptor)
+                raise
+            return cls(
+                final=final,
+                stage=stage,
+                stage_descriptor=stage_descriptor,
+                _stage_parent_descriptor=stage_parent_descriptor,
+                adjacent_stage_name=f"{adjacent_prefix}u{uid}-p{os.getpid()}-{uuid.uuid4().hex}",
+                parent_descriptor=parent_descriptor,
+                _owner=owner,
+                published_root_mode=validated_published_root_mode,
+                sensitivity=validated_sensitivity,
+            )
+        except BaseException:
+            os.close(parent_descriptor)
+            raise
+
+    def _parent_matches_anchor(self) -> bool:
+        try:
+            current = os.stat(self.final.parent, follow_symlinks=False)
+        except FileNotFoundError:
+            return False
+        anchored = os.fstat(self.parent_descriptor)
+        return stat.S_ISDIR(current.st_mode) and (current.st_dev, current.st_ino) == (
+            anchored.st_dev,
+            anchored.st_ino,
+        )
+
+    def publish(
+        self,
+        *,
+        required_manifest: str,
+        verify_copied_descriptor: Callable[[int], None] | None = None,
+        copy_file_size_limit_bytes: int | None = None,
+        copy_aggregate_size_limit_bytes: int | None = None,
+        copy_entry_count_limit: int | None = None,
+    ) -> None:
+        if self._closed:
+            raise PublicationError("Artifact publication is already closed")
+        if self._published_descriptor is not None:
+            raise PublicationError(f"Artifact bundle is already published: {self.final}")
+        copy_budget = _CopyBudget(
+            file_limit_bytes=_validate_copy_limit(
+                copy_file_size_limit_bytes,
+                label="copy file-size limit",
+            ),
+            aggregate_limit_bytes=_validate_copy_limit(
+                copy_aggregate_size_limit_bytes,
+                label="copy aggregate-size limit",
+            ),
+            entry_limit=_validate_copy_limit(
+                copy_entry_count_limit,
+                label="copy entry-count limit",
+            ),
+        )
+        validated_published_root_mode = _validate_published_root_mode(self.published_root_mode)
+        manifest_relative = Path(required_manifest)
+        if (
+            not required_manifest.strip()
+            or not manifest_relative.parts
+            or manifest_relative.is_absolute()
+            or ".." in manifest_relative.parts
+        ):
+            raise PublicationError("Artifact bundle required manifest must stay inside publication staging")
+        if not _required_manifest_is_regular(self.stage_descriptor, manifest_relative):
+            raise PublicationError("Artifact bundle required manifest must stay inside publication staging")
+        relative_entry_files = _descriptor_entry_files(self.stage_descriptor)
+        validate_publication_metadata_paths(
+            self.stage,
+            required_manifest=manifest_relative,
+            owner_file=_OWNER_FILE,
+            relative_entry_files=relative_entry_files,
+        )
+        if not owner_matches_descriptor(self.stage_descriptor, self._owner, owner_file=_OWNER_FILE):
+            raise PublicationError("Artifact bundle publication owner sentinel is unavailable or unsafe")
+        if not self._parent_matches_anchor():
+            raise PublicationError(f"Artifact bundle parent changed during publication: {self.final.parent}")
+        if _entry_exists_at(self.parent_descriptor, self.adjacent_stage_name):
+            raise PublicationError(f"Artifact bundle staging already exists: {self.adjacent_stage_name}")
+        renamed = False
+        published_descriptor: int | None = None
+        try:
+            _copy_directory(
+                self.stage_descriptor,
+                self.parent_descriptor,
+                self.adjacent_stage_name,
+                budget=copy_budget,
+            )
+            if not self._parent_matches_anchor():
+                raise PublicationError(f"Artifact bundle parent changed during publication: {self.final.parent}")
+            final_flags = os.O_RDONLY | os.O_DIRECTORY
+            if hasattr(os, "O_NOFOLLOW"):
+                final_flags |= os.O_NOFOLLOW
+            published_descriptor = os.open(
+                self.adjacent_stage_name,
+                final_flags,
+                dir_fd=self.parent_descriptor,
+            )
+            if not owner_matches_descriptor(
+                published_descriptor,
+                self._owner,
+                owner_file=_OWNER_FILE,
+            ):
+                raise PublicationError("Artifact bundle publication owner sentinel is unavailable or unsafe")
+            if verify_copied_descriptor is not None:
+                verify_copied_descriptor(published_descriptor)
+            _rename_create_only(self.parent_descriptor, self.adjacent_stage_name, self.final.name)
+            renamed = True
+            if not descriptor_matches_entry(self.parent_descriptor, self.final.name, published_descriptor):
+                raise PublicationError("Published artifact bundle identity changed after atomic rename")
+            if self.sensitivity == "public":
+                _restore_published_modes(self.stage_descriptor, published_descriptor)
+            os.fchmod(published_descriptor, validated_published_root_mode)
+            os.unlink(_OWNER_FILE, dir_fd=published_descriptor)
+            self._published_descriptor = published_descriptor
+            published_descriptor = None
+        except BaseException:
+            if renamed and published_descriptor is not None:
+                self._published_descriptor = published_descriptor
+                published_descriptor = None
+                self.rollback()
+            elif published_descriptor is not None:
+                remove_owned_directory(
+                    self.parent_descriptor,
+                    self.adjacent_stage_name,
+                    published_descriptor,
+                    self._owner,
+                    owner_file=_OWNER_FILE,
+                )
+            else:
+                remove_owned_named_directory(
+                    self.parent_descriptor,
+                    self.adjacent_stage_name,
+                    self._owner,
+                    owner_file=_OWNER_FILE,
+                )
+            raise
+        finally:
+            if published_descriptor is not None:
+                os.close(published_descriptor)
+
+    def assert_published_path_identity(self) -> None:
+        """Require the final path to still name this transaction's published directory."""
+
+        if self._closed:
+            raise PublicationError("Artifact publication is already closed")
+        published_descriptor = self._published_descriptor
+        if published_descriptor is None:
+            raise PublicationError(f"Artifact bundle is not published: {self.final}")
+        if not self._parent_matches_anchor():
+            raise PublicationError(f"Artifact bundle parent changed after publication: {self.final.parent}")
+        if not descriptor_matches_entry(
+            self.parent_descriptor,
+            self.final.name,
+            published_descriptor,
+        ):
+            raise PublicationError(f"Artifact bundle path identity changed after publication: {self.final}")
+
+    def duplicate_published_descriptor(self) -> int:
+        """Return a caller-owned descriptor for this transaction's publication."""
+        if self._closed:
+            raise PublicationError("Artifact publication is already closed")
+        published_descriptor = self._published_descriptor
+        if published_descriptor is None:
+            raise PublicationError(f"Artifact bundle is not published: {self.final}")
+        return os.dup(published_descriptor)
+
+    def rollback(self) -> bool:
+        """Atomically hide this transaction's publication before recursive cleanup."""
+
+        if self._closed:
+            raise PublicationError("Artifact publication is already closed")
+        published_descriptor = self._published_descriptor
+        if published_descriptor is None:
+            return False
+        rollback_name = self._rollback_name
+        if rollback_name is None:
+            rollback_name = f".{self.final.name}.rollback-u{self._owner['uid']}-p{os.getpid()}-{uuid.uuid4().hex}"
+            self._rollback_name = rollback_name
+        rollback_owner = _rollback_owner_payload(self._owner)
+        detached = descriptor_matches_entry(
+            self.parent_descriptor,
+            rollback_name,
+            published_descriptor,
+        )
+        if not detached:
+            if not descriptor_matches_entry(
+                self.parent_descriptor,
+                self.final.name,
+                published_descriptor,
+            ):
+                return False
+            _ensure_owner_on_descriptor(
+                published_descriptor,
+                rollback_owner,
+                accepted_existing=self._owner,
+            )
+            if not descriptor_matches_entry(
+                self.parent_descriptor,
+                self.final.name,
+                published_descriptor,
+            ):
+                _remove_owner_from_descriptor(published_descriptor)
+                return False
+            try:
+                _rename_create_only(
+                    self.parent_descriptor,
+                    self.final.name,
+                    rollback_name,
+                )
+            except BaseException:
+                if not descriptor_matches_entry(
+                    self.parent_descriptor,
+                    rollback_name,
+                    published_descriptor,
+                ):
+                    _remove_owner_from_descriptor(published_descriptor)
+                raise
+            if not descriptor_matches_entry(
+                self.parent_descriptor,
+                rollback_name,
+                published_descriptor,
+            ):
+                _restore_entry_after_detachment_mismatch(
+                    self.parent_descriptor,
+                    rollback_name,
+                    self.final.name,
+                    published_descriptor,
+                )
+        else:
+            _ensure_owner_on_descriptor(
+                published_descriptor,
+                rollback_owner,
+                accepted_existing=self._owner,
+            )
+        removed = remove_descriptor_anchored_directory(
+            self.parent_descriptor,
+            rollback_name,
+            published_descriptor,
+            last_entry=_OWNER_FILE,
+        )
+        if removed:
+            os.close(published_descriptor)
+            self._published_descriptor = None
+            self._rollback_name = None
+        return removed
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        try:
+            stage_name = _descriptor_entry_name(self._stage_parent_descriptor, self.stage_descriptor)
+            if stage_name is not None:
+                remove_descriptor_anchored_directory(
+                    self._stage_parent_descriptor,
+                    stage_name,
+                    self.stage_descriptor,
+                    last_entry=_OWNER_FILE,
+                )
+            remove_owned_named_directory(
+                self.parent_descriptor,
+                self.adjacent_stage_name,
+                self._owner,
+                owner_file=_OWNER_FILE,
+            )
+            if self._published_descriptor is not None and self._rollback_name is not None:
+                self.rollback()
+        finally:
+            if self._published_descriptor is not None:
+                os.close(self._published_descriptor)
+                self._published_descriptor = None
+            self._rollback_name = None
+            os.close(self.stage_descriptor)
+            os.close(self._stage_parent_descriptor)
+            os.close(self.parent_descriptor)
+            self._closed = True
+
+    def __enter__(self) -> CreateOnlyDirectoryPublication:
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        del exc_type, exc, traceback
+        self.close()

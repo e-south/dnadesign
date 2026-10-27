@@ -1,0 +1,11 @@
+schema_version: 1
+catalog_order: 3
+tool: usr
+summary: Tool-owned dataset lifecycle docs, dataset handoffs, sync routes, and promoter feature assembly.
+keywords:
+  - promoter
+  - feature matrix
+  - source of truth
+  - active learning
+  - wildtype
+  - evo2

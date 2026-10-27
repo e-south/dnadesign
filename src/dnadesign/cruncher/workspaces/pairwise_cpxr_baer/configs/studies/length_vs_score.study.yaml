@@ -1,0 +1,45 @@
+study:
+  schema_version: 3
+  name: length_vs_score
+  base_config: config.yaml
+  target:
+    kind: regulator_set
+    set_index: 1
+  execution:
+    parallelism: 6
+    on_trial_error: continue
+    exit_code_policy: nonzero_if_any_error
+    summarize_after_run: true
+  artifacts:
+    trial_output_profile: minimal
+  replicates:
+    seed_path: sample.seed
+    seeds:
+    - 11
+  trials: []
+  trial_grids:
+  - id_prefix: L
+    factors:
+      sample.sequence_length:
+      - 15
+      - 17
+      - 18
+      - 19
+      - 21
+      - 23
+      - 25
+      - 27
+      - 29
+      - 31
+      - 33
+      - 35
+      - 37
+      - 39
+      - 41
+      - 43
+      - 45
+      - 47
+      - 49
+  replays:
+    mmr_sweep:
+      enabled: false

@@ -1,0 +1,14 @@
+schema_version: 1
+catalog_order: 11
+tool: baserender
+summary: Contract renderer for producer-emitted visual jobs, plus optional demo/ad hoc workspaces.
+keywords:
+  - baserender
+  - visual contracts
+  - rendering
+  - job files
+  - optional workspaces
+routes:
+  - id: junction-review
+    path: integrations/junction.md
+    summary: Render optional per-target review images from a verified junction review contract without recomputing the design.

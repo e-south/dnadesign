@@ -1,0 +1,431 @@
+## DenseGen outputs reference
+
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-10-26
+This page defines what DenseGen writes, where it writes it, and which event stream each
+consumer should read.
+
+DenseGen can emit Parquet outputs locally and/or write through USR. When USR
+is enabled for a shared study, DenseGen writes to the shared root declared in
+the config rather than inventing a workspace-local mirror.
+
+For a compact run-and-artifact checklist, use **[DenseGen quick checklist](../concepts/checklists/quick-checklist.md)**.
+
+### Contents
+
+- [Deterministic IDs](#deterministic-ids) - deterministic sequence identifiers.
+- [Parquet](#parquet) - dataset layout and deduplication.
+- [USR](#usr) - attach semantics and optional dependency.
+- [Shared metadata fields](#shared-metadata-fields) - namespaced record fields and retention labels.
+- [Run manifests](#run-manifests) - run-level JSON summaries.
+- [Library provenance artifacts](#library-provenance-artifacts) - solver-offered libraries and attempts.
+- [Source column values](#source-column-values) - provenance string.
+- [Rejected solutions](#rejected-solutions) - constraint rejections audit.
+
+---
+
+### Event boundary paths
+
+Use **[observability and events](../concepts/runtime/observability-and-events.md)** for stream-boundary behavior; this section lists only artifact paths.
+
+- DenseGen runtime diagnostics: `outputs/meta/events.jsonl`
+- USR mutation events: `<usr_root>/<dataset>/.events.log`
+
+---
+
+### Deterministic IDs
+
+
+- Sequence IDs use USR's algorithm:
+  - `normalize_sequence(sequence, bio_type, alphabet)`
+  - `compute_id(bio_type, normalized_sequence)`
+- Parquet and USR must return the same `id` for the same sequence.
+- `bio_type` and `alphabet` are defined once in `output.schema` and shared by all sinks.
+
+---
+
+### Parquet
+
+Parquet output is written as a single file (`outputs/tables/records.parquet`) under the run root. Each row contains required fields (`id`, `sequence`, `bio_type`, `alphabet`, `source`) plus namespaced `densegen__*` metadata columns.
+
+Behavior:
+- If `deduplicate: true`, existing IDs in the dataset are loaded and skipped.
+- Parquet requires `pyarrow`; if unavailable, DenseGen fails fast.
+- The output `path` must be a `.parquet` file (single-file output).
+- List/dict metadata values are stored as native list/struct columns (no JSON encoding).
+- If an existing dataset has a mismatched schema, DenseGen fails fast and requires a fresh output
+  path.
+- DenseGen maintains a local ID index (`outputs/meta/_densegen_ids.sqlite`) to speed deduplication and alignment checks.
+
+---
+
+### USR
+
+USR output uses the USR Dataset overlay-part writer with a fixed namespace (`densegen`). USR integration is
+optional; if you do not include `usr` in `output.targets`, DenseGen should not import USR code. USR output requires
+an explicit `output.usr.root` and a registry entry for the `densegen` namespace (repo-wide `usr/datasets/registry.yaml`).
+
+Behavior:
+- Base sequences are imported once; derived metadata is written as overlay parts under `_derived/densegen/part-*.parquet`.
+- Metadata values are stored as typed Arrow list/struct columns (no JSON encoding).
+- Existing IDs in `records.parquet` are skipped (resume-safe).
+- Overlay parts are append-only. Compact parts with `usr maintenance overlay-compact <dataset> --namespace densegen`.
+- If `output.usr.npz_fields` is set, those metadata fields are offloaded into NPZ artifacts under
+   `<dataset>/_artifacts/densegen_npz/<id>.npz`. Overlay columns `densegen__npz_ref`,
+   `densegen__npz_sha256`, `densegen__npz_bytes`, and `densegen__npz_fields` are populated and the
+   offloaded fields are stored as null inline. Each offloaded field is a scalar Unicode array containing JSON.
+   Read with `numpy.load(path, allow_pickle=False)` and decode a field with
+   `json.loads(archive[field].item())`. Object-array artifacts are rejected without unpickling;
+   supplied SHA-256 checks run before array parsing.
+
+When multiple outputs are configured, all sinks must be in sync before a run. If one output already exists and the other
+does not (or IDs differ), DenseGen fails fast.
+
+---
+
+### Shared metadata fields
+
+Keys are namespaced as `densegen__<key>`.
+
+Overlay-first USR note:
+- Base `records.parquet` may contain only USR core columns (`id`, `bio_type`, `sequence`, `alphabet`, `length`, `source`, `created_at`).
+- DenseGen-derived columns are attached under `_derived/densegen/part-*.parquet` and are merged by default in USR reads (`usr head`, `usr schema`, `usr info`).
+- Use `usr materialize` when you need those merged columns physically written into base `records.parquet`.
+
+Retention labels in the table:
+- `record_keep`: keep at record level for downstream analysis/provenance.
+- `record_conditional`: keep at record level when applicable.
+
+Curated record fields:
+
+| Field | Retention | Meaning |
+|---|---|---|
+| `densegen__schema_version` | record_keep | DenseGen schema version (for example, 2.9). |
+| `densegen__created_at` | record_keep | UTC ISO8601 timestamp for record creation. |
+| `densegen__run_id` | record_keep | Run identifier (`densegen.run.id`). |
+| `densegen__length` | record_keep | Actual output sequence length. |
+| `densegen__plan` | record_keep | Plan item name from `generation.plan[*].name`. |
+| `densegen__input_name` | record_keep | Stage-B sampled pool/source id for that plan (typically `plan_pool__<plan>`). |
+| `densegen__input_mode` | record_keep | Input mode (`binding_sites`/`sequence_library`/`pwm_sampled`/`plan_pool`). Unknown modes fail fast. |
+| `densegen__input_pwm_ids` | record_conditional | Stage-A PWM motif IDs used for sampling (`pwm_*` inputs). |
+| `densegen__used_tfbs` | record_keep | `TF:TFBS` strings used in the final sequence. |
+| `densegen__used_tfbs_detail` | record_keep | Consolidated per-placement detail for all sequence parts. TFBS entries use explicit keys (`part_index`, `regulator`, `sequence`, `core_sequence`, `orientation`, `offset_raw`, `pad_left`, `offset`, `length`, `end`, `source`, `motif_id`, `tfbs_id`). PWM-sampled runs additionally include lineage fields (`score_best_hit_raw`, `score_theoretical_max`, `score_relative_to_theoretical_max`, `rank_among_mined_positive`, `rank_among_selected`, `selection_policy`, `nearest_selected_*`, `matched_start`, `matched_stop`, `matched_strand`). Fixed-element entries keep `role`, `sequence`, normalized geometry, and optional variant/spacer metadata. |
+| `densegen__used_tf_counts` | record_keep | Per-TF placement counts (`{tf, count}`) computed from `densegen__used_tfbs_detail` TFBS entries. |
+| `densegen__library_unique_tf_count` | record_keep | Unique TF count in sampled library. |
+| `densegen__library_unique_tfbs_count` | record_keep | Unique TFBS count in sampled library. |
+| `densegen__covers_all_tfs_in_solution` | record_keep | Whether min-count TF coverage was satisfied. |
+| `densegen__required_regulators` | record_keep | Selected required regulators for this sampled library (one/minimum picks from `regulator_constraints.groups`). This is a constraint set, not the full set of regulators used in the accepted sequence. |
+| `densegen__min_count_by_regulator` | record_keep | Per-regulator minimum counts (`{tf, min_count}`). |
+| `densegen__compression_ratio` | record_keep | Solution compression ratio. |
+| `densegen__sampling_library_hash` | record_keep | Stage-B stable sampled-library hash. |
+| `densegen__sampling_library_index` | record_keep | Stage-B 1-based sampled library index. |
+| `densegen__sequence_validation` | record_keep | Final-sequence validation summary (`validation_passed`, `violations`). |
+| `densegen__pad_used` | record_keep | Whether pad bases were applied. |
+| `densegen__pad_bases` | record_conditional | Number of bases padded. |
+| `densegen__pad_end` | record_conditional | Pad end (`5prime`/`3prime`). |
+| `densegen__pad_literal` | record_conditional | Literal pad sequence written into the final output. |
+| `densegen__gc_total` | record_keep | GC fraction of final sequence. |
+| `densegen__gc_core` | record_keep | GC fraction of pre-pad core sequence. |
+| `densegen__npz_ref` | record_conditional | Relative NPZ artifact reference when `output.usr.npz_fields` is enabled (USR sink only). |
+| `densegen__npz_sha256` | record_conditional | NPZ payload SHA256 (USR sink only). |
+| `densegen__npz_bytes` | record_conditional | NPZ payload size in bytes (USR sink only). |
+| `densegen__npz_fields` | record_conditional | Fields offloaded to NPZ (USR sink only). |
+
+For type definitions and validation logic, see `src/dnadesign/densegen/src/core/metadata_schema.py`.
+
+---
+
+### Run manifests
+
+DenseGen writes run-level JSON files under `outputs/meta/`:
+
+- `outputs/meta/run_state.json` — checkpointed progress for resumable runs (updated during execution).
+- `outputs/meta/run_manifest.json` — summary counts and quotas per input/plan plus solver settings and derived seeds (written on completion). Includes `total_quota`, `quota_progress_pct`, and per-item `quota`, plus a `leaderboard_latest` snapshot (top TF/TFBS usage, failure hotspots, diversity coverage).
+- `outputs/meta/inputs_manifest.json` — resolved input paths and Stage‑A PWM sampling settings used for the run.
+- `outputs/meta/effective_config.json` — resolved config with derived seeds and Stage‑A sampling caps.
+
+These are produced alongside Parquet/USR outputs and provide a compact audit trail.
+
+---
+
+### DenseGen events log
+
+DenseGen writes `outputs/meta/events.jsonl` (JSON lines) with structured events for pool builds, library builds, sampling pressure, stalls, and resamples. This is a lightweight machine-readable trace of runtime control flow.
+
+---
+
+### Related event docs
+
+
+See also:
+- DenseGen boundary and mistakes: **[observability and events](../concepts/runtime/observability-and-events.md)**
+- USR event schema: `../../../usr/docs/reference/event-log.md`
+- Notify operators doc: `../../../../../docs/notify/usr-events.md`
+- DenseGen watcher walkthrough: **[DenseGen to USR to Notify tutorial](../tutorials/demo_usr_notify.md)**
+
+---
+
+### Run diagnostics table
+
+DenseGen writes `outputs/tables/run_metrics.parquet`, an aggregated diagnostics table built from pools, libraries, attempts, and composition. It powers the run-level plots and makes it easy to answer: which libraries were weak, which TFs were over/under-used, and whether top-scoring Stage-A sites were actually consumed.
+Tier-based metrics (e.g., tier enrichment) are computed only for PWM-derived pools with tier labels. Background pools do not carry tiers and are excluded from tier aggregations.
+
+---
+
+### Library provenance artifacts
+
+DenseGen records solver library provenance in two places:
+
+- `outputs/libraries/library_builds.parquet` + `library_members.parquet` (primary library artifacts).
+- `outputs/tables/attempts.parquet` (attempt-level audit log with offered library lists). Each attempt row stores the full library offered to the solver (`library_tfbs`, `library_tfs`, `library_site_ids`, `library_sources`) along with the library hash/index and solver status. Attempts include `attempt_id` and `solution_id` (when successful) for stable joins. Output records carry both `densegen__sampling_library_hash` and `densegen__sampling_library_index`, and composition/solutions tables keep full library join keys.
+
+---
+
+### Solutions log
+
+DenseGen writes `outputs/tables/solutions.parquet` (append-only) with the solution id, attempt id, and library hash. Join keys:
+
+- `solutions.solution_id` ↔ `records.id`
+- `solutions.attempt_id` ↔ `attempts.attempt_id`
+- `solutions.solution_id` ↔ `composition.solution_id`
+
+---
+
+### Notebook output
+
+`dense notebook generate` writes a workspace-scoped marimo notebook:
+
+- `<run_root>/outputs/notebooks/densegen_run_overview.py` (default path)
+
+The notebook reads run artifacts (`outputs/meta/*`, `outputs/tables/*`, `outputs/plots/current_inventory.json`) and reflects the current persisted run state each time you open or rerun notebook cells. Notebook startup is read-only and `current_inventory.json` is the only normal-path inventory source for notebook display; missing or incompatible inventories fail with a regenerate-plots diagnostic instead of falling back to filesystem discovery.
+
+DenseGen -> BaseRender contract for the scaffolded notebook:
+
+- Contract source: `dnadesign.densegen:densegen_notebook_render_contract`
+- Adapter policy contract: `on_invalid_row=error` (invalid rows fail instead of skipping)
+- Records source path: resolved from output sink selection:
+  - single sink in `output.targets` -> that sink (`parquet` or `usr`)
+  - multiple sinks in `output.targets` -> `plots.source`
+  - `parquet` source path: `densegen.output.parquet.path`
+  - `usr` source path: `<densegen.output.usr.root>/<densegen.output.usr.dataset>/records.parquet`
+- BaseRender API surface used by the notebook:
+  - `dnadesign.baserender.load_records_from_parquet(...)`
+  - `dnadesign.baserender.render_record_figure(...)`
+- Notebook records preview/export contract:
+  - The notebook preview/export table is a curated projection of `records.parquet` focused on row-level signal.
+  - Notebook preview fields are read directly from persisted records; the notebook does not reconstruct fixed elements or pad literals.
+- `densegen__parts_detail` is copied from `densegen__used_tfbs_detail` so preview/export matches Parquet and USR output rows.
+- DenseGen does not provide back-compat shims for old part-detail keys (`tf`, `tfbs`, `stage_a_*`); mismatched payloads fail validation.
+  - `densegen__pad_literal` is read from the persisted `densegen__pad_literal` column.
+- Rendering style preset: `presentation_default` (fixed in the DenseGen contract)
+- Notebook record preview window limit: `500` rows
+- Required parquet columns for the default contract:
+  - `id`
+  - `sequence`
+  - `densegen__used_tfbs_detail`
+- Required TFBS entry keys inside `densegen__used_tfbs_detail`:
+  - `regulator`
+  - `sequence`
+  - `orientation`
+  - `offset`
+- Notebook layout (run mode):
+  - `Workspace context`: workspace/config/output provenance and records path.
+  - `Run summary`: compact status (`run_id`, `quota status`, `plans at quota`, solver backend/strategy).
+  - `Records preview`: plan-filtered table with explicit dataset export controls (`parquet|csv`, output path).
+  - `Records export path behavior`: relative paths resolve from the workspace run root, empty paths default to `outputs/notebooks/records_preview`, and file suffixes are normalized to the selected format (`.parquet` or `.csv`).
+  - `BaseRender preview`: `Prev`/`Next` controls with centered index/id status (`i / N | id: ...`).
+  - `BaseRender export path behavior`: export path is required, relative paths resolve from the workspace run root, and file suffixes are normalized to the selected format (`.png` or `.pdf`).
+- `Selected plot`: scope/type/plot controls stacked above the rendered plot.
+- `Plot gallery`: filtered inventory table for browsing and audit.
+- `Plot export`: export `selected|filtered|all` plots to one format (`pdf|png|svg`) under a target directory.
+- Plot scope labels:
+  - `all scopes (all plots)` includes run-level, stage-a, and plan-scoped artifacts.
+  - `run-level` refers to unscoped run diagnostics such as `attempt_outcome_timeline`.
+  - `stage-a` refers to concrete Stage-A plot ids such as `stage_a_sampling_yield`.
+  - plan-scoped entries map to concrete plan names from `current_inventory.json`.
+
+---
+
+### Plot output
+
+`dense plot` writes plot images under `outputs/plots/` (format controlled by `plots.format`).
+
+- `outputs/plots/current_inventory.json` is the authoritative current snapshot for the configured render surface.
+- `outputs/plots/artifact_ledger.json` is the optional historical ledger when cumulative history is retained.
+- `outputs/plots/plot_manifest.json` may remain as a compatibility ledger mirror, but notebooks and status consumers should treat `current_inventory.json` as the authoritative current surface.
+
+Run diagnostics metrics are summarized in `outputs/tables/run_metrics.parquet` (aggregated from pools, libraries, attempts, and composition). Plots below are generated from run artifacts plus accepted-sequence records loaded from the configured plot source (`plots.source`: parquet or usr), not candidate/debug logs.
+
+Concrete plot outputs:
+
+- `source_cohort_concentration` — provenance summary for final-record source cohorts.
+- `source_plan_input_heatmap` — provenance drilldown across source, plan, and input metadata.
+- `stage_a_sampling_yield` — retained Stage-A yield and sampling bias.
+- `stage_a_pool_diversity` — retained Stage-A diversity.
+- `background_sequence_logo` — background-pool sequence logo.
+- `stage_a_pool_score_strata` — Stage-A score/tier strata summary.
+- `plan_regulator_deployment_heatmap` — Stage-B deployment mix across plans and regulators.
+- `placement_occupancy_map` — Stage-B positional occupancy map for accepted placements.
+- `tfbs_concentration_profile` — rank concentration and share-decay profile for deployed TFBS usage.
+- `retained_pool_coverage_by_regulator` — core Stage-B bridge view from retained pool to deployed coverage.
+- `retained_vs_deployed_tier_mix_by_regulator` — optional tier-mix bridge drilldown.
+- `retained_vs_deployed_length_mix_by_regulator` — optional length-mix bridge drilldown.
+- `upstream_motif_supply_and_pwm_strength` — upstream motif-supply and PWM-strength context.
+- `attempt_outcome_timeline` — attempt status timeline across plans.
+- `solve_pressure_and_progress` — solver pressure, waste, and accepted-progress dashboard.
+- `compression_ratio_by_plan` — compression-ratio drilldown by plan.
+- `dense_array_showcase_video` — optional Stage-B MP4 montage from sampled accepted outputs.
+
+Notebook launch requires the full notebook-visible surface. The happy path is
+that `dense plot` renders every notebook-visible plot id listed in
+`plots.default`, and `dense notebook run` then opens a notebook whose gallery
+contains that full review surface.
+
+Stage-A plots write under `outputs/plots/stage_a/`:
+- `stage_a_sampling_yield.pdf`
+- `stage_a_pool_diversity.pdf`
+- `stage_a_pool_score_strata.pdf`
+- `<input>__background_sequence_logo.pdf` for background pools
+- `no_stage_a_panels.pdf` when no Stage-A diagnostics apply
+
+`placement_occupancy_map` writes one image under:
+`outputs/plots/stage_b/<plan>/placement_occupancy_map.pdf` (or `outputs/plots/stage_b/<plan>/<input>/` when multiple non-redundant inputs map to the same plan)
+
+`tfbs_concentration_profile` writes one image into the same plan directory:
+`outputs/plots/stage_b/<plan>/tfbs_concentration_profile.pdf` (or under `<input>/` for multi-input plans)
+
+`dense_array_showcase_video` writes one MP4 under:
+- all-plan mode: `outputs/plots/stage_b/all_plans/showcase.mp4`
+- single-plan mode: `outputs/plots/stage_b/<plan>/showcase.mp4`
+
+Stage-B scoping options are strict and per-plot:
+- `plots.options.placement_occupancy_map.scope: auto|per_plan|per_group`
+- `plots.options.tfbs_concentration_profile.scope: auto|per_plan|per_group`
+- `max_plans` (used by `auto`)
+- `drilldown_plans` (optional per-plan detail count when grouped)
+
+With `scope: auto`, DenseGen emits per-plan outputs for small plan sets and switches to grouped outputs when plan count exceeds `max_plans`. When grouping applies, plan-pool internal inputs are normalized to grouped plan scopes, so matrix-expanded runs do not fan out into one Stage-B file per expanded variant unless you request per-plan drilldowns.
+
+Run diagnostics write:
+- `outputs/plots/run_health/attempt_outcome_timeline.pdf`
+- `outputs/plots/run_health/solve_pressure_and_progress.pdf`
+- `outputs/plots/run_health/compression_ratio_by_plan.pdf`
+- `outputs/plots/run_health/summary.csv`
+
+Run diagnostics use status taxonomy `ok|rejected|duplicate|failed` from
+`outputs/tables/attempts.parquet` and plan quotas from
+`outputs/meta/effective_config.json` (`generation.plan[].sequences`).
+`summary.csv` is a compact support table with run-level totals and per-plan accepted/quota ratios.
+For large expanded runs, `solve_pressure_and_progress.pdf` plan rows auto-collapse to base plan groups unless overridden with plot style options (`run_health_plan_scope: per_plan|auto|per_group`, `run_health_plan_max_labels`).
+`attempt_outcome_timeline.pdf` has independent plan scoping controls (`run_health_outcomes_plan_scope: per_plan|auto|per_group`, `run_health_outcomes_plan_max_labels`).
+`attempt_outcome_timeline.pdf` tiles attempts into per-plan rows (first attempts at top) with optional packing controls (`run_health_outcomes_attempts_per_row`, `run_health_outcomes_rows_per_block`).
+
+See `../concepts/generation/sampling.md` for plot interpretation context.
+
+`stage_a_sampling_yield`, `stage_a_pool_diversity`, and `stage_a_pool_score_strata`
+require diversity metrics in `pool_manifest.json`. If your pool manifest predates
+diversity metrics, rerun `dense stage-a build-pool --fresh` to regenerate it.
+
+---
+
+#### How `placement_occupancy_map` shows fixed elements
+
+`placement_occupancy_map` visualizes 1-nt occupancy across binding-site types (regulators and fixed elements).
+
+When your plan includes `fixed_elements.promoter_constraints`, `placement_occupancy_map` renders the promoter
+as fixed-element bands overlaid alongside regulator occupancy so you can see how fixed constraints
+consume positional budget relative to sampled sites.
+Fixed elements are shown in the legend as `<name> -35` and `<name> -10`.
+
+---
+
+### Optional stage helper outputs
+
+DenseGen can materialize Stage‑A/Stage‑B artifacts without running the solver:
+
+- `dense stage-a build-pool` writes:
+  - `outputs/pools/pool_manifest.json`
+  - `outputs/pools/<input>__pool.parquet`
+  - `outputs/pools/candidates/<input_name>/candidates__<label>.parquet` (when `keep_all_candidates_debug: true`)
+  - `outputs/pools/candidates/<input_name>/<label>__fimo.tsv` (when `keep_all_candidates_debug: true`)
+  - `outputs/pools/candidates/candidates.parquet` + `candidates_summary.parquet` + `candidates_manifest.json`
+    (overwritten by `stage-a build-pool --fresh` or `dense run --fresh`)
+- `dense stage-b build-libraries` writes:
+  - `outputs/libraries/library_builds.parquet`
+  - `outputs/libraries/library_members.parquet`
+  - `outputs/libraries/library_manifest.json`
+
+`dense stage-a build-pool` appends new unique TFBS to existing pools by default; pass `--fresh`
+to rebuild pools from scratch.
+`pool_manifest.json` includes the input config hash plus file fingerprints; append requires they match.
+The config hash includes `runtime.random_seed`, so changing the seed makes an existing Stage-A pool stale.
+For FIMO-backed PWM inputs, it records Stage-A sampling metadata, including:
+- tier fractions + source + scheme label
+- eligibility/retention rules, FIMO threshold, background source/bgfile
+- consensus and max-score stats (`pwm_consensus`, `pwm_consensus_iupac`, `pwm_consensus_score`,
+  `pwm_theoretical_max_score`, `max_observed_score`)
+- selection pool diagnostics (`selection_pool_*`, `selection_score_norm_*`)
+- core representative provenance (`core_representative_policy`, `runtime_random_seed`)
+- trimming metadata (`motif_width`, `trimmed_width`, `trim_window_length`,
+  `trim_window_strategy`, `trim_window_start`, `trim_window_score`, `trim_window_applied`)
+- diversity summaries (k‑NN unweighted/weighted, pairwise weighted, overlap, score quantiles)
+- mining and padding audits
+
+See the sampling guide for interpretation; the manifest is the source of truth for field names.
+Stage-A pool rows include `best_hit_score`, `tier`, `rank_within_regulator` (1-based rank among
+eligible_unique TFBS per regulator), and `tfbs_core` for core-level uniqueness checks.
+
+When `sampling.uniqueness.key=core`, DenseGen preserves the maximum-scoring candidate for each
+FIMO-matched core. If multiple complete motif sequences share that maximum score, it selects one with
+the Stage-A seeded random process after placing candidates and cores in stable order. The fixed seed is
+reproducible, candidate enumeration does not change membership, and nucleotide lexical order is not a
+selection criterion. Pool-manifest schema 1.7 identifies this membership contract; manifests from
+earlier schemas require an explicit `--fresh` rebuild and remain evidence of the behavior that created
+them.
+
+Stage‑B expects Stage‑A pools (default `outputs/pools`). `dense run` reuses these pools by default
+and rebuilds them if they are missing or stale; rebuild explicitly with `dense stage-a build-pool --fresh`
+or reset everything with `dense run --fresh`.
+
+---
+
+### Source column values
+
+The `source` column is always present and encodes provenance as:
+
+```
+densegen:{input_name}:{plan_name}
+```
+
+Per-placement provenance (regulator/sequence identity, offsets, orientations, and IDs) is recorded in `densegen__used_tfbs_detail` (including `motif_id`/`tfbs_id`), `outputs/tables/composition.parquet`, and the attempts log.
+
+---
+
+### Rejected solutions
+
+DenseGen records non-success solver attempts in `outputs/tables/attempts.parquet` with:
+
+- `status` (`rejected`, `failed`, `duplicate`, `ok`)
+- `reason` (normalized reason-family label)
+- `reason_detail_json` (structured context for constraint audits)
+
+This is the primary source for rejection audits and post-run failure triage.
+
+---
+
+### Attempts log
+
+DenseGen writes `outputs/tables/attempts.parquet`, an append-only audit log of solver attempts (success, duplicate, and constraint rejections). Each row includes the attempt status, reason/detail JSON, solver metadata, and library hash/index. Each attempt includes:
+
+- `attempt_id` — stable join key across artifacts
+- `solution_id` — present for successful attempts
+- `attempt_index` — per-plan monotonic counter
+
+For returned candidates, `solver_solve_time_s` measures the elapsed time spent
+requesting that candidate from the optimizer iterator. It includes lazy model
+setup and enumeration bookkeeping, and excludes subsequent validation and
+output writing. DenseGen measures this at its runtime boundary without adding
+metadata attributes to the immutable optimizer result. No-solution attempt
+rows retain the elapsed library-attempt diagnostic.
+
+Each attempt also records the exact library TF/TFBS/site_id lists offered to the solver (subset attribution). If no attempts are logged, the file is absent. Attempts logs require `pyarrow`.

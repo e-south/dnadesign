@@ -1,0 +1,46 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/infer/src/adapters/__init__.py
+
+Package exports for infer adapters.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from ..registry import register_default_embedding_layer, register_fn, register_model
+
+EVO2_DEFAULT_EMBEDDING_LAYER = "block26_mlp_out"
+
+
+class Evo2Adapter:
+    def __new__(cls, model_id: str, device: str, precision: str):
+        from .evo2 import Evo2Adapter as _Evo2Adapter
+
+        return _Evo2Adapter(model_id, device, precision)
+
+
+_REGISTERED = False
+
+
+def register_defaults() -> None:
+    global _REGISTERED
+    if _REGISTERED:
+        return
+
+    # Register models
+    register_model("evo2_7b", Evo2Adapter)
+    register_model("evo2_20b", Evo2Adapter)
+    register_model("evo2_1b_base", Evo2Adapter)  # convenience
+
+    # Register functions (namespaced)
+    register_fn("evo2.logits", "logits")
+    register_fn("evo2.embedding", "embedding")
+    register_fn("evo2.log_likelihood", "log_likelihood")
+    register_fn("evo2.generate", "generate")
+    register_default_embedding_layer("evo2", EVO2_DEFAULT_EMBEDDING_LAYER)
+
+    _REGISTERED = True

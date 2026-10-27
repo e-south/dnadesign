@@ -1,0 +1,92 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/permuter/src/workspaces/loader.py
+
+Workspace discovery and strict config loading for Permuter runs.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pandas as pd
+import yaml
+
+from dnadesign.permuter.src.core.config import ScopeConfig
+from dnadesign.permuter.src.core.paths import CONFIG_NAME, expand_for_workspace
+from dnadesign.permuter.src.workspaces.contracts import PermuterWorkspace
+
+
+def load_workspace(workspace: Path | str) -> PermuterWorkspace:
+    root = Path(workspace).expanduser().resolve()
+    config_path = root / CONFIG_NAME if root.is_dir() else root
+    if config_path.name != CONFIG_NAME:
+        raise ValueError(f"workspace config must be named {CONFIG_NAME!r}; got {config_path}")
+    if not config_path.exists():
+        raise ValueError(f"workspace config not found: {config_path}")
+    try:
+        data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise ValueError(f"workspace config is not valid YAML: {config_path}") from exc
+    if not isinstance(data, dict):
+        raise ValueError(f"workspace config must be a mapping: {config_path}")
+    try:
+        config = ScopeConfig.model_validate(data)
+    except Exception as exc:
+        raise ValueError(f"workspace config does not satisfy Permuter config contract: {config_path}: {exc}") from exc
+    workspace_root = config_path.parent
+    scope_id = workspace_root.name
+    if config.scope.name != scope_id:
+        raise ValueError(
+            f"workspace scope id must match scope.name: scope={scope_id!r} scope.name={config.scope.name!r}"
+        )
+    _validate_input_refs(config=config, workspace_root=workspace_root)
+    output_root = expand_for_workspace(config.scope.output.dir, workspace_dir=workspace_root)
+    outputs_root = (workspace_root / "outputs").resolve()
+    try:
+        output_root.relative_to(outputs_root)
+    except ValueError as exc:
+        raise ValueError(
+            "workspace output.dir must resolve inside the workspace outputs/ tree: "
+            f"{config.scope.output.dir!r} -> {output_root}"
+        ) from exc
+    return PermuterWorkspace(
+        scope_id=scope_id,
+        root=workspace_root,
+        config_path=config_path,
+        config=config,
+    )
+
+
+def find_workspaces(root: Path | str) -> list[Path]:
+    base = Path(root).expanduser().resolve()
+    if not base.exists():
+        raise ValueError(f"workspace root not found: {base}")
+    if base.is_file():
+        return [base] if base.name == CONFIG_NAME else []
+    direct = base / CONFIG_NAME
+    if direct.exists():
+        return [direct]
+    return sorted(path for path in base.glob(f"*/{CONFIG_NAME}") if path.is_file())
+
+
+def _validate_input_refs(*, config: ScopeConfig, workspace_root: Path) -> None:
+    refs_path = expand_for_workspace(config.scope.input.refs, workspace_dir=workspace_root)
+    if refs_path.is_dir():
+        raise IsADirectoryError(f"workspace input.refs must be a CSV file, not a directory: {refs_path}")
+    if not refs_path.exists():
+        raise FileNotFoundError(f"workspace input.refs not found: {refs_path}")
+    try:
+        columns = set(pd.read_csv(refs_path, dtype=str, nrows=0).columns)
+    except Exception as exc:
+        raise ValueError(f"workspace input.refs is not a readable CSV: {refs_path}: {exc}") from exc
+    required = {config.scope.input.name_col, config.scope.input.seq_col}
+    if config.scope.input.aa_col:
+        required.add(config.scope.input.aa_col)
+    missing = sorted(required - columns)
+    if missing:
+        raise ValueError(f"workspace input.refs missing required column(s): {missing}")

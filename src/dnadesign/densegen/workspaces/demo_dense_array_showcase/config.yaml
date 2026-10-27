@@ -1,0 +1,222 @@
+# DenseGen demo: dense array showcase with toy TFBS and fixed-element variants.
+densegen:
+  schema_version: "2.9"
+  run:
+    id: demo_dense_array_showcase
+    root: "."
+
+  motif_sets:
+    anchor_alpha_upstream:
+      a: AAACCCGT
+      b: AAAGGGCT
+      c: CCCAAAGT
+      d: GGGAAACT
+    anchor_alpha_downstream:
+      a: ACGGGTTT
+      b: AGCCCTTT
+      c: ACTTTGGG
+      d: AGTTTCCC
+
+  inputs:
+    - name: toy_sites
+      type: binding_sites
+      path: inputs/sites.csv
+
+  output:
+    targets: [parquet]
+    schema:
+      bio_type: dna
+      alphabet: dna_4
+    parquet:
+      path: outputs/tables/records.parquet
+      deduplicate: true
+      chunk_size: 128
+
+  generation:
+    sequence_length: 100
+    expansion:
+      max_plans: 16
+    sampling:
+      pool_strategy: subsample
+      library_size: 6
+      library_sampling_strategy: tf_balanced
+      cover_all_regulators: false
+      unique_binding_sites: true
+      unique_binding_cores: true
+      max_sites_per_regulator: null
+      relax_on_exhaustion: false
+
+    plan:
+      - name: dense_free
+        sequences: 300
+        sampling:
+          include_inputs: [toy_sites]
+        regulator_constraints:
+          min_total_sites: 5
+          groups:
+            - name: left_panel
+              members: [TF_A, TF_B, TF_C, TF_D]
+              min_required: 1
+            - name: right_panel
+              members: [TF_E, TF_F, TF_G, TF_H]
+              min_required: 1
+      - name: single_anchor
+        sequences: 180
+        expanded_name_template: "{base}__alpha={up}-{down}"
+        sampling:
+          include_inputs: [toy_sites]
+        fixed_elements:
+          fixed_element_matrix:
+            name: alpha_anchor
+            upstream_from_set: anchor_alpha_upstream
+            upstream_variant_ids: [c, d]
+            downstream_from_set: anchor_alpha_downstream
+            downstream_variant_ids: [c, d]
+            pairing:
+              mode: explicit_pairs
+              pairs:
+                - up: c
+                  down: c
+                - up: d
+                  down: d
+            spacer_length: [16, 20]
+            upstream_pos: [0, 99]
+        regulator_constraints:
+          min_total_sites: 0
+          groups: []
+      - name: dual_anchor
+        sequences: 20
+        expanded_name_template: "{base}__alpha={up}-{down}"
+        sampling:
+          include_inputs: [toy_sites]
+        fixed_elements:
+          promoter_constraints:
+            - name: beta_anchor
+              upstream: CCCCGGAA
+              downstream: TTCCGGGG
+              spacer_length: [16, 20]
+          fixed_element_matrix:
+            name: alpha_anchor
+            upstream_from_set: anchor_alpha_upstream
+            upstream_variant_ids: [c]
+            downstream_from_set: anchor_alpha_downstream
+            downstream_variant_ids: [c]
+            pairing:
+              mode: explicit_pairs
+              pairs:
+                - up: c
+                  down: c
+            spacer_length: [16, 20]
+            upstream_pos: [0, 99]
+        regulator_constraints:
+          min_total_sites: 0
+          groups: []
+
+  solver:
+    backend: CBC
+    strategy: iterate
+    solver_attempt_timeout_seconds: 3
+
+  runtime:
+    round_robin: true
+    max_accepted_per_library: 16
+    min_count_per_tf: 0
+    max_duplicate_solutions: 3
+    no_progress_seconds_before_resample: 3
+    max_consecutive_no_progress_resamples: 60
+    max_failed_solutions: 5000
+    max_failed_solutions_per_target: 4.0
+    random_seed: 42
+
+  postprocess:
+    pad:
+      mode: adaptive
+      end: 5prime
+      gc:
+        mode: range
+        min: 0.40
+        max: 0.60
+        target: 0.50
+        tolerance: 0.10
+        min_pad_length: 0
+      max_tries: 2000
+
+  logging:
+    log_dir: outputs/logs
+    level: INFO
+    suppress_solver_stderr: true
+    print_visual: false
+    visuals:
+      tf_colors:
+        TF_A: "#0072B2"
+        TF_B: "#D55E00"
+        TF_C: "#009E73"
+        TF_D: "#E69F00"
+        TF_E: "#CC79A7"
+        TF_F: "#56B4E9"
+        TF_G: "#332288"
+        TF_H: "#882255"
+        alpha_anchor: "#332288"
+        beta_anchor: "#882255"
+    progress_style: auto
+    progress_every: 25
+    progress_refresh_seconds: 1.0
+
+plots:
+  source: parquet
+  out_dir: outputs/plots
+  format: pdf
+  default:
+    [
+      source_cohort_concentration,
+      plan_regulator_deployment_heatmap,
+      placement_occupancy_map,
+      retained_pool_coverage_by_regulator,
+      attempt_outcome_timeline,
+      solve_pressure_and_progress,
+      compression_ratio_by_plan,
+      dense_array_showcase_video,
+      retained_vs_deployed_length_mix_by_regulator,
+      source_plan_input_heatmap,
+      tfbs_concentration_profile,
+    ]
+  options:
+    placement_occupancy_map:
+      scope: auto
+      max_plans: 12
+    tfbs_concentration_profile:
+      scope: auto
+      max_plans: 12
+  video:
+    enabled: true
+    show_title: false
+    show_subtitle: false
+    mode: all_plans_round_robin_single_video
+    presentation:
+      legend_font_size: 30
+      legend_height_px: 176
+      palette:
+        "tf:TF_A": "#0072B2"
+        "tf:TF_B": "#D55E00"
+        "tf:TF_C": "#009E73"
+        "tf:TF_D": "#E69F00"
+        "tf:TF_E": "#CC79A7"
+        "tf:TF_F": "#56B4E9"
+        "tf:TF_G": "#332288"
+        "tf:TF_H": "#882255"
+        "promoter:alpha_anchor:upstream": "#332288"
+        "promoter:alpha_anchor:downstream": "#56B4E9"
+        "promoter:beta_anchor:upstream": "#882255"
+        "promoter:beta_anchor:downstream": "#CC79A7"
+    sampling:
+      stride: 1
+      max_source_rows: 20000
+      max_snapshots: 32
+      plan_snapshots:
+        dense_free: 6
+        single_anchor__alpha=c-c: 9
+        single_anchor__alpha=d-d: 9
+        dual_anchor__alpha=c-c: 8
+    playback:
+      target_duration_sec: 20
+      fps: 8

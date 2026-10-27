@@ -1,0 +1,750 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/src/core/reporting_data.py
+
+Report data collection helpers for DenseGen runs.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict
+
+import pandas as pd
+import pyarrow.parquet as pq
+
+from ..adapters.outputs import load_records_from_config
+from ..config import RootConfig, resolve_outputs_scoped_path, resolve_run_root, resolve_usr_root_scoped_path
+from .artifacts.pool import POOL_MODE_TFBS, load_pool_data
+from .event_log import load_events
+from .motif_labels import input_motifs, motif_display_name
+from .pipeline.attempts import _attempts_artifact_paths, _load_attempts_snapshot
+from .pipeline.plan_pools import build_plan_pools, plan_pool_label
+from .record_values import (
+    coerce_list as _ensure_list,
+)
+from .reporting_transforms import (
+    _compute_adjacency,
+    _compute_cooccurrence,
+    _dg,
+    _explode_library_from_attempts,
+    _explode_used,
+    _explode_used_from_composition,
+    _normalized_entropy_from_counts,
+    _usage_stats_from_counts,
+)
+from .run_manifest import load_run_manifest
+from .run_paths import (
+    candidates_root,
+    run_manifest_path,
+    run_outputs_root,
+    run_tables_root,
+)
+
+log = logging.getLogger(__name__)
+
+_ATTEMPTS_REPORT_COLUMNS = [
+    "status",
+    "sampling_library_hash",
+    "sampling_library_index",
+    "input_name",
+    "plan_name",
+    "library_tfbs",
+    "library_tfs",
+    "library_site_ids",
+    "library_sources",
+]
+_SOLUTIONS_REPORT_COLUMNS = [
+    "solution_id",
+    "attempt_id",
+    "input_name",
+    "plan_name",
+    "sampling_library_index",
+    "sampling_library_hash",
+    "sequence",
+]
+_COMPOSITION_REPORT_COLUMNS = [
+    "solution_id",
+    "input_name",
+    "plan_name",
+    "library_index",
+    "library_hash",
+    "tf",
+    "tfbs",
+    "offset",
+    "length",
+    "end",
+    "site_id",
+    "source",
+]
+
+
+def _resolve_composition_projection_columns(
+    path: Path,
+    columns: list[str] | None,
+) -> tuple[list[str] | None, dict[str, str]]:
+    if columns is None:
+        return None, {}
+    try:
+        available = set(pq.read_schema(path).names)
+    except Exception:
+        return columns, {}
+    read_cols: list[str] = []
+    aliases: dict[str, str] = {}
+    missing: list[str] = []
+    for col in columns:
+        if col == "tf":
+            if "regulator" in available:
+                read_cols.append("regulator")
+                aliases["tf"] = "regulator"
+            elif "tf" in available:
+                read_cols.append("tf")
+            else:
+                missing.append("tf")
+            continue
+        if col == "tfbs":
+            if "sequence" in available:
+                read_cols.append("sequence")
+                aliases["tfbs"] = "sequence"
+            elif "tfbs" in available:
+                read_cols.append("tfbs")
+            else:
+                missing.append("tfbs")
+            continue
+        if col in available:
+            read_cols.append(col)
+            continue
+        missing.append(col)
+    if missing:
+        raise ValueError(
+            "composition.parquet missing required columns: "
+            f"{sorted(set(missing))}. Available columns: {sorted(available)}"
+        )
+    return sorted(set(read_cols)), aliases
+
+
+def _read_composition_parquet(path: Path, *, columns: list[str] | None) -> pd.DataFrame:
+    read_columns, aliases = _resolve_composition_projection_columns(path, columns)
+    frame = pd.read_parquet(path, columns=read_columns)
+    for dest, source in aliases.items():
+        if dest not in frame.columns and source in frame.columns:
+            frame[dest] = frame[source]
+    return frame
+
+
+def _resolve_output_records_path(root_cfg: RootConfig, cfg_path: Path, run_root: Path, source_label: str) -> str | None:
+    out_cfg = root_cfg.densegen.output
+    targets = list(out_cfg.targets)
+    if len(targets) > 1:
+        plots_cfg = root_cfg.plots
+        if plots_cfg is None or plots_cfg.source is None:
+            raise ValueError("plots.source must be set when output.targets has multiple sinks")
+        source = str(plots_cfg.source)
+    elif targets:
+        source = str(targets[0])
+    else:
+        source = "missing"
+
+    if source == "usr":
+        usr_cfg = out_cfg.usr
+        if usr_cfg is None:
+            raise ValueError("output.usr is required when selected output source is usr")
+        usr_root = resolve_usr_root_scoped_path(
+            cfg_path,
+            usr_cfg.root,
+            label="output.usr.root",
+            scope=usr_cfg.root_scope,
+        )
+        return os.path.relpath(usr_root / usr_cfg.dataset / "records.parquet", run_root)
+
+    if source == "parquet":
+        pq_cfg = out_cfg.parquet
+        if pq_cfg is None:
+            raise ValueError("output.parquet is required when selected output source is parquet")
+        pq_path = resolve_outputs_scoped_path(cfg_path, run_root, pq_cfg.path, label="output.parquet.path")
+        return os.path.relpath(pq_path, run_root)
+
+    if source_label and source_label != "missing":
+        return str(source_label)
+    return None
+
+
+@dataclass
+class ReportBundle:
+    run_report: dict
+    tables: Dict[str, pd.DataFrame]
+    plots: dict[str, list[str]] | None = None
+
+
+def collect_report_data(
+    root_cfg: RootConfig,
+    cfg_path: Path,
+    *,
+    include_combinatorics: bool = False,
+    strict: bool = False,
+) -> ReportBundle:
+    run_root = resolve_run_root(cfg_path, root_cfg.densegen.run.root)
+    outputs_root = run_outputs_root(run_root)
+    tables_root = run_tables_root(run_root)
+    warnings: list[str] = []
+    cols = [
+        "id",
+        "sequence",
+        _dg("plan"),
+        _dg("input_name"),
+        _dg("sampling_library_index"),
+        _dg("sampling_library_hash"),
+        _dg("used_tfbs_detail"),
+        _dg("required_regulators"),
+        _dg("covers_all_tfs_in_solution"),
+        _dg("used_tf_counts"),
+        _dg("min_count_by_regulator"),
+    ]
+    try:
+        df, source_label = load_records_from_config(root_cfg, cfg_path, columns=cols)
+    except Exception as exc:
+        message = f"No output records available; report will focus on Stage-A/Stage-B diagnostics. ({exc})"
+        if strict:
+            raise ValueError(message) from exc
+        warnings.append(message)
+        df = pd.DataFrame(columns=cols)
+        source_label = "missing"
+    if df.empty:
+        warnings.append("Output records are empty; solution-focused sections will be blank.")
+
+    try:
+        output_records_path = _resolve_output_records_path(root_cfg, cfg_path, run_root, source_label)
+    except Exception as exc:
+        message = f"Failed to resolve output records path for report outputs section. ({exc})"
+        if strict:
+            raise ValueError(message) from exc
+        warnings.append(message)
+        output_records_path = None
+
+    used_df = _explode_used(df)
+    composition_path = tables_root / "composition.parquet"
+    composition = pd.DataFrame()
+    if composition_path.exists():
+        try:
+            composition = _read_composition_parquet(composition_path, columns=_COMPOSITION_REPORT_COLUMNS)
+        except Exception as exc:
+            message = f"Failed to load composition.parquet; composition summaries will be incomplete. ({exc})"
+            if strict:
+                raise ValueError(message) from exc
+            warnings.append(message)
+            composition = pd.DataFrame()
+    if used_df.empty and not composition.empty:
+        try:
+            recovered_used_df = _explode_used_from_composition(composition)
+        except Exception as exc:
+            message = f"Failed to recover used TFBS placements from composition.parquet. ({exc})"
+            if strict:
+                raise ValueError(message) from exc
+            warnings.append(message)
+        else:
+            if not recovered_used_df.empty:
+                used_df = recovered_used_df
+                warnings.append(
+                    "Output records did not include used TFBS detail; recovered library utilization from "
+                    "outputs/tables/composition.parquet."
+                )
+    attempt_paths = _attempts_artifact_paths(tables_root)
+    attempts_path = attempt_paths[0] if attempt_paths else tables_root / "attempts.parquet"
+    if not attempt_paths:
+        message = (
+            "outputs/tables/attempts.parquet or attempts_part-*.parquet are missing; "
+            "library utilization summaries may be incomplete."
+        )
+        if strict:
+            raise ValueError(message)
+        warnings.append(message)
+        attempts_df = pd.DataFrame()
+    else:
+        try:
+            attempts_df = _load_attempts_snapshot(tables_root, columns=_ATTEMPTS_REPORT_COLUMNS)
+        except Exception as exc:
+            message = f"Failed to load attempts artifacts; library utilization summaries will be incomplete. ({exc})"
+            if strict:
+                raise ValueError(message) from exc
+            warnings.append(message)
+            attempts_df = pd.DataFrame()
+    library_df = _explode_library_from_attempts(attempts_df)
+
+    solutions_path = tables_root / "solutions.parquet"
+    if not solutions_path.exists():
+        message = (
+            "outputs/tables/solutions.parquet is missing; solution previews and composition summaries will be skipped."
+        )
+        if strict:
+            raise ValueError(message)
+        warnings.append(message)
+        solutions_df = pd.DataFrame()
+    else:
+        try:
+            solutions_df = pd.read_parquet(solutions_path, columns=_SOLUTIONS_REPORT_COLUMNS)
+        except Exception as exc:
+            message = f"Failed to load solutions.parquet; skipping solution tables. ({exc})"
+            if strict:
+                raise ValueError(message) from exc
+            warnings.append(message)
+            solutions_df = pd.DataFrame()
+    tables: Dict[str, pd.DataFrame] = {}
+    tables["solutions"] = solutions_df
+    display_map_by_input: dict[str, dict[str, str]] = {}
+    inputs_by_name = {inp.name: inp for inp in root_cfg.densegen.inputs}
+    plan_items = list(root_cfg.densegen.generation.resolve_plan())
+    for plan in plan_items:
+        include_inputs = list(getattr(plan, "include_inputs", []) or [])
+        if not include_inputs:
+            raise ValueError(f"plan '{plan.name}' is missing include_inputs for plan-scoped pooling")
+        mapping: dict[str, str] = {}
+        for input_name in include_inputs:
+            inp = inputs_by_name.get(input_name)
+            if inp is None:
+                continue
+            for motif_id, name in input_motifs(inp, cfg_path):
+                if motif_id and name and motif_id not in mapping:
+                    mapping[motif_id] = name
+        if mapping:
+            pool_name = plan_pool_label(str(plan.name))
+            display_map_by_input[pool_name] = mapping
+
+    def _display_tf_label(input_name: str, tf: str) -> str:
+        mapping = display_map_by_input.get(input_name, {})
+        return mapping.get(tf, motif_display_name(tf, None))
+
+    stage_a_tiers = pd.DataFrame(columns=["input_name", "tf", "tier", "count", "total"])
+    stage_a_score_summary = pd.DataFrame(
+        columns=[
+            "input_name",
+            "tf",
+            "metric",
+            "count",
+            "min",
+            "p10",
+            "p50",
+            "p90",
+            "max",
+        ]
+    )
+    pool_dir = outputs_root / "pools"
+    if pool_dir.exists():
+        try:
+            _artifact, pool_data = load_pool_data(pool_dir)
+            plan_pools = build_plan_pools(plan_items=plan_items, pool_data=pool_data)
+            rows: list[dict[str, Any]] = []
+            score_rows: list[dict[str, Any]] = []
+            for plan in plan_items:
+                spec = plan_pools.get(str(plan.name))
+                if spec is None or spec.pool.pool_mode != POOL_MODE_TFBS or spec.pool.df is None:
+                    continue
+                df_pool = spec.pool.df
+                if "tf" not in df_pool.columns:
+                    continue
+                if "tier" in df_pool.columns:
+                    total_counts = df_pool.groupby("tf").size().to_dict()
+                    grouped = df_pool.groupby(["tf", "tier"])
+                    for (tf, tier), group in grouped:
+                        rows.append(
+                            {
+                                "input_name": spec.pool.name,
+                                "tf": tf,
+                                "tier": int(tier),
+                                "count": int(len(group)),
+                                "total": int(total_counts.get(tf, len(group))),
+                            }
+                        )
+                for tf, sub in df_pool.groupby("tf"):
+                    if sub.empty:
+                        continue
+                    if "best_hit_score" in sub.columns:
+                        vals = pd.to_numeric(sub["best_hit_score"], errors="coerce").dropna()
+                        if not vals.empty:
+                            score_rows.append(
+                                {
+                                    "input_name": spec.pool.name,
+                                    "tf": tf,
+                                    "metric": "best_hit_score",
+                                    "count": int(len(vals)),
+                                    "min": float(vals.min()),
+                                    "p10": float(vals.quantile(0.1)),
+                                    "p50": float(vals.quantile(0.5)),
+                                    "p90": float(vals.quantile(0.9)),
+                                    "max": float(vals.max()),
+                                }
+                            )
+                        if "score" in sub.columns:
+                            vals = pd.to_numeric(sub["score"], errors="coerce").dropna()
+                            if not vals.empty:
+                                score_rows.append(
+                                    {
+                                        "input_name": spec.pool.name,
+                                        "tf": tf,
+                                        "metric": "densegen_score",
+                                        "count": int(len(vals)),
+                                        "min": float(vals.min()),
+                                        "p10": float(vals.quantile(0.1)),
+                                        "p50": float(vals.quantile(0.5)),
+                                        "p90": float(vals.quantile(0.9)),
+                                        "max": float(vals.max()),
+                                    }
+                                )
+            if rows:
+                stage_a_tiers = pd.DataFrame(rows)
+            if score_rows:
+                stage_a_score_summary = pd.DataFrame(score_rows)
+        except Exception:
+            log.warning("Failed to load Stage-A pool tiers for report.", exc_info=True)
+
+    if not stage_a_tiers.empty and "input_name" in stage_a_tiers.columns and "tf" in stage_a_tiers.columns:
+        stage_a_tiers["tf"] = stage_a_tiers.apply(
+            lambda row: _display_tf_label(str(row.get("input_name") or ""), str(row.get("tf") or "")),
+            axis=1,
+        )
+    if (
+        not stage_a_score_summary.empty
+        and "input_name" in stage_a_score_summary.columns
+        and "tf" in stage_a_score_summary.columns
+    ):
+        stage_a_score_summary["tf"] = stage_a_score_summary.apply(
+            lambda row: _display_tf_label(str(row.get("input_name") or ""), str(row.get("tf") or "")),
+            axis=1,
+        )
+
+    tables["stage_a_tiers"] = stage_a_tiers
+    tables["stage_a_score_summary"] = stage_a_score_summary
+
+    def _candidate_logging_enabled() -> bool:
+        for inp in root_cfg.densegen.inputs:
+            sampling = getattr(inp, "sampling", None)
+            if sampling is None:
+                continue
+            if getattr(sampling, "keep_all_candidates_debug", False):
+                return True
+        return False
+
+    candidate_logging = _candidate_logging_enabled()
+    candidates_summary = pd.DataFrame(
+        columns=[
+            "input_name",
+            "motif_id",
+            "motif_label",
+            "scoring_backend",
+            "total_candidates",
+            "accepted",
+            "selected",
+            "rejected",
+        ]
+    )
+    candidates_dir = candidates_root(outputs_root, root_cfg.densegen.run.id)
+    cand_summary_path = candidates_dir / "candidates_summary.parquet"
+    if cand_summary_path.exists():
+        if candidate_logging:
+            try:
+                candidates_summary = pd.read_parquet(cand_summary_path)
+            except Exception:
+                log.warning("Failed to load candidates_summary.parquet for report.", exc_info=True)
+        else:
+            warnings.append(
+                "Candidate summary exists but keep_all_candidates_debug is false; "
+                "candidate artifacts may be stale. Enable keep_all_candidates_debug to refresh."
+            )
+    tables["candidates_summary"] = candidates_summary
+
+    library_summary = pd.DataFrame(
+        columns=[
+            "input_name",
+            "plan_name",
+            "libraries",
+            "library_size_min",
+            "library_size_median",
+            "library_size_max",
+            "total_bp_min",
+            "total_bp_median",
+            "total_bp_max",
+        ]
+    )
+    if not library_df.empty:
+        per_library = (
+            library_df.groupby(["library_hash", "library_index", "input_name", "plan_name"])
+            .agg(
+                size=("tfbs", "size"),
+                total_bp=("tfbs_length", "sum"),
+            )
+            .reset_index()
+        )
+        library_summary = (
+            per_library.groupby(["input_name", "plan_name"])
+            .agg(
+                libraries=("library_index", "size"),
+                library_size_min=("size", "min"),
+                library_size_median=("size", "median"),
+                library_size_max=("size", "max"),
+                total_bp_min=("total_bp", "min"),
+                total_bp_median=("total_bp", "median"),
+                total_bp_max=("total_bp", "max"),
+            )
+            .reset_index()
+        )
+        library_summary["libraries"] = (
+            pd.to_numeric(library_summary["libraries"], errors="coerce").fillna(0).astype(int)
+        )
+
+    tables["library_summary"] = library_summary
+
+    plan_summary = pd.DataFrame(
+        columns=[
+            "input_name",
+            "plan_name",
+            "outputs",
+            "unique_solutions",
+            "coverage_required_rate",
+            "coverage_all_tfs_rate",
+            "avg_used_tf_count",
+        ]
+    )
+    if not df.empty:
+        df_plan = df.copy()
+
+        def _used_tf_count(value: Any) -> int:
+            counts = _ensure_list(value)
+            total = 0
+            for item in counts:
+                if isinstance(item, dict):
+                    tf_val = str(item.get("tf") or "").strip()
+                    if tf_val:
+                        total += 1
+            return int(total)
+
+        def _covers_required(row: pd.Series) -> bool:
+            required = {str(v).strip() for v in _ensure_list(row.get(_dg("required_regulators"))) if str(v).strip()}
+            if not required:
+                return True
+            used_counts: dict[str, int] = {}
+            for item in _ensure_list(row.get(_dg("used_tf_counts"))):
+                if not isinstance(item, dict):
+                    continue
+                tf_val = str(item.get("tf") or "").strip()
+                if not tf_val:
+                    continue
+                try:
+                    used_counts[tf_val] = int(item.get("count") or 0)
+                except Exception:
+                    used_counts[tf_val] = 0
+            min_by_reg = {}
+            for item in _ensure_list(row.get(_dg("min_count_by_regulator"))):
+                if not isinstance(item, dict):
+                    continue
+                tf_val = str(item.get("tf") or "").strip()
+                if not tf_val:
+                    continue
+                try:
+                    min_by_reg[tf_val] = int(item.get("min_count") or 0)
+                except Exception:
+                    min_by_reg[tf_val] = 0
+            for tf_val in required:
+                min_required = int(min_by_reg.get(tf_val, 1))
+                if int(used_counts.get(tf_val, 0)) < min_required:
+                    return False
+            return True
+
+        df_plan["_used_tf_count"] = df_plan[_dg("used_tf_counts")].apply(_used_tf_count)
+        df_plan["_covers_required"] = df_plan.apply(_covers_required, axis=1)
+        df_plan["_covers_all"] = df_plan[_dg("covers_all_tfs_in_solution")].fillna(False).astype(bool)
+        plan_summary = (
+            df_plan.groupby([_dg("input_name"), _dg("plan")])
+            .agg(
+                outputs=("sequence", "size"),
+                unique_solutions=("id", pd.Series.nunique),
+                coverage_required_rate=("_covers_required", "mean"),
+                coverage_all_tfs_rate=("_covers_all", "mean"),
+                avg_used_tf_count=("_used_tf_count", "mean"),
+            )
+            .reset_index()
+            .rename(columns={_dg("input_name"): "input_name", _dg("plan"): "plan_name"})
+        )
+    tables["plan_summary"] = plan_summary
+
+    offered_tf = pd.DataFrame(columns=["library_hash", "tf", "offered_instances", "offered_unique_tfbs"])
+    offered_tfbs = pd.DataFrame(columns=["library_hash", "tf", "tfbs", "offered_instances"])
+    if not library_df.empty:
+        offered_tf = (
+            library_df.groupby(["library_hash", "tf"])
+            .agg(offered_instances=("tfbs", "size"), offered_unique_tfbs=("tfbs", pd.Series.nunique))
+            .reset_index()
+        )
+        offered_tfbs = (
+            library_df.groupby(["library_hash", "tf", "tfbs"]).agg(offered_instances=("tfbs", "size")).reset_index()
+        )
+
+    if not used_df.empty:
+        used_tf = (
+            used_df.groupby(["library_hash", "plan", "tf"])
+            .agg(
+                used_placements=("tf", "size"),
+                used_unique_tfbs=("tfbs", pd.Series.nunique),
+                used_sequences=("solution_id", pd.Series.nunique),
+            )
+            .reset_index()
+        )
+        used_tfbs = (
+            used_df.groupby(["library_hash", "plan", "tf", "tfbs"])
+            .agg(used_placements=("tfbs", "size"), used_sequences=("solution_id", pd.Series.nunique))
+            .reset_index()
+        )
+    else:
+        used_tf = pd.DataFrame(
+            columns=["library_hash", "plan", "tf", "used_placements", "used_unique_tfbs", "used_sequences"]
+        )
+        used_tfbs = pd.DataFrame(columns=["library_hash", "plan", "tf", "tfbs", "used_placements", "used_sequences"])
+
+    total_sequences = (
+        used_df.groupby("library_hash")["solution_id"].nunique().reset_index(name="total_sequences")
+        if not used_df.empty
+        else pd.DataFrame(columns=["library_hash", "total_sequences"])
+    )
+    used_tf_any = (
+        used_tf.groupby(["library_hash", "tf"])
+        .agg(
+            used_placements=("used_placements", "sum"),
+            used_unique_tfbs=("used_unique_tfbs", "sum"),
+            used_sequences=("used_sequences", "sum"),
+        )
+        .reset_index()
+    )
+    offered_vs_used_tf = offered_tf.merge(used_tf_any, on=["library_hash", "tf"], how="left").merge(
+        total_sequences, on="library_hash", how="left"
+    )
+    for col in ["used_placements", "used_unique_tfbs", "used_sequences", "total_sequences"]:
+        if col in offered_vs_used_tf.columns:
+            offered_vs_used_tf[col] = pd.to_numeric(offered_vs_used_tf[col], errors="coerce").fillna(0).astype(int)
+    offered_vs_used_tf["utilization_any"] = offered_vs_used_tf.apply(
+        lambda r: (r["used_sequences"] / r["total_sequences"]) if r["total_sequences"] else 0.0, axis=1
+    )
+    offered_vs_used_tf["utilization_placements_per_offered"] = offered_vs_used_tf.apply(
+        lambda r: (r["used_placements"] / r["offered_instances"]) if r["offered_instances"] else 0.0, axis=1
+    )
+
+    used_tfbs_any = (
+        used_tfbs.groupby(["library_hash", "tf", "tfbs"])
+        .agg(used_placements=("used_placements", "sum"), used_sequences=("used_sequences", "sum"))
+        .reset_index()
+    )
+    offered_vs_used_tfbs = offered_tfbs.merge(used_tfbs_any, on=["library_hash", "tf", "tfbs"], how="left")
+    for col in ["used_placements", "used_sequences"]:
+        if col in offered_vs_used_tfbs.columns:
+            offered_vs_used_tfbs[col] = pd.to_numeric(offered_vs_used_tfbs[col], errors="coerce").fillna(0).astype(int)
+
+    tables["offered_vs_used_tf"] = offered_vs_used_tf
+    tables["offered_vs_used_tfbs"] = offered_vs_used_tfbs
+    tables["attempts"] = attempts_df
+
+    events_path = outputs_root / "meta" / "events.jsonl"
+    events_df = load_events(events_path, allow_missing=True)
+    tables["events"] = events_df
+
+    if include_combinatorics:
+        tables["tf_cooccurrence"] = _compute_cooccurrence(used_df)
+        tables["tf_adjacency"] = _compute_adjacency(used_df)
+
+    if not composition.empty:
+        composition_table = composition.copy()
+        if "tf" in composition_table.columns and "input_name" in composition_table.columns:
+            composition_table["tf"] = composition_table.apply(
+                lambda row: _display_tf_label(str(row.get("input_name") or ""), str(row.get("tf") or "")),
+                axis=1,
+            )
+        tables["composition"] = composition_table
+
+    library_hashes = used_df["library_hash"].dropna().unique().tolist() if "library_hash" in used_df.columns else []
+    tf_counts = used_df["tf"].value_counts().to_dict() if not used_df.empty else {}
+    tfbs_counts = used_df["tfbs"].value_counts().to_dict() if not used_df.empty else {}
+    diversity_entropy_tfbs = _normalized_entropy_from_counts({str(k): int(v) for k, v in tfbs_counts.items()})
+    tf_usage_stats = _usage_stats_from_counts({str(k): int(v) for k, v in tf_counts.items()})
+    tfbs_usage_stats = _usage_stats_from_counts({str(k): int(v) for k, v in tfbs_counts.items()})
+    attempts_total = int(len(attempts_df)) if attempts_df is not None else 0
+    attempts_success = int((attempts_df["status"] == "success").sum()) if "status" in attempts_df else 0
+    attempts_failed = max(0, attempts_total - attempts_success)
+
+    lib_tf_total = int(offered_vs_used_tf["tf"].nunique()) if not offered_vs_used_tf.empty else 0
+    used_tf_total = (
+        int(offered_vs_used_tf[offered_vs_used_tf["used_sequences"] > 0]["tf"].nunique())
+        if not offered_vs_used_tf.empty
+        else 0
+    )
+    lib_tfbs_total = (
+        int(offered_vs_used_tfbs.drop_duplicates(["tf", "tfbs"]).shape[0]) if not offered_vs_used_tfbs.empty else 0
+    )
+    used_tfbs_total = (
+        int(offered_vs_used_tfbs[offered_vs_used_tfbs["used_sequences"] > 0].drop_duplicates(["tf", "tfbs"]).shape[0])
+        if not offered_vs_used_tfbs.empty
+        else 0
+    )
+    tf_coverage = used_tf_total / max(1, lib_tf_total) if lib_tf_total else None
+    tfbs_coverage = used_tfbs_total / max(1, lib_tfbs_total) if lib_tfbs_total else None
+
+    run_report = {
+        "run_root": os.path.relpath(run_root, run_root),
+        "schema_version": root_cfg.densegen.schema_version,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "output_source": source_label,
+        "warnings": warnings,
+        "output_rows": int(len(df)),
+        "output_unique_sequences": int(df["id"].nunique()) if "id" in df.columns else int(len(df)),
+        "libraries_in_outputs": int(len(set(library_hashes))),
+        "plans": sorted({str(x) for x in df[_dg("plan")].dropna().tolist()}),
+        "diversity_unique_tfs": int(len(tf_counts)),
+        "diversity_unique_tfbs": int(len(tfbs_counts)),
+        "diversity_entropy_tfbs": diversity_entropy_tfbs,
+        "coverage": {
+            "tf_coverage": tf_coverage,
+            "tfbs_coverage": tfbs_coverage,
+            "library_tf_count": int(lib_tf_total),
+            "library_tfbs_count": int(lib_tfbs_total),
+            "used_tf_count": int(len(tf_counts)),
+            "used_tfbs_count": int(len(tfbs_counts)),
+        },
+        "usage_stats": {
+            "tf": tf_usage_stats,
+            "tfbs": tfbs_usage_stats,
+        },
+        "attempts_total": attempts_total,
+        "attempts_success": attempts_success,
+        "attempts_failed": attempts_failed,
+        "attempts_path": os.path.relpath(attempts_path, run_root) if attempts_path.exists() else None,
+        "solutions_path": os.path.relpath(solutions_path, run_root) if solutions_path.exists() else None,
+        "events_path": os.path.relpath(events_path, run_root) if events_path.exists() else None,
+        "candidates_path": os.path.relpath(candidates_dir / "candidates.parquet", run_root)
+        if candidate_logging and (candidates_dir / "candidates.parquet").exists()
+        else None,
+        "candidates_summary_path": os.path.relpath(cand_summary_path, run_root)
+        if candidate_logging and cand_summary_path.exists()
+        else None,
+        "outputs_path": output_records_path,
+        "effective_config_path": os.path.relpath(outputs_root / "meta" / "effective_config.json", run_root)
+        if (outputs_root / "meta" / "effective_config.json").exists()
+        else None,
+    }
+    manifest_path = run_manifest_path(run_root)
+    if manifest_path.exists():
+        try:
+            manifest = load_run_manifest(manifest_path)
+            run_report.update(
+                {
+                    "run_id": manifest.run_id,
+                    "dense_arrays_version": manifest.dense_arrays_version,
+                    "dense_arrays_version_source": manifest.dense_arrays_version_source,
+                }
+            )
+        except Exception:
+            log.warning("Failed to read run_manifest.json for report metadata.", exc_info=True)
+
+    return ReportBundle(run_report=run_report, tables=tables, plots={})

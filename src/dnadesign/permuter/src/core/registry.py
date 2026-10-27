@@ -1,0 +1,134 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/permuter/src/core/registry.py
+
+Core runtime primitives for registry Permuter core.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import logging
+from importlib.metadata import entry_points
+from typing import Dict, Type
+
+# caches
+_PROTO: dict[str, Type] = {}
+_EVAL: dict[str, Type] = {}
+_LOG = logging.getLogger("permuter.registry")
+
+
+def _load(group: str) -> dict[str, Type]:
+    out: dict[str, Type] = {}
+    try:
+        eps = entry_points().select(group=f"permuter.{group}")
+        names = [ep.name for ep in eps]
+        _LOG.debug(f"[registry] discovered entry points for '{group}': {names or []}")
+        for ep in eps:
+            try:
+                out[ep.name] = ep.load()
+                _LOG.debug(f"[registry] loaded entry point '{group}:{ep.name}'")
+            except Exception as e:
+                _LOG.debug(f"[registry] failed to load '{group}:{ep.name}': {e}")
+    except Exception as e:
+        _LOG.debug(f"[registry] entry point scan failed for '{group}': {e}")
+    return out
+
+
+def _builtins(group: str) -> dict[str, Type]:
+    """
+    Load the core scan_dna protocol and available evaluator adapters.
+    Optional adapters are best-effort with DEBUG logs.
+    """
+    out: Dict[str, Type] = {}
+    if group == "protocols":
+        try:
+            from dnadesign.permuter.src.protocols.dms.scan_dna import ScanDNA
+        except Exception as e:
+            # core protocol must be present
+            raise RuntimeError(f"[registry] core builtin protocol 'scan_dna' failed to import: {e}") from e
+        out["scan_dna"] = ScanDNA
+        try:
+            from dnadesign.permuter.src.protocols.dms.scan_codon import ScanCodon
+
+            out["scan_codon"] = ScanCodon
+        except Exception as e:
+            _LOG.debug(f"[registry] optional builtin protocol 'scan_codon' not available: {e}")
+        try:
+            from dnadesign.permuter.src.protocols.hairpins.scan_stem_loop import (
+                ScanStemLoop,
+            )
+
+            out["scan_stem_loop"] = ScanStemLoop
+        except Exception as e:
+            _LOG.debug(f"[registry] optional builtin protocol 'scan_stem_loop' not available: {e}")
+        try:
+            from dnadesign.permuter.src.protocols.combine.combine_aa import CombineAA
+
+            out["combine_aa"] = CombineAA
+        except Exception as e:
+            _LOG.debug(f"[registry] optional builtin protocol 'combine_aa' not available: {e}")
+        try:
+            from dnadesign.permuter.src.protocols.multisite_select.main import MSel
+
+            out["multisite_select"] = MSel
+        except Exception as e:
+            _LOG.debug(
+                "[registry] optional builtin protocol 'multisite_select' not available: %s",
+                e,
+            )
+        return out
+    else:
+        try:
+            from dnadesign.permuter.src.evaluators.evo2_ll import (
+                Evo2LogLikelihoodEvaluator,
+            )
+
+            out["evo2_ll"] = Evo2LogLikelihoodEvaluator
+        except Exception as e:
+            _LOG.debug("[registry] optional evaluator 'evo2_ll' not available: %s", e)
+        try:
+            from dnadesign.permuter.src.evaluators.evo2_llr import (
+                Evo2LogLikelihoodRatioEvaluator,
+            )
+
+            out["evo2_llr"] = Evo2LogLikelihoodRatioEvaluator
+        except Exception as e:
+            _LOG.debug("[registry] optional evaluator 'evo2_llr' not available: %s", e)
+        try:
+            from dnadesign.permuter.src.evaluators.evo2_logits import (
+                Evo2LogitsMeanEvaluator,
+            )
+
+            out["evo2_logits"] = Evo2LogitsMeanEvaluator
+        except Exception as e:
+            _LOG.debug("[registry] optional evaluator 'evo2_logits' not available: %s", e)
+        return out
+
+
+def get_protocol(name: str) -> Type:
+    if name == "rt_select":
+        raise ValueError("Protocol 'rt_select' is retired; use 'multisite_select' in workspace configs.")
+    if not _PROTO:
+        # Load plugins then ensure built-ins (core guaranteed or raise).
+        _PROTO.update(_load("protocols"))
+        _PROTO.update(_builtins("protocols"))
+        _LOG.debug(f"[registry] available protocols: {sorted(_PROTO.keys())}")
+    if name in _PROTO:
+        return _PROTO[name]
+    available = ", ".join(sorted(_PROTO.keys()))
+    raise ValueError(f"Unknown protocol: {name!r}. Available: [{available}]")
+
+
+def get_evaluator(name: str) -> Type:
+    if not _EVAL:
+        _EVAL.update(_load("evaluators"))
+        _EVAL.update(_builtins("evaluators"))
+        _LOG.debug(f"[registry] available evaluators: {sorted(_EVAL.keys())}")
+    if name in _EVAL:
+        return _EVAL[name]
+    available = ", ".join(sorted(_EVAL.keys()))
+    raise ValueError(f"Unknown evaluator: {name!r}. Available: [{available}]")

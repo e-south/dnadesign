@@ -1,0 +1,20 @@
+version: 1
+provider_id: latentdna.workspace-status
+entries:
+  - status_kind: latentdna-workspace-snapshot
+    owner_boundary: latentdna
+    observes_plane: data
+    provider_ref: dnadesign.latentdna.ops.status_providers:provide_latentdna_workspace_snapshot_status
+    description: Publish the sanctioned LatentDNA workspace snapshot for one workspace.
+    surface_type: artifact_catalog
+    cost_class: cheap
+    summary_scope: workspace
+    input_schema:
+      - name: workspace
+        manifest_key: workspace
+        cli_flag: --workspace
+        placeholder: /path/to/workspace
+        summary: Workspace id or path passed through to `latentdna workspace snapshot`.
+        type: path
+        required: true
+        path_base: repo

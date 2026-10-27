@@ -1,0 +1,62 @@
+## demo_tfbs_baseline Runbook
+
+**Workspace Path**
+- src/dnadesign/densegen/workspaces/demo_tfbs_baseline/
+
+**Regulators**
+- [none required]
+
+**Purpose**
+- Run the smallest DenseGen baseline from inside one workspace without root-level path exports.
+
+**Runbook command**
+
+Run this command from the workspace root:
+
+    # Execute the full runbook flow from a clean output state.
+    ./runbook.sh --mode fresh
+
+Use `--mode resume` to continue generation without wiping outputs, or `--mode analysis` to rebuild plots/notebook only.
+
+### Step-by-Step Commands
+
+    # Enable strict shell behavior for fail-fast execution.
+    set -euo pipefail
+    # Pin the workspace config path for repeated CLI calls.
+    CONFIG="$PWD/config.yaml"
+
+    # Validate config schema and probe solver availability.
+    uv run dense validate-config --probe-solver -c "$CONFIG"
+    # Start a fresh run from a clean output state (sequence generation only).
+    # Plot rendering is explicit in the next step for clearer failure isolation.
+    uv run dense run --fresh --no-plot -c "$CONFIG"
+    # If running only `dense run`, omit `--no-plot` to auto-render configured plots.
+    # uv run dense run --fresh -c "$CONFIG"
+    # Inspect run diagnostics and per-plan library progress.
+    uv run dense inspect run --events --library -c "$CONFIG"
+    # Render DenseGen analysis artifacts from current run outputs.
+    # `dense plot` is the analysis entry point; static plots always render.
+    # The Stage-B showcase video is optional. Enable plots.video and either add
+    # dense_array_showcase_video to plots.default or render it explicitly with --only.
+    uv run dense plot -c "$CONFIG"
+    # Optional analysis shortcut: render only the Stage-B showcase video artifact.
+    # uv run dense plot --only dense_array_showcase_video -c "$CONFIG"
+    # Generate the run-overview marimo notebook artifact.
+    uv run dense notebook generate -c "$CONFIG"
+    # Validate the generated notebook before opening or sharing it.
+    uv run marimo check "$PWD/outputs/notebooks/densegen_run_overview.py"
+
+### Optional analysis mode (existing outputs)
+
+    # Rebuild plots/notebook from existing run artifacts without regenerating sequences.
+    ./runbook.sh --mode analysis
+
+### Optional notebook open
+
+    # Launch the generated notebook in marimo app mode.
+    uv run dense notebook run -c "$CONFIG"
+
+### Optional workspace reset
+
+    # Remove run artifacts to return the workspace to a clean state.
+    uv run dense campaign-reset -c "$CONFIG"

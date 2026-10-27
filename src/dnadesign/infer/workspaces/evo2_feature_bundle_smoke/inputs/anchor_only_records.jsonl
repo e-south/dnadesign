@@ -1,0 +1,4 @@
+{"id":"control_anchor_1","sequence":"TTGACATGATAAAT","is_wildtype":true}
+{"id":"control_anchor_2","sequence":"TTTACAAGTTTACA","is_wildtype":true}
+{"id":"candidate_anchor_1","sequence":"TTGCCATGATTAAT","is_wildtype":false}
+{"id":"candidate_anchor_2","sequence":"TTTACGCGTTAACA","is_wildtype":false}

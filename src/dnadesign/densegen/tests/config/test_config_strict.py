@@ -1,0 +1,1122 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/config/test_config_strict.py
+
+Config validation strictness checks for DenseGen.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import copy
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+import yaml
+
+from dnadesign.densegen.src.config import ConfigError, load_config
+from dnadesign.densegen.src.config.base import resolve_usr_root_scoped_path
+
+MIN_CONFIG = {
+    "densegen": {
+        "schema_version": "2.9",
+        "run": {"id": "demo", "root": "."},
+        "inputs": [
+            {
+                "name": "demo",
+                "type": "binding_sites",
+                "path": "inputs.csv",
+            }
+        ],
+        "output": {
+            "targets": ["parquet"],
+            "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+            "parquet": {
+                "path": "outputs/tables/records.parquet",
+                "deduplicate": True,
+                "chunk_size": 128,
+            },
+        },
+        "generation": {
+            "sequence_length": 10,
+            "plan": [
+                {
+                    "name": "default",
+                    "sequences": 1,
+                    "sampling": {"include_inputs": ["demo"]},
+                    "regulator_constraints": {"groups": []},
+                }
+            ],
+        },
+        "solver": {"backend": "CBC", "strategy": "iterate", "strands": "double"},
+        "logging": {"log_dir": "outputs/logs"},
+    }
+}
+
+
+def _write(cfg: dict, path: Path) -> Path:
+    path.write_text(yaml.safe_dump(cfg))
+    return path
+
+
+def test_config_requires_densegen_root(tmp_path: Path) -> None:
+    cfg_path = _write({"foo": "bar"}, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_schema_version_required(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"].pop("schema_version", None)
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_schema_version_supported(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["schema_version"] = "9.9"
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_plots_format_defaults_to_pdf(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.plots is not None
+    assert loaded.root.plots.format == "pdf"
+
+
+def test_plots_video_defaults_disabled(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.plots is not None
+    assert loaded.root.plots.video.enabled is False
+    assert loaded.root.plots.video.mode == "all_plans_round_robin_single_video"
+    assert loaded.root.plots.video.sampling.max_snapshots == 140
+    assert loaded.root.plots.video.playback.target_duration_sec == 14
+
+
+def test_plots_video_single_plan_requires_name(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "video": {
+            "enabled": True,
+            "mode": "single_plan_single_video",
+        }
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="single_plan_name"):
+        load_config(cfg_path)
+
+
+def test_plots_video_fps_bounds_enforced(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "video": {
+            "enabled": True,
+            "playback": {"fps": 30},
+        }
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="playback.fps"):
+        load_config(cfg_path)
+
+
+def test_plots_video_budget_rejects_over_frame_limit(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "video": {
+            "enabled": True,
+            "playback": {"target_duration_sec": 20, "fps": 20},
+            "limits": {"max_total_frames": 120},
+        }
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="max_total_frames"):
+        load_config(cfg_path)
+
+
+def test_plots_video_output_name_rejects_path_segments(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "video": {
+            "enabled": True,
+            "output_name": "../escape.mp4",
+        }
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="flat filename"):
+        load_config(cfg_path)
+
+
+def test_plots_video_sampling_stride_rejects_zero(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "video": {
+            "enabled": True,
+            "sampling": {"stride": 0},
+        }
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="sampling.stride"):
+        load_config(cfg_path)
+
+
+def test_sampling_defaults_cover_all_regulators_false(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.densegen.generation.sampling.cover_all_regulators is False
+
+
+def test_runtime_default_max_consecutive_no_progress_resamples(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.densegen.runtime.max_consecutive_no_progress_resamples == 25
+
+
+def test_round_robin_runtime_guards_are_independent(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["runtime"] = {
+        "round_robin": True,
+        "no_progress_seconds_before_resample": 60,
+        "max_consecutive_no_progress_resamples": 6,
+    }
+    cfg["densegen"]["solver"]["solver_attempt_timeout_seconds"] = 5
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    runtime = loaded.root.densegen.runtime
+    assert runtime.round_robin is True
+    assert runtime.no_progress_seconds_before_resample == 60
+    assert runtime.max_consecutive_no_progress_resamples == 6
+
+
+def test_round_robin_failure_budget_preserves_configured_values(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["runtime"] = {
+        "round_robin": True,
+        "no_progress_seconds_before_resample": 10,
+        "max_consecutive_no_progress_resamples": 6,
+    }
+    cfg["densegen"]["solver"]["solver_attempt_timeout_seconds"] = 5
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.densegen.runtime.max_consecutive_no_progress_resamples == 6
+
+
+def test_runtime_max_failed_solutions_per_target_accepts_non_negative(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["runtime"] = {"max_failed_solutions_per_target": 0.25}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.densegen.runtime.max_failed_solutions_per_target == pytest.approx(0.25)
+
+
+def test_runtime_max_failed_solutions_per_target_rejects_negative(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["runtime"] = {"max_failed_solutions_per_target": -0.1}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="max_failed_solutions_per_target"):
+        load_config(cfg_path)
+
+
+def test_pwm_artifact_set_partial_overrides_merge(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["inputs"] = [
+        {
+            "name": "demo_pwm",
+            "type": "pwm_artifact_set",
+            "paths": ["inputs/M1.json", "inputs/M2.json"],
+            "sampling": {
+                "strategy": "stochastic",
+                "n_sites": 2,
+                "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 20}},
+                "length": {"policy": "range", "range": [16, 20]},
+                "uniqueness": {"key": "core"},
+                "selection": {
+                    "policy": "mmr",
+                    "alpha": 0.5,
+                    "pool": {"min_score_norm": 0.8},
+                },
+            },
+            "overrides_by_motif_id": {
+                "M2": {"trimming": {"window_length": 16}},
+            },
+        }
+    ]
+    cfg["densegen"]["generation"]["plan"][0]["sampling"]["include_inputs"] = ["demo_pwm"]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    inp = loaded.root.densegen.inputs[0]
+    override = inp.overrides_by_motif_id["M2"]
+    assert override.trimming.window_length == 16
+    assert override.selection.policy == "mmr"
+
+
+def test_allow_incomplete_coverage_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["generation"]["sampling"] = {"allow_incomplete_coverage": True}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="allow_incomplete_coverage"):
+        load_config(cfg_path)
+
+
+def test_subsample_over_length_budget_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["generation"]["sampling"] = {"subsample_over_length_budget_by": 10}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="subsample_over_length_budget_by"):
+        load_config(cfg_path)
+
+
+def test_iterative_settings_rejected_without_iterative_strategy(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["generation"]["sampling"] = {
+        "pool_strategy": "subsample",
+        "iterative_max_libraries": 3,
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="iterative_max_libraries"):
+        load_config(cfg_path)
+
+
+def test_runtime_resample_caps_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["runtime"] = {"max_resample_attempts": 1}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="max_resample_attempts"):
+        load_config(cfg_path)
+
+
+def test_legacy_pwm_sampling_keys_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["inputs"] = [
+        {
+            "name": "demo_pwm",
+            "type": "pwm_artifact",
+            "path": "inputs/motif.json",
+            "sampling": {
+                "strategy": "stochastic",
+                "n_sites": 5,
+                "mining": {
+                    "batch_size": 10,
+                    "budget": {"mode": "fixed_candidates", "candidates": 50},
+                },
+                "oversample_factor": 2,
+            },
+        }
+    ]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="oversample_factor"):
+        load_config(cfg_path)
+
+
+def test_gap_fill_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["postprocess"] = {"gap_fill": {"mode": "off"}}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="gap_fill"):
+        load_config(cfg_path)
+
+
+def test_postprocess_validate_final_sequence_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["postprocess"] = {
+        "validate_final_sequence": {"forbid_kmers_outside_promoter_windows": {"kmers": ["TTGACA", "TATAAT"]}}
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="validate_final_sequence"):
+        load_config(cfg_path)
+
+
+def test_pad_config_accepts(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["postprocess"] = {
+        "pad": {
+            "mode": "off",
+            "end": "5prime",
+            "gc": {
+                "mode": "range",
+                "min": 0.4,
+                "max": 0.6,
+                "target": 0.5,
+                "tolerance": 0.1,
+                "min_pad_length": 4,
+            },
+            "max_tries": 2000,
+        }
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    load_config(cfg_path)
+
+
+def test_pad_mode_off_accepts_yaml_boolean(tmp_path: Path) -> None:
+    cfg_text = """
+    densegen:
+      schema_version: "2.9"
+      run:
+        id: demo
+        root: "."
+      inputs:
+        - name: demo
+          type: binding_sites
+          path: inputs.csv
+      output:
+        targets: [parquet]
+        schema:
+          bio_type: dna
+          alphabet: dna_4
+        parquet:
+          path: outputs/tables/records.parquet
+          deduplicate: true
+          chunk_size: 128
+      generation:
+        sequence_length: 10
+        plan:
+          - name: default
+            sequences: 1
+            sampling:
+              include_inputs: [demo]
+            regulator_constraints:
+              groups: []
+      solver:
+        backend: CBC
+        strategy: iterate
+      postprocess:
+        pad:
+          mode: off
+          end: 5prime
+          gc:
+            mode: off
+            min: 0.4
+            max: 0.6
+            target: 0.5
+            tolerance: 0.1
+            min_pad_length: 0
+          max_tries: 2000
+      logging:
+        log_dir: outputs/logs
+    """
+    cfg_path = tmp_path / "cfg.yaml"
+    cfg_path.write_text(cfg_text.strip())
+    loaded = load_config(cfg_path)
+    assert loaded.root.densegen.postprocess.pad.mode == "off"
+    assert loaded.root.densegen.postprocess.pad.gc.mode == "off"
+
+
+def test_plan_mixing_quota_and_fraction(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["generation"]["plan"] = [
+        {"name": "a", "quota": 1, "regulator_constraints": {"groups": []}},
+        {"name": "b", "fraction": 0.5, "regulator_constraints": {"groups": []}},
+    ]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="fraction"):
+        load_config(cfg_path)
+
+
+def test_generation_top_level_quota_is_not_allowed(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["generation"]["quota"] = 10
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="densegen.generation.quota"):
+        load_config(cfg_path)
+
+
+def test_generation_without_top_level_quota_uses_plan_quotas(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["generation"].pop("quota", None)
+    cfg["densegen"]["generation"]["plan"] = [
+        {
+            "name": "a",
+            "sequences": 2,
+            "sampling": {"include_inputs": ["demo"]},
+            "regulator_constraints": {"groups": []},
+        },
+        {
+            "name": "b",
+            "sequences": 3,
+            "sampling": {"include_inputs": ["demo"]},
+            "regulator_constraints": {"groups": []},
+        },
+    ]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    resolved = loaded.root.densegen.generation.resolve_plan()
+    assert [item.quota for item in resolved] == [2, 3]
+
+
+def test_usr_output_requires_root(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {
+        "targets": ["usr"],
+        "usr": {"dataset": "densegen_demo", "chunk_size": 10},
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_usr_sequences_requires_root(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["inputs"] = [{"name": "demo", "type": "usr_sequences", "dataset": "demo"}]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_usr_health_event_interval_requires_positive_value(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {
+        "targets": ["usr"],
+        "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+        "usr": {
+            "dataset": "densegen_demo",
+            "root": "outputs/usr_datasets",
+            "health_event_interval_seconds": 0,
+        },
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="health_event_interval_seconds"):
+        load_config(cfg_path)
+
+
+def test_usr_dataset_requires_non_empty_string(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {
+        "targets": ["usr"],
+        "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+        "usr": {
+            "dataset": "   ",
+            "root": "outputs/usr_datasets",
+        },
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="output.usr.dataset must be a non-empty string"):
+        load_config(cfg_path)
+
+
+def test_usr_dataset_must_be_relative_path(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {
+        "targets": ["usr"],
+        "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+        "usr": {
+            "dataset": "/absolute_dataset",
+            "root": "outputs/usr_datasets",
+        },
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="output.usr.dataset must be a relative path"):
+        load_config(cfg_path)
+
+
+def test_usr_dataset_must_be_densegen_owner_first_id(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {
+        "targets": ["usr"],
+        "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+        "usr": {
+            "dataset": "demo",
+            "root": "outputs/usr_datasets",
+        },
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="starting with 'densegen_'"):
+        load_config(cfg_path)
+
+
+def test_usr_chunk_size_requires_positive_value(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {
+        "targets": ["usr"],
+        "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+        "usr": {
+            "dataset": "densegen_demo",
+            "root": "outputs/usr_datasets",
+            "chunk_size": 0,
+        },
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="output.usr.chunk_size must be > 0"):
+        load_config(cfg_path)
+
+
+def test_usr_allow_overwrite_removed(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {
+        "targets": ["usr"],
+        "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+        "usr": {
+            "dataset": "densegen_demo",
+            "root": "outputs/usr_datasets",
+            "allow_overwrite": False,
+        },
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="allow_overwrite"):
+        load_config(cfg_path)
+
+
+def test_sequence_constraints_scope_removed(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["motif_sets"] = {"sigma": {"up": "TTGACA"}}
+    cfg["densegen"]["generation"]["sequence_constraints"] = {
+        "forbid_kmers": [
+            {
+                "name": "sigma_rule",
+                "patterns_from_motif_sets": ["sigma"],
+                "scope": "outside_allowed_placements",
+            }
+        ],
+        "allowlist": [
+            {
+                "kind": "fixed_element_instance",
+                "selector": {"fixed_element": "promoter", "component": ["upstream"]},
+            }
+        ],
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="scope"):
+        load_config(cfg_path)
+
+
+def test_sequence_constraints_match_exact_coordinates_removed(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["motif_sets"] = {"sigma": {"up": "TTGACA"}}
+    cfg["densegen"]["generation"]["sequence_constraints"] = {
+        "forbid_kmers": [
+            {
+                "name": "sigma_rule",
+                "patterns_from_motif_sets": ["sigma"],
+            }
+        ],
+        "allowlist": [
+            {
+                "kind": "fixed_element_instance",
+                "selector": {"fixed_element": "promoter", "component": ["upstream"]},
+                "match_exact_coordinates": True,
+            }
+        ],
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="match_exact_coordinates"):
+        load_config(cfg_path)
+
+
+def test_background_forbid_kmers_accepts_motif_set_rules(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["motif_sets"] = {"sigma": {"consensus": "TTGACA"}}
+    cfg["densegen"]["inputs"] = [
+        {
+            "name": "background",
+            "type": "background_pool",
+            "sampling": {
+                "n_sites": 5,
+                "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 50}},
+                "length": {"policy": "range", "range": [16, 20]},
+                "uniqueness": {"key": "sequence"},
+                "filters": {
+                    "forbid_kmers": [
+                        {
+                            "patterns_from_motif_sets": ["sigma"],
+                            "include_reverse_complements": True,
+                            "strands": "both",
+                        }
+                    ]
+                },
+            },
+        }
+    ]
+    cfg["densegen"]["generation"]["plan"][0]["sampling"]["include_inputs"] = ["background"]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    background = loaded.root.densegen.inputs[0]
+    filters = background.sampling.filters
+    assert len(filters.forbid_kmers) == 1
+    rule = filters.forbid_kmers[0]
+    assert not isinstance(rule, str)
+    assert list(rule.patterns_from_motif_sets) == ["sigma"]
+    assert bool(rule.include_reverse_complements) is True
+    assert str(rule.strands) == "both"
+
+
+def test_background_forbid_kmers_rule_requires_known_motif_sets(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["motif_sets"] = {"sigma": {"consensus": "TTGACA"}}
+    cfg["densegen"]["inputs"] = [
+        {
+            "name": "background",
+            "type": "background_pool",
+            "sampling": {
+                "n_sites": 5,
+                "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 50}},
+                "length": {"policy": "range", "range": [16, 20]},
+                "uniqueness": {"key": "sequence"},
+                "filters": {
+                    "forbid_kmers": [
+                        {
+                            "patterns_from_motif_sets": ["unknown_sigma"],
+                            "include_reverse_complements": True,
+                            "strands": "both",
+                        }
+                    ]
+                },
+            },
+        }
+    ]
+    cfg["densegen"]["generation"]["plan"][0]["sampling"]["include_inputs"] = ["background"]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="forbid_kmers references unknown motif_sets"):
+        load_config(cfg_path)
+
+
+def test_output_paths_must_live_under_outputs(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"]["parquet"]["path"] = "records.parquet"
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="output.parquet.path must be within outputs"):
+        load_config(cfg_path)
+
+
+def test_usr_root_can_live_outside_outputs(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {
+        "targets": ["usr"],
+        "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+        "usr": {"dataset": "densegen_demo", "root": "../usr_root"},
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.densegen.output.usr is not None
+    assert loaded.root.densegen.output.usr.root == "../usr_root"
+
+
+def test_usr_root_scope_can_resolve_from_git_common_repo_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo_root = tmp_path / "repo"
+    shared_usr_root = repo_root / "src" / "dnadesign" / "usr" / "datasets"
+    shared_usr_root.mkdir(parents=True)
+    cfg_path = repo_root / ".worktrees" / "audit-wt" / "cfg.yaml"
+    cfg_path.parent.mkdir(parents=True)
+    cfg_path.write_text("densegen: {}\n")
+
+    def _fake_run(*args, **kwargs):
+        return SimpleNamespace(returncode=0, stdout=str(repo_root / ".git") + "\n", stderr="")
+
+    monkeypatch.setattr("dnadesign.densegen.src.config.base.subprocess.run", _fake_run)
+    resolved = resolve_usr_root_scoped_path(
+        cfg_path,
+        "src/dnadesign/usr/datasets",
+        label="output.usr.root",
+        scope="git_common_repo_root",
+    )
+
+    assert resolved == shared_usr_root.resolve()
+
+
+def test_logging_dir_must_live_under_outputs(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["logging"]["log_dir"] = "logs"
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="logging.log_dir must be within outputs"):
+        load_config(cfg_path)
+
+
+def test_logging_visuals_required_for_print_visual(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["logging"]["print_visual"] = True
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="logging.visuals.tf_colors"):
+        load_config(cfg_path)
+
+
+def test_plots_dir_must_live_under_outputs(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {"out_dir": "plots"}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="plots.out_dir must be within outputs"):
+        load_config(cfg_path)
+
+
+def test_library_artifact_path_must_live_under_outputs(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["generation"]["sampling"] = {
+        "library_source": "artifact",
+        "library_artifact_path": "libraries",
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="sampling.library_artifact_path must be within outputs"):
+        load_config(cfg_path)
+
+
+def test_output_kind_is_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {"kind": "parquet", "parquet": {"path": "outputs/tables/demo_parquet.parquet"}}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_solver_options_removed(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["solver"]["options"] = ["TimeLimit=5"]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="solver.options"):
+        load_config(cfg_path)
+
+
+def test_solver_allow_unknown_options_removed(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["solver"]["allow_unknown_options"] = True
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="solver.allow_unknown_options"):
+        load_config(cfg_path)
+
+
+def test_solver_controls_accepts_threads_and_time_limit(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["solver"]["backend"] = "GUROBI"
+    cfg["densegen"]["solver"]["solver_attempt_timeout_seconds"] = 5
+    cfg["densegen"]["solver"]["threads"] = 2
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.densegen.solver.solver_attempt_timeout_seconds == 5
+    assert loaded.root.densegen.solver.threads == 2
+
+
+def test_solver_controls_rejected_for_approximate(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["solver"]["strategy"] = "approximate"
+    cfg["densegen"]["solver"]["backend"] = None
+    cfg["densegen"]["solver"]["solver_attempt_timeout_seconds"] = 5
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="approximate"):
+        load_config(cfg_path)
+
+
+def test_solver_threads_rejected_for_cbc(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["solver"]["threads"] = 2
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="threads.*CBC"):
+        load_config(cfg_path)
+
+
+def test_pad_gc_default_min_pad_length_zero(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["postprocess"] = {
+        "pad": {
+            "mode": "adaptive",
+            "end": "5prime",
+            "gc": {
+                "mode": "range",
+                "min": 0.4,
+                "max": 0.6,
+                "target": 0.5,
+                "tolerance": 0.1,
+            },
+            "max_tries": 2000,
+        }
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.densegen.postprocess.pad.gc.min_pad_length == 0
+
+
+def test_promoter_constraint_motif_validation(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["generation"]["plan"] = [
+        {
+            "name": "bad",
+            "sequences": 1,
+            "regulator_constraints": {"groups": []},
+            "fixed_elements": {
+                "promoter_constraints": [{"upstream": "TTGAZ", "downstream": "TATAAT", "spacer_length": [16, 18]}]
+            },
+        }
+    ]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_fimo_rejects_max_candidates(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["inputs"] = [
+        {
+            "name": "motifs",
+            "type": "pwm_meme",
+            "path": "inputs.meme",
+            "sampling": {
+                "strategy": "stochastic",
+                "n_sites": 2,
+                "max_candidates": 100,
+                "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 20}},
+            },
+        }
+    ]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="max_candidates"):
+        load_config(cfg_path)
+
+
+def test_fimo_rejects_legacy_pvalue_threshold(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["inputs"] = [
+        {
+            "name": "motifs",
+            "type": "pwm_meme",
+            "path": "inputs.meme",
+            "sampling": {
+                "strategy": "stochastic",
+                "n_sites": 2,
+                "pvalue_threshold": 1e-8,
+                "mining": {"batch_size": 10, "budget": {"mode": "fixed_candidates", "candidates": 20}},
+            },
+        }
+    ]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_fimo_rejects_legacy_retain_bin_ids(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["inputs"] = [
+        {
+            "name": "motifs",
+            "type": "pwm_meme",
+            "path": "inputs.meme",
+            "sampling": {
+                "strategy": "stochastic",
+                "n_sites": 2,
+                "mining": {
+                    "batch_size": 10,
+                    "budget": {"mode": "fixed_candidates", "candidates": 20},
+                    "retain_bin_ids": [0],
+                },
+            },
+        }
+    ]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_promoter_constraint_range_non_negative(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["generation"]["plan"] = [
+        {
+            "name": "bad",
+            "sequences": 1,
+            "regulator_constraints": {"groups": []},
+            "fixed_elements": {
+                "promoter_constraints": [{"upstream": "TTGACA", "downstream": "TATAAT", "spacer_length": [-1, 18]}]
+            },
+        }
+    ]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_side_biases_overlap_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["generation"]["plan"] = [
+        {
+            "name": "bad",
+            "sequences": 1,
+            "regulator_constraints": {"groups": []},
+            "fixed_elements": {"side_biases": {"left": ["TTGACA"], "right": ["TTGACA"]}},
+        }
+    ]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_solver_strategy_approximate_rejects_threads(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["solver"] = {"backend": "CBC", "strategy": "approximate", "threads": 2}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_solver_backend_optional_for_approximate(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["solver"] = {"strategy": "approximate"}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    load_config(cfg_path)
+
+
+def test_min_total_sites_rejected_for_approximate_at_config_validation(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["solver"] = {"strategy": "approximate"}
+    cfg["densegen"]["generation"]["plan"][0]["regulator_constraints"]["min_total_sites"] = 1
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="min_total_sites.*non-approximate"):
+        load_config(cfg_path)
+
+
+def test_side_biases_invalid_motif_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["generation"]["plan"] = [
+        {
+            "name": "bad",
+            "sequences": 1,
+            "regulator_constraints": {"groups": []},
+            "fixed_elements": {"side_biases": {"left": ["TTGAZ"], "right": []}},
+        }
+    ]
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_plots_source_required_for_multi_sink(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {
+        "targets": ["usr", "parquet"],
+        "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+        "usr": {"dataset": "densegen_demo", "root": "usr_root", "chunk_size": 10},
+        "parquet": {"path": "outputs/tables/demo_parquet.parquet", "deduplicate": True, "chunk_size": 128},
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_plots_source_must_be_target(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["densegen"]["output"] = {
+        "targets": ["usr", "parquet"],
+        "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+        "usr": {"dataset": "densegen_demo", "root": "usr_root", "chunk_size": 10},
+        "parquet": {"path": "outputs/tables/demo_parquet.parquet", "deduplicate": True, "chunk_size": 128},
+    }
+    cfg["plots"] = {"source": "csv", "out_dir": "plots"}
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_plot_scope_options_accept_concrete_plot_ids(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "source": "parquet",
+        "out_dir": "outputs/plots",
+        "options": {
+            "placement_occupancy_map": {"scope": "auto", "max_plans": 12},
+            "tfbs_concentration_profile": {"scope": "per_group", "max_plans": 8, "drilldown_plans": 2},
+        },
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    loaded = load_config(cfg_path)
+    assert loaded.root.plots is not None
+    placement_opts = dict((loaded.root.plots.options or {}).get("placement_occupancy_map") or {})
+    tfbs_opts = dict((loaded.root.plots.options or {}).get("tfbs_concentration_profile") or {})
+    assert placement_opts["scope"] == "auto"
+    assert int(placement_opts["max_plans"]) == 12
+    assert tfbs_opts["scope"] == "per_group"
+    assert int(tfbs_opts["max_plans"]) == 8
+    assert int(tfbs_opts["drilldown_plans"]) == 2
+
+
+def test_legacy_stage_a_summary_plot_option_is_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "source": "parquet",
+        "out_dir": "outputs/plots",
+        "options": {"stage_a_summary": {"include_sampling_length_companion": True}},
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="stage_a_summary"):
+        load_config(cfg_path)
+
+
+@pytest.mark.parametrize(
+    "legacy_plot_id",
+    [
+        "stage_a_summary",
+        "placement_map",
+        "tfbs_usage",
+        "run_health",
+        "dataset_source_inventory",
+        "run_health/outcomes_over_time",
+    ],
+)
+def test_legacy_plot_ids_are_rejected_in_plots_default(tmp_path: Path, legacy_plot_id: str) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "source": "parquet",
+        "out_dir": "outputs/plots",
+        "default": [legacy_plot_id],
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="no longer supported"):
+        load_config(cfg_path)
+
+
+@pytest.mark.parametrize(
+    "legacy_option_key",
+    [
+        "stage_a_summary",
+        "run_health",
+        "placement_map",
+        "tfbs_usage",
+    ],
+)
+def test_legacy_plot_option_blocks_are_rejected(tmp_path: Path, legacy_option_key: str) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "source": "parquet",
+        "out_dir": "outputs/plots",
+        "options": {legacy_option_key: {}},
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="no longer supported"):
+        load_config(cfg_path)
+
+
+def test_unknown_plot_option_blocks_are_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    cfg["plots"] = {
+        "source": "parquet",
+        "out_dir": "outputs/plots",
+        "options": {"stage_a_sampling_yield": {"scope": "auto"}},
+    }
+    cfg_path = _write(cfg, tmp_path / "cfg.yaml")
+    with pytest.raises(ConfigError, match="supported plot option blocks"):
+        load_config(cfg_path)
+
+
+def test_output_outside_run_root_rejected(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    run_dir = tmp_path / "run"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    cfg["densegen"]["output"]["parquet"]["path"] = "../outside/parquet"
+    cfg_path = _write(cfg, run_dir / "config.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)
+
+
+def test_config_must_live_inside_run_root(tmp_path: Path) -> None:
+    cfg = copy.deepcopy(MIN_CONFIG)
+    run_dir = tmp_path / "run_root"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    cfg["densegen"]["run"]["root"] = str(run_dir)
+    cfg_path = _write(cfg, tmp_path / "config.yaml")
+    with pytest.raises(ConfigError):
+        load_config(cfg_path)

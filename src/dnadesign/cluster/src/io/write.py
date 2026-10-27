@@ -1,0 +1,208 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cluster/src/io/write.py
+
+I/O helpers for write cluster I/O.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import json
+import shutil
+from pathlib import Path
+
+import pandas as pd
+
+from .parquet_attach import write_parquet_with_attached_columns
+
+
+def _backup_file(p: Path, backup_suffix: str = ".bak") -> Path:
+    b = p.with_suffix(p.suffix + backup_suffix)
+    if not b.exists():
+        shutil.copy2(p, b)
+    return b
+
+
+def _append_usr_event(event_log: Path, payload: dict[str, object]) -> None:
+    try:
+        with event_log.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(payload) + "\n")
+    except Exception as exc:
+        raise RuntimeError(f"USR mutation completed but event logging failed at '{event_log}': {exc}") from exc
+
+
+def attach_usr(usr_root: Path, dataset: str, cols_df: pd.DataFrame, allow_overwrite: bool = False) -> None:
+    """Attach columns to a USR dataset using its Python API. We require dnadesign.usr.Dataset."""
+    try:
+        from dnadesign.usr import Dataset
+    except Exception as e:
+        raise RuntimeError(
+            "dnadesign.usr is required to attach columns to a USR dataset. Please install the dnadesign package."
+        ) from e
+    ds = Dataset(usr_root, dataset)
+    # We assume 'cols_df' contains 'id' plus one or more *namespaced* columns
+    # (e.g., 'cluster__promoter_clusters_v1', 'cluster__promoter_clusters_v1__meta', ...).
+    # USR requires an explicit namespace; infer it and *fail fast* if ambiguous.
+    non_id = [c for c in cols_df.columns if c != "id"]
+    if not non_id:
+        return
+    ns_tokens = {c.split("__", 1)[0] for c in non_id if "__" in c}
+    if len(ns_tokens) != 1:
+        raise RuntimeError(
+            "attach_usr() requires all columns (except 'id') to share the same '<namespace>__' prefix. "
+            f"Columns seen: {sorted(non_id)[:5]}..."
+        )
+    namespace = next(iter(ns_tokens))
+    tmp = usr_root / dataset / ".__cluster_attach_temp.parquet"
+    cols_df.to_parquet(tmp, index=False)
+    try:
+        # Pass the explicit namespace; Dataset.attach() will keep already
+        # namespaced columns intact (it won't double-prefix).
+        ds.attach_columns(
+            tmp,
+            namespace=namespace,
+            id_col="id",
+            columns=[c for c in cols_df.columns if c != "id"],
+            allow_overwrite=allow_overwrite,
+        )
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+    _append_usr_event(
+        usr_root / dataset / ".events.log",
+        {
+            "event": "cluster_attach",
+            "columns": [c for c in cols_df.columns if c != "id"],
+        },
+    )
+
+
+def drop_usr_columns(usr_root: Path, dataset: str, columns: list[str]) -> None:
+    """
+    Delete namespaced columns from a USR dataset by editing records.parquet atomically.
+    ─ Only 'cluster__*' columns are allowed (defensive guard).
+    ─ Uses dnadesign.usr I/O helpers for snapshots + metadata preservation + event log.
+    """
+    if not columns:
+        return
+    # Normalize dotted leaf paths (e.g., 'cluster__foo__meta.method_id') to their
+    # top‑level column ('cluster__foo__meta') and de‑duplicate.
+    columns = list(dict.fromkeys(c.split(".", 1)[0] for c in columns))
+    non_cluster = [c for c in columns if not c.startswith("cluster__")]
+    if non_cluster:
+        raise RuntimeError(
+            "Refusing to delete non-namespaced or non-cluster columns. "
+            f"Only 'cluster__*' allowed; offending: {non_cluster[:5]}..."
+        )
+    # Resolve dataset paths deterministically
+    ds_dir = (usr_root / dataset).resolve()
+    records = ds_dir / "records.parquet"
+    events = ds_dir / ".events.log"
+    if not records.exists():
+        raise FileNotFoundError(f"USR dataset not found: {records}")
+
+    # Use public USR API and pyarrow for deterministic in-place rewrite.
+    try:
+        from dnadesign.usr import Dataset
+    except Exception as e:
+        raise RuntimeError(
+            "dnadesign.usr is required to modify USR datasets. "
+            "Please ensure the dnadesign package is installed and up to date."
+        ) from e
+
+    import pyarrow.parquet as pq
+
+    ds = Dataset(usr_root, dataset)
+    tbl = pq.read_table(records)
+    names = set(tbl.schema.names)  # top‑level Arrow names
+    drop_now = [c for c in columns if c in names]
+    if not drop_now:
+        return
+    keep = [c for c in tbl.schema.names if c not in drop_now]
+    # Build new table by selection (pyarrow Table.select keeps metadata on preserved columns)
+    new_tbl = tbl.select(keep)
+
+    # Persist atomically and snapshot using public dataset lifecycle hooks.
+    ds.snapshot()
+    tmp_path = records.with_suffix(records.suffix + ".tmp")
+    try:
+        pq.write_table(new_tbl, tmp_path)
+        tmp_path.replace(records)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+    _append_usr_event(events, {"action": "cluster_delete", "columns": drop_now})
+
+
+def write_generic(
+    src_file: Path,
+    df: pd.DataFrame,
+    *,
+    inplace: bool,
+    out: Path | None,
+    backup_suffix: str,
+) -> Path:
+    if inplace and out is not None:
+        raise ValueError("Pass either --inplace or --out, not both.")
+    if not inplace and out is None:
+        raise ValueError("Provide --out when not using --inplace.")
+    if inplace:
+        _backup_file(src_file, backup_suffix=backup_suffix)
+        if src_file.suffix.lower() == ".parquet":
+            df.to_parquet(src_file, index=False)
+        elif src_file.suffix.lower() == ".csv":
+            df.to_csv(src_file, index=False)
+        else:
+            raise ValueError(f"Unsupported file type: {src_file}")
+        return src_file
+    else:
+        out = Path(out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        if out.suffix.lower() == ".parquet":
+            df.to_parquet(out, index=False)
+        elif out.suffix.lower() == ".csv":
+            df.to_csv(out, index=False)
+        else:
+            raise ValueError(f"Unsupported out path: {out}")
+        return out
+
+
+def write_generic_attached_columns(
+    *,
+    src_file: Path,
+    kind: str,
+    key_col: str,
+    cols_df: pd.DataFrame,
+    allow_overwrite: bool,
+    inplace: bool,
+    out: Path | None,
+    backup_suffix: str,
+    base_df: pd.DataFrame | None = None,
+) -> Path:
+    target = src_file if inplace else Path(out) if out is not None else None
+    if kind == "parquet" and target is not None and target.suffix.lower() == ".parquet":
+        return write_parquet_with_attached_columns(
+            src_file=src_file,
+            cols_df=cols_df,
+            key_col=key_col,
+            allow_overwrite=allow_overwrite,
+            inplace=inplace,
+            out=target,
+            backup_fn=lambda path: _backup_file(path, backup_suffix=backup_suffix),
+            base_df=base_df,
+        )
+    if base_df is not None:
+        materialized_df = base_df
+    elif kind == "parquet":
+        materialized_df = pd.read_parquet(src_file)
+    else:
+        materialized_df = pd.read_csv(src_file)
+    from ..execution_support import attach_columns_schema_preserving
+
+    merged = attach_columns_schema_preserving(materialized_df, cols_df, key_col, allow_overwrite=allow_overwrite)
+    return write_generic(src_file, merged, inplace=inplace, out=out, backup_suffix=backup_suffix)

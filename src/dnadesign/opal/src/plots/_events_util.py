@@ -1,0 +1,94 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/src/plots/_events_util.py
+
+Loads ledger-backed event data for plot plugins. Resolves output paths.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Set, Union
+
+from ..analysis.ledger import (
+    load_predictions_with_setpoint,
+    read_runs,
+    read_selection_view_predictions,
+)
+from ..core.stderr_filter import maybe_install_pyarrow_sysctl_filter
+
+if TYPE_CHECKING:
+    import pandas as pd
+
+
+def resolve_outputs_dir(context) -> Path:
+    """
+    Resolve the campaign outputs/ directory (ledger sinks live here).
+    """
+    if hasattr(context, "workspace"):
+        return Path(context.workspace.outputs_dir)
+    return Path(context.campaign_dir) / "outputs"
+
+
+def load_events_with_setpoint(
+    outputs_dir: Path,
+    base_columns: Iterable[str],
+    round_selector: Optional[Union[str, int, List[int]]] = None,
+    *,
+    selection_view_id: str,
+    run_id: Optional[str] = None,
+    row_filters: Optional[Iterable[Mapping[str, Any]]] = None,
+) -> pd.DataFrame:
+    """
+    Read the minimum columns needed for a plot **from the ledger** and join
+    the named view setpoint from outputs/ledger/runs.parquet.
+    `outputs_dir` should point to the campaign's outputs/ directory.
+    If multiple run_ids exist for the selected round(s), run_id is required.
+    """
+    maybe_install_pyarrow_sysctl_filter()
+    want: Set[str] = set(map(str, base_columns)) | {"run_id"}
+    df = load_predictions_with_setpoint(
+        outputs_dir,
+        want,
+        selection_view_id=selection_view_id,
+        round_selector=round_selector,
+        run_id=run_id,
+        row_filters=list(row_filters or []),
+    )
+    return df.to_pandas()
+
+
+def load_events(
+    outputs_dir: Path,
+    base_columns: Iterable[str],
+    round_selector: Optional[Union[str, int, List[int]]] = None,
+    *,
+    selection_view_id: str,
+    run_id: Optional[str] = None,
+    row_filters: Optional[Iterable[Mapping[str, Any]]] = None,
+    allow_missing: bool = False,
+) -> pd.DataFrame:
+    """
+    Read the minimum columns needed for a plot **from the ledger** without
+    joining setpoint metadata. Useful for plots that do not require
+    objective metadata.
+    If multiple run_ids exist for the selected round(s), run_id is required.
+    """
+    maybe_install_pyarrow_sysctl_filter()
+    want: Set[str] = set(map(str, base_columns))
+    runs_df = read_runs(outputs_dir / "ledger" / "runs.parquet")
+    df = read_selection_view_predictions(
+        outputs_dir / "ledger" / "predictions",
+        selection_view_id=selection_view_id,
+        columns=sorted(want),
+        round_selector=round_selector,
+        run_id=run_id,
+        runs_df=runs_df,
+        row_filters=list(row_filters or []),
+        allow_missing=allow_missing,
+    )
+    return df.to_pandas()

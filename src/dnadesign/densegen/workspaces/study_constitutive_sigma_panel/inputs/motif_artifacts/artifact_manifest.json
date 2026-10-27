@@ -1,0 +1,23 @@
+{
+  "artifacts": [
+    {
+      "motif_id": "araC_TAKSRATWWWHHCSMTA",
+      "path": "araC__pairwise_laci_arac_merged_meme_oops__araC_TAKSRATWWWHHCSMTA.json",
+      "source": "pairwise_laci_arac_merged_meme_oops",
+      "tf_name": "araC"
+    },
+    {
+      "motif_id": "lacI_WWWTGTGAGCGNDTMACAA",
+      "path": "lacI__pairwise_laci_arac_merged_meme_oops__lacI_WWWTGTGAGCGNDTMACAA.json",
+      "source": "pairwise_laci_arac_merged_meme_oops",
+      "tf_name": "lacI"
+    }
+  ],
+  "background_policy": "record",
+  "catalog_root": "src/dnadesign/cruncher/.cruncher/pairwise_laci_arac",
+  "config_path": "src/dnadesign/cruncher/workspaces/pairwise_laci_arac/configs/config.yaml",
+  "created_at": "2026-02-20T18:26:26.507155+00:00",
+  "producer": "cruncher",
+  "pseudocount": null,
+  "schema_version": "1.0"
+}

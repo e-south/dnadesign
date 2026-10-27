@@ -1,0 +1,363 @@
+# =============================================================================
+# dnadesign — .gitignore
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# OS cruft
+# -----------------------------------------------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux/Unix temp + swap
+*.~lock.*
+*~
+*.swp
+*.swo
+
+# -----------------------------------------------------------------------------
+# Editor / IDE cruft
+# -----------------------------------------------------------------------------
+# VS Code
+.vscode/
+*.code-workspace
+
+# JetBrains
+.idea/
+*.iml
+
+# Misc editor output
+out/
+
+# -----------------------------------------------------------------------------
+# Jupyter
+# -----------------------------------------------------------------------------
+.ipynb_checkpoints/
+
+# -----------------------------------------------------------------------------
+# Python build & tooling
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.pyd
+
+# Packaging / builds
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+*.whl
+
+# Virtual envs
+.venv/
+env/
+venv/
+.pixi/
+
+# Test/analysis caches
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+.cache/matplotlib/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+/core-junit.xml
+/ci-capabilities.json
+
+# -----------------------------------------------------------------------------
+# Node / JS (if present)
+# -----------------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# -----------------------------------------------------------------------------
+# Logs, temp files
+# -----------------------------------------------------------------------------
+*.log
+*.out
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+*.rej
+temp.md
+tmp/
+
+# Local operator configuration (copy the tracked example before use)
+src/dnadesign/usr/remotes.yaml
+
+# -----------------------------------------------------------------------------
+# Archives
+# -----------------------------------------------------------------------------
+/archived/
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# -----------------------------------------------------------------------------
+# Large/binary data artifacts (keep out of git)
+# -----------------------------------------------------------------------------
+*.parquet
+*.parq
+*.pq
+*.feather
+*.joblib
+*.pkl
+*.pt
+!src/dnadesign/baserender/docs/examples/data/*.parquet
+
+# -----------------------------------------------------------------------------
+# Images: ignore by default; allow curated exceptions
+# -----------------------------------------------------------------------------
+*.png
+!assets/dnadesign-banner.png
+*.jpg
+*.jpeg
+*.gif
+
+# allow curated PNGs
+!src/dnadesign/nmf/images/
+!src/dnadesign/nmf/images/*.png
+!src/dnadesign/libshuffle/images/*.png
+!images/*.png
+# allow Cruncher docs media
+!src/dnadesign/cruncher/docs/**/*.png
+!src/dnadesign/cruncher/docs/**/*.jpg
+!src/dnadesign/cruncher/docs/**/*.jpeg
+!src/dnadesign/cruncher/docs/**/*.gif
+!src/dnadesign/cruncher/images/*.png
+
+# -----------------------------------------------------------------------------
+# Project-specific
+# -----------------------------------------------------------------------------
+# Cruncher: local cache + run outputs + experiment artifacts (keep demos/templates)
+.cruncher/
+**/.cruncher/
+src/dnadesign/cruncher/.cruncher/
+src/dnadesign/cruncher/results/
+src/dnadesign/cruncher/experiments/
+src/dnadesign/cruncher/old_results/
+src/dnadesign/cruncher/workspaces/**/.cruncher/
+src/dnadesign/cruncher/**/runs/
+src/dnadesign/cruncher/workspaces/**/runs/
+src/dnadesign/cruncher/workspaces/**/campaign.*.yaml
+src/dnadesign/cruncher/workspaces/**/campaign_*.yaml
+src/dnadesign/cruncher/workspaces/**/*.campaign_manifest.json
+src/dnadesign/cruncher/**/run_manifest.json
+src/dnadesign/cruncher/**/run_status.json
+src/dnadesign/cruncher/**/config_used.yaml
+src/dnadesign/cruncher/**/sequences.csv
+src/dnadesign/cruncher/**/sequences.parquet
+!src/dnadesign/cruncher/src/utils/elites.py
+!src/dnadesign/cruncher/src/analysis/elites.py
+src/dnadesign/cruncher/**/trace.nc
+src/dnadesign/cruncher/**/gathered_per_pwm_*.csv
+src/dnadesign/cruncher/workspaces/archived/
+projects/**/projects/
+src/dnadesign/cruncher/projects/**/projects/
+
+# Internal archives/prototypes
+src/dnadesign/archived/
+src/dnadesign/prototypes/
+src/dnadesign/usr/archived/
+src/dnadesign/usr/datasets/usr_regulondb_native_promoters/
+
+# OPAL campaigns: keep configs tracked, ignore artifacts/data.
+src/dnadesign/opal/campaigns/**
+!src/dnadesign/opal/campaigns/**/
+!src/dnadesign/opal/campaigns/**/campaign.yaml
+!src/dnadesign/opal/campaigns/**/plots.yaml
+!src/dnadesign/opal/campaigns/**/README.md
+!src/dnadesign/opal/campaigns/.gitignore
+src/dnadesign/opal/campaigns/**/notebooks/
+src/dnadesign/opal/campaigns/**/notebooks/**
+src/dnadesign/opal/campaigns/**/inputs/
+src/dnadesign/opal/campaigns/**/records.parquet
+!src/dnadesign/opal/campaigns/_fixtures/**
+src/dnadesign/opal/campaigns/**/inputs/**/.DS_Store
+
+# Live study state belongs in an external study repository. Ignore any local
+# residue from checkouts created before that boundary was established.
+docs/studies/
+src/dnadesign/studies/
+
+# OPAL per-run products anywhere
+**/outputs/
+# Cruncher demo fixtures: keep packaged YIU demo bundle outputs, not full run trees.
+!src/dnadesign/cruncher/workspaces/demo_yiu_payload/outputs/
+src/dnadesign/cruncher/workspaces/demo_yiu_payload/outputs/**
+!src/dnadesign/cruncher/workspaces/demo_yiu_payload/outputs/*/
+!src/dnadesign/cruncher/workspaces/demo_yiu_payload/outputs/*/**
+!src/dnadesign/cruncher/workspaces/demo_yiu_payload/outputs/*__payload_views.pdf
+!src/dnadesign/cruncher/workspaces/demo_monotypic_*/outputs/
+src/dnadesign/cruncher/workspaces/demo_monotypic_*/outputs/**
+!src/dnadesign/cruncher/workspaces/demo_monotypic_*/outputs/plots/
+src/dnadesign/cruncher/workspaces/demo_monotypic_*/outputs/plots/**
+!src/dnadesign/cruncher/workspaces/demo_monotypic_*/outputs/plots/yiu__*/
+!src/dnadesign/cruncher/workspaces/demo_monotypic_*/outputs/plots/yiu__*/**
+# DenseGen code package named "outputs" (not a run artifact)
+!src/dnadesign/densegen/src/adapters/outputs/
+!src/dnadesign/densegen/src/adapters/outputs/**
+src/dnadesign/densegen/src/adapters/outputs/**/__pycache__/
+src/dnadesign/densegen/src/adapters/outputs/**/*.pyc
+# BaseRender code package named "outputs" (not a run artifact)
+!src/dnadesign/baserender/src/outputs/
+!src/dnadesign/baserender/src/outputs/**
+src/dnadesign/baserender/src/outputs/**/__pycache__/
+src/dnadesign/baserender/src/outputs/**/*.pyc
+# DenseGen workspaces: ignore everything by default, allow packaged templates and shared runbook flow
+src/dnadesign/densegen/workspaces/**
+!src/dnadesign/densegen/workspaces/README.md
+!src/dnadesign/densegen/workspaces/_shared/
+!src/dnadesign/densegen/workspaces/_shared/workspace_runbook_flow.sh
+!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/
+!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/README.md
+!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/config.yaml
+!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/runbook.md
+!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/runbook.sh
+!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/inputs/
+!src/dnadesign/densegen/workspaces/demo_tfbs_baseline/inputs/*.csv
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/README.md
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/config.yaml
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/playback.yaml
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/playback-constraints.yaml
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/runbook.md
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/runbook.sh
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/inputs/
+!src/dnadesign/densegen/workspaces/demo_dense_array_showcase/inputs/*.csv
+!src/dnadesign/densegen/workspaces/demo_sampling_baseline/
+!src/dnadesign/densegen/workspaces/demo_sampling_baseline/README.md
+!src/dnadesign/densegen/workspaces/demo_sampling_baseline/config.yaml
+!src/dnadesign/densegen/workspaces/demo_sampling_baseline/runbook.md
+!src/dnadesign/densegen/workspaces/demo_sampling_baseline/runbook.sh
+!src/dnadesign/densegen/workspaces/demo_sampling_baseline/inputs/
+!src/dnadesign/densegen/workspaces/demo_sampling_baseline/inputs/motif_artifacts/
+!src/dnadesign/densegen/workspaces/demo_sampling_baseline/inputs/motif_artifacts/*.json
+!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/
+!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/README.md
+!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/config.yaml
+!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/runbook.md
+!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/runbook.sh
+!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/inputs/
+!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/inputs/motif_artifacts/
+!src/dnadesign/densegen/workspaces/study_constitutive_sigma_panel/inputs/motif_artifacts/*.json
+!src/dnadesign/baserender/assets/overlays/*.png
+# BaseRender workspaces: ignore everything by default, allow README
+src/dnadesign/baserender/workspaces/**
+!src/dnadesign/baserender/workspaces/README.md
+!src/dnadesign/baserender/workspaces/demo_densegen_render/
+!src/dnadesign/baserender/workspaces/demo_densegen_render/.baserender-workspace
+!src/dnadesign/baserender/workspaces/demo_densegen_render/job.yaml
+!src/dnadesign/baserender/workspaces/demo_densegen_render/inputs/
+!src/dnadesign/baserender/workspaces/demo_densegen_render/inputs/input.parquet
+!src/dnadesign/baserender/workspaces/demo_densegen_render/outputs/
+!src/dnadesign/baserender/workspaces/demo_densegen_render/outputs/.gitkeep
+!src/dnadesign/baserender/workspaces/demo_cruncher_render/
+!src/dnadesign/baserender/workspaces/demo_cruncher_render/.baserender-workspace
+!src/dnadesign/baserender/workspaces/demo_cruncher_render/job.yaml
+!src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/
+!src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/README.md
+!src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/elites_showcase_records.parquet
+!src/dnadesign/baserender/workspaces/demo_cruncher_render/inputs/motif_library.json
+!src/dnadesign/baserender/workspaces/demo_cruncher_render/outputs/
+!src/dnadesign/baserender/workspaces/demo_cruncher_render/outputs/.gitkeep
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/.baserender-workspace
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/README.md
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/job.yaml
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/inputs/
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/inputs/README.md
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/outputs/
+!src/dnadesign/baserender/workspaces/usr_promoter_references_genbank/outputs/.gitkeep
+
+# LatentDNA workspaces: keep configs/templates tracked; generated analysis outputs stay local.
+# The stress study snapshot is a sanctioned checked-in status record; use
+# `latentdna workspace snapshot --dry-run` for read-only inspections.
+src/dnadesign/latentdna/workspaces/**/outputs/
+
+# DenseGen run outputs retained outside active package surfaces
+src/dnadesign/densegen/runs/**
+!src/dnadesign/densegen/runs/demo/inputs/*.jaspar
+!src/dnadesign/densegen/runs/demo_meme_two_tf/
+!src/dnadesign/densegen/runs/demo_meme_two_tf/config.yaml
+**/_densegen_ids.sqlite
+**/campaign.log.jsonl
+**/round.log.jsonl
+**/state.json
+**/.opal/
+/$OPAL_TMPDIR/
+
+# USR datasets (large, not for git)
+src/dnadesign/usr/datasets/**
+!src/dnadesign/usr/datasets/
+!src/dnadesign/usr/datasets/README.md
+!src/dnadesign/usr/datasets/registry.yaml
+!src/dnadesign/usr/datasets/archived/
+!src/dnadesign/usr/datasets/archived/README.md
+!src/dnadesign/usr/datasets/archived/promoter_misc_pytorch/
+!src/dnadesign/usr/datasets/archived/promoter_misc_pytorch/README.md
+
+# Common local project dirs
+/.var/
+/campaigns/
+/datasets/
+/prototypes/
+/molbench/
+/test_configs/
+/batches/
+/runtime/
+**/batch_results/
+**/results/
+**/cluster_log/
+
+# Misc project-generated YAML summaries
+**/progress_status_*.yaml
+**/summary.yaml
+
+# Misc project metadata/secrets
+meta.yaml
+*.env
+*.env.*
+*.key
+
+# Stitcher utility
+.stitcher.toml
+.stitcher.use
+.stitch.txt
+
+# ADEs
+AGENTS.md
+!src/dnadesign/baserender/AGENTS.md
+!src/dnadesign/cluster/AGENTS.md
+!src/dnadesign/construct/AGENTS.md
+!src/dnadesign/cruncher/AGENTS.md
+!src/dnadesign/infer/AGENTS.md
+!src/dnadesign/latentdna/AGENTS.md
+!src/dnadesign/notify/AGENTS.md
+!src/dnadesign/opal/AGENTS.md
+!src/dnadesign/opal/notebooks/AGENTS.md
+!src/dnadesign/permuter/AGENTS.md
+!src/dnadesign/usr/notebooks/AGENTS.md
+src/dnadesign/notify/.secrets/
+
+# Marimo
+**/__marimo__/cache/
+**/__marimo__/

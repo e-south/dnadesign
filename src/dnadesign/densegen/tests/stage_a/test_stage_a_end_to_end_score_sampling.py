@@ -1,0 +1,182 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/tests/stage_a/test_stage_a_end_to_end_score_sampling.py
+
+End-to-end Stage-A score-only sampling across two PWM artifacts.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+import yaml
+
+from dnadesign.densegen.src.config import load_config
+from dnadesign.densegen.src.core.artifacts.pool import build_pool_artifact
+from dnadesign.densegen.src.core.pipeline import default_deps
+from dnadesign.densegen.src.integrations.meme_suite import resolve_executable
+from dnadesign.densegen.src.viz.plotting import plot_stage_a_summary
+
+pytestmark = pytest.mark.fimo
+
+_FIMO_MISSING = resolve_executable("fimo", tool_path=None) is None
+
+
+def _artifact_paths() -> list[str]:
+    base = Path(__file__).resolve().parents[2] / "workspaces" / "demo_sampling_baseline" / "inputs" / "motif_artifacts"
+    return [
+        str(base / "lexA__demo_merged_meme_oops_multitf__lexA_CTGTATAWAWWHACA.json"),
+        str(base / "cpxR__demo_merged_meme_oops_multitf__cpxR_MANWWHTTTAM.json"),
+    ]
+
+
+def _write_config(tmp_path: Path) -> Path:
+    cfg_path = tmp_path / "config.yaml"
+    cfg_path.write_text(
+        yaml.safe_dump(
+            {
+                "densegen": {
+                    "schema_version": "2.9",
+                    "run": {"id": "stage_a_e2e", "root": "."},
+                    "inputs": [
+                        {
+                            "name": "demo_pwm",
+                            "type": "pwm_artifact_set",
+                            "paths": _artifact_paths(),
+                            "sampling": {
+                                "strategy": "stochastic",
+                                "n_sites": 5,
+                                "mining": {
+                                    "batch_size": 200,
+                                    "budget": {"mode": "fixed_candidates", "candidates": 2000},
+                                    "log_every_batches": 1,
+                                },
+                                "length": {"policy": "range", "range": [15, 20]},
+                                "keep_all_candidates_debug": True,
+                            },
+                        }
+                    ],
+                    "output": {
+                        "targets": ["parquet"],
+                        "schema": {"bio_type": "dna", "alphabet": "dna_4"},
+                        "parquet": {"path": "outputs/tables/records.parquet"},
+                    },
+                    "generation": {
+                        "sequence_length": 60,
+                        "plan": [
+                            {
+                                "name": "default",
+                                "sequences": 1,
+                                "sampling": {"include_inputs": ["demo_pwm"]},
+                                "regulator_constraints": {"groups": []},
+                            }
+                        ],
+                    },
+                    "solver": {"backend": "CBC", "strategy": "iterate"},
+                    "runtime": {
+                        "round_robin": False,
+                        "max_accepted_per_library": 5,
+                        "min_count_per_tf": 0,
+                        "max_duplicate_solutions": 1,
+                        "no_progress_seconds_before_resample": 1,
+                        "max_consecutive_no_progress_resamples": 25,
+                        "max_failed_solutions": 0,
+                        "checkpoint_every": 0,
+                        "leaderboard_every": 1,
+                    },
+                    "logging": {"log_dir": "outputs/logs", "level": "INFO"},
+                    "postprocess": {"pad": {"mode": "off"}},
+                }
+            }
+        )
+    )
+    return cfg_path
+
+
+@pytest.mark.skipif(
+    _FIMO_MISSING,
+    reason="fimo executable not available (run tests via `pixi run pytest` or set MEME_BIN).",
+)
+def test_stage_a_end_to_end_score_sampling(tmp_path: Path) -> None:
+    cfg_path = _write_config(tmp_path)
+    loaded = load_config(cfg_path)
+    cfg = loaded.root.densegen
+    outputs_root = tmp_path / "outputs"
+    out_dir = outputs_root / "pools"
+    deps = default_deps()
+    artifact, pool_data = build_pool_artifact(
+        cfg=cfg,
+        cfg_path=cfg_path,
+        deps=deps,
+        rng=np.random.default_rng(0),
+        outputs_root=outputs_root,
+        out_dir=out_dir,
+        overwrite=False,
+    )
+
+    pool = pool_data["demo_pwm"]
+    assert pool.df is not None
+    df = pool.df
+    for col in ("best_hit_score", "tier", "rank_within_regulator", "tfbs_sequence", "tier_target_eligible_unique"):
+        assert col in df.columns
+
+    regulators = sorted({str(tf) for tf in df["tf"].tolist()})
+    assert len(regulators) == 2
+    for reg in regulators:
+        sub = df[df["tf"].astype(str) == reg].copy()
+        assert not sub.empty
+        assert (sub["best_hit_score"] > 0).all()
+        assert int(sub["rank_within_regulator"].min()) >= 1
+
+    candidates_dir = outputs_root / "pools" / "candidates" / "demo_pwm"
+    candidate_files = sorted(candidates_dir.glob("candidates__*.parquet"))
+    assert candidate_files
+    candidates = pd.concat([pd.read_parquet(path) for path in candidate_files], ignore_index=True)
+    accepted = candidates[candidates["accepted"]].copy()
+    assert not accepted.empty
+    for reg in regulators:
+        sub = df[df["tf"].astype(str) == reg].copy()
+        accepted_regulator = accepted[accepted["motif_label"].astype(str) == reg]
+        for retained in sub.itertuples():
+            matching_core = accepted_regulator[
+                accepted_regulator["matched_sequence"].astype(str) == str(retained.tfbs_core)
+            ]
+            assert not matching_core.empty
+            max_score = float(matching_core["best_hit_score"].max())
+            max_score_sequences = set(
+                matching_core[matching_core["best_hit_score"] == max_score]["sequence"].astype(str)
+            )
+            assert float(retained.best_hit_score) == max_score
+            assert str(retained.tfbs_sequence) in max_score_sequences
+
+    entry = artifact.entry_for("demo_pwm")
+    sampling = entry.stage_a_sampling
+    assert sampling is not None
+    for row in sampling.get("eligible_score_hist") or []:
+        assert "tier0_score" in row
+        assert "tier1_score" in row
+        assert "tier2_score" in row
+        assert "generated" in row
+        assert "candidates_with_hit" in row
+        assert "eligible_raw" in row
+        assert "eligible_unique" in row
+        assert "retained" in row
+
+    plot_dir = tmp_path / "plots"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    out_path = plot_dir / "stage_a_summary.png"
+    paths = plot_stage_a_summary(
+        df=pd.DataFrame(),
+        out_path=out_path,
+        pools={"demo_pwm": df},
+        pool_manifest=artifact,
+    )
+    assert len(paths) == 3
+    assert paths[0].exists()

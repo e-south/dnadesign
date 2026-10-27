@@ -1,0 +1,85 @@
+## `dnadesign` for agents
+
+This repository is a uv-managed Python monorepo containing modular tools under `src/dnadesign/`.
+Treat this file as a navigation map; canonical policy and operational detail live in system-of-record docs and runbooks linked below.
+
+## Start here (system of record)
+
+- Architecture map: `ARCHITECTURE.md`
+- Engineering invariants: `DESIGN.md`
+- Security/secrets policy: `SECURITY.md`
+- Reliability and operational model: `RELIABILITY.md`
+- Planning lifecycle: `PLANS.md`
+- Quality score scaffold: `QUALITY_SCORE.md`
+- Full docs index: `docs/README.md`
+
+## Repo map
+
+- Root docs: `README.md`, `docs/`
+- Python code: `src/dnadesign/`
+- CI: `.github/workflows/ci.yaml`
+- Tooling: `.pre-commit-config.yaml`, `pyproject.toml`, `uv.lock`, `pixi.lock`
+- Local tool instructions: follow nearest `AGENTS.md` inside each tool directory.
+
+## Task map
+
+- Setup environment:
+  - `uv sync --locked`
+  - `uv sync --locked --group dev`
+- Validate changes:
+  - Start with the affected tool's tests and the matching static checks in
+    [Repo change gate](docs/repo-change-gate.md).
+  - Full-repository pytest is for broad behavior changes or merge-depth validation.
+    Documentation-only changes use documentation and routing checks.
+  - This repo does not ship `./scripts/agent-verify`; use the repo change gate instead.
+- Discover CLIs:
+  - check `[project.scripts]` in `pyproject.toml`
+  - run `uv run <script> --help`
+
+## Operational references
+
+- BU SCC operations source of truth: `docs/bu-scc/README.md`, `docs/bu-scc/setup/quickstart.md`, and `docs/bu-scc/runbooks/batch-notify.md`
+- BU SCC quickstart: `docs/bu-scc/setup/quickstart.md`
+- BU SCC batch + notify runbook: `docs/bu-scc/runbooks/batch-notify.md`
+- Submit-ready BU SCC jobs: `docs/bu-scc/jobs/README.md`
+- Notify operator docs: `docs/notify/README.md`
+- Notify event contract: `docs/notify/usr-events.md`
+- Repo-local notify operator skill: `.agents/skills/notify-ops/SKILL.md`
+- Repo-local SGE/HPC operator skill: `.agents/skills/sge-hpc-ops/SKILL.md`
+- Repo-local BU SCC USR sync skill: `.agents/skills/bu-scc-usr-sync/SKILL.md`
+- Critical reusable operational workflows live under `.agents/skills/`.
+  Native project-scope skill discovery only applies when the Codex session is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the repo docs and explicit CLI entrypoints instead of assuming a repo-local skill will appear in the advertised skill list.
+- External study integration contract: `docs/integrations/study-workspaces.md`
+- Maintainer docs and CI/testing notes: `docs/dev/README.md`
+
+## Repository patterns
+
+- Many tools are direct package layouts under `src/dnadesign/<tool>/`.
+- Some tools are mini-projects with nested `src/` (for example `permuter`, `opal`) and local configs/jobs/notebooks.
+- Prefer explicit tool boundaries and artifact contracts over cross-tool internal coupling.
+
+## Generated artifacts policy
+
+Treat these paths as generated/run artifacts unless local tool docs explicitly state otherwise:
+
+- `**/outputs/**`
+- `**/batch_results/**`
+- `**/runs/**`
+- `**/.pytest_cache/**`
+- `src/dnadesign/**/campaigns/**/outputs/**`
+
+Rules:
+
+- Do not hand-edit generated outputs; fix code/config and regenerate.
+- Ask before committing generated artifacts or large binaries.
+- Avoid archived or prototype source trees unless explicitly requested.
+
+## Definition of done
+
+- Diff reviewed
+- Tests pass or scope-limited rationale documented
+- Ruff checks pass
+- Architecture boundary checks pass
+- Docs checks pass
+- No generated artifacts committed unintentionally
+- Changes are on a branch and ready for PR review

@@ -1,0 +1,14 @@
+legend: false
+legend_mode: none
+show_reverse_complement: true
+show_coordinate_ticks: true
+track_spacing: 20.0
+baseline_spacing: 46.0
+palette:
+  segment_flank: "#d1d5db"
+  segment_stem5p: "#93c5fd"
+  segment_loop: "#fcd34d"
+  segment_stem3p: "#86efac"
+  site_intended: "#2563eb"
+  site_extra: "#9ca3af"
+  bounded_segment: "#f97316"

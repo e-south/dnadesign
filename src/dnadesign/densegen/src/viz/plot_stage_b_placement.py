@@ -1,0 +1,962 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/densegen/src/viz/plot_stage_b_placement.py
+
+Stage-B placement map plotting (occupancy + TFBS usage leaderboard).
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Optional
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.colors import to_rgb, to_rgba
+
+from dnadesign.baserender import Palette
+
+from ..integrations.baserender.notebook_contract import densegen_baserender_palette_overrides
+from .plot_common import _apply_style, _palette, _rename_artifact_path, _save_figure, _stage_b_plan_output_dir, _style
+
+log = logging.getLogger(__name__)
+
+
+def _plot_config(cfg: dict) -> dict:
+    if not isinstance(cfg, dict):
+        return {}
+    if isinstance(cfg.get("generation"), dict):
+        return cfg
+    nested = cfg.get("config")
+    if isinstance(nested, dict):
+        return nested
+    return cfg
+
+
+def _sequence_length_from_cfg(cfg: dict) -> int:
+    cfg = _plot_config(cfg)
+    gen = cfg.get("generation") if cfg else None
+    if not isinstance(gen, dict):
+        raise ValueError("Plot config missing generation block.")
+    length = gen.get("sequence_length")
+    if length is None:
+        raise ValueError("Plot config missing generation.sequence_length.")
+    return int(length)
+
+
+def _require_columns(df: pd.DataFrame, required: set[str], label: str) -> None:
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"{label} missing required columns: {sorted(missing)}")
+
+
+def _promoter_constraints(cfg: dict, plan_name: str) -> tuple[list[dict], bool]:
+    cfg = _plot_config(cfg)
+    gen = cfg.get("generation", {}) if cfg else {}
+    plan_items = gen.get("plan", []) or []
+    exact_matches: list[dict] = []
+    grouped_matches: list[dict] = []
+    grouped_prefix = f"{str(plan_name)}__"
+    for item in plan_items:
+        if not isinstance(item, dict):
+            continue
+        item_name = str(item.get("name") or "")
+        if item_name == str(plan_name):
+            exact_matches.append(item)
+            continue
+        if grouped_prefix and item_name.startswith(grouped_prefix):
+            grouped_matches.append(item)
+    selected_items = exact_matches if exact_matches else grouped_matches
+    aggregate_fixed_components = bool(grouped_matches) and not bool(exact_matches)
+
+    out = []
+    seen: set[
+        tuple[
+            str,
+            str,
+            int | None,
+            int | None,
+            tuple[int, int] | None,
+            tuple[int, int] | None,
+        ]
+    ] = set()
+    for item in selected_items:
+        fixed = item.get("fixed_elements") or {}
+        pcs = fixed.get("promoter_constraints")
+        pcs = [pcs] if isinstance(pcs, dict) else (pcs or [])
+        for pc in (p for p in pcs if isinstance(p, dict)):
+            upstream = str(pc.get("upstream") or "").strip().upper()
+            downstream = str(pc.get("downstream") or "").strip().upper()
+            if not upstream or not downstream:
+                continue
+            name = str(pc.get("name") or "").strip() or None
+            spacer = pc.get("spacer_length")
+            if isinstance(spacer, (list, tuple)) and spacer:
+                spacer_min = min(int(v) for v in spacer)
+                spacer_max = max(int(v) for v in spacer)
+            elif isinstance(spacer, (int, float)):
+                spacer_min = int(spacer)
+                spacer_max = int(spacer)
+            else:
+                spacer_min = None
+                spacer_max = None
+            upstream_pos_raw = pc.get("upstream_pos")
+            downstream_pos_raw = pc.get("downstream_pos")
+            upstream_pos = (
+                (int(upstream_pos_raw[0]), int(upstream_pos_raw[1]))
+                if isinstance(upstream_pos_raw, (list, tuple)) and len(upstream_pos_raw) == 2
+                else None
+            )
+            downstream_pos = (
+                (int(downstream_pos_raw[0]), int(downstream_pos_raw[1]))
+                if isinstance(downstream_pos_raw, (list, tuple)) and len(downstream_pos_raw) == 2
+                else None
+            )
+            key = (upstream, downstream, spacer_min, spacer_max, upstream_pos, downstream_pos)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(
+                {
+                    "name": name,
+                    "upstream": upstream,
+                    "downstream": downstream,
+                    "spacer_min": spacer_min,
+                    "spacer_max": spacer_max,
+                    "upstream_pos": list(upstream_pos) if upstream_pos is not None else upstream_pos_raw,
+                    "downstream_pos": list(downstream_pos) if downstream_pos is not None else downstream_pos_raw,
+                }
+            )
+    return out, aggregate_fixed_components
+
+
+def _fixed_label_name(pc: dict, idx: int, *, aggregate_fixed_components: bool) -> str:
+    if aggregate_fixed_components:
+        return "promoter"
+    return str(pc.get("name") or f"promoter_{idx + 1}")
+
+
+def _fixed_component_label(
+    pc: dict,
+    idx: int,
+    component: str,
+    *,
+    aggregate_fixed_components: bool,
+) -> str:
+    return f"fixed:{_fixed_label_name(pc, idx, aggregate_fixed_components=aggregate_fixed_components)}:{component}"
+
+
+def _fixed_labels(constraints: list[dict], *, aggregate_fixed_components: bool = False) -> list[str]:
+    labels = []
+    for idx, pc in enumerate(constraints):
+        labels.append(_fixed_component_label(pc, idx, "-35", aggregate_fixed_components=aggregate_fixed_components))
+        labels.append(_fixed_component_label(pc, idx, "-10", aggregate_fixed_components=aggregate_fixed_components))
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for label in labels:
+        if label in seen:
+            continue
+        seen.add(label)
+        deduped.append(label)
+    return deduped
+
+
+def _collapse_fixed_component_label(label: str, *, aggregate_fixed_components: bool) -> str:
+    label_text = str(label).strip()
+    if not aggregate_fixed_components:
+        return label_text
+    if not label_text.startswith("fixed:"):
+        return label_text
+    if label_text.endswith(":-35"):
+        return "fixed:promoter:-35"
+    if label_text.endswith(":-10"):
+        return "fixed:promoter:-10"
+    return label_text
+
+
+def _fixed_label_sequences(
+    constraints: list[dict],
+    *,
+    aggregate_fixed_components: bool = False,
+) -> dict[str, str]:
+    sequences_multi: dict[str, set[str]] = {}
+    for idx, pc in enumerate(constraints):
+        upstream = str(pc.get("upstream") or "").strip().upper()
+        downstream = str(pc.get("downstream") or "").strip().upper()
+        if upstream:
+            label_up = _fixed_component_label(
+                pc,
+                idx,
+                "-35",
+                aggregate_fixed_components=aggregate_fixed_components,
+            )
+            sequences_multi.setdefault(label_up, set()).add(upstream)
+        if downstream:
+            label_down = _fixed_component_label(
+                pc,
+                idx,
+                "-10",
+                aggregate_fixed_components=aggregate_fixed_components,
+            )
+            sequences_multi.setdefault(label_down, set()).add(downstream)
+    sequences: dict[str, str] = {}
+    for label, seq_set in sequences_multi.items():
+        if len(seq_set) == 1:
+            sequences[label] = next(iter(seq_set))
+    return sequences
+
+
+def _sanitize_tf_label(label: str) -> str:
+    label = str(label)
+    if "_" in label:
+        head, tail = label.split("_", 1)
+        tail_upper = tail.upper()
+        iupac = set("ACGTURYSWKMBDHVN")
+        if len(tail_upper) >= 6 and set(tail_upper).issubset(iupac):
+            return head
+    return label
+
+
+def _sanitize_fixed_label(label: str) -> str:
+    label = str(label)
+    if label.startswith("fixed:"):
+        label = label[len("fixed:") :]
+    if ":" not in label:
+        return label
+    name, suffix = label.rsplit(":", 1)
+    normalized = name.replace("_", "").replace("-", "").lower()
+    if normalized.startswith("sigma"):
+        suffix_digits = "".join(ch for ch in normalized[len("sigma") :] if ch.isdigit())
+        promoter_name = f"σ{suffix_digits}" if suffix_digits else "σ"
+    else:
+        promoter_name = name.replace("_", " ")
+    if suffix == "-35":
+        return f"{promoter_name} upstream site (-35)"
+    if suffix == "-10":
+        return f"{promoter_name} downstream site (-10)"
+    return f"{promoter_name} {suffix}".strip()
+
+
+def _normalize_tf_label(label: str, fixed_set: set[str]) -> str:
+    if label is None:
+        return ""
+    try:
+        if pd.isna(label):
+            return ""
+    except Exception:
+        pass
+    label = str(label).strip()
+    if not label or label.lower() in {"none", "nan"}:
+        return ""
+    if label in fixed_set or label.startswith("fixed:"):
+        return label
+    return _sanitize_tf_label(label)
+
+
+def _find_positions(seq: str, motif: str, pos_range) -> list[int]:
+    seq = str(seq).upper()
+    motif = str(motif).upper()
+    if not motif:
+        return []
+    lo = None
+    hi = None
+    if isinstance(pos_range, (list, tuple)) and len(pos_range) == 2:
+        lo = int(pos_range[0])
+        hi = int(pos_range[1])
+    positions = []
+    start = 0
+    while True:
+        idx = seq.find(motif, start)
+        if idx < 0:
+            break
+        if lo is not None and idx < lo:
+            start = idx + 1
+            continue
+        if hi is not None and idx > hi:
+            start = idx + 1
+            continue
+        if idx + len(motif) <= len(seq):
+            positions.append(idx)
+        start = idx + 1
+    return positions
+
+
+def _select_promoter_pair(seq: str, pc: dict) -> tuple[int, int] | None:
+    upstream = pc["upstream"]
+    downstream = pc["downstream"]
+    up_positions = _find_positions(seq, upstream, pc.get("upstream_pos"))
+    down_positions = _find_positions(seq, downstream, pc.get("downstream_pos"))
+    if not up_positions or not down_positions:
+        return None
+    spacer_min = pc.get("spacer_min")
+    spacer_max = pc.get("spacer_max")
+    for up_start in sorted(up_positions):
+        up_end = up_start + len(upstream)
+        for down_start in sorted(down_positions):
+            if down_start < up_end:
+                continue
+            spacer = down_start - up_end
+            if spacer_min is not None and spacer < int(spacer_min):
+                continue
+            if spacer_max is not None and spacer > int(spacer_max):
+                continue
+            return up_start, down_start
+    return None
+
+
+def _truncate_tfbs(seq: str, *, head: int = 8, tail: int = 6) -> str:
+    seq = str(seq)
+    if len(seq) <= head + tail + 3:
+        return seq
+    return f"{seq[:head]}...{seq[-tail:]}"
+
+
+def _placement_bounds(row: pd.Series, seq_len: int) -> tuple[int, int] | None:
+    return _placement_bounds_from_values(
+        offset_val=row.get("offset"),
+        offset_raw_val=row.get("offset_raw"),
+        pad_left_val=row.get("pad_left"),
+        length_val=(row.get("length") if "length" in row else None),
+        end_val=row.get("end"),
+        seq_len=seq_len,
+    )
+
+
+def _placement_bounds_from_values(
+    *,
+    offset_val: object,
+    offset_raw_val: object,
+    pad_left_val: object,
+    length_val: object,
+    end_val: object,
+    seq_len: int,
+) -> tuple[int, int] | None:
+    has_offset = offset_val is not None and not pd.isna(offset_val)
+    has_offset_raw = offset_raw_val is not None and not pd.isna(offset_raw_val)
+    has_pad_left = pad_left_val is not None and not pd.isna(pad_left_val)
+
+    if has_offset:
+        start = int(offset_val)
+        if has_offset_raw:
+            offset_raw = int(offset_raw_val)
+            if has_pad_left:
+                expected = offset_raw + int(pad_left_val)
+                if expected != start:
+                    raise ValueError(
+                        "composition.parquet offset metadata mismatch: "
+                        f"offset={start}, offset_raw={offset_raw}, pad_left={int(pad_left_val)}."
+                    )
+            elif offset_raw != start:
+                raise ValueError(
+                    "composition.parquet offset metadata mismatch: "
+                    f"offset={start}, offset_raw={offset_raw}, missing pad_left."
+                )
+    elif has_offset_raw:
+        start = int(offset_raw_val) + (int(pad_left_val) if has_pad_left else 0)
+    else:
+        raise ValueError("composition.parquet has placement row with missing offset/offset_raw.")
+
+    if length_val is not None and not pd.isna(length_val):
+        end = start + int(length_val)
+    else:
+        if end_val is None or pd.isna(end_val):
+            raise ValueError("composition.parquet has placement row with missing length/end.")
+        end = int(end_val)
+    if end <= start:
+        return None
+    lo = max(0, min(start, seq_len))
+    hi = max(lo, min(end, seq_len))
+    if hi <= lo:
+        return None
+    return lo, hi
+
+
+def _category_display_label(
+    label: str,
+    *,
+    fixed_label_sequences: dict[str, str] | None = None,
+    include_fixed_sequence: bool = True,
+) -> str:
+    if label.startswith("fixed:"):
+        sequence = (fixed_label_sequences or {}).get(label)
+        display_label = _sanitize_fixed_label(label)
+        if include_fixed_sequence and sequence:
+            return f"{display_label} ({sequence})"
+        return str(display_label)
+    if str(label).strip() == "neutral_bg":
+        return "background"
+    return label
+
+
+def _colorblind_palette(style: dict, n: int) -> list:
+    palette_style = dict(style)
+    palette_style["palette"] = "okabe_ito"
+    return _palette(palette_style, n)
+
+
+def _occupancy_palette_tag(label: str) -> str | None:
+    label_text = str(label).strip()
+    if not label_text:
+        return None
+    if label_text.startswith("tf:"):
+        return label_text
+    if label_text.startswith("fixed:"):
+        if label_text.endswith(":-35"):
+            return "promoter:sigma70_core:upstream"
+        if label_text.endswith(":-10"):
+            return "promoter:sigma70_core:downstream"
+        return None
+    display_label = str(_category_display_label(label_text, include_fixed_sequence=False)).strip()
+    compact_display = display_label.replace(" ", "").replace("_", "").lower()
+    if compact_display in {"background", "neutral", "neutralbg", "neutralsites"}:
+        return "tf:background"
+    sanitized = _sanitize_tf_label(label_text).strip()
+    if not sanitized:
+        return None
+    compact_tf = sanitized.replace(" ", "").replace("_", "").lower()
+    canonical_tf = {
+        "background": "background",
+        "lexa": "lexA",
+        "cpxr": "cpxR",
+        "baer": "baeR",
+    }.get(compact_tf, sanitized)
+    return f"tf:{canonical_tf}"
+
+
+def _occupancy_color_map(categories: list[str], *, style: dict) -> dict[str, object]:
+    fallback_colors = dict(zip(categories, _colorblind_palette(style, len(categories))))
+    palette = Palette(densegen_baserender_palette_overrides())
+    colors: dict[str, object] = {}
+    for label in categories:
+        palette_tag = _occupancy_palette_tag(label)
+        if palette_tag is None:
+            colors[label] = fallback_colors[label]
+            continue
+        colors[label] = palette.color_for(palette_tag)
+    return colors
+
+
+def _darken_color(color: object, *, factor: float) -> tuple[float, float, float]:
+    r, g, b = to_rgb(color)
+    scale = min(1.0, max(0.0, float(factor)))
+    return (r * scale, g * scale, b * scale)
+
+
+def _occupancy_fill_alpha(*, alpha: float, is_fixed: bool) -> float:
+    alpha_base = float(alpha)
+    alpha_scale = 2.35 if is_fixed else 2.15
+    alpha_floor = 0.52 if is_fixed else 0.48
+    return min(0.78, max(alpha_floor, alpha_base * alpha_scale))
+
+
+def _build_occupancy(
+    sub: pd.DataFrame,
+    *,
+    solutions: pd.DataFrame,
+    seq_len: int,
+    constraints: list[dict],
+    max_categories: int,
+    aggregate_fixed_components: bool = False,
+) -> tuple[dict[str, np.ndarray], list[str], dict[str, int]]:
+    fixed_labels = _fixed_labels(constraints, aggregate_fixed_components=aggregate_fixed_components)
+    fixed_set = set(fixed_labels)
+    if max_categories < len(fixed_labels):
+        msg = (
+            "placement_occupancy_map occupancy_max_categories="
+            f"{max_categories} is smaller than fixed categories ({len(fixed_labels)})."
+        )
+        raise ValueError(msg)
+
+    sub = sub.copy()
+    sub["tf_label"] = sub["tf"].map(
+        lambda tf: _collapse_fixed_component_label(
+            _normalize_tf_label(tf, fixed_set),
+            aggregate_fixed_components=aggregate_fixed_components,
+        )
+    )
+    tf_label_values = sub["tf_label"].astype(str).tolist()
+    regulator_labels = sorted({label for label in tf_label_values if label.strip() and label not in fixed_set})
+    row_count = int(len(sub))
+    offset_values = sub["offset"].tolist() if "offset" in sub.columns else [None] * row_count
+    offset_raw_values = sub["offset_raw"].tolist() if "offset_raw" in sub.columns else [None] * row_count
+    pad_left_values = sub["pad_left"].tolist() if "pad_left" in sub.columns else [None] * row_count
+    length_values = sub["length"].tolist() if "length" in sub.columns else [None] * row_count
+    end_values = sub["end"].tolist() if "end" in sub.columns else [None] * row_count
+
+    placement_spans: list[tuple[str, int, int]] = []
+    tf_totals: dict[str, int] = {}
+    for tf_label, offset_val, offset_raw_val, pad_left_val, length_val, end_val in zip(
+        tf_label_values,
+        offset_values,
+        offset_raw_values,
+        pad_left_values,
+        length_values,
+        end_values,
+    ):
+        tf_label = str(tf_label).strip()
+        if not tf_label:
+            continue
+        bounds = _placement_bounds_from_values(
+            offset_val=offset_val,
+            offset_raw_val=offset_raw_val,
+            pad_left_val=pad_left_val,
+            length_val=length_val,
+            end_val=end_val,
+            seq_len=seq_len,
+        )
+        if bounds is None:
+            continue
+        lo, hi = bounds
+        placement_spans.append((tf_label, lo, hi))
+        if tf_label in fixed_set:
+            continue
+        tf_totals[tf_label] = tf_totals.get(tf_label, 0) + max(0, hi - lo)
+
+    max_regulators = max(0, max_categories - len(fixed_labels))
+    if len(regulator_labels) > max_regulators and max_regulators > 0:
+        keep = max(0, max_regulators - 1)
+        ranked = sorted(regulator_labels, key=lambda t: (-tf_totals.get(t, 0), t))
+        selected_tfs = sorted(ranked[:keep])
+        other_tfs = ranked[keep:]
+    elif max_regulators <= 0 and regulator_labels:
+        selected_tfs = []
+        other_tfs = regulator_labels
+    else:
+        selected_tfs = sorted(regulator_labels)
+        other_tfs = []
+
+    categories = list(fixed_labels) + list(selected_tfs)
+    if other_tfs:
+        categories.append("other")
+    occupancy = {label: np.zeros(seq_len, dtype=float) for label in categories}
+
+    for tf_label, lo, hi in placement_spans:
+        if tf_label in fixed_set:
+            label = tf_label
+        else:
+            label = tf_label if tf_label in selected_tfs else ("other" if other_tfs else tf_label)
+        if label not in occupancy:
+            continue
+        occupancy[label][lo:hi] += 1.0
+
+    fixed_from_composition = {
+        _collapse_fixed_component_label(str(label), aggregate_fixed_components=aggregate_fixed_components)
+        for label in tf_label_values
+        if str(label).strip().startswith("fixed:")
+    }.intersection(fixed_set)
+    missing_counts: dict[str, int] = {}
+    if "sequence" in solutions.columns:
+        solution_sequences = [str(seq or "") for seq in solutions["sequence"].tolist()]
+    else:
+        solution_sequences = [""] * int(len(solutions))
+    for pc_idx, pc in enumerate(constraints):
+        name = _fixed_label_name(pc, pc_idx, aggregate_fixed_components=aggregate_fixed_components)
+        label_up = _fixed_component_label(
+            pc,
+            pc_idx,
+            "-35",
+            aggregate_fixed_components=aggregate_fixed_components,
+        )
+        label_down = _fixed_component_label(
+            pc,
+            pc_idx,
+            "-10",
+            aggregate_fixed_components=aggregate_fixed_components,
+        )
+        for seq in solution_sequences:
+            pair = _select_promoter_pair(seq, pc)
+            if pair is None:
+                missing_counts[name] = missing_counts.get(name, 0) + 1
+                continue
+            up_start, down_start = pair
+            up_end = up_start + len(pc["upstream"])
+            down_end = down_start + len(pc["downstream"])
+            up_lo = max(0, min(up_start, seq_len))
+            up_hi = max(up_lo, min(up_end, seq_len))
+            down_lo = max(0, min(down_start, seq_len))
+            down_hi = max(down_lo, min(down_end, seq_len))
+            if up_hi > up_lo and label_up in occupancy and label_up not in fixed_from_composition:
+                occupancy[label_up][up_lo:up_hi] += 1.0
+            if down_hi > down_lo and label_down in occupancy and label_down not in fixed_from_composition:
+                occupancy[label_down][down_lo:down_hi] += 1.0
+
+    return occupancy, categories, missing_counts
+
+
+def _place_figure_legend_below_xlabel(
+    fig: plt.Figure,
+    *,
+    ax_xlabel: plt.Axes,
+    legend: plt.Legend,
+    gap: float = 0.012,
+    min_bottom: float = 0.01,
+    max_bottom: float = 0.60,
+) -> None:
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    xlabel_bbox = (
+        ax_xlabel.xaxis.get_label().get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+    )
+    target_top = float(xlabel_bbox.y0) - float(gap)
+    legend.set_bbox_to_anchor((0.5, target_top), transform=fig.transFigure)
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    legend_bbox = legend.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+    if legend_bbox.y0 < float(min_bottom):
+        needed = float(min_bottom) - float(legend_bbox.y0)
+        new_bottom = min(float(max_bottom), float(fig.subplotpars.bottom) + needed + 0.005)
+        fig.subplots_adjust(bottom=new_bottom)
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        xlabel_bbox = (
+            ax_xlabel.xaxis.get_label().get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+        )
+        target_top = float(xlabel_bbox.y0) - float(gap)
+        legend.set_bbox_to_anchor((0.5, target_top), transform=fig.transFigure)
+        fig.canvas.draw()
+
+
+def _normalize_occupancy_legend_label(label: str) -> str:
+    text = str(label).strip()
+    if text.lower() == "background":
+        return "Neutral sites"
+    if text.lower() == "neutral sites":
+        return "Neutral sites"
+    if text.lower() == "other sites":
+        return "Other sites"
+    if text and "a" <= text[0] <= "z":
+        return text[0].upper() + text[1:]
+    return text
+
+
+def _occupancy_legend_priority(label: str) -> int:
+    text = str(label).strip().lower()
+    if text in {"background", "neutral sites"}:
+        return 0
+    if text == "-35 sites" or text.endswith(":-35"):
+        return 1
+    if text == "-10 sites" or text.endswith(":-10"):
+        return 2
+    return 3
+
+
+def _occupancy_legend_label(
+    label: str,
+    *,
+    fixed_label_sequences: dict[str, str] | None = None,
+) -> str:
+    raw_label = str(label).strip()
+    if not raw_label:
+        return raw_label
+    if raw_label.startswith("fixed:"):
+        if raw_label.endswith(":-35"):
+            return "-35 sites"
+        if raw_label.endswith(":-10"):
+            return "-10 sites"
+        return _sanitize_fixed_label(raw_label)
+    display_label = _category_display_label(
+        raw_label,
+        fixed_label_sequences=fixed_label_sequences,
+        include_fixed_sequence=False,
+    )
+    lowered = str(display_label).strip().lower()
+    if lowered == "background":
+        return "Neutral sites"
+    if lowered == "other":
+        return "Other sites"
+    if lowered.endswith(" site") or lowered.endswith(" sites"):
+        return str(display_label)
+    return f"{display_label} sites"
+
+
+def _render_occupancy(
+    occupancy: dict[str, np.ndarray],
+    categories: list[str],
+    *,
+    seq_len: int,
+    input_name: str,
+    plan_name: str,
+    n_solutions: int,
+    alpha: float,
+    fixed_label_sequences: dict[str, str] | None,
+    style: dict,
+) -> tuple[plt.Figure, plt.Axes]:
+    width = max(8.4, float(seq_len) * 0.2, float(len(categories)) * 1.6)
+    fig, ax = plt.subplots(1, 1, figsize=(width, 3.25))
+    x_positions = np.arange(seq_len, dtype=float)
+    colors = _occupancy_color_map(categories, style=style)
+    category_totals = {label: float(np.nansum(np.asarray(occupancy[label], dtype=float))) for label in categories}
+    # Draw larger-count categories first so lower-count categories stay visible on top.
+    draw_order = sorted(categories, key=lambda label: (-category_totals.get(label, 0.0), str(label)))
+    for draw_rank, label in enumerate(draw_order):
+        color = colors[label]
+        y = occupancy[label]
+        if y.shape[0] != seq_len:
+            raise ValueError(
+                "Occupancy series length mismatch; expected one value per nucleotide "
+                f"(seq_len={seq_len}, got={y.shape[0]} for '{label}')."
+            )
+        is_fixed = str(label).startswith("fixed:")
+        fill_alpha = _occupancy_fill_alpha(alpha=alpha, is_fixed=is_fixed)
+        fill_rgb = to_rgb(color)
+        edge_rgb = _darken_color(color, factor=0.56 if is_fixed else 0.62)
+        line_width = 0.75 if is_fixed else 0.6
+        z_base = 2.0 + float(draw_rank)
+        fill_color = to_rgba(fill_rgb, alpha=fill_alpha)
+        edge_color = to_rgba(edge_rgb, alpha=1.0)
+        ax.bar(
+            x_positions,
+            y.astype(float),
+            width=0.96,
+            align="edge",
+            color=fill_color,
+            edgecolor=edge_color,
+            linewidth=line_width,
+            label=_occupancy_legend_label(
+                label,
+                fixed_label_sequences=fixed_label_sequences,
+            ),
+            zorder=z_base + (0.5 if is_fixed else 0.0),
+        )
+
+    x_pad = max(0.8, float(seq_len) * 0.015)
+    ax.set_xlim(0.0 - x_pad, float(seq_len) + x_pad)
+    ax.set_xticks(np.arange(0, seq_len + 1, 5, dtype=int))
+    ax.set_xlabel("Position (nt)", labelpad=8)
+    ax.set_ylabel("Occurrences")
+    input_label = str(input_name).replace("plan_pool__", "").replace("_", " ")
+    plan_label = str(plan_name).replace("_", " ")
+    if input_label == plan_label:
+        scope = plan_label
+    else:
+        scope = f"{plan_label} / {input_label}"
+    ax.set_title(f"Occupancy across sequence positions for {scope} (n={n_solutions})")
+    _apply_style(ax, style)
+    font_size = float(style.get("font_size", 13.0))
+    tick_size = max(float(style.get("tick_size", font_size)), font_size + 1.0)
+    label_size = max(float(style.get("label_size", font_size)), font_size + 2.0)
+    title_size = max(float(style.get("title_size", font_size * 1.1)), font_size + 3.0)
+    ax.tick_params(axis="both", labelsize=tick_size)
+    ax.xaxis.label.set_size(label_size)
+    ax.yaxis.label.set_size(label_size)
+    ax.title.set_size(title_size)
+    handles, labels = ax.get_legend_handles_labels()
+    legend_rows = 1
+    legend_obj = None
+    if handles:
+        deduped: dict[str, object] = {}
+        for handle, label in zip(handles, labels):
+            deduped[_normalize_occupancy_legend_label(str(label))] = handle
+        ordered_labels = list(deduped.keys())
+        insertion_order = {label: idx for idx, label in enumerate(ordered_labels)}
+        ordered_labels = sorted(
+            ordered_labels,
+            key=lambda label: (_occupancy_legend_priority(label), insertion_order[label]),
+        )
+        entry_count = max(1, len(deduped))
+        legend_font_size = max(
+            12.0,
+            tick_size * 0.92,
+        )
+        legend_handles = [deduped[label] for label in ordered_labels]
+        legend_labels = ordered_labels
+
+        def _draw_legend(ncol: int):
+            return fig.legend(
+                legend_handles,
+                legend_labels,
+                loc="upper center",
+                bbox_to_anchor=(0.5, 0.015),
+                ncol=int(max(1, ncol)),
+                frameon=False,
+                fontsize=legend_font_size,
+            )
+
+        ncol = entry_count
+        legend = _draw_legend(ncol)
+        legend_obj = legend
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        legend_bbox = legend.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+        max_legend_width = 0.98
+        if legend_bbox.width > max_legend_width and entry_count > 1:
+            legend.remove()
+            legend = None
+            for candidate_ncol in range(entry_count - 1, 0, -1):
+                candidate = _draw_legend(candidate_ncol)
+                fig.canvas.draw()
+                candidate_bbox = candidate.get_window_extent(renderer=renderer).transformed(fig.transFigure.inverted())
+                if candidate_bbox.width <= max_legend_width:
+                    legend = candidate
+                    ncol = int(candidate_ncol)
+                    legend_obj = legend
+                    break
+                candidate.remove()
+            if legend is None:
+                fallback_ncol = max(1, min(4, int(np.ceil(np.sqrt(entry_count)))))
+                legend = _draw_legend(fallback_ncol)
+                ncol = int(fallback_ncol)
+                legend_obj = legend
+        legend_rows = int(np.ceil(float(entry_count) / float(max(1, ncol))))
+    bottom = max(0.31, 0.22 + 0.07 * float(legend_rows))
+    fig.subplots_adjust(left=0.08, right=0.99, bottom=bottom, top=0.88)
+    if legend_obj is not None:
+        _place_figure_legend_below_xlabel(fig, ax_xlabel=ax, legend=legend_obj)
+    return fig, ax
+
+
+def plot_placement_map(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    composition_df: pd.DataFrame,
+    dense_arrays_df: pd.DataFrame,
+    library_members_df: pd.DataFrame | None,
+    cfg: dict,
+    style: Optional[dict] = None,
+    occupancy_alpha: float | None = None,
+    occupancy_max_categories: int | None = None,
+    plan_col: str = "densegen__plan",
+    input_col: str = "densegen__input_name",
+    plot_label: str = "placement_occupancy_map",
+) -> list[Path]:
+    if composition_df is None or composition_df.empty:
+        raise ValueError(f"{plot_label} requires composition.parquet with placements.")
+    if dense_arrays_df is None or dense_arrays_df.empty:
+        raise ValueError(f"{plot_label} requires records.parquet with final sequences.")
+    plan_col = str(plan_col or "").strip() or "densegen__plan"
+    input_col = str(input_col or "").strip() or "densegen__input_name"
+    _require_columns(
+        dense_arrays_df,
+        {"id", "sequence", input_col, plan_col},
+        "records.parquet",
+    )
+    _require_columns(
+        composition_df,
+        {"solution_id", "input_name", "plan_name", "tf", "tfbs", "offset"},
+        "composition.parquet",
+    )
+    if "length" not in composition_df.columns and "end" not in composition_df.columns:
+        raise ValueError("composition.parquet requires length or end columns.")
+
+    style = _style(style)
+    alpha_val = float(occupancy_alpha) if occupancy_alpha is not None else 0.22
+    if not (0.0 < alpha_val <= 1.0):
+        raise ValueError(f"{plot_label} occupancy_alpha must be between 0 and 1.")
+    max_cats = int(occupancy_max_categories) if occupancy_max_categories is not None else 12
+    if max_cats <= 0:
+        raise ValueError(f"{plot_label} occupancy_max_categories must be positive.")
+
+    seq_len = _sequence_length_from_cfg(cfg)
+    dense_arrays_df = dense_arrays_df.copy()
+    dense_arrays_df[input_col] = dense_arrays_df[input_col].astype(str)
+    dense_arrays_df[plan_col] = dense_arrays_df[plan_col].astype(str)
+    composition_df = composition_df.copy()
+    composition_df["input_name"] = composition_df["input_name"].astype(str)
+    composition_df["plan_name"] = composition_df["plan_name"].astype(str)
+
+    paths: list[Path] = []
+    for (input_name, plan_name), solutions in dense_arrays_df.groupby([input_col, plan_col]):
+        solution_ids = solutions["id"].astype(str).dropna().unique().tolist()
+        if not solution_ids:
+            raise ValueError(f"{plot_label} has no accepted solutions for {input_name}/{plan_name}.")
+        sub = composition_df[
+            (composition_df["input_name"] == input_name)
+            & (composition_df["plan_name"] == plan_name)
+            & (composition_df["solution_id"].astype(str).isin(solution_ids))
+        ].copy()
+        if sub.empty:
+            raise ValueError(f"{plot_label} has no placements for {input_name}/{plan_name}.")
+
+        constraints, aggregate_fixed_components = _promoter_constraints(cfg, str(plan_name))
+        fixed_label_sequences = _fixed_label_sequences(
+            constraints,
+            aggregate_fixed_components=aggregate_fixed_components,
+        )
+        n_solutions = len(solution_ids)
+        occupancy, categories, missing_counts = _build_occupancy(
+            sub,
+            solutions=solutions,
+            seq_len=seq_len,
+            constraints=constraints,
+            max_categories=max_cats,
+            aggregate_fixed_components=aggregate_fixed_components,
+        )
+
+        if aggregate_fixed_components:
+            fixed_total = sum(
+                float(occupancy.get(label, np.zeros(seq_len, dtype=float)).sum())
+                for label in categories
+                if str(label).startswith("fixed:")
+            )
+            if fixed_total <= 0.0:
+                log.warning(
+                    "%s fixed promoter occupancy is empty for grouped scope %s/%s.",
+                    plot_label,
+                    input_name,
+                    plan_name,
+                )
+        elif missing_counts:
+            misses = ", ".join(f"{name}({count})" for name, count in sorted(missing_counts.items()))
+            log.warning("%s promoter motifs not found for %s/%s: %s", plot_label, input_name, plan_name, misses)
+
+        fig_occ, _ = _render_occupancy(
+            occupancy,
+            categories,
+            seq_len=seq_len,
+            input_name=str(input_name),
+            plan_name=str(plan_name),
+            n_solutions=n_solutions,
+            alpha=alpha_val,
+            fixed_label_sequences=fixed_label_sequences,
+            style=style,
+        )
+        base_dir = _stage_b_plan_output_dir(out_path, input_name=str(input_name), plan_name=str(plan_name))
+        base_dir.mkdir(parents=True, exist_ok=True)
+        occ_path = base_dir / f"occupancy{out_path.suffix}"
+        _save_figure(fig_occ, occ_path, style=style)
+        plt.close(fig_occ)
+        paths.append(occ_path)
+
+    return paths
+
+
+def plot_placement_occupancy_map(
+    df: pd.DataFrame,
+    out_path: Path,
+    *,
+    composition_df: pd.DataFrame,
+    dense_arrays_df: pd.DataFrame,
+    library_members_df: pd.DataFrame | None,
+    cfg: dict,
+    style: Optional[dict] = None,
+    occupancy_alpha: float | None = None,
+    occupancy_max_categories: int | None = None,
+    plan_col: str = "densegen__plan",
+    input_col: str = "densegen__input_name",
+) -> list[Path]:
+    paths = plot_placement_map(
+        df,
+        out_path,
+        composition_df=composition_df,
+        dense_arrays_df=dense_arrays_df,
+        library_members_df=library_members_df,
+        cfg=cfg,
+        style=style,
+        occupancy_alpha=occupancy_alpha,
+        occupancy_max_categories=occupancy_max_categories,
+        plan_col=plan_col,
+        input_col=input_col,
+        plot_label="placement_occupancy_map",
+    )
+    renamed: list[Path] = []
+    for path in paths:
+        target = path.with_name(f"placement_occupancy_map{path.suffix}")
+        renamed.append(_rename_artifact_path(path, target))
+    return renamed

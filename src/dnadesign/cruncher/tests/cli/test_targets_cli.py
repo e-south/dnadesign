@@ -1,0 +1,53 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/tests/cli/test_targets_cli.py
+
+Regression tests for targets CLI Cruncher CLI.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from pathlib import Path
+
+import yaml
+from typer.testing import CliRunner
+
+from dnadesign.cruncher.cli.app import app
+
+runner = CliRunner()
+
+
+def _write_config(tmp_path: Path) -> Path:
+    config = {
+        "cruncher": {
+            "schema_version": 3,
+            "workspace": {
+                "out_dir": "runs",
+                "regulator_sets": [["LexA"]],
+                "regulator_categories": {
+                    "CatA": ["LexA", "CpxR"],
+                    "CatB": ["Fur", "Lrp"],
+                },
+            },
+        }
+    }
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(yaml.safe_dump(config))
+    return config_path
+
+
+def test_targets_list_category(tmp_path: Path) -> None:
+    config_path = _write_config(tmp_path)
+    result = runner.invoke(app, ["targets", "list", "--category", "CatA", str(config_path)], color=False)
+    assert result.exit_code == 0
+    assert "LexA" in result.output
+    assert "CpxR" in result.output
+
+
+def test_targets_list_rejects_unknown_category(tmp_path: Path) -> None:
+    config_path = _write_config(tmp_path)
+    result = runner.invoke(app, ["targets", "list", "--category", "NotARealCategory", str(config_path)], color=False)
+    assert result.exit_code != 0
+    assert "not found" in result.output

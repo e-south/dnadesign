@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "Cite DNADesign and record the exact version, source revision and artifact checksum used."
+type: software
+title: "DNADesign: DNA sequence design and analysis tools"
+authors:
+  - family-names: South
+    given-names: Eric
+repository-code: "https://github.com/e-south/dnadesign"
+license: MIT
+# pyproject.toml owns the version. The build command adds it to the bundle citation.

@@ -1,0 +1,10 @@
+version: 1
+presets:
+  - name: bu-scc-dunlop
+    description: BU SCC scheduler account and template defaults for Dunlop-operated runbooks.
+    project: dunlop
+    templates:
+      notify: docs/bu-scc/jobs/notify-watch.qsub
+      densegen: docs/bu-scc/jobs/densegen-cpu.qsub
+      densegen_post_run: docs/bu-scc/jobs/densegen-analysis.qsub
+      infer: docs/bu-scc/jobs/evo2-gpu-infer.qsub

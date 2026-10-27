@@ -1,0 +1,311 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/src/analysis/overlap.py
+
+Analysis helpers for overlap Cruncher analysis.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from collections import Counter
+from typing import Iterable
+
+import numpy as np
+import pandas as pd
+
+
+def _resolve_hist_bins(hist_bins: list[int] | None, max_value: float) -> list[float]:
+    if hist_bins is None:
+        hist_bins = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20]
+    bins = sorted({float(v) for v in hist_bins if v > 0})
+    if not bins:
+        bins = [1.0, 2.0, 3.0, 4.0, 5.0]
+    if max_value > bins[-1]:
+        bins.append(float(max_value))
+    return bins
+
+
+def _init_pair_stats(tf_list: list[str]) -> tuple[list[tuple[str, str]], dict[tuple[str, str], dict[str, object]]]:
+    pair_keys: list[tuple[str, str]] = []
+    pair_stats: dict[tuple[str, str], dict[str, object]] = {}
+    for i, tf_i in enumerate(tf_list):
+        for tf_j in tf_list[i + 1 :]:
+            key = (tf_i, tf_j)
+            pair_keys.append(key)
+            pair_stats[key] = {
+                "pair_count": 0,
+                "overlap_count": 0,
+                "overlap_bp": [],
+                "delta": [],
+                "strand_counts": Counter(),
+            }
+    return pair_keys, pair_stats
+
+
+def _resolve_hit_keys(
+    *,
+    hits_df: pd.DataFrame,
+    tf_names: Iterable[str],
+) -> list[str]:
+    tf_list = [str(tf_name) for tf_name in tf_names]
+    if hits_df is None or hits_df.empty or "tf_slot" not in hits_df.columns:
+        return tf_list
+    slot_rows = hits_df[["tf", "tf_slot"]].dropna().copy()
+    if slot_rows.empty:
+        return tf_list
+    tf_order = {tf_name: idx for idx, tf_name in enumerate(tf_list)}
+    unique_rows = {
+        (str(tf_name), str(tf_slot))
+        for tf_name, tf_slot in slot_rows.itertuples(index=False, name=None)
+        if str(tf_name) in tf_order and str(tf_slot)
+    }
+    if not unique_rows:
+        return tf_list
+
+    def _sort_key(item: tuple[str, str]) -> tuple[int, int, str]:
+        tf_name, tf_slot = item
+        suffix = tf_slot[len(tf_name) + 1 :] if tf_slot.startswith(f"{tf_name}#") else ""
+        try:
+            occurrence_rank = int(suffix)
+        except (TypeError, ValueError):
+            occurrence_rank = 1
+        return (tf_order.get(tf_name, len(tf_order)), occurrence_rank, tf_slot)
+
+    return [slot for _tf, slot in sorted(unique_rows, key=_sort_key)]
+
+
+def _empty_overlap_output(*, pair_keys: list[tuple[str, str]], include_sequences: bool):
+    pair_df = pd.DataFrame(
+        [
+            {
+                "tf_i": tf_i,
+                "tf_j": tf_j,
+                "pair_count": 0,
+                "overlap_count": 0,
+                "overlap_rate": None,
+                "overlap_bp_mean": None,
+                "overlap_bp_median": None,
+                "overlap_bp_hist": None,
+                "offset_delta_mean": None,
+                "offset_delta_median": None,
+                "strand_pp": 0,
+                "strand_pm": 0,
+                "strand_mp": 0,
+                "strand_mm": 0,
+            }
+            for tf_i, tf_j in pair_keys
+        ]
+    )
+    elite_cols = ["id", "rank", "sequence_hash", "overlap_total_bp", "overlap_pair_count"]
+    if include_sequences:
+        elite_cols.append("sequence")
+    elite_df = pd.DataFrame(columns=elite_cols)
+    return pair_df, elite_df
+
+
+def _elite_info_map(elites_df: pd.DataFrame) -> dict[str, dict[str, object]]:
+    elite_info: dict[str, dict[str, object]] = {}
+    elite_cols = ["id"]
+    if "rank" in elites_df.columns:
+        elite_cols.append("rank")
+    if "sequence" in elites_df.columns:
+        elite_cols.append("sequence")
+    for values in elites_df[elite_cols].itertuples(index=False, name=None):
+        row = dict(zip(elite_cols, values, strict=False))
+        elite_id = str(row.get("id") or "")
+        if not elite_id:
+            raise ValueError("Elites parquet missing required 'id' column.")
+        elite_info[elite_id] = {
+            "rank": row.get("rank"),
+            "sequence": row.get("sequence"),
+        }
+    return elite_info
+
+
+def _hits_by_elite_map(
+    *,
+    hits_df: pd.DataFrame,
+    hit_keys: list[str],
+) -> dict[str, dict[str, tuple[int, int, str | None]]]:
+    hits_by_elite: dict[str, dict[str, tuple[int, int, str | None]]] = {}
+    hit_key_column = "tf_slot" if "tf_slot" in hits_df.columns else "tf"
+    hit_cols = ["elite_id", hit_key_column, "best_start", "pwm_width", "best_strand"]
+    for elite_id_raw, hit_key, start, width, strand in hits_df[hit_cols].itertuples(index=False, name=None):
+        elite_id = str(elite_id_raw or "")
+        hit_key = str(hit_key)
+        if not elite_id or hit_key not in hit_keys:
+            continue
+        if not isinstance(start, (int, float)) or not isinstance(width, (int, float)) or not isinstance(strand, str):
+            raise ValueError(f"Invalid hit metadata for elite '{elite_id}' key '{hit_key}'.")
+        start_i = int(start)
+        end_i = start_i + int(width)
+        hits_by_elite.setdefault(elite_id, {})[hit_key] = (start_i, end_i, strand)
+    return hits_by_elite
+
+
+def _accumulate_pair_stats(
+    *,
+    hits: dict[str, tuple[int, int, str | None]],
+    pair_keys: list[tuple[str, str]],
+    pair_stats: dict[tuple[str, str], dict[str, object]],
+) -> tuple[int, int]:
+    overlap_total = 0
+    overlap_pairs = 0
+    for tf_i, tf_j in pair_keys:
+        hit_i = hits.get(tf_i)
+        hit_j = hits.get(tf_j)
+        if hit_i is None or hit_j is None:
+            continue
+        start_i, end_i, strand_i = hit_i
+        start_j, end_j, strand_j = hit_j
+        stats = pair_stats[(tf_i, tf_j)]
+        stats["pair_count"] += 1
+        stats["delta"].append(start_j - start_i)
+        if strand_i and strand_j:
+            stats["strand_counts"][f"{strand_i}{strand_j}"] += 1
+        overlap_bp = max(0, min(end_i, end_j) - max(start_i, start_j))
+        if overlap_bp > 0:
+            stats["overlap_count"] += 1
+            stats["overlap_bp"].append(overlap_bp)
+            overlap_total += overlap_bp
+            overlap_pairs += 1
+    return overlap_total, overlap_pairs
+
+
+def _build_pair_rows(
+    *,
+    pair_keys: list[tuple[str, str]],
+    pair_stats: dict[tuple[str, str], dict[str, object]],
+    hist_bins: list[int] | None,
+) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for tf_i, tf_j in pair_keys:
+        stats = pair_stats[(tf_i, tf_j)]
+        pair_count = int(stats["pair_count"])
+        overlap_count = int(stats["overlap_count"])
+        overlap_rate = overlap_count / float(pair_count) if pair_count else None
+        overlap_bp = np.asarray(stats["overlap_bp"], dtype=float)
+        delta = np.asarray(stats["delta"], dtype=float)
+        hist_payload = None
+        if overlap_bp.size:
+            bins = _resolve_hist_bins(hist_bins, float(overlap_bp.max()))
+            counts, edges = np.histogram(overlap_bp, bins=bins)
+            hist_payload = json.dumps({"bins": edges.tolist(), "counts": counts.tolist()})
+        strand_counts: Counter = stats["strand_counts"]
+        rows.append(
+            {
+                "tf_i": tf_i,
+                "tf_j": tf_j,
+                "pair_count": pair_count,
+                "overlap_count": overlap_count,
+                "overlap_rate": overlap_rate,
+                "overlap_bp_mean": float(np.mean(overlap_bp)) if overlap_bp.size else None,
+                "overlap_bp_median": float(np.median(overlap_bp)) if overlap_bp.size else None,
+                "overlap_bp_hist": hist_payload,
+                "offset_delta_mean": float(np.mean(delta)) if delta.size else None,
+                "offset_delta_median": float(np.median(delta)) if delta.size else None,
+                "strand_pp": int(strand_counts.get("++", 0)),
+                "strand_pm": int(strand_counts.get("+-", 0)),
+                "strand_mp": int(strand_counts.get("-+", 0)),
+                "strand_mm": int(strand_counts.get("--", 0)),
+            }
+        )
+    return rows
+
+
+def _overlap_summary(pair_df: pd.DataFrame, elite_df: pd.DataFrame) -> dict[str, float | None]:
+    overlap_rate_median = None
+    if not pair_df.empty and pair_df["overlap_rate"].notna().any():
+        overlap_rate_median = float(pair_df["overlap_rate"].median())
+    overlap_total_bp_median = None
+    if not elite_df.empty and elite_df["overlap_total_bp"].notna().any():
+        overlap_total_bp_median = float(elite_df["overlap_total_bp"].median())
+    return {
+        "overlap_rate_median": overlap_rate_median,
+        "overlap_total_bp_median": overlap_total_bp_median,
+    }
+
+
+def compute_overlap_tables(
+    elites_df: pd.DataFrame,
+    hits_df: pd.DataFrame,
+    tf_names: Iterable[str],
+    pwm_widths: dict[str, int] | None = None,
+    hist_bins: list[int] | None = None,
+    *,
+    include_sequences: bool = False,
+) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, float | None]]:
+    hit_keys = _resolve_hit_keys(hits_df=hits_df, tf_names=tf_names)
+    pair_keys, pair_stats = _init_pair_stats(hit_keys)
+
+    elite_rows: list[dict[str, object]] = []
+    if elites_df is None or elites_df.empty:
+        pair_df, elite_df = _empty_overlap_output(pair_keys=pair_keys, include_sequences=include_sequences)
+        return pair_df, elite_df, {"overlap_rate_median": None, "overlap_total_bp_median": None}
+
+    if hits_df is None or hits_df.empty:
+        raise ValueError("elites_hits.parquet is required to compute overlap metrics.")
+
+    elite_info = _elite_info_map(elites_df)
+    hits_by_elite = _hits_by_elite_map(hits_df=hits_df, hit_keys=hit_keys)
+
+    for elite_id, hits in hits_by_elite.items():
+        elite_meta = elite_info.get(elite_id, {})
+        overlap_total, overlap_pairs = _accumulate_pair_stats(
+            hits=hits,
+            pair_keys=pair_keys,
+            pair_stats=pair_stats,
+        )
+
+        seq_val = elite_meta.get("sequence")
+        seq_hash = None
+        if isinstance(seq_val, str):
+            seq_hash = hashlib.sha256(seq_val.encode("utf-8")).hexdigest()[:12]
+        row_payload = {
+            "id": elite_id,
+            "rank": elite_meta.get("rank"),
+            "sequence_hash": seq_hash,
+            "overlap_total_bp": overlap_total,
+            "overlap_pair_count": overlap_pairs,
+        }
+        if include_sequences:
+            row_payload["sequence"] = seq_val
+        elite_rows.append(row_payload)
+
+    pair_df = pd.DataFrame(_build_pair_rows(pair_keys=pair_keys, pair_stats=pair_stats, hist_bins=hist_bins))
+    elite_df = pd.DataFrame(elite_rows)
+    return pair_df, elite_df, _overlap_summary(pair_df, elite_df)
+
+
+def extract_elite_hits(
+    hits_df: pd.DataFrame,
+    tf_names: Iterable[str],
+) -> pd.DataFrame:
+    hit_keys = set(_resolve_hit_keys(hits_df=hits_df, tf_names=tf_names))
+    if hits_df is None or hits_df.empty:
+        return pd.DataFrame(columns=["tf", "offset", "end", "strand", "elite_id"])
+    rows: list[dict[str, object]] = []
+    hit_key_column = "tf_slot" if "tf_slot" in hits_df.columns else "tf"
+    hit_cols = ["elite_id", "tf", hit_key_column, "best_start", "pwm_width", "best_strand"]
+    for elite_id, tf_name, hit_key, start, width, strand in hits_df[hit_cols].itertuples(index=False, name=None):
+        if str(hit_key) not in hit_keys:
+            continue
+        if not isinstance(start, (int, float)) or not isinstance(width, (int, float)) or not isinstance(strand, str):
+            continue
+        rows.append(
+            {
+                "tf": tf_name,
+                "tf_slot": str(hit_key),
+                "offset": int(start),
+                "end": int(start) + int(width),
+                "strand": strand,
+                "elite_id": elite_id,
+            }
+        )
+    return pd.DataFrame(rows)

@@ -1,0 +1,13 @@
+schema_version: 1
+catalog_order: 1
+tool: densegen
+summary: Tool-owned tutorials, HPC runbooks, and event-producing demo flows.
+keywords:
+  - promoter
+  - anchors
+  - usr
+  - feature matrix
+routes:
+  - id: usr-notify-tutorial
+    path: tutorials/demo_usr_notify.md
+    summary: DenseGen-to-USR-to-Notify walkthrough for event-producing datasets and watcher validation.
