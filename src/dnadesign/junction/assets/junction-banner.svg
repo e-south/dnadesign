@@ -1,17 +1,15 @@
 <svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
   xmlns="http://www.w3.org/2000/svg" role="img"
   aria-labelledby="junction-banner-title junction-banner-description" shape-rendering="geometricPrecision">
-  <title id="junction-banner-title">junction: three-way-junction oligo design</title>
+  <title id="junction-banner-title">junction: Three-way-junction oligo design</title>
   <desc id="junction-banner-description">Compile exact DNA targets into checked three-way-junction oligo plans.</desc>
-  <rect width="1200" height="180" rx="16" fill="#1E1D1A"/>
-  <g font-family="Menlo, Monaco, Consolas, monospace">
-    <text x="48" y="78" fill="#F3EFE7" font-size="42" font-weight="700" letter-spacing="-1">junction</text>
-    <text x="50" y="114" fill="#969087" font-size="17" font-weight="700" letter-spacing="1">THREE-WAY-JUNCTION OLIGO DESIGN</text>
-    <rect x="50" y="132" width="32" height="5" fill="#D97757"/>
+  <rect width="1200" height="180" rx="16" fill="#F1F4F6"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="48" y="89" fill="#163047" font-size="56" font-weight="500" letter-spacing="-1.1">junction</text>
+    <text x="50" y="126" fill="#526475" font-size="20">Three-way-junction oligo design</text>
   </g>
-  <path d="M510 34V146" stroke="#3F3C37" stroke-width="2"/>
-  <path d="M584 124H1144" stroke="#5A5650" stroke-width="2"/>
-  <g transform="translate(720 48)">
-    <path d="M0 28H58V2M70 2V28H128" stroke="#F3EFE7" stroke-width="4" fill="none"/><path d="M0 42H50M58 42H128" stroke="#969087" stroke-width="3" fill="none"/><path d="M50 28H58M58 42H66" stroke="#D97757" stroke-width="4" fill="none"/><path d="M58 2V28M70 2V28" stroke="#7BB4AE" stroke-width="4" fill="none"/><path d="M58 8H70M58 15H70M58 22H70" stroke="#5A5650" stroke-width="2" fill="none"/><path d="M14 28V42M34 28V42M86 28V42M106 28V42" stroke="#5A5650" stroke-width="2" fill="none"/><path d="M50 36L58 48" stroke="#F3EFE7" stroke-width="2" fill="none"/>
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
+    <path d="M5 29H58V5M70 5V29H123M5 43H50M58 43H123" stroke="#163047" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M58 5V29M70 5V29" stroke="#2F6EAD" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M58 10H70M58 18H70M16 29V43M35 29V43M88 29V43M108 29V43" stroke="#A5B3BE" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M50 37L58 49" stroke="#2F6EAD" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
   </g>
 </svg>

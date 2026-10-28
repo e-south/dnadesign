@@ -1,17 +1,15 @@
 <svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
   xmlns="http://www.w3.org/2000/svg" role="img"
   aria-labelledby="densegen-banner-title densegen-banner-description" shape-rendering="geometricPrecision">
-  <title id="densegen-banner-title">densegen: generate libraries</title>
+  <title id="densegen-banner-title">densegen: Generate libraries</title>
   <desc id="densegen-banner-description">Generate reproducible DNA libraries from workspace inputs.</desc>
-  <rect width="1200" height="180" rx="16" fill="#1E1D1A"/>
-  <g font-family="Menlo, Monaco, Consolas, monospace">
-    <text x="48" y="78" fill="#F3EFE7" font-size="42" font-weight="700" letter-spacing="-1">densegen</text>
-    <text x="50" y="114" fill="#969087" font-size="17" font-weight="700" letter-spacing="1">GENERATE LIBRARIES</text>
-    <rect x="50" y="132" width="32" height="5" fill="#D97757"/>
+  <rect width="1200" height="180" rx="16" fill="#F1F4F6"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="48" y="89" fill="#163047" font-size="56" font-weight="500" letter-spacing="-1.1">densegen</text>
+    <text x="50" y="126" fill="#526475" font-size="20">Generate libraries</text>
   </g>
-  <path d="M510 34V146" stroke="#3F3C37" stroke-width="2"/>
-  <path d="M584 124H1144" stroke="#5A5650" stroke-width="2"/>
-  <g transform="translate(720 48)">
-    <path d="M0 29H24M24 29L48 10M24 29L48 29M24 29L48 48" stroke="#969087" stroke-width="3" fill="none"/><path d="M48 10H92M48 29H102M48 48H82" stroke="#F3EFE7" stroke-width="4" fill="none"/>
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
+    <rect x="7" y="10" width="23" height="9" rx="1" fill="#163047"/><rect x="34" y="10" width="46" height="9" rx="1" fill="#2F6EAD"/><rect x="84" y="10" width="34" height="9" rx="1" fill="#526475"/><rect x="7" y="28" width="38" height="9" rx="1" fill="#2F6EAD"/><rect x="49" y="28" width="23" height="9" rx="1" fill="#526475"/><rect x="76" y="28" width="42" height="9" rx="1" fill="#163047"/><rect x="7" y="46" width="46" height="9" rx="1" fill="#526475"/><rect x="57" y="46" width="34" height="9" rx="1" fill="#163047"/><rect x="95" y="46" width="23" height="9" rx="1" fill="#2F6EAD"/>
   </g>
 </svg>

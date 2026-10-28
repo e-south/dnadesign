@@ -1,17 +1,15 @@
 <svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
   xmlns="http://www.w3.org/2000/svg" role="img"
   aria-labelledby="notify-banner-title notify-banner-description" shape-rendering="geometricPrecision">
-  <title id="notify-banner-title">notify: send run updates</title>
+  <title id="notify-banner-title">notify: Send run updates</title>
   <desc id="notify-banner-description">Send notifications for local and scheduled jobs.</desc>
-  <rect width="1200" height="180" rx="16" fill="#1E1D1A"/>
-  <g font-family="Menlo, Monaco, Consolas, monospace">
-    <text x="48" y="78" fill="#F3EFE7" font-size="42" font-weight="700" letter-spacing="-1">notify</text>
-    <text x="50" y="114" fill="#969087" font-size="17" font-weight="700" letter-spacing="1">SEND RUN UPDATES</text>
-    <rect x="50" y="132" width="32" height="5" fill="#D97757"/>
+  <rect width="1200" height="180" rx="16" fill="#F1F4F6"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="48" y="89" fill="#163047" font-size="56" font-weight="500" letter-spacing="-1.1">notify</text>
+    <text x="50" y="126" fill="#526475" font-size="20">Send run updates</text>
   </g>
-  <path d="M510 34V146" stroke="#3F3C37" stroke-width="2"/>
-  <path d="M584 124H1144" stroke="#5A5650" stroke-width="2"/>
-  <g transform="translate(720 48)">
-    <path d="M0 33H18L28 12L42 48L54 24L68 33H106" stroke="#F3EFE7" stroke-width="4" fill="none"/><rect x="102" y="29" width="8" height="8" fill="#D97757"/>
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
+    <path d="M7 12H99V43H30L17 54V43H7Z" stroke="#526475" stroke-width="2.5" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M20 24H71M20 33H56" stroke="#A5B3BE" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/><circle cx="108" cy="17" r="8" fill="#2F6EAD"/>
   </g>
 </svg>

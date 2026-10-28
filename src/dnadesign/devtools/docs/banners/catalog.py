@@ -22,8 +22,6 @@ class BannerSpec:
     capability: str
     description: str
     glyph: str
-    glyph_transform: str = "translate(720 48)"
-    subtitle_size: int = 17
 
 
 REPOSITORY_BANNER_PATH = "assets/dnadesign-banner.svg"
@@ -133,8 +131,6 @@ BANNERS = (
         "SELECT NEXT DESIGNS",
         "Choose the next designs from measured sequence results.",
         "select",
-        glyph_transform="translate(774 34) scale(1.6)",
-        subtitle_size=21,
     ),
     BannerSpec(
         "src/dnadesign/ops/assets/ops-banner.svg",

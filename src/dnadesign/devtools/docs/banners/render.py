@@ -16,10 +16,10 @@ import tomllib
 from pathlib import Path
 
 from .catalog import BANNERS, REPOSITORY_BANNER_PATH, BannerSpec
-from .glyphs import ACCENT, DIM, INK, MUTED, glyph
+from .glyphs import INK, MUTED, glyph
 
-BACKGROUND = "#1E1D1A"
-FONT_STACK = "Menlo, Monaco, Consolas, monospace"
+BACKGROUND = "#F1F4F6"
+FONT_STACK = "Helvetica Neue, Helvetica, Arial, sans-serif"
 BANNER_NAME_PATTERN = re.compile(r"[a-z0-9]+(?:[a-z0-9_-]*[a-z0-9])?")
 
 
@@ -148,64 +148,48 @@ def _preflight_banner_catalog(root: Path) -> tuple[tuple[Path, BannerSpec | None
 
 
 def repository_svg() -> str:
+    stages = "".join(
+        f'<g transform="translate({x - 51.2} 47) scale(.8)">{glyph(mark)}</g>'
+        f'<text x="{x}" y="144" text-anchor="middle" fill="{MUTED}" font-size="18">{label}</text>'
+        for x, label, mark in zip(
+            (602, 774, 946, 1118),
+            ("Design", "Construct", "Model", "Analyze"),
+            ("generate", "construct", "infer", "latent"),
+            strict=True,
+        )
+    )
     return f'''<svg width="1280" height="200" viewBox="0 0 1280 200" fill="none"
   xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc"
   shape-rendering="geometricPrecision">
   <title id="title">dnadesign sequence-design toolkit</title>
-  <desc id="desc">A dark, quiet path through sequence design, construction, modeling, and analysis.</desc>
+  <desc id="desc">Sequence libraries, assembled parts, model features, and comparisons.</desc>
   <rect width="1280" height="200" rx="18" fill="{BACKGROUND}"/>
   <g font-family="{FONT_STACK}">
-    <text x="52" y="43" fill="{MUTED}" font-size="17" letter-spacing="1">MODULAR SEQUENCE TOOLKIT</text>
-    <text x="48" y="128" fill="{INK}" font-size="72" font-weight="700" letter-spacing="-2">dnadesign</text>
-    <rect x="52" y="154" width="40" height="6" fill="{ACCENT}"/>
-  </g>
-  <path d="M452 28V172" stroke="#3F3C37" stroke-width="2"/>
-  <path d="M520 119H1192" stroke="{DIM}" stroke-width="2"/>
-  <g font-family="{FONT_STACK}" font-size="18" font-weight="700" letter-spacing="0.6">
-    <g transform="translate(520 -12)">
-      <path d="M0 82H56M0 98H40M0 114H48" stroke="{INK}" stroke-width="6"/>
-      <text x="0" y="174" fill="{INK}">DESIGN</text>
-    </g>
-    <g transform="translate(696 -12)">
-      <rect x="0" y="88" width="22" height="22" fill="{INK}"/>
-      <rect x="30" y="88" width="38" height="22" fill="{ACCENT}"/>
-      <rect x="76" y="88" width="20" height="22" fill="{INK}"/>
-      <text x="0" y="174" fill="{INK}">ASSEMBLE</text>
-    </g>
-    <g transform="translate(892 -12)">
-      <path d="M0 110L22 84L44 104L68 72" stroke="{INK}" stroke-width="5" fill="none"/>
-      <rect x="64" y="68" width="8" height="8" fill="{ACCENT}"/>
-      <text x="0" y="174" fill="{INK}">MODEL</text>
-    </g>
-    <g transform="translate(1064 -12)">
-      <rect x="0" y="104" width="12" height="12" fill="{MUTED}"/>
-      <rect x="22" y="90" width="12" height="26" fill="{INK}"/>
-      <rect x="44" y="76" width="12" height="40" fill="{ACCENT}"/>
-      <text x="0" y="174" fill="{INK}">ANALYZE</text>
-    </g>
+    <text x="48" y="101" fill="{INK}" font-size="64" font-weight="500" letter-spacing="-1.1">dnadesign</text>
+    <text x="51" y="140" fill="{MUTED}" font-size="20">Modular sequence toolkit</text>
+    <path d="M486 44V156" stroke="#CDD6DE" stroke-width="1.2"/>
+    {stages}
   </g>
 </svg>
 '''
 
 
 def tool_svg(spec: BannerSpec) -> str:
-    size = spec.subtitle_size
     title_id = f"{spec.name}-banner-title"
     description_id = f"{spec.name}-banner-description"
+    capability = spec.capability.capitalize().replace("rna", "RNA").replace("dna", "DNA")
     return f'''<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
   xmlns="http://www.w3.org/2000/svg" role="img"
   aria-labelledby="{title_id} {description_id}" shape-rendering="geometricPrecision">
-  <title id="{title_id}">{spec.name}: {spec.capability.lower()}</title>
+  <title id="{title_id}">{spec.name}: {capability}</title>
   <desc id="{description_id}">{spec.description}</desc>
   <rect width="1200" height="180" rx="16" fill="{BACKGROUND}"/>
   <g font-family="{FONT_STACK}">
-    <text x="48" y="78" fill="{INK}" font-size="42" font-weight="700" letter-spacing="-1">{spec.name}</text>
-    <text x="50" y="114" fill="{MUTED}" font-size="{size}" font-weight="700" letter-spacing="1">{spec.capability}</text>
-    <rect x="50" y="132" width="32" height="5" fill="{ACCENT}"/>
+    <text x="48" y="89" fill="{INK}" font-size="56" font-weight="500" letter-spacing="-1.1">{spec.name}</text>
+    <text x="50" y="126" fill="{MUTED}" font-size="20">{capability}</text>
   </g>
-  <path d="M510 34V146" stroke="#3F3C37" stroke-width="2"/>
-  <path d="M584 124H1144" stroke="{DIM}" stroke-width="2"/>
-  <g transform="{spec.glyph_transform}">
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
     {glyph(spec.glyph)}
   </g>
 </svg>

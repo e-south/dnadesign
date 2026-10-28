@@ -11,102 +11,127 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-INK = "#F3EFE7"
-MUTED = "#969087"
-DIM = "#5A5650"
-ACCENT = "#D97757"
+INK = "#163047"
+MUTED = "#526475"
+DIM = "#A5B3BE"
+ACCENT = "#2F6EAD"
 
 
-def _rect(x: int, y: int, width: int, height: int, fill: str = INK) -> str:
-    return f'<rect x="{x}" y="{y}" width="{width}" height="{height}" fill="{fill}"/>'
+def _rect(x: float, y: float, width: float, height: float, fill: str = INK) -> str:
+    return f'<rect x="{x}" y="{y}" width="{width}" height="{height}" rx="1" fill="{fill}"/>'
 
 
-def _line(path: str, stroke: str = INK, width: int = 4, dash: str | None = None) -> str:
-    dashed = f' stroke-dasharray="{dash}"' if dash else ""
-    return f'<path d="{path}" stroke="{stroke}" stroke-width="{width}" fill="none"{dashed}/>'
+def _line(path: str, stroke: str = INK, width: float = 2) -> str:
+    return (
+        f'<path d="{path}" stroke="{stroke}" stroke-width="{width}" fill="none" '
+        'stroke-linejoin="round" stroke-linecap="round"/>'
+    )
+
+
+def _dot(x: float, y: float, color: str = INK, radius: float = 3) -> str:
+    return f'<circle cx="{x}" cy="{y}" r="{radius}" fill="{color}"/>'
+
+
+def _sequence_rows(*, aligned: bool = False, variants: bool = False) -> str:
+    rows = []
+    for row, y in enumerate((12, 29, 46)):
+        for col in range(7):
+            x = 7 + col * 17
+            if aligned and (row, col) in {(0, 3), (2, 1)}:
+                rows.append(_line(f"M{x} {y + 4}h11", DIM))
+            else:
+                color = ACCENT if (col == 3 if variants else col in (2, 3, 5)) else MUTED
+                rows.append(_rect(x, y, 11, 8, color))
+    return "".join(rows)
+
+
+def _feature_matrix() -> str:
+    return "".join(
+        _rect(11 + col * 19, 7 + row * 17, 13, 11, (DIM, MUTED, ACCENT)[(row * 3 + col * 2 + col // 2) % 3])
+        for row in range(3)
+        for col in range(6)
+    )
 
 
 def glyph(name: str) -> str:
-    """Return one deliberately small, crisp capability mark."""
-    selected = {(0, 48), (20, 8), (40, 28)}
+    """Render a capability mark in a shared 128-by-64 coordinate system."""
+    selected = {(9, 13), (29, 31), (49, 49)}
     marks = {
-        "align": _line("M0 18H72M0 42H72", MUTED, 3) + _rect(12, 13, 20, 10) + _rect(38, 37, 20, 10, ACCENT),
-        "render": _line("M0 8H66V52H0Z", MUTED, 3) + _line("M12 20H54M12 30H42M12 40H48", INK, 4),
-        "diversity": "".join(
-            _rect(index * 18, 46 - height, 10, height, color)
-            for index, (height, color) in enumerate(((14, MUTED), (30, INK), (20, DIM), (42, ACCENT), (25, INK)))
+        "align": _sequence_rows(aligned=True),
+        "render": _line("M7 20H121M7 46H121", DIM)
+        + '<path d="M15 13H42L50 20L42 27H15Z" fill="'
+        + INK
+        + '"/>'
+        + '<path d="M103 39H76L68 46L76 53H103Z" fill="'
+        + ACCENT
+        + '"/>',
+        "cluster": "".join(
+            _dot(x, y, color)
+            for color, points in (
+                (INK, ((15, 13), (28, 11), (19, 27), (33, 24))),
+                (ACCENT, ((79, 16), (93, 10), (98, 26), (84, 30))),
+                (MUTED, ((49, 45), (62, 50), (72, 43))),
+            )
+            for x, y in points
         ),
-        "cluster": (
-            '<circle cx="15" cy="18" r="7" fill="#F3EFE7"/>'
-            '<circle cx="34" cy="12" r="5" fill="#969087"/>'
-            '<circle cx="26" cy="34" r="6" fill="#D97757"/>'
-            '<circle cx="68" cy="38" r="7" fill="#F3EFE7"/>'
-            '<circle cx="84" cy="27" r="5" fill="#5A5650"/>'
+        "construct": _rect(4, 23, 29, 18, MUTED)
+        + _rect(39, 23, 49, 18, ACCENT)
+        + _rect(94, 23, 30, 18)
+        + _line("M33 32H39M88 32H94", DIM),
+        "contracts": _line("M5 7H51V57H5ZM77 7H123V57H77Z", MUTED)
+        + _line("M13 18H42M13 29H36M13 40H42M85 18H114M85 29H108M85 40H114", DIM)
+        + _line("M46 32H82", ACCENT, 3),
+        "optimize": _sequence_rows(variants=True) + _line("M3 5H126V59H3Z", DIM, 1),
+        "generate": "".join(
+            _rect(7 + sum(widths[:i]) + i * 4, 10 + row * 18, width, 9, (INK, ACCENT, MUTED)[(i + row) % 3])
+            for row, widths in enumerate(((23, 46, 34), (38, 23, 42), (46, 34, 23)))
+            for i, width in enumerate(widths)
         ),
-        "construct": _rect(0, 21, 26, 16, MUTED)
-        + _rect(32, 21, 42, 16, ACCENT)
-        + _rect(80, 21, 24, 16)
-        + _line("M26 29H32M74 29H80", DIM, 3),
-        "contracts": _line("M0 12H40V46H0ZM62 12H102V46H62Z", MUTED, 3) + _line("M34 29H68", ACCENT, 5),
-        "optimize": _line("M0 8H102L72 30V50H30V30Z", MUTED, 3) + _rect(45, 39, 12, 12, ACCENT),
-        "generate": _line("M0 29H24M24 29L48 10M24 29L48 29M24 29L48 48", MUTED, 3)
-        + _line("M48 10H92M48 29H102M48 48H82", INK, 4),
-        "test": _line("M0 12H42V50H0ZM60 12H102V50H60Z", MUTED, 3)
-        + _line("M9 31L18 40L34 20M69 31L78 40L94 20", ACCENT, 4),
-        "fold": _line("M0 45C14 45 14 10 32 10C50 10 50 45 66 45C82 45 82 20 98 20", INK, 4)
-        + _rect(29, 7, 6, 6, ACCENT),
-        "infer": _line("M0 28H30M30 28L48 10M30 28H54M30 28L48 46", MUTED, 3)
-        + _rect(62, 9, 34, 8)
-        + _rect(62, 24, 48, 8, ACCENT)
-        + _rect(62, 39, 26, 8, MUTED),
-        "latent": _line("M0 49L28 9L55 49", DIM, 3)
-        + '<circle cx="13" cy="34" r="5" fill="#F3EFE7"/>'
-        + '<circle cx="33" cy="27" r="5" fill="#D97757"/>'
-        + '<circle cx="47" cy="41" r="4" fill="#969087"/>'
-        + _line("M70 49L98 9L125 49", DIM, 3),
-        "shuffle": _line("M0 12H24C48 12 48 46 72 46H104", MUTED, 3)
-        + _line("M0 46H24C48 46 48 12 72 12H104", ACCENT, 3),
-        "factor": _rect(0, 8, 44, 44, MUTED)
-        + _rect(8, 16, 10, 10, INK)
-        + _rect(26, 34, 10, 10, ACCENT)
-        + _line("M56 30H72", DIM, 3)
-        + _rect(82, 8, 10, 44, INK)
-        + _rect(102, 8, 10, 44, ACCENT),
-        "notify": _line("M0 33H18L28 12L42 48L54 24L68 33H106", INK, 4) + _rect(102, 29, 8, 8, ACCENT),
-        "select": '<g stroke-linecap="round" stroke-linejoin="round">'
+        "test": _line("M8 7H51V57H8ZM77 7H120V57H77Z", DIM) + _line("M18 33L27 42L42 23M87 33L96 42L111 23", ACCENT, 3),
+        "fold": _line("M24 57H48V27C33 21 33 5 48 4H80C95 5 95 21 80 27V57H104", INK, 3)
+        + _line("M48 32H80M48 41H80M48 50H80", ACCENT, 2),
+        "infer": _feature_matrix(),
+        "latent": _line("M9 5V57H122", DIM, 1.5)
         + "".join(
-            f'<circle cx="{x}" cy="{y}" r="4" fill="{ACCENT if (x, y) in selected else DIM}"/>'
-            for x in (0, 20, 40)
-            for y in (8, 28, 48)
+            _dot(x, y, ACCENT if i % 3 == 0 else MUTED)
+            for i, (x, y) in enumerate(
+                ((24, 39), (37, 31), (44, 45), (59, 27), (68, 38), (74, 18), (89, 29), (105, 14), (112, 23))
+            )
+        ),
+        "notify": _line("M7 12H99V43H30L17 54V43H7Z", MUTED, 2.5)
+        + _line("M20 24H71M20 33H56", DIM)
+        + _dot(108, 17, ACCENT, 8),
+        "select": "".join(
+            _dot(x, y, ACCENT if (x, y) in selected else DIM, 4) for x in (9, 29, 49) for y in (13, 31, 49)
         )
-        + _line("M60 28H92M86 22L92 28L86 34", MUTED, 2)
-        + "".join(f'<circle cx="112" cy="{y}" r="5" fill="{ACCENT}"/>' for y in (8, 28, 48))
-        + "</g>",
-        "route": _line("M0 28H26M26 28L50 10M26 28L50 46M50 10H102M50 46H84", INK, 3) + _rect(96, 6, 10, 8, ACCENT),
-        "permute": _line("M0 14H104M0 30H104M0 46H104", DIM, 3)
-        + _rect(22, 9, 18, 10)
-        + _rect(48, 25, 18, 10, ACCENT)
-        + _rect(74, 41, 18, 10, MUTED),
-        "study": _line("M0 10H42V48H0ZM58 10H100V48H58Z", MUTED, 3)
-        + _rect(8, 19, 26, 5)
-        + _rect(66, 19, 26, 5, ACCENT)
-        + _rect(8, 31, 18, 5, DIM)
-        + _rect(66, 31, 22, 5),
-        "knockdown": _rect(0, 8, 10, 42)
-        + _rect(22, 19, 10, 31, MUTED)
-        + _rect(44, 30, 10, 20, ACCENT)
-        + _line("M70 8V50M62 42L70 50L78 42", INK, 4),
-        "thread": _line("M0 16C20 16 20 44 40 44S60 16 80 16S100 44 120 44", INK, 4)
-        + _rect(37, 39, 7, 10, ACCENT)
-        + _rect(77, 11, 7, 10, MUTED),
-        "junction": _line("M0 28H58V2M70 2V28H128", INK, 4)
-        + _line("M0 42H50M58 42H128", MUTED, 3)
-        + _line("M50 28H58M58 42H66", ACCENT, 4)
-        + _line("M58 2V28M70 2V28", "#7BB4AE", 4)
-        + _line("M58 8H70M58 15H70M58 22H70", DIM, 2)
-        + _line("M14 28V42M34 28V42M86 28V42M106 28V42", DIM, 2)
-        + _line("M50 36L58 48", INK, 2),
-        "records": _line("M0 8H88V22H0ZM0 27H104V41H0ZM0 46H76V60H0Z", MUTED, 3) + _rect(92, 10, 8, 8, ACCENT),
+        + _line("M67 31H91M85 25L91 31L85 37", MUTED)
+        + "".join(_dot(113, y, ACCENT, 5) for y in (13, 31, 49)),
+        "route": "".join(
+            _rect(8, y, 88, 9, DIM) + _dot(115, y + 4.5, color, 4) for y, color in ((10, INK), (28, ACCENT), (46, DIM))
+        ),
+        "permute": _sequence_rows(variants=True),
+        "thread": _line("M10 43L32 15L53 47L76 15L98 46L119 24", DIM, 3)
+        + "".join(
+            _dot(x, y, ACCENT if i in (1, 3) else INK, 5)
+            for i, (x, y) in enumerate(((10, 43), (32, 15), (53, 47), (76, 15), (98, 46), (119, 24)))
+        ),
+        "junction": _line("M5 29H58V5M70 5V29H123M5 43H50M58 43H123", INK, 3)
+        + _line("M58 5V29M70 5V29", ACCENT, 3)
+        + _line("M58 10H70M58 18H70M16 29V43M35 29V43M88 29V43M108 29V43", DIM)
+        + _line("M50 37L58 49", ACCENT),
+        "records": _line("M7 7H121V57H7ZM7 23H121M7 40H121M36 7V57", MUTED)
+        + _rect(45, 12, 44, 6, ACCENT)
+        + _rect(45, 29, 63, 6, DIM)
+        + _rect(45, 46, 53, 6, DIM),
+        "diversity": _line("M9 7V57H121", DIM, 1.5)
+        + "".join(
+            _rect(x, 57 - h, 12, h, color)
+            for x, h, color in ((22, 17, MUTED), (46, 35, INK), (70, 25, ACCENT), (94, 43, INK))
+        ),
+        "transform": _line("M7 7H121V57H7ZM7 23H121M7 40H121M36 7V57M77 7V57", DIM)
+        + "".join(_rect(83, y, 30, 7, ACCENT) for y in (11, 28, 45)),
+        "trace": _line("M23 32H106", DIM)
+        + "".join(_rect(x, 18, 22, 28, color) for x, color in ((5, MUTED), (53, ACCENT), (101, INK))),
     }
     try:
         return marks[name]

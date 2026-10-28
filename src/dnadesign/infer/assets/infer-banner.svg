@@ -1,17 +1,15 @@
 <svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
   xmlns="http://www.w3.org/2000/svg" role="img"
   aria-labelledby="infer-banner-title infer-banner-description" shape-rendering="geometricPrecision">
-  <title id="infer-banner-title">infer: add model results</title>
+  <title id="infer-banner-title">infer: Add model results</title>
   <desc id="infer-banner-description">Run sequence models and add their results to datasets.</desc>
-  <rect width="1200" height="180" rx="16" fill="#1E1D1A"/>
-  <g font-family="Menlo, Monaco, Consolas, monospace">
-    <text x="48" y="78" fill="#F3EFE7" font-size="42" font-weight="700" letter-spacing="-1">infer</text>
-    <text x="50" y="114" fill="#969087" font-size="17" font-weight="700" letter-spacing="1">ADD MODEL RESULTS</text>
-    <rect x="50" y="132" width="32" height="5" fill="#D97757"/>
+  <rect width="1200" height="180" rx="16" fill="#F1F4F6"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="48" y="89" fill="#163047" font-size="56" font-weight="500" letter-spacing="-1.1">infer</text>
+    <text x="50" y="126" fill="#526475" font-size="20">Add model results</text>
   </g>
-  <path d="M510 34V146" stroke="#3F3C37" stroke-width="2"/>
-  <path d="M584 124H1144" stroke="#5A5650" stroke-width="2"/>
-  <g transform="translate(720 48)">
-    <path d="M0 28H30M30 28L48 10M30 28H54M30 28L48 46" stroke="#969087" stroke-width="3" fill="none"/><rect x="62" y="9" width="34" height="8" fill="#F3EFE7"/><rect x="62" y="24" width="48" height="8" fill="#D97757"/><rect x="62" y="39" width="26" height="8" fill="#969087"/>
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
+    <rect x="11" y="7" width="13" height="11" rx="1" fill="#A5B3BE"/><rect x="30" y="7" width="13" height="11" rx="1" fill="#2F6EAD"/><rect x="49" y="7" width="13" height="11" rx="1" fill="#2F6EAD"/><rect x="68" y="7" width="13" height="11" rx="1" fill="#526475"/><rect x="87" y="7" width="13" height="11" rx="1" fill="#526475"/><rect x="106" y="7" width="13" height="11" rx="1" fill="#A5B3BE"/><rect x="11" y="24" width="13" height="11" rx="1" fill="#A5B3BE"/><rect x="30" y="24" width="13" height="11" rx="1" fill="#2F6EAD"/><rect x="49" y="24" width="13" height="11" rx="1" fill="#2F6EAD"/><rect x="68" y="24" width="13" height="11" rx="1" fill="#526475"/><rect x="87" y="24" width="13" height="11" rx="1" fill="#526475"/><rect x="106" y="24" width="13" height="11" rx="1" fill="#A5B3BE"/><rect x="11" y="41" width="13" height="11" rx="1" fill="#A5B3BE"/><rect x="30" y="41" width="13" height="11" rx="1" fill="#2F6EAD"/><rect x="49" y="41" width="13" height="11" rx="1" fill="#2F6EAD"/><rect x="68" y="41" width="13" height="11" rx="1" fill="#526475"/><rect x="87" y="41" width="13" height="11" rx="1" fill="#526475"/><rect x="106" y="41" width="13" height="11" rx="1" fill="#A5B3BE"/>
   </g>
 </svg>
