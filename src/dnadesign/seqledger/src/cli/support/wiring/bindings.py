@@ -29,7 +29,6 @@ CommandBinding = Callable[[object], None]
 
 @dataclass(frozen=True)
 class CliBindings:
-    cmd_repair_densegen: CommandBinding
     cmd_ls: CommandBinding
     cmd_init: CommandBinding
     cmd_import: CommandBinding
@@ -58,7 +57,6 @@ class CliBindings:
     cmd_state_get: CommandBinding
     cmd_materialize: CommandBinding
     cmd_snapshot: CommandBinding
-    cmd_convert_legacy: CommandBinding
     cmd_make_mock: CommandBinding
     cmd_add_demo: CommandBinding
     cmd_merge_datasets: CommandBinding
@@ -96,9 +94,6 @@ def build_cli_bindings(
     get_shutil_module: Callable[[], Any],
     get_ssh_remote_class: Callable[[], Any],
 ) -> CliBindings:
-    def cmd_repair_densegen(args):
-        tooling_commands.cmd_repair_densegen(args, deps=tooling_deps())
-
     def cmd_ls(args):
         query_commands.cmd_ls(
             args,
@@ -204,9 +199,6 @@ def build_cli_bindings(
     def cmd_snapshot(args):
         lifecycle_commands.cmd_snapshot(args, deps=snapshot_deps())
 
-    def cmd_convert_legacy(args):
-        tooling_commands.cmd_convert_legacy(args, deps=tooling_deps())
-
     def cmd_make_mock(args):
         tooling_commands.cmd_make_mock(args, deps=tooling_deps())
 
@@ -268,7 +260,6 @@ def build_cli_bindings(
         maintenance_commands.cmd_dedupe_sequences(args, deps=maintenance_deps())
 
     return CliBindings(
-        cmd_repair_densegen=cmd_repair_densegen,
         cmd_ls=cmd_ls,
         cmd_init=cmd_init,
         cmd_import=cmd_import,
@@ -297,7 +288,6 @@ def build_cli_bindings(
         cmd_state_get=cmd_state_get,
         cmd_materialize=cmd_materialize,
         cmd_snapshot=cmd_snapshot,
-        cmd_convert_legacy=cmd_convert_legacy,
         cmd_make_mock=cmd_make_mock,
         cmd_add_demo=cmd_add_demo,
         cmd_merge_datasets=cmd_merge_datasets,

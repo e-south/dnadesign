@@ -31,7 +31,6 @@ TOP_LEVEL_TEST_PACKAGES = {
     "cli",
     "docs_contract",
     "datasets",
-    "legacy",
     "overlays",
     "sync",
 }
@@ -56,13 +55,6 @@ TEST_FAMILY_FILES = {
     "datasets": {
         "__init__.py",
     },
-    "legacy": {
-        "__init__.py",
-        "test_convert_module_imports.py",
-        "test_legacy_dedupe_module.py",
-        "test_legacy_inputs_module.py",
-        "test_legacy_tfbs_module.py",
-    },
     "overlays": {
         "__init__.py",
         "test_overlays.py",
@@ -82,7 +74,6 @@ TEST_FAMILY_SUBPACKAGES = {
     "cli": {"commands", "support", "sync"},
     "docs_contract": set(),
     "datasets": {"core", "lifecycle", "merge", "overlay", "query", "state", "validate", "views"},
-    "legacy": set(),
     "overlays": {"support"},
     "sync": {"remote"},
 }

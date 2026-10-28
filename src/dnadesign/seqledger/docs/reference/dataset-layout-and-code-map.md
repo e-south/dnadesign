@@ -56,7 +56,6 @@ High-level coordinator packages at `src/dnadesign/seqledger/src/`:
 
 - `src/dnadesign/seqledger/src/api/__init__.py`
 - `src/dnadesign/seqledger/src/cli/__init__.py`
-- `src/dnadesign/seqledger/src/legacy/convert.py`
 - `src/dnadesign/seqledger/src/dataset/__init__.py`
 - `src/dnadesign/seqledger/src/maintenance/__init__.py`
 - `src/dnadesign/seqledger/src/sync/__init__.py`
@@ -184,9 +183,7 @@ Helper packages under `src/dnadesign/seqledger/src/`:
 - `src/dnadesign/seqledger/src/cli/commands/sync/cli.py`
 - `src/dnadesign/seqledger/src/cli/commands/tooling/__init__.py`
 - `src/dnadesign/seqledger/src/cli/commands/tooling/cli.py`
-- `src/dnadesign/seqledger/src/cli/commands/tooling/densegen.py`
 - `src/dnadesign/seqledger/src/cli/commands/tooling/dev.py`
-- `src/dnadesign/seqledger/src/cli/commands/tooling/legacy.py`
 - `src/dnadesign/seqledger/src/cli/commands/tooling/shared.py`
 - `src/dnadesign/seqledger/src/datasets/query/__init__.py`
 - `src/dnadesign/seqledger/src/datasets/query/catalog.py`

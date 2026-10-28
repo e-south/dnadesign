@@ -123,14 +123,10 @@ def register_cli_surface(*, apps: CliApps, root_callback: Callable[..., None], c
     )
 
     tooling_commands.register_ops_commands(
-        apps.densegen_app,
         apps.dev_app,
-        apps.legacy_app,
         ctx_args_builder=ctx_args_builder,
-        cmd_repair_densegen=bindings.cmd_repair_densegen,
         cmd_make_mock=bindings.cmd_make_mock,
         cmd_add_demo=bindings.cmd_add_demo,
-        cmd_convert_legacy=bindings.cmd_convert_legacy,
     )
 
     register_query_commands(

@@ -33,4 +33,4 @@ def test_usr_cli_bindings_delegate_to_command_modules() -> None:
     assert "maintenance_commands.cmd_overlay_remove(" in source
     assert "namespace_commands.cmd_namespace_register(" in source
     assert "maintenance_commands.cmd_merge_datasets(" in source
-    assert "tooling_commands.cmd_repair_densegen(" in source
+    assert "tooling_commands.cmd_make_mock(" in source

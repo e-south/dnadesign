@@ -23,7 +23,6 @@ TOP_LEVEL_SOURCE_PACKAGES = {
     "datasets",
     "events",
     "genbank",
-    "legacy",
     "maintenance",
     "overlays",
     "regulondb",
@@ -90,13 +89,6 @@ PACKAGE_FILES = {
         "importer.py",
         "models.py",
         "parser.py",
-    },
-    ("legacy",): {
-        "__init__.py",
-        "convert.py",
-        "dedupe.py",
-        "inputs.py",
-        "tfbs.py",
     },
     ("maintenance",): {
         "__init__.py",
@@ -212,9 +204,7 @@ PACKAGE_FILES = {
     ("cli", "commands", "tooling"): {
         "__init__.py",
         "cli.py",
-        "densegen.py",
         "dev.py",
-        "legacy.py",
         "shared.py",
     },
     ("cli", "support", "presentation"): {
@@ -342,7 +332,6 @@ PACKAGE_SUBPACKAGES = {
     ("datasets", "views"): set(),
     ("events",): set(),
     ("genbank",): set(),
-    ("legacy",): set(),
     ("maintenance",): set(),
     ("overlays",): {"support"},
     ("overlays", "support"): set(),

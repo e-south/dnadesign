@@ -124,14 +124,6 @@ def test_cli_package_exports_expected_symbols() -> None:
     assert hasattr(module, "merge_usr_to_usr")
 
 
-def test_legacy_convert_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.seqledger.src.legacy.convert")
-    assert hasattr(module, "ConvertStats")
-    assert hasattr(module, "RepairStats")
-    assert hasattr(module, "convert_legacy")
-    assert hasattr(module, "repair_densegen_used_tfbs")
-
-
 def test_dataset_package_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.seqledger.src.dataset")
     assert hasattr(module, "Dataset")
@@ -709,26 +701,14 @@ def test_cli_tooling_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.seqledger.src.cli.commands.tooling")
     assert hasattr(module, "ToolingDeps")
     assert hasattr(module, "register_ops_commands")
-    assert hasattr(module, "cmd_repair_densegen")
-    assert hasattr(module, "cmd_convert_legacy")
     assert hasattr(module, "cmd_make_mock")
     assert hasattr(module, "cmd_add_demo")
-
-
-def test_cli_tooling_densegen_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.seqledger.src.cli.commands.tooling.densegen")
-    assert hasattr(module, "cmd_repair_densegen")
 
 
 def test_cli_tooling_dev_module_exports_expected_symbols() -> None:
     module = importlib.import_module("dnadesign.seqledger.src.cli.commands.tooling.dev")
     assert hasattr(module, "cmd_make_mock")
     assert hasattr(module, "cmd_add_demo")
-
-
-def test_cli_tooling_legacy_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.seqledger.src.cli.commands.tooling.legacy")
-    assert hasattr(module, "cmd_convert_legacy")
 
 
 def test_cli_error_output_module_exports_expected_symbols() -> None:
@@ -770,26 +750,3 @@ def test_sync_remote_transfer_module_exports_expected_symbols() -> None:
     assert hasattr(module, "copy_file_atomic")
     assert hasattr(module, "collect_staged_entries")
     assert hasattr(module, "promote_staged_pull")
-
-
-def test_legacy_inputs_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.seqledger.src.legacy.inputs")
-    assert hasattr(module, "Profile")
-    assert hasattr(module, "profile_60bp_dual_promoter")
-    assert hasattr(module, "_coerce_logits")
-    assert hasattr(module, "_tf_from_parts")
-    assert hasattr(module, "_count_tf")
-    assert hasattr(module, "_ensure_pt_list_of_dicts")
-    assert hasattr(module, "_gather_pt_files")
-
-
-def test_legacy_tfbs_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.seqledger.src.legacy.tfbs")
-    assert hasattr(module, "_parse_tfbs_parts")
-    assert hasattr(module, "_scan_used_tfbs")
-    assert hasattr(module, "_detect_promoter_forward")
-
-
-def test_legacy_dedupe_module_exports_expected_symbols() -> None:
-    module = importlib.import_module("dnadesign.seqledger.src.legacy.dedupe")
-    assert hasattr(module, "apply_casefold_sequence_dedupe")

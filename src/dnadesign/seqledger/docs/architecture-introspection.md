@@ -61,7 +61,6 @@ Edge cases handled:
 - Sidecar inventory mismatch (`_derived`, `_snapshots`, `_auxiliary`).
 - Hash mismatch in default derived and auxiliary content verification.
 - Archived storage is kept out of default live dataset-id discovery while explicit archived paths remain readable.
-- Legacy promoter-focused PyTorch archives live under `datasets/archived/promoter_misc_pytorch/` and stay outside the `records.parquet` dataset API.
 - Strict bootstrap dataset-id enforcement.
 
 ## Architecture view stack
@@ -77,7 +76,6 @@ Package-root Python should stay limited to `__init__.py` and `__main__.py`; cros
   - Shared contracts: `contracts/*` for errors, schema constants, API dataclasses, and sequence normalization/id rules
   - Dataset core: `dataset/*` coordinating helpers under `datasets/*`, with core identity/ingest/activity helpers under `datasets/core/*`, demo/mock generation under `datasets/demo/*`, lifecycle/registry/materialization/snapshot coordination under `datasets/lifecycle/*`, maintenance-gated mutation helpers under `datasets/maintenance/*`, maintenance-gated merge execution under `datasets/merge/*`, overlay mutation logic under `datasets/overlay/*`, overlay query/catalog logic under `datasets/query/*`, reserved state lifecycle under `datasets/state/*`, integrity checks under `datasets/validate/*`, and read/export flows under `datasets/views/*`
   - Sync core: `sync/*` coordinating helpers under `sync/remote/*`, including execution orchestration under `sync/remote/execution.py`
-  - Legacy conversion/repair: `legacy/convert.py` coordinating helpers under `legacy/*`
   - Runtime helpers: `runtime/*`, currently centered on DuckDB UTC session enforcement
   - Overlay support: `overlays/*` plus `overlays/support/*`
   - RegulonDB support: `regulondb/*` for source-specific promoter/regulator enrichment helpers
@@ -170,9 +168,7 @@ Precedence notes:
   - `src/dnadesign/seqledger/src/cli/commands/sync/cli.py`
   - `src/dnadesign/seqledger/src/cli/commands/tooling/__init__.py`
   - `src/dnadesign/seqledger/src/cli/commands/tooling/cli.py`
-  - `src/dnadesign/seqledger/src/cli/commands/tooling/densegen.py`
   - `src/dnadesign/seqledger/src/cli/commands/tooling/dev.py`
-  - `src/dnadesign/seqledger/src/cli/commands/tooling/legacy.py`
   - `src/dnadesign/seqledger/src/cli/commands/tooling/shared.py`
 - Sync behavior and verification:
   - `src/dnadesign/seqledger/src/sync/__init__.py`
@@ -238,15 +234,9 @@ Precedence notes:
   - `src/dnadesign/seqledger/src/registry/validation.py`
   - `src/dnadesign/seqledger/src/runtime/__init__.py`
   - `src/dnadesign/seqledger/src/runtime/duckdb.py`
-- Legacy repair decomposition:
-  - `src/dnadesign/seqledger/src/legacy/convert.py`
-  - `src/dnadesign/seqledger/src/legacy/inputs.py`
-  - `src/dnadesign/seqledger/src/legacy/tfbs.py`
-  - `src/dnadesign/seqledger/src/legacy/dedupe.py`
 - Behavior and reliability tests:
   - `src/dnadesign/seqledger/tests/sync/test_sync_iterative_batch_flow.py`
   - `src/dnadesign/seqledger/tests/sync/test_sync_schema_adversarial.py`
-  - `src/dnadesign/seqledger/tests/legacy/test_legacy_dedupe_module.py`
   - `src/dnadesign/seqledger/tests/docs_contract/test_sync.py`
 
 ## Open questions and risk notes
@@ -254,6 +244,5 @@ Precedence notes:
 - `dataset/` remains a large orchestration surface; core identity/ingest helpers now live under `datasets/core/*`, demo/mock helpers under `datasets/demo/*`, registry freeze/write-session/materialization under `datasets/lifecycle/*`, maintenance operations under `datasets/maintenance/*`, merge execution under `datasets/merge/*`, and reserved-overlay paths under `datasets/state/*`.
 - The layout contract now depends on helper families remaining under sanctioned subpackages; adding new top-level `usr/src/*.py` helpers should be treated as an architecture regression unless they are true coordinators.
 - Closed helper clusters should keep nesting under their owning family instead of adding new sibling flat modules; `contracts/*`, `events/*`, `overlays/*`, `registry/*`, `cli/commands/datasets/*`, `cli/commands/lifecycle/*`, `cli/commands/maintenance/*`, `cli/commands/namespace/*`, `cli/commands/query/*`, `cli/commands/read_views/*`, `cli/commands/remotes/*`, `cli/commands/sync/*`, `cli/commands/tooling/*`, `datasets/core/*`, `datasets/demo/*`, `datasets/lifecycle/*`, `datasets/maintenance/*`, `datasets/merge/*`, `datasets/overlay/*`, `datasets/query/*`, `datasets/state/*`, `datasets/validate/*`, `datasets/views/*`, and `runtime/*` are the current precedent.
-- `repair_densegen_used_tfbs()` still combines multiple optional mutation/drop paths; next extraction slice should isolate single-TF and id/sequence-only drop policy handling.
 - Default derived and auxiliary content hashing can add runtime cost on very large overlay trees; any opt-out should be an explicit operator decision tied to transfer-window constraints.
 - Sync audit output is strong for decision support; adding machine-readable audit snapshots may further improve automated orchestration loops.

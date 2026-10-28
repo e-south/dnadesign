@@ -210,7 +210,6 @@ _bindings = build_cli_bindings(
     get_ssh_remote_class=lambda: SSHRemote,
 )
 
-cmd_repair_densegen = _bindings.cmd_repair_densegen
 cmd_ls = _bindings.cmd_ls
 cmd_init = _bindings.cmd_init
 cmd_import = _bindings.cmd_import
@@ -237,7 +236,6 @@ cmd_state_clear = _bindings.cmd_state_clear
 cmd_state_get = _bindings.cmd_state_get
 cmd_materialize = _bindings.cmd_materialize
 cmd_snapshot = _bindings.cmd_snapshot
-cmd_convert_legacy = _bindings.cmd_convert_legacy
 cmd_make_mock = _bindings.cmd_make_mock
 cmd_add_demo = _bindings.cmd_add_demo
 cmd_merge_datasets = _bindings.cmd_merge_datasets
@@ -259,9 +257,7 @@ cmd_dedupe_sequences = _bindings.cmd_dedupe_sequences
 _cli_apps = build_cli_apps(show_dev_commands=os.getenv("SEQLEDGER_SHOW_DEV_COMMANDS") == "1")
 app = _cli_apps.app
 remotes_app = _cli_apps.remotes_app
-legacy_app = _cli_apps.legacy_app
 maintenance_app = _cli_apps.maintenance_app
-densegen_app = _cli_apps.densegen_app
 dev_app = _cli_apps.dev_app
 namespace_app = _cli_apps.namespace_app
 events_app = _cli_apps.events_app

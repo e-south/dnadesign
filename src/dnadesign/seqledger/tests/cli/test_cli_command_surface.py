@@ -38,9 +38,9 @@ def test_top_level_excludes_tool_commands() -> None:
     assert "dedupe-sequences" not in help_text
     assert "plot" not in help_text
 
-    assert "legacy" in help_text
+    assert "legacy" not in help_text
     assert "genbank" in help_text
-    assert "densegen" in help_text
+    assert "densegen" not in help_text
     assert "maintenance" in help_text
     assert "namespace" in help_text
     assert "events" in help_text

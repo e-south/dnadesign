@@ -89,6 +89,7 @@ _FORBIDDEN_WHEEL_PREFIXES = (
     "dnadesign/archived/",
     "dnadesign/prototypes/",
     "dnadesign/seqledger/archived/",
+    "dnadesign/seqledger/src/legacy/",
     "dnadesign/seqledger/datasets/usr_regulondb_native_promoters/",
     "dnadesign/studies/",
     "dnadesign/cruncher/workspaces/project_",
@@ -97,6 +98,8 @@ _FORBIDDEN_WHEEL_PREFIXES = (
     "dnadesign/latentdna/workspaces/templates/promoter_reference_margin_benchmark/",
 )
 _FORBIDDEN_WHEEL_MEMBERS = {
+    "dnadesign/seqledger/src/cli/commands/tooling/legacy.py",
+    "dnadesign/seqledger/src/cli/commands/tooling/densegen.py",
     "dnadesign/junction/docs/assets/three-fragment-review.svg",
     "dnadesign/junction/examples/three-fragment-review/review.job.yaml",
     "dnadesign/ops/runbooks/init_presets.yaml",
