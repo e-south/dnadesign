@@ -1,24 +1,12 @@
 ## Design Proposals
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-10-28
 
-Design proposals capture intent and tradeoffs before or during implementation.
-Use semantic lanes instead of a flat chronology.
+Use [planning guidance](../../../PLANS.md) for changes that need an explicit
+proposal. Keep active proposals under `tools/<tool>/` or `cross-tool/<topic>/`,
+with an owner, scope and validation criteria. Remove superseded proposals when
+their accepted contracts are recorded in [architecture decisions](../../architecture/decisions/README.md).
 
-### Lanes
-
-- `tools/<tool>/`: proposals owned mostly by one tool.
-- `cross-tool/<topic>/`: proposals that define cross-package contracts or
-  handoffs.
-- `archive/`: inactive historical proposals retained for traceability.
-
-### Current Proposals
-
-- [Cruncher proposals](tools/cruncher/)
-- [DenseGen proposals](tools/densegen/)
-- [USR proposals](tools/usr/)
-
-Study-owned proposals live in their private study workspaces. Promote a
-reusable boundary into this index only when it changes a public dnadesign
-contract.
+Current tool ownership is defined by the [lifecycle inventory](../../../.github/tool-lifecycle.toml).
+Study-specific decisions belong in the consuming study repository.

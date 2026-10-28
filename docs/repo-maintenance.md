@@ -1,7 +1,7 @@
 ## Repo Maintenance
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-17
+**Last verified:** 2026-10-28
 
 Use this page for repo-wide maintenance orientation. Keep durable procedures in
 their owner docs and use this page as a compact route map.
@@ -15,7 +15,6 @@ their owner docs and use this page as a compact route map.
 | Engineering invariants and failure posture | [Design](../DESIGN.md) |
 | Operational reliability model | [Reliability](../RELIABILITY.md) |
 | Quality gates and entropy reports | [Quality docs](quality/README.md) |
-| Current maintainer audit notes | [Monorepo organization audit](dev/audits/monorepo-organization.md) |
 
 ### Cadence
 

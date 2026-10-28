@@ -2,14 +2,14 @@
 doc_id: architecture
 surface: system-of-record
 owner: dnadesign-maintainers
-last_verified: 2026-08-27
+last_verified: 2026-10-28
 ---
 
 # ARCHITECTURE
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-26
+**Last verified:** 2026-10-28
 
 ## At a glance
 `dnadesign` is a uv-managed monorepo of modular bioinformatics tools under `src/dnadesign/`, with shared CI/devtools and operator runbooks in `docs/`.
@@ -90,7 +90,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
   continues to own each object's internal schema and behavior.
 - USR owns durable dataset records and the integration event stream (`.events.log`) that downstream tooling consumes.
 - Active shared USR dataset ids are flat owner-first contracts, for example
-  `densegen_prom_eth_cip_source`; provenance belongs in `root_kind`,
+  `construct_library`; provenance belongs in `root_kind`,
   `owner_tool`, overlays, event metadata, and study records rather than nested
   tool-routing folders.
 - Cross-dataset USR overlay transfer is explicit-only: maintenance merge defaults to base-row merge, while any overlay carry must be opt-in, namespace-scoped, schema-compatible, and auditable in events.
@@ -101,6 +101,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
   mirrors, self-contained demos, or handoff surfaces named directly in a study
   record or runbook.
 - Cross-tool coupling is file/event contract based; packages must not depend on internal `src.*` modules across tool boundaries.
+- Import checks cover runtime packages and shared contracts, including `src/workspaces` and `src/notebooks`. Tool-root data and example shelves are resources, not runtime source.
 - Utility modules must stay tool-local (`src/dnadesign/<tool>/...`); top-level shared `src/dnadesign/utils` is not an allowed boundary.
 - Study status and preflight logic is study-owned once it becomes specific.
   External packages register status metadata through the
@@ -157,7 +158,6 @@ This file is the architecture map: it names system boundaries, major flows, and 
 
 ## Where to go deeper
 - Maintainer index: `docs/dev/README.md`
-- Monorepo organization audit: `docs/dev/audits/monorepo-organization.md`
 - BU SCC operator references: `docs/bu-scc/README.md`, `docs/bu-scc/setup/quickstart.md`, `docs/bu-scc/runbooks/batch-notify.md`, and `docs/bu-scc/jobs/README.md`
 - Notify event contract: `docs/notify/usr-events.md`
 - Reliability operations: `RELIABILITY.md`

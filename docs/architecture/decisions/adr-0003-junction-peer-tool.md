@@ -130,6 +130,5 @@ legal review.
 
 ### Links
 
-- [Archived proposal](../../dev/plans/archive/2026-08-01-junction-boundary-proposal.md)
 - Documentation decision PR: [#64](https://github.com/e-south/dnadesign/pull/64)
 - Feature implementation: [#67](https://github.com/e-south/dnadesign/pull/67)

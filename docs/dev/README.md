@@ -1,7 +1,7 @@
 ## Developer Documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-27
+**Last verified:** 2026-10-28
 
 Use this index to find maintainer workflows, checks, and planning records.
 
@@ -184,6 +184,7 @@ and passing dependency audits.
 - Use kebab-case for markdown files.
 - Prefix plan docs with `YYYY-MM-DD-`.
 - Keep current design proposals in semantic lanes under `plans/tools/` or
-  `plans/cross-tool/`; keep archived plans under `plans/archive/`.
+  `plans/cross-tool/`; retain accepted contracts in architecture decisions.
 
-[Tool lifecycle plan](plans/tool-lifecycle-20261026.md) tracks tool ownership, independent installation and retirement checks.
+Tool ownership and installation status are declared in
+[the lifecycle inventory](../../.github/tool-lifecycle.toml).
