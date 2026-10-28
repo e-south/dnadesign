@@ -132,7 +132,7 @@ def head_dataset(
         empty = pd.DataFrame(columns=columns or dataset.schema().names)
         _HEAD_CACHE[cache_key] = (state_sig, empty.copy(deep=True))
         if len(_HEAD_CACHE) > _HEAD_CACHE_MAX:
-            _HEAD_CACHE.clear()
+            _HEAD_CACHE.pop(next(iter(_HEAD_CACHE)))
         return empty
     tbl = pa.Table.from_batches(batches)
     if tbl.num_rows > n:
@@ -140,7 +140,7 @@ def head_dataset(
     out = tbl.to_pandas()
     _HEAD_CACHE[cache_key] = (state_sig, out.copy(deep=True))
     if len(_HEAD_CACHE) > _HEAD_CACHE_MAX:
-        _HEAD_CACHE.clear()
+        _HEAD_CACHE.pop(next(iter(_HEAD_CACHE)))
     return out
 
 

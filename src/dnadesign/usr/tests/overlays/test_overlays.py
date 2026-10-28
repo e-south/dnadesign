@@ -882,7 +882,12 @@ def test_list_overlays_ignores_temporary_parquet_files(tmp_path: Path) -> None:
     assert (ds.dir / "_derived" / "mock") in paths
 
 
-def test_head_reuses_cached_result_when_dataset_state_is_unchanged(tmp_path: Path) -> None:
+@pytest.mark.parametrize("cache_capacity", [1, 64])
+def test_head_reuses_cached_result_when_dataset_state_is_unchanged(tmp_path: Path, monkeypatch, cache_capacity) -> None:
+    from dnadesign.usr.src.datasets import views
+
+    monkeypatch.setattr(views, "_HEAD_CACHE", {})
+    monkeypatch.setattr(views, "_HEAD_CACHE_MAX", cache_capacity)
     ds = _make_dataset(tmp_path)
     target_id = ds.head(1)["id"].iloc[0]
     ds.write_overlay_part("mock", pa.table({"id": [target_id], "mock__score": [1.0]}), key="id")
