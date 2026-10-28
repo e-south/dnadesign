@@ -47,6 +47,42 @@ def write_catalog(destination):
 
 
 class PortableBuild(build_py):
+    @staticmethod
+    def _resource_package(package):
+        parts = package.split(".")
+        return (
+            len(parts) >= 3
+            and parts[0] == "dnadesign"
+            and parts[2]
+            in {
+                "assets",
+                "campaigns",
+                "datasets",
+                "docs",
+                "examples",
+                "images",
+                "jobs",
+                "presets",
+                "resources",
+                "styles",
+                "workspaces",
+            }
+        )
+
+    def find_package_modules(self, package, package_dir):
+        # Top-level example/data shelves are resources, never executable packages.
+        # Runtime packages such as <tool>.src.workspaces remain ordinary source.
+        if self._resource_package(package):
+            return []
+        return super().find_package_modules(package, package_dir)
+
+    def find_data_files(self, package, src_dir):
+        # Approved resources are listed on the owning tool package. Do not let
+        # setuptools' implicit .pyi/py.typed rules discover local shelf contents.
+        if self._resource_package(package):
+            return []
+        return super().find_data_files(package, src_dir)
+
     def run(self):
         # setuptools copies current inputs but does not remove deleted resources.
         # Rebuild its staging directory so incremental wheels cannot retain them.

@@ -66,6 +66,52 @@ _PROFILE_IMPORTS = {
 }
 _PROFILE_IMPORTS["infer"] = _PROFILE_IMPORTS["usr"] | {"tqdm"}
 
+_PROFILE_IMPORTS["ops"] = {"pydantic", "yaml", "typer", "pyarrow", "click"}
+_PROFILE_IMPORTS["notify"] = {"typer", "click", "keyring", "certifi"}
+_PROFILE_IMPORTS["folding"] = {"pydantic", "yaml", "typer", "psutil", "RNA"}
+_PROFILE_IMPORTS["construct"] = _PROFILE_IMPORTS["usr"] | _PROFILE_IMPORTS["folding"] | {"vl_convert"}
+_PROFILE_IMPORTS["baserender"] = {"pydantic", "yaml", "typer", "pyarrow", "matplotlib", "PIL", "psutil"}
+_PROFILE_IMPORTS["junction"] = {"pydantic", "yaml", "typer", "matplotlib", "psutil"}
+_PROFILE_IMPORTS["cluster"] = _PROFILE_IMPORTS["usr"] | {
+    "scanpy",
+    "igraph",
+    "leidenalg",
+    "sklearn",
+    "scipy",
+    "seaborn",
+    "matplotlib",
+    "umap",
+    "Levenshtein",
+    "click",
+}
+_PROFILE_IMPORTS["latentdna"] = _PROFILE_IMPORTS["usr"] | {
+    "anndata",
+    "igraph",
+    "leidenalg",
+    "pynndescent",
+    "scipy",
+    "sklearn",
+    "matplotlib",
+    "umap",
+}
+_PROFILE_IMPORTS["cruncher"] = _PROFILE_IMPORTS["baserender"] | {
+    "Bio",
+    "Levenshtein",
+    "arviz",
+    "certifi",
+    "click",
+    "logomaker",
+    "numba",
+    "pandas",
+    "pysam",
+    "rich",
+    "tqdm",
+}
+
+
+for _notebook_tool in ("opal", "latentdna", "cruncher"):
+    _PROFILE_IMPORTS[f"{_notebook_tool}-notebook"] = _PROFILE_IMPORTS[_notebook_tool] | {"marimo"}
+
 
 def _run(target: str, extra: str):
     try:
@@ -74,6 +120,8 @@ def _run(target: str, extra: str):
     except ModuleNotFoundError as exc:
         if not exc.name or exc.name.startswith("dnadesign") or "." in exc.name:
             raise
+        if exc.name == "marimo" and extra in {"opal", "latentdna", "cruncher"}:
+            extra = f"{extra}-notebook"
         if extra in {"infer", "permuter", "full"}:
             if exc.name in {"evo2", "flash_attn", "transformer_engine"}:
                 extra = "infer-evo2"
@@ -105,7 +153,7 @@ def dense():
 
 
 def notify():
-    return _run("dnadesign.notify.cli:app", "full")
+    return _run("dnadesign.notify.cli:app", "notify")
 
 
 def infer():
@@ -113,19 +161,19 @@ def infer():
 
 
 def construct():
-    return _run("dnadesign.construct:main", "full")
+    return _run("dnadesign.construct:main", "construct")
 
 
 def folding():
-    return _run("dnadesign.folding.cli:main", "full")
+    return _run("dnadesign.folding.cli:main", "folding")
 
 
 def cluster():
-    return _run("dnadesign.cluster.cli:main", "full")
+    return _run("dnadesign.cluster.cli:main", "cluster")
 
 
 def latentdna():
-    return _run("dnadesign.latentdna.src:main", "full")
+    return _run("dnadesign.latentdna.src:main", "latentdna")
 
 
 def permuter():
@@ -133,16 +181,16 @@ def permuter():
 
 
 def baserender():
-    return _run("dnadesign.baserender:app", "full")
+    return _run("dnadesign.baserender:app", "baserender")
 
 
 def cruncher():
-    return _run("dnadesign.cruncher.cli.app:app", "full")
+    return _run("dnadesign.cruncher.cli.app:app", "cruncher")
 
 
 def junction():
-    return _run("dnadesign.junction.cli:main", "full")
+    return _run("dnadesign.junction.cli:main", "junction")
 
 
 def ops():
-    return _run("dnadesign.ops.cli:main", "full")
+    return _run("dnadesign.ops.cli:main", "ops")

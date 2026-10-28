@@ -33,11 +33,33 @@ dnadesign-storage = "dnadesign.contracts.storage_objects.cli:main"
 [project.optional-dependencies]
 usr = [
   "biopython>=1.87", "duckdb>=1.5.5,<2", "pandas", "pyarrow>=23.0.1",
-  "pydantic", "pyyaml", "rich", "typer", "psutil>=7.2.1",
+  "pydantic>=2.12.5,<3", "pyyaml", "rich", "typer", "psutil>=7.2.1",
 ]
 infer = ["dnadesign-tools[usr]", "tqdm"]
+ops = ["pydantic>=2.12.5,<3", "pyyaml", "typer", "pyarrow>=23.0.1", "click>=8.3.3"]
+notify = ["typer", "click>=8.3.3", "keyring>=25.6.0", "certifi>=2026.10.19"]
+folding = ["pydantic>=2.12.5,<3", "pyyaml", "typer", "psutil>=7.2.1", "viennarna>=2.7.2"]
+construct = ["dnadesign-tools[usr,folding]", "vl-convert-python>=1.9.0"]
+baserender = ["pydantic>=2.12.5,<3", "pyyaml", "typer", "pyarrow>=23.0.1", "matplotlib", "pillow>=13.0.0", "psutil>=7.2.1"]
+junction = ["pydantic>=2.12.5,<3", "pyyaml", "typer", "matplotlib", "psutil>=7.2.1"]
+cluster = [
+  "dnadesign-tools[usr]", "scanpy==1.10.3", "igraph", "leidenalg",
+  "scikit-learn>=1.8,<2", "scipy>=1.17.0", "seaborn", "matplotlib",
+  "umap-learn>=0.5.11", "python-levenshtein", "click>=8.3.3",
+]
+latentdna = [
+  "dnadesign-tools[usr]", "anndata", "igraph", "leidenalg", "pynndescent",
+  "scipy>=1.17.0", "scikit-learn>=1.8,<2", "matplotlib", "umap-learn>=0.5.11",
+]
+latentdna-notebook = ["dnadesign-tools[latentdna]", "marimo>=0.23.16"]
+cruncher = [
+  "dnadesign-tools[baserender]", "biopython>=1.87", "python-levenshtein",
+  "arviz>=0.23.0", "certifi>=2026.10.19", "click>=8.3.3", "logomaker",
+  "numba", "pandas", "pysam>=0.23.3", "rich", "tqdm",
+]
+cruncher-notebook = ["dnadesign-tools[cruncher]", "marimo>=0.23.16"]
 permuter = [
-  "pandas", "pyarrow>=23.0.1", "pydantic", "pyyaml", "rich", "typer",
+  "pandas", "pyarrow>=23.0.1", "pydantic>=2.12.5,<3", "pyyaml", "rich", "typer",
   "matplotlib", "seaborn", "psutil>=7.2.1",
 ]
 opal = [
@@ -47,7 +69,7 @@ opal = [
   "scikit-learn>=1.8,<2",
   "scipy>=1.17.0",
   "joblib",
-  "pydantic",
+  "pydantic>=2.12.5,<3",
   "pyyaml",
   "rich",
   "typer",
@@ -65,58 +87,21 @@ opal-notebook = [
   "pillow>=13.0.0",
 ]
 
-# Preserve the complete tool runtime separately from the NumPy-only scoring API.
+# Complete runtime composes the tool profiles and adds shared optional backends.
 full = [
+  "dnadesign-tools[usr,infer,permuter,opal-notebook,ops,notify,folding,construct,baserender,junction,cluster,latentdna-notebook,cruncher-notebook]",
   "anyio>=4.14.2",
-  "arviz>=0.23.0",
-  "biopython>=1.87",
-  "click>=8.3.3",
-  "igraph",
-  "leidenalg",
-  "logomaker",
   "markdown-it-py>=4.0.0,<5",
-  "matplotlib",
-  "openpyxl",
   "ortools>=9.9,<9.10",
-  "pandas",
-  "pillow>=13.0.0",
-  "pyarrow>=23.0.1",
-  "pydantic",
   "pygments>=2.20.0",
-  "python-levenshtein",
-  "pyyaml",
-  "rich",
-  "scanpy==1.10.3",
-  "scikit-learn>=1.8,<2",
-  "scipy>=1.17.0",
-  "seaborn",
-  "tqdm",
-  "typer",
-  "umap-learn>=0.5.11",
-  "duckdb>=1.5.5,<2",
   "xlrd",
-  # Keep the full and optional Evo2 environments on one supported Torch family.
   "torch>=2.13,<2.14; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
-  # Qualified registry release; historical study runtimes keep their separate pins.
   "dense-arrays==0.2.0",
-  "polars>=1.36.1",
-  "altair>=6.0.0",
-  "vegafusion>=2.0.3",
-  "vl-convert-python>=1.9.0",
-  "pysam>=0.23.3",
   "netcdf4>=1.7.3",
-  "certifi>=2026.10.19",
-  "keyring>=25.6.0",
   "fastparquet>=2025.12.0",
-  # Torch also depends on filelock; publish its security floor for non-uv installs.
   "filelock>=4.2.4,<5",
-  "marimo>=0.23.16",
-  "viennarna>=2.7.2",
-  # 1.5.7.3 is yanked for a thread-safety regression.
   "zstd>=1.5.7.2,!=1.5.7.3",
   "py3dmol==2.5.5",
-  "plotly>=6.9.0",
-  "psutil>=7.2.1",
 ]
 
 # GPU stack (Linux x86_64 only)
@@ -153,7 +138,7 @@ dev = [
 ]
 ci-docs = [
   { include-group = "dev" },
-  "pyyaml", "pydantic",
+  "pyyaml", "pydantic>=2.12.5,<3",
 ]
 
 [tool.setuptools]

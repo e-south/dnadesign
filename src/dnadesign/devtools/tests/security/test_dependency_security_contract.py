@@ -19,6 +19,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from dnadesign.devtools.tests.support.dependencies import profile_requirements
+
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[5]
@@ -67,7 +69,7 @@ def _repository_source_files(
 
 def test_security_floors_are_published_by_their_owning_dependency_sets() -> None:
     project = _pyproject()["project"]
-    dependencies = tuple(project["dependencies"]) + tuple(project["optional-dependencies"]["full"])
+    dependencies = tuple(project["dependencies"]) + tuple(profile_requirements(project, "full"))
     evo2_dependencies = tuple(project["optional-dependencies"]["infer-evo2"])
     build_dependencies = tuple(_pyproject()["build-system"]["requires"])
     constraint_dependencies = tuple(_pyproject()["tool"]["uv"]["constraint-dependencies"])

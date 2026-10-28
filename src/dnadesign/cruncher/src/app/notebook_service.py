@@ -35,9 +35,13 @@ from dnadesign.cruncher.artifacts.manifest import load_manifest, write_manifest
 def ensure_marimo() -> None:
     try:
         import marimo as _  # noqa: F401
-    except Exception as exc:  # pragma: no cover - optional dependency
+    except ModuleNotFoundError as exc:
+        if exc.name != "marimo":
+            raise
         raise RuntimeError(
-            "marimo is not installed. Install with:\n  uv sync --locked\nThen re-run: cruncher notebook <run_dir>"
+            "Notebook generation requires dnadesign-tools[cruncher-notebook]. "
+            "Install that profile, or in a checkout run "
+            "uv sync --locked --no-default-groups --extra cruncher-notebook."
         ) from exc
 
 

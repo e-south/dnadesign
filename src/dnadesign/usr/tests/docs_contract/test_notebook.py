@@ -20,6 +20,8 @@ from pathlib import Path
 
 import polars as pl
 
+from dnadesign.devtools.tests.support.dependencies import profile_requirements
+
 from .helpers import read_text, repo_root
 
 
@@ -31,7 +33,7 @@ def test_notebook_agent_setup_uses_a_declared_locked_environment() -> None:
     assert "--group notebooks" not in agent_text
     assert project["tool"]["uv"]["default-groups"] == ["tools"]
     assert project["dependency-groups"]["tools"] == ["dnadesign-tools[full]"]
-    full = project["project"]["optional-dependencies"]["full"]
+    full = profile_requirements(project["project"], "full")
     assert any(requirement.startswith("marimo>=") for requirement in full)
 
 

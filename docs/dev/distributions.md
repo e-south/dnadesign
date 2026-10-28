@@ -1,7 +1,7 @@
 ## Distribution builds and verification
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-27
+**Last verified:** 2026-10-28
 
 DNADesign has one distribution version, declared in `pyproject.toml`. Runtime
 `dnadesign.__version__` reads installed metadata. Individual tools can version
@@ -102,8 +102,9 @@ changes and a patch version for compatible corrections. Describe affected tools
 and migration requirements in the release notes; a version increment alone does
 not qualify historical replay.
 
-The base install supports NumPy-only multistate scoring. Focused CLI profiles are `usr`, `permuter`, `infer`, and `opal`;
-`[full]` installs the complete runtime, including Dense Arrays 0.2.0.
+The base install supports NumPy-only multistate scoring. See the
+[installation guide](../setup/installation.md) for focused tool and notebook
+profiles. `[full]` installs the complete runtime.
 Version-based wheel installation does not provide Git provenance. Downstream
 verification must bind retained artifact bytes to installed content rather than
 invent a Git commit from `direct_url.json`.

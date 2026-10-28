@@ -177,3 +177,25 @@ def test_generate_notebook_requires_table_manifest_contract_keys(tmp_path, monke
 
     with pytest.raises(FileNotFoundError, match="analysis table manifest missing required table keys"):
         notebook_service.generate_notebook(run_dir, latest=True)
+
+
+@pytest.mark.parametrize("missing_name", ["marimo", "notebook_plugin_dependency"])
+def test_notebook_dependency_error_preserves_owner(monkeypatch, missing_name):
+    import builtins
+
+    original_import = builtins.__import__
+    failure = ModuleNotFoundError("module absent", name=missing_name)
+
+    def missing(name, *args, **kwargs):
+        if name == "marimo":
+            raise failure
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", missing)
+    if missing_name == "marimo":
+        with pytest.raises(RuntimeError, match="cruncher-notebook"):
+            notebook_service.ensure_marimo()
+    else:
+        with pytest.raises(ModuleNotFoundError) as caught:
+            notebook_service.ensure_marimo()
+        assert caught.value is failure

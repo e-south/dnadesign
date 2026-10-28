@@ -1,10 +1,10 @@
 ## Installation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-27
+**Last verified:** 2026-10-28
 
-Choose the runtime for the tools you need. Focused profiles support sequence storage, variant generation, inference setup,
-and OPAL campaigns without installing the complete toolkit. Add `--group dev` when running tests or lint checks.
+Choose the runtime for the tools you need. Combine profiles by repeating `--extra`.
+Add `--group dev` when running tests or lint checks.
 
 | Use | Checkout command |
 | --- | --- |
@@ -14,7 +14,22 @@ and OPAL campaigns without installing the complete toolkit. Add `--group dev` wh
 | Inference configuration and dry runs | `uv sync --locked --no-default-groups --extra infer` |
 | OPAL campaigns and plots | `uv sync --locked --no-default-groups --extra opal` |
 | OPAL with interactive notebooks | `uv sync --locked --no-default-groups --extra opal-notebook` |
+| Sequence construction | `uv sync --locked --no-default-groups --extra construct` |
+| ViennaRNA folding | `uv sync --locked --no-default-groups --extra folding` |
+| Sequence rendering | `uv sync --locked --no-default-groups --extra baserender` |
+| Motif optimization | `uv sync --locked --no-default-groups --extra cruncher` |
+| Oligo planning | `uv sync --locked --no-default-groups --extra junction` |
+| Clustering | `uv sync --locked --no-default-groups --extra cluster` |
+| Representation analysis | `uv sync --locked --no-default-groups --extra latentdna` |
+| Workflow discovery and orchestration | `uv sync --locked --no-default-groups --extra ops` |
+| Event notifications | `uv sync --locked --no-default-groups --extra notify` |
 | Complete toolkit | `uv sync --locked` |
+
+Use `latentdna-notebook` or `cruncher-notebook` for interactive notebooks.
+CPU profiles do not install Torch, Evo 2 or DenseArrays. OPS and Notify install
+their own command runtimes; add the profile of any producer whose configuration
+or outputs you will inspect or execute. Scheduler binaries are needed only for
+the corresponding orchestration commands. Rendering video requires FFmpeg.
 
 Activate the chosen environment with `source .venv/bin/activate`. Its installed
 commands then work from a campaign or data directory outside the checkout.
@@ -91,7 +106,7 @@ you need. The PyPI project named `dnadesign` is unrelated.
   - if you run `uv sync --locked --group dev` on a GPU env, it removes `infer-evo2` extras unless `--extra infer-evo2` is also included.
 
 The base library supports scoring. Use the named profiles above for individual
-tools and `full` for the remaining toolkit. Model execution also needs its backend
+tools and `full` for the complete toolkit. Model execution also needs its backend
 runtime; the `infer` profile supports configuration and dry runs without GPU libraries. See the
 [MSRB Python example](../../src/dnadesign/opal/docs/plugins/objectives/multistate-response-behavior.md#python-scoring-without-a-campaign).
 The `full` extra includes DenseArrays from PyPI. Checkout installs resolve its

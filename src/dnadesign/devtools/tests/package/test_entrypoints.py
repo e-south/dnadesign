@@ -18,6 +18,7 @@ from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
 from dnadesign import _entrypoints as entrypoints
+from dnadesign.devtools.tests.support.dependencies import profile_requirements
 
 
 def test_missing_optional_dependency_reports_install_profile(monkeypatch):
@@ -27,6 +28,18 @@ def test_missing_optional_dependency_reports_install_profile(monkeypatch):
     monkeypatch.setattr(entrypoints, "import_module", missing)
     with pytest.raises(SystemExit, match=r"dnadesign-tools\[usr\].*pandas"):
         entrypoints.usr()
+
+
+@pytest.mark.parametrize(
+    "command", ["ops", "notify", "construct", "folding", "cluster", "latentdna", "baserender", "cruncher", "junction"]
+)
+def test_cpu_command_recommends_its_own_runtime_profile(monkeypatch, command):
+    def missing(name):
+        raise ModuleNotFoundError("No module named typer", name="typer")
+
+    monkeypatch.setattr(entrypoints, "import_module", missing)
+    with pytest.raises(SystemExit, match=rf"dnadesign-tools\[{command}\]"):
+        getattr(entrypoints, command)()
 
 
 def test_internal_import_failure_is_not_misreported_as_an_optional_dependency(monkeypatch):
@@ -97,7 +110,7 @@ def test_missing_submodule_is_not_misreported_as_missing_distribution(monkeypatc
 
 def test_diagnostic_profiles_actually_supply_the_named_dependencies():
     root = next(path for path in Path(__file__).resolve().parents if (path / "pyproject.toml").is_file())
-    extras = tomllib.loads((root / "pyproject.toml").read_text())["project"]["optional-dependencies"]
+    project = tomllib.loads((root / "pyproject.toml").read_text())["project"]
     aliases = {
         "Bio": "biopython",
         "yaml": "pyyaml",
@@ -110,21 +123,20 @@ def test_diagnostic_profiles_actually_supply_the_named_dependencies():
         "RNA": "viennarna",
     }
 
-    def distributions(extra):
-        names = set()
-        for value in extras[extra]:
-            requirement = Requirement(value)
-            if requirement.name == "dnadesign-tools":
-                for parent in requirement.extras:
-                    names.update(distributions(parent))
-            else:
-                names.add(canonicalize_name(requirement.name))
-        return names
-
     for extra, modules in entrypoints._PROFILE_IMPORTS.items():
         names = {canonicalize_name(aliases.get(module, module)) for module in modules}
-        supplied = distributions(extra)
+        supplied = {canonicalize_name(Requirement(value).name) for value in profile_requirements(project, extra)}
         if "pydantic" in supplied:
             assert "typing-extensions" in {canonicalize_name(Requirement(value).name) for value in requires("pydantic")}
             supplied.add("typing-extensions")
         assert names <= supplied
+
+
+@pytest.mark.parametrize("command", ["latentdna", "cruncher", "opal"])
+def test_missing_notebook_runtime_reports_notebook_profile(monkeypatch, command):
+    def missing(name):
+        raise ModuleNotFoundError("No module named marimo", name="marimo")
+
+    monkeypatch.setattr(entrypoints, "import_module", missing)
+    with pytest.raises(SystemExit, match=rf"dnadesign-tools\[{command}-notebook\]"):
+        getattr(entrypoints, command)()

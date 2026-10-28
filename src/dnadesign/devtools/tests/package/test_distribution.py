@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import re
+import runpy
 import shutil
 import subprocess
 import sys
@@ -24,11 +25,18 @@ from importlib import import_module
 from importlib.metadata import version
 from pathlib import Path
 
+import pytest
 from packaging.requirements import Requirement
 from setuptools import Distribution, find_namespace_packages
 from setuptools.config.pyprojecttoml import apply_configuration
 
+from dnadesign.devtools.architecture.boundaries import (
+    TOP_LEVEL_ROOT_MODULES,
+    _discover_tools,
+    _iter_checked_python_files,
+)
 from dnadesign.devtools.architecture.lifecycle import load_lifecycle, wheel_issues
+from dnadesign.devtools.tests.support.dependencies import profile_requirements
 
 _DISTRIBUTION_DATA_EXCLUDES = [
     "reader_spop_*.parquet",
@@ -111,6 +119,16 @@ def test_opal_install_does_not_require_other_tool_runtimes() -> None:
     assert requirements.isdisjoint({"torch", "pymc", "scanpy", "ortools", "dense-arrays", "marimo"})
 
 
+@pytest.mark.parametrize("profile", ["usr", "permuter", "opal", "full"])
+def test_declared_pydantic_versions_require_the_runtime_validator_api(profile: str) -> None:
+    project = tomllib.loads((_repo_root() / "pyproject.toml").read_text())["project"]
+    requirement = next(
+        Requirement(value) for value in profile_requirements(project, profile) if Requirement(value).name == "pydantic"
+    )
+    assert not requirement.specifier.contains("1.10.24")
+    assert requirement.specifier.contains(version("pydantic"))
+
+
 def _copy_build_source(repo_root: Path, destination: Path) -> None:
     """Copy only Git-accepted files so ignored build residue cannot enter a wheel."""
 
@@ -175,6 +193,12 @@ def test_build_excludes_unapproved_local_workspace_resources(tmp_path: Path) -> 
     _copy_build_source(_repo_root(), source)
     private_paths = [
         "baserender/workspaces/unpublished/inputs/private.parquet",
+        "latentdna/workspaces/unpublished/local_notes.py",
+        "latentdna/workspaces/unpublished/__init__.py",
+        "latentdna/workspaces/unpublished/private.pyi",
+        "opal/campaigns/demo_gp_topn/private_trial.py",
+        "usr/datasets/unpublished/analysis.py",
+        "construct/docs/private_example.py",
         "baserender/workspaces/demo_densegen_render/inputs/private.parquet",
         "construct/workspaces/demo_anchor_template_local/inputs/private.json",
         "densegen/workspaces/demo_tfbs_baseline/inputs/private.csv",
@@ -236,18 +260,17 @@ def test_distribution_excludes_internal_source_shelves(tmp_path: Path) -> None:
     assert _RETAINED_PACKAGE_SENTINELS <= discovered
 
 
-def test_distribution_contains_no_ignored_python_sources() -> None:
+def test_distribution_contains_no_ignored_python_sources(monkeypatch: pytest.MonkeyPatch) -> None:
     repo_root = _repo_root()
-    project = tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8"))
-    discovery = project["tool"]["setuptools"]["packages"]["find"]
-    source_root = repo_root / discovery["where"][0]
-    packages = find_namespace_packages(
-        where=str(source_root),
-        exclude=discovery["exclude"],
-    )
-    packaged_sources = {
-        path.resolve() for package in packages for path in (source_root / package.replace(".", "/")).glob("*.py")
-    }
+    with monkeypatch.context() as scoped:
+        scoped.setattr("setuptools.setup", lambda **kwargs: None)
+        backend = runpy.run_path(str(repo_root / "setup.py"))
+    distribution = Distribution({"long_description": "", "long_description_content_type": "text/markdown"})
+    distribution.script_name = str(repo_root / "setup.py")
+    apply_configuration(distribution, str(repo_root / "pyproject.toml"))
+    builder = backend["PortableBuild"](distribution)
+    builder.ensure_finalized()
+    packaged_sources = {Path(source).resolve() for source in builder.get_source_files()}
 
     accepted = subprocess.run(
         [
@@ -368,6 +391,12 @@ def test_built_wheel_retains_runtime_resources_without_internal_shelves(tmp_path
     assert all(requirement.url is None for requirement in requirements)
 
     assert _REQUIRED_WHEEL_MEMBERS <= members
+    checked_sources = {
+        str(path.relative_to(repo_root / "src"))
+        for path in _iter_checked_python_files(repo_root, _discover_tools(repo_root))
+    }
+    checked_sources.update(f"dnadesign/{name}" for name in TOP_LEVEL_ROOT_MODULES)
+    assert {name for name in members if name.endswith(".py")} <= checked_sources
     assert wheel_issues(load_lifecycle(repo_root), members) == []
     assert not any(member.endswith("tool-lifecycle.toml") for member in members)
     assert members.isdisjoint(_FORBIDDEN_WHEEL_MEMBERS)
@@ -438,6 +467,15 @@ def _check_focused_installs(repo_root: Path, tmp_path: Path, wheel: Path) -> Non
         ("usr", ["--help"]),
         ("permuter", ["workspace", "list"]),
         ("infer", ["adapters", "list"]),
+        ("ops", ["catalog", "list", "--simple"]),
+        ("notify", ["--help"]),
+        ("folding", ["--help"]),
+        ("construct", ["workspace", "list"]),
+        ("baserender", ["catalog", "--json"]),
+        ("junction", ["--help"]),
+        ("cluster", ["workspaces", "list"]),
+        ("latentdna", ["workspace", "init", "--workspace", str(tmp_path / "focused_latent"), "--template", "minimal"]),
+        ("cruncher", ["optimizers", "list"]),
     ):
         environment = tmp_path / f"{profile}-env"
         requirements = tmp_path / f"pylock.{profile}.toml"
@@ -481,6 +519,25 @@ def _check_focused_installs(repo_root: Path, tmp_path: Path, wheel: Path) -> Non
             [str(environment / f"bin/{profile}"), *arguments], cwd=tmp_path, capture_output=True, text=True, timeout=60
         )
         assert result.returncode == 0, (profile, result.stdout, result.stderr)
+        if profile == "folding":
+            subprocess.run(
+                [
+                    str(python),
+                    "-I",
+                    "-c",
+                    "import RNA; structure, energy = RNA.fold('GCGCAAAAGCGC'); assert len(structure) == 12",
+                ],
+                cwd=tmp_path,
+                check=True,
+                capture_output=True,
+            )
+        if profile == "ops":
+            subprocess.run(
+                [str(environment / "bin/ops"), "progress", "kinds"],
+                cwd=tmp_path,
+                check=True,
+                capture_output=True,
+            )
         if profile == "infer":
             dry_run = subprocess.run(
                 [
@@ -508,7 +565,13 @@ def _check_focused_installs(repo_root: Path, tmp_path: Path, wheel: Path) -> Non
             assert dry_run.returncode == 0, dry_run.stdout + dry_run.stderr
             assert "dry run" in dry_run.stdout
         subprocess.run(
-            [str(python), "-I", "-c", "from importlib.util import find_spec; assert find_spec('torch') is None"],
+            [
+                str(python),
+                "-I",
+                "-c",
+                "from importlib.util import find_spec; "
+                "assert all(find_spec(name) is None for name in ('torch', 'evo2', 'dense_arrays', 'marimo'))",
+            ],
             check=True,
             capture_output=True,
         )
@@ -706,7 +769,7 @@ def test_scoring_install_is_small_and_full_tools_remain_explicit() -> None:
     assert project["project"]["name"] == "dnadesign-tools"
     base = {Requirement(value).name for value in project["project"]["dependencies"]}
     assert base == {"numpy"}
-    full = {Requirement(value).name for value in project["project"]["optional-dependencies"]["full"]}
+    full = {Requirement(value).name for value in profile_requirements(project["project"], "full")}
     assert {"pandas", "pyarrow", "pydantic", "typer", "scikit-learn", "dense-arrays", "torch", "marimo"} <= full
     assert project["dependency-groups"]["tools"] == ["dnadesign-tools[full]"]
     assert project["tool"]["uv"]["default-groups"] == ["tools"]
@@ -714,7 +777,7 @@ def test_scoring_install_is_small_and_full_tools_remain_explicit() -> None:
 
 def test_document_checks_do_not_add_runtime_dependencies() -> None:
     project = tomllib.loads((_repo_root() / "pyproject.toml").read_text())
-    full = {Requirement(value).name for value in project["project"]["optional-dependencies"]["full"]}
+    full = {Requirement(value).name for value in profile_requirements(project["project"], "full")}
     assert full.isdisjoint({"html5lib", "upa-url"})
 
 
