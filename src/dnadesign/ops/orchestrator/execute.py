@@ -52,6 +52,10 @@ class BatchExecutionResult:
         }
 
 
+def _output_text(value: str | bytes | None) -> str:
+    return value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value or ""
+
+
 def _default_command_runner(command: CommandSpec, *, timeout_seconds: float | None) -> tuple[int, str, str]:
     env = os.environ.copy()
     env.update(command.env)
@@ -78,11 +82,13 @@ def _default_command_runner(command: CommandSpec, *, timeout_seconds: float | No
                 timeout=timeout_seconds,
             )
     except subprocess.TimeoutExpired as exc:
-        stdout = exc.stdout or ""
-        stderr = (exc.stderr or "").strip()
+        stdout = _output_text(exc.stdout)
+        stderr = _output_text(exc.stderr).strip()
         timeout_message = f"command timed out after {timeout_seconds} seconds"
         stderr = f"{stderr}\n{timeout_message}".strip() if stderr else timeout_message
         return 124, stdout, stderr
+    except OSError as exc:
+        return (127 if isinstance(exc, FileNotFoundError) else 126), "", f"Command could not run: {exc}"
     return int(result.returncode), result.stdout, result.stderr
 
 
