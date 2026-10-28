@@ -115,3 +115,13 @@ def test_invalid_read_mode_does_not_create_lock(tmp_path):
     with pytest.raises(ValueError, match="read_mode"):
         payloads.read_payload_table(path, read_mode="typo")
     assert not (tmp_path / ".sidecar.lock").exists()
+
+
+def test_snapshot_rejects_manifest_publication_during_single_file_read(tmp_path):
+    path = tmp_path / "feature_vectors.parquet"
+    pq.write_table(_table(0.25), path)
+    stream = payloads.iter_payload_batches(path, read_mode="snapshot")
+    next(stream)
+    _bundle(tmp_path)
+    with pytest.raises(ValueError, match="changed during"):
+        next(stream)

@@ -155,9 +155,12 @@ def _read_files(path: Path, *, lock: bool, read_mode: ReadMode):
         files = payload_files(path)
         identities = {part: _file_identity(part.stat()) for part in files}
         yield files
-        after = _file_identity(inventory.stat()) if inventory.exists() else None
-        if after != before or any(
-            not p.exists() or _file_identity(p.stat()) != identity for p, identity in identities.items()
+        current = manifest_path(path) if manifest_path(path).exists() else path
+        after = _file_identity(current.stat()) if current.exists() else None
+        if (
+            current != inventory
+            or after != before
+            or any(not p.exists() or _file_identity(p.stat()) != identity for p, identity in identities.items())
         ):
             raise ValueError(f"Feature payload changed during read: {path}")
 
