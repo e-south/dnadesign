@@ -242,6 +242,7 @@ NESTED_TEST_PACKAGE_FILES = {
         "test_dataset_overlay_package_module.py",
         "test_dataset_reserved_overlay_module.py",
         "test_mock_overlay.py",
+        "test_part_overwrite.py",
     },
     ("datasets", "query"): {
         "__init__.py",

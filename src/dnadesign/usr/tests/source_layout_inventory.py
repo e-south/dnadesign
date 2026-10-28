@@ -263,6 +263,7 @@ PACKAGE_FILES = {
     ("datasets", "overlay"): {
         "__init__.py",
         "attach.py",
+        "collision.py",
         "maintenance.py",
         "policy.py",
         "write.py",

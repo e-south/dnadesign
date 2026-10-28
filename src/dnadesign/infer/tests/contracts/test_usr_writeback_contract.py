@@ -24,8 +24,33 @@ from dnadesign.infer.src.config import JobConfig, ModelConfig
 from dnadesign.infer.src.engine import _plan_resume_for_usr, run_extract_job
 from dnadesign.infer.src.errors import RuntimeOOMError, WriteBackError
 from dnadesign.infer.src.runtime.resume_planner import read_usr_columns
+from dnadesign.infer.src.writers import usr as usr_writer
 from dnadesign.infer.src.writers.usr import write_back_usr
 from dnadesign.usr import Dataset
+
+
+def test_interleaved_write_rechecks_occupancy_inside_storage_transaction(tmp_path, monkeypatch) -> None:
+    root = tmp_path / "datasets"
+    register_test_namespace(root, namespace="infer", columns_spec="infer__evo2_7b__job_a__ll_mean:float64")
+    ds = Dataset(root, "demo")
+    ds.init(source="test")
+    ds.import_rows([{"sequence": "ACGT", "bio_type": "dna", "alphabet": "dna_4", "source": "test"}], source="test")
+    ids = ds.head(1)["id"].tolist()
+    original = usr_writer._write_usr_overlay_part
+
+    def interleaved(dataset, **kwargs):
+        monkeypatch.setattr(usr_writer, "_write_usr_overlay_part", original)
+        write_back_usr(
+            dataset, ids=ids, model_id="evo2_7b", job_id="job_a", columnar={"ll_mean": [2.0]}, overwrite=False
+        )
+        original(dataset, **kwargs)
+
+    monkeypatch.setattr(usr_writer, "_write_usr_overlay_part", interleaved)
+    with pytest.raises(WriteBackError, match="Refusing overwrite"):
+        write_back_usr(ds, ids=ids, model_id="evo2_7b", job_id="job_a", columnar={"ll_mean": [1.0]}, overwrite=False)
+    assert ds.head(1)["infer__evo2_7b__job_a__ll_mean"].tolist() == [2.0]
+    events = [json.loads(line) for line in ds.events_path.read_text().splitlines()]
+    assert len([event for event in events if event["action"] == "write_overlay_part"]) == 1
 
 
 class _AttachCaptureDataset:
@@ -84,6 +109,7 @@ class _OverlayPartCaptureDataset:
         key: str = "id",
         key_col: str | None = None,
         allow_missing: bool = False,
+        overwrite: bool = True,
         actor: dict[str, object] | None = None,
         event_args: dict[str, object] | None = None,
     ) -> int:
@@ -95,6 +121,7 @@ class _OverlayPartCaptureDataset:
                 "columns": list(table_or_batches.columns),
                 "payload": table_or_batches.to_dict(orient="list"),
                 "allow_missing": allow_missing,
+                "overwrite": overwrite,
                 "actor": actor,
                 "event_args": event_args,
             }

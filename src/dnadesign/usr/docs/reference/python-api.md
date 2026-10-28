@@ -1,7 +1,7 @@
 # USR Python API quickstart
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-28
 
 Public import surface: `dnadesign.usr`
 
@@ -75,6 +75,12 @@ ds.write_overlay("mock", overlay_df, key="id")
 
 print(ds.head(3))
 ```
+
+For incremental producers, `ds.write_overlay_part("mock", batch, overwrite=False)`
+checks occupied cells while holding the dataset write lock. It permits filling
+nulls and adding disjoint rows or columns, but rejects a batch that targets an
+existing non-null value. Rejected collisions leave data and mutation events
+unchanged. The default `overwrite=True` retains last-writer-wins behavior.
 
 ## Next steps
 

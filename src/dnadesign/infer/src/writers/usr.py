@@ -167,6 +167,7 @@ def _write_usr_overlay_part(
     df: pd.DataFrame,
     job_id: str,
     columnar: Dict[str, List[object]],
+    overwrite: bool,
     event_args: Mapping[str, object] | None,
 ) -> None:
     actor = _infer_actor(job_id)
@@ -176,6 +177,7 @@ def _write_usr_overlay_part(
         df,
         key="id",
         allow_missing=False,
+        overwrite=overwrite,
         actor=actor,
         event_args=resolved_event_args,
     )
@@ -288,14 +290,19 @@ def write_back_usr(
     df = pd.DataFrame({"id": ids, **out_cols})
 
     if _supports_overlay_part_write(ds):
-        _guard_usr_overwrite(ds, ids=ids, out_cols=list(out_cols.keys()), overwrite=overwrite)
-        _write_usr_overlay_part(
-            ds,
-            df=df,
-            job_id=job_id,
-            columnar=columnar,
-            event_args=event_args,
-        )
+        try:
+            _write_usr_overlay_part(
+                ds,
+                df=df,
+                job_id=job_id,
+                columnar=columnar,
+                overwrite=overwrite,
+                event_args=event_args,
+            )
+        except SchemaError as error:
+            if str(error).startswith("Refusing overwrite for existing values in column "):
+                raise WriteBackError(str(error)) from error
+            raise
         return
 
     if _supports_inprocess_attach(ds):

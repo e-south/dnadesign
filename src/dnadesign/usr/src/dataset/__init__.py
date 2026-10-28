@@ -638,6 +638,7 @@ class Dataset:
         key: str = "id",
         key_col: Optional[str] = None,
         allow_missing: bool = False,
+        overwrite: bool = True,
         actor: Optional[dict] = None,
         event_args: Mapping[str, object] | None = None,
     ) -> int:
@@ -648,6 +649,7 @@ class Dataset:
             key=key,
             key_col=key_col,
             allow_missing=allow_missing,
+            overwrite=overwrite,
             actor=actor,
             event_args=event_args,
             reserved_namespaces=MUTATION_RESERVED_NAMESPACES,

@@ -37,6 +37,7 @@ from ...runtime import connect_duckdb_utc
 from ...storage.locking import dataset_write_lock
 from ...storage.parquet import PARQUET_COMPRESSION, now_utc
 from .attach import _attach_frame_dataset
+from .collision import reject_occupied_cells
 from .policy import (
     SUPPORTED_OVERLAY_KEYS,
     coerce_null_overlay_columns_to_registry_schema,
@@ -55,6 +56,7 @@ _WRITE_OVERLAY_PART_RESERVED_EVENT_KEYS = frozenset(
         "rows_written",
         "rows_missing",
         "allow_missing",
+        "overwrite",
     }
 )
 
@@ -86,6 +88,7 @@ def _merge_write_overlay_part_event_args(
     rows_written: int,
     rows_missing: int,
     allow_missing: bool,
+    overwrite: bool,
     event_args: Mapping[str, object] | None,
 ) -> dict[str, object]:
     args: dict[str, object] = {
@@ -97,6 +100,7 @@ def _merge_write_overlay_part_event_args(
         "rows_written": rows_written,
         "rows_missing": rows_missing,
         "allow_missing": allow_missing,
+        "overwrite": overwrite,
     }
     if event_args is None:
         return args
@@ -166,13 +170,18 @@ def write_overlay_part_dataset(
     key: str = "id",
     key_col: Optional[str] = None,
     allow_missing: bool = False,
+    overwrite: bool = True,
     actor: Optional[dict] = None,
     event_args: Mapping[str, object] | None = None,
     create_only: bool = False,
     reserved_namespaces: set[str],
     write_lock=dataset_write_lock,
 ) -> int:
-    """Write an overlay part, optionally requiring an absent namespace."""
+    """Write an overlay part with collision checks inside the dataset lock.
+
+    ``overwrite=False`` rejects occupied cells, but permits filling nulls and
+    adding disjoint rows or columns. ``create_only`` requires an absent namespace.
+    """
     dataset._require_exists()
     if namespace in reserved_namespaces:
         raise NamespaceError(f"Namespace '{namespace}' is reserved.")
@@ -224,6 +233,7 @@ def write_overlay_part_dataset(
             rows_written=0,
             rows_missing=0,
             allow_missing=allow_missing,
+            overwrite=overwrite,
             event_args=event_args,
         ),
         metrics={"rows_incoming": 0, "rows_written": 0, "rows_missing": 0},
@@ -367,6 +377,7 @@ def write_overlay_part_dataset(
             rows_written=rows_written,
             rows_missing=rows_missing,
             allow_missing=allow_missing,
+            overwrite=overwrite,
             event_args=event_args,
         )
         metrics = {
@@ -418,6 +429,8 @@ def write_overlay_part_dataset(
     with write_lock(dataset.dir):
         if create_only and (_entry_exists(file_path) or _entry_exists(dir_path)):
             raise FileExistsError(f"Overlay namespace '{namespace}' already exists for {dataset.name}.")
+        if not overwrite:
+            reject_occupied_cells(dataset, namespace=namespace, incoming=tbl, key=key)
         dataset._auto_freeze_registry()
         if not create_only:
             result = _write_part()
