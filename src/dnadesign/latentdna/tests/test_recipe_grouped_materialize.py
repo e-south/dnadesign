@@ -187,16 +187,26 @@ def _write_two_view_sidecar_workspace(tmp_path: Path) -> Path:
     return workspace_dir
 
 
+@pytest.mark.parametrize("read_mode", ["live", "snapshot"])
 def test_recipe_groups_compatible_infer_sidecar_materializations_after_one_shared_dim_probe(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, read_mode: str
 ) -> None:
     workspace_dir = _write_two_view_sidecar_workspace(tmp_path)
+    config_path = workspace_dir / "config.yaml"
+    config = yaml.safe_load(config_path.read_text())
+    for source in config["sources"].values():
+        source["read_mode"] = read_mode
+    config_path.write_text(yaml.safe_dump(config))
+    payload_dir = tmp_path / "usr/grouped_sidecar/_derived/infer"
+    if read_mode == "snapshot":
+        (payload_dir / ".sidecar.lock").unlink()
+        payload_dir.chmod(0o555)
     real_parquet_file = infer_sidecar_join.pq.ParquetFile
     payload_scans = 0
 
     class CountingParquetFile:
         def __init__(self, path, *args, **kwargs):
-            self.path = Path(path)
+            self.path = Path(path if isinstance(path, (str, Path)) else path.name)
             self.inner = real_parquet_file(path, *args, **kwargs)
 
         def __getattr__(self, name: str):
@@ -216,7 +226,12 @@ def test_recipe_groups_compatible_infer_sidecar_materializations_after_one_share
 
     monkeypatch.setattr(infer_sidecar_join.pq, "ParquetFile", counting_parquet_file)
 
-    result = run_recipe(workspace_dir, "two_view_recipe", refresh_catalog=False)
+    try:
+        result = run_recipe(workspace_dir, "two_view_recipe", refresh_catalog=False)
+        if read_mode == "snapshot":
+            assert not (payload_dir / ".sidecar.lock").exists()
+    finally:
+        payload_dir.chmod(0o755)
 
     assert result.status == "ok"
     assert payload_scans == 2

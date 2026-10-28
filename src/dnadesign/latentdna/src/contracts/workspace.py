@@ -304,12 +304,14 @@ class InferFeatureSidecarSourceConfig(SourceBase):
     kind: Literal["infer_feature_sidecar"]
     root: str
     dataset: str
+    read_mode: Literal["live", "snapshot"] = "live"
 
 
 class InferFeatureScalarSidecarSourceConfig(SourceBase):
     kind: Literal["infer_feature_scalar_sidecar"]
     root: str
     dataset: str
+    read_mode: Literal["live", "snapshot"] = "live"
 
 
 SourceConfig = Annotated[

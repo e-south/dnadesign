@@ -55,6 +55,43 @@ def _runtime_contract_fields() -> dict[str, str]:
     }
 
 
+@pytest.mark.parametrize("kind", ["infer_feature_sidecar", "infer_feature_scalar_sidecar"])
+def test_snapshot_source_reads_transferred_bundle_without_lock(tmp_path, kind):
+    from dnadesign.latentdna.src.contracts.workspace import (
+        InferFeatureScalarSidecarSourceConfig,
+        InferFeatureSidecarSourceConfig,
+    )
+    from dnadesign.latentdna.src.sources.resolver import (
+        inspect_source_schema,
+        iter_records_batches,
+        read_records_table,
+        resolve_source,
+    )
+
+    root, ds = _standard_metadata_sidecar_dataset(tmp_path)
+    cls = InferFeatureSidecarSourceConfig if kind == "infer_feature_sidecar" else InferFeatureScalarSidecarSourceConfig
+    source = cls(
+        kind=kind,
+        root=str(root),
+        dataset=ds.name,
+        read_mode="snapshot",
+        record_key="alias_id",
+        subject_key="sequence_id",
+    )
+    resolved = resolve_source("snapshot", source, workspace_dir=tmp_path)
+    directory = ds.dir / "_derived/infer"
+    (directory / ".sidecar.lock").unlink()
+    directory.chmod(0o555)
+    try:
+        assert inspect_source_schema(resolved)
+        table = read_records_table(resolved, columns=["value"])
+        assert table.num_rows == 1
+        assert sum(batch.num_rows for batch in iter_records_batches(resolved, columns=["value"])) == 1
+        assert not (directory / ".sidecar.lock").exists()
+    finally:
+        directory.chmod(0o755)
+
+
 def _planned_dataset(tmp_path: Path) -> tuple[Path, Dataset, str]:
     usr_root = tmp_path / "usr"
     ensure_sequence_contract_namespaces(usr_root)
@@ -752,7 +789,7 @@ def test_feature_sidecar_metadata_only_reads_do_not_scan_vector_payloads(
     real_parquet_file = infer_feature_sidecar_source.infer_sidecar_join.pq.ParquetFile
 
     def fail_payload_scan(path, *args, **kwargs):
-        if Path(path).name == "feature_vectors.parquet":
+        if Path(path if isinstance(path, (str, Path)) else path.name).name == "feature_vectors.parquet":
             raise AssertionError("metadata-only sidecar reads should not scan feature vector payload rows")
         return real_parquet_file(path, *args, **kwargs)
 
@@ -784,7 +821,7 @@ def test_feature_scalar_sidecar_metadata_only_reads_do_not_scan_scalar_payloads(
     real_parquet_file = infer_feature_scalar_sidecar_source.infer_sidecar_join.pq.ParquetFile
 
     def fail_payload_scan(path, *args, **kwargs):
-        if Path(path).name == "feature_scalars.parquet":
+        if Path(path if isinstance(path, (str, Path)) else path.name).name == "feature_scalars.parquet":
             raise AssertionError("metadata-only sidecar reads should not scan feature scalar payload rows")
         return real_parquet_file(path, *args, **kwargs)
 

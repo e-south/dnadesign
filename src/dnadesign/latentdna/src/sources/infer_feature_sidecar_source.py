@@ -12,10 +12,13 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import pyarrow as pa
+
+from dnadesign.contracts.feature_payloads import ReadMode
 
 from . import infer_sidecar_join
 
@@ -98,11 +101,11 @@ def _read_alias_table(
 
 
 def inspect_schema(
-    root: str, dataset: str, *, workspace_dir: Path, where: Mapping[str, object] | None
+    root: str, dataset: str, *, workspace_dir: Path, where: Mapping[str, object] | None, read_mode: ReadMode = "live"
 ) -> dict[str, Any]:
     aliases = _read_alias_table(root, dataset, workspace_dir=workspace_dir, where=where)
     return infer_sidecar_join.inspect_schema(
-        _CONTRACT,
+        replace(_CONTRACT, read_mode=read_mode),
         root,
         dataset,
         workspace_dir=workspace_dir,
@@ -119,9 +122,10 @@ def iter_batches(
     where: Mapping[str, object] | None,
     columns: list[str] | None,
     batch_size: int = _BATCH_SIZE,
+    read_mode: ReadMode = "live",
 ):
     yield from infer_sidecar_join.iter_batches(
-        _CONTRACT,
+        replace(_CONTRACT, read_mode=read_mode),
         root,
         dataset,
         workspace_dir=workspace_dir,
@@ -138,9 +142,10 @@ def iter_grouped_batches(
     workspace_dir: Path,
     requests: list[infer_sidecar_join.SidecarBatchRequest],
     batch_size: int = _BATCH_SIZE,
+    read_mode: ReadMode = "live",
 ):
     yield from infer_sidecar_join.iter_grouped_batches(
-        _CONTRACT,
+        replace(_CONTRACT, read_mode=read_mode),
         root,
         dataset,
         workspace_dir=workspace_dir,
@@ -156,9 +161,10 @@ def read_table(
     workspace_dir: Path,
     where: Mapping[str, object] | None,
     columns: list[str] | None,
+    read_mode: ReadMode = "live",
 ) -> pa.Table:
     return infer_sidecar_join.read_table(
-        _CONTRACT,
+        replace(_CONTRACT, read_mode=read_mode),
         root,
         dataset,
         workspace_dir=workspace_dir,
@@ -174,5 +180,8 @@ def source_provenance(
     *,
     workspace_dir: Path,
     columns: list[str] | None,
+    read_mode: ReadMode = "live",
 ) -> list[dict[str, object]]:
-    return infer_sidecar_join.source_provenance(_CONTRACT, root, dataset, workspace_dir=workspace_dir, columns=columns)
+    return infer_sidecar_join.source_provenance(
+        replace(_CONTRACT, read_mode=read_mode), root, dataset, workspace_dir=workspace_dir, columns=columns
+    )

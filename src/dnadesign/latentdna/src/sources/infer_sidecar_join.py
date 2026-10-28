@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from collections.abc import Mapping
+from contextlib import nullcontext
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -22,9 +23,12 @@ import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from dnadesign.contracts.feature_payloads import (
+    ReadMode,
     iter_payload_batches,
+    manifest_path,
     payload_exists,
     payload_files,
+    payload_lock,
     payload_signature,
     read_payload_table,
 )
@@ -51,6 +55,7 @@ class InferSidecarJoinContract:
     payload_schema: pa.Schema
     payload_value_field_types: Mapping[str, pa.DataType]
     vector_columns: list[str]
+    read_mode: ReadMode = "live"
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,12 +96,14 @@ def read_alias_table(
 
 
 @lru_cache(maxsize=32)
-def _payload_key_set_for_path(path_text: str, key_column: str, mtime_ns: int, size: int) -> set[str]:
-    del mtime_ns, size
+def _payload_key_set_for_path(
+    path_text: str, key_column: str, mtime_ns: int, size: int, ctime_ns: int, read_mode: ReadMode
+) -> set[str]:
+    del mtime_ns, size, ctime_ns
     path = Path(path_text)
     if not payload_exists(path):
         return set()
-    table = read_payload_table(path, columns=[key_column])
+    table = read_payload_table(path, columns=[key_column], read_mode=read_mode)
     return {str(value) for value in table.column(key_column).to_pylist() if value is not None}
 
 
@@ -110,7 +117,16 @@ def _payload_key_set(
     path = payload_path(contract, root, dataset, workspace_dir=workspace_dir)
     if not payload_exists(path):
         return set()
-    return _payload_key_set_for_path(path.as_posix(), contract.payload_key_column, *payload_signature(path))
+    with payload_lock(path) if contract.read_mode == "live" else nullcontext():
+        payload_files(path)
+        inventory = manifest_path(path) if manifest_path(path).exists() else path
+        return _payload_key_set_for_path(
+            path.as_posix(),
+            contract.payload_key_column,
+            *payload_signature(path),
+            inventory.stat().st_ctime_ns,
+            contract.read_mode,
+        )
 
 
 def _first_true_index(mask: pa.Array | pa.ChunkedArray) -> int:
@@ -455,7 +471,9 @@ def iter_batches(
         payload_columns.append("created_at")
     if not payload_exists(payload_table_path):
         return
-    for batch in iter_payload_batches(payload_table_path, columns=payload_columns, batch_size=batch_size):
+    for batch in iter_payload_batches(
+        payload_table_path, columns=payload_columns, batch_size=batch_size, read_mode=contract.read_mode
+    ):
         matched_metadata_rows, payload_indices = _match_payload_batch_rows(contract, batch, metadata=metadata)
         if not matched_metadata_rows:
             continue
@@ -576,7 +594,9 @@ def iter_grouped_batches(
         payload_columns.append(contract.payload_value_column)
     if needs_created_at_column:
         payload_columns.append("created_at")
-    for batch in iter_payload_batches(payload_table_path, columns=payload_columns, batch_size=batch_size):
+    for batch in iter_payload_batches(
+        payload_table_path, columns=payload_columns, batch_size=batch_size, read_mode=contract.read_mode
+    ):
         grouped_metadata_rows: dict[str, list[dict[str, object]]] = {request_id: [] for request_id in request_state}
         grouped_payload_indices: dict[str, list[int]] = {request_id: [] for request_id in request_state}
         for row_index, key_value in enumerate(_record_batch_column(batch, contract.payload_key_column).to_pylist()):
@@ -664,9 +684,11 @@ def source_provenance(
     ]:
         if path.is_file():
             entries.append({"kind": "file", "id": role, "path": path.as_posix(), "role": role})
-    for part in payload_files(
-        payload_path(contract, root, dataset, workspace_dir=workspace_dir), include_manifest=True
-    ):
-        source_id = f"{contract.payload_role}:{part.stem}" if part.name.startswith("part-") else contract.payload_role
-        entries.append({"kind": "file", "id": source_id, "path": part.as_posix(), "role": contract.payload_role})
+    path = payload_path(contract, root, dataset, workspace_dir=workspace_dir)
+    with payload_lock(path) if contract.read_mode == "live" else nullcontext():
+        for part in payload_files(path, include_manifest=True):
+            source_id = (
+                f"{contract.payload_role}:{part.stem}" if part.name.startswith("part-") else contract.payload_role
+            )
+            entries.append({"kind": "file", "id": source_id, "path": part.as_posix(), "role": contract.payload_role})
     return entries

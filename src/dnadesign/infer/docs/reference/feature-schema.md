@@ -138,6 +138,21 @@ parts and single-file Parquet payloads. It coordinates with writers through the
 local `.sidecar.lock`; this lock is not data and can be recreated after transfer.
 Keys, values and alias schemas are unchanged by the storage layout.
 
+Readers verify each committed part's SHA-256, schema, and row count before use.
+Verification is cached within the process for unchanged files. The cache key
+includes the manifest expectations and file device, inode, size, modification
+time, and change time; changing a part or its declared digest triggers another
+verification. The first read therefore scans each part's bytes, while repeated
+reads avoid that cost. Single-file payloads have no manifest digest and require
+an external checksum when transferred.
+
+The shared readers default to `read_mode="live"`, which coordinates with writers.
+For an immutable transferred bundle, use `read_mode="snapshot"`. Snapshot reads
+verify committed parts without creating a lock or writing into the input
+directory, and reject changes detected during the read. Do not select snapshot
+mode for a store being updated or compacted. `lock=False` is reserved for callers
+already holding the live store's lock.
+
 Before appending to single-file payloads, explicitly migrate them:
 
 ```bash

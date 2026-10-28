@@ -147,6 +147,7 @@ def inspect_source_schema(resolved: ResolvedSource) -> dict[str, Any]:
             resolved.source.root,
             resolved.source.dataset,
             workspace_dir=resolved.workspace_dir,
+            read_mode=resolved.source.read_mode,
             where=resolved.source.where,
         )
     if isinstance(resolved.source, InferFeatureScalarSidecarSourceConfig):
@@ -154,6 +155,7 @@ def inspect_source_schema(resolved: ResolvedSource) -> dict[str, Any]:
             resolved.source.root,
             resolved.source.dataset,
             workspace_dir=resolved.workspace_dir,
+            read_mode=resolved.source.read_mode,
             where=resolved.source.where,
         )
     if resolved.records_path is not None:
@@ -204,6 +206,7 @@ def read_records_table(
             resolved.source.root,
             resolved.source.dataset,
             workspace_dir=resolved.workspace_dir,
+            read_mode=resolved.source.read_mode,
             where=resolved.source.where,
             columns=columns,
         )
@@ -212,6 +215,7 @@ def read_records_table(
             resolved.source.root,
             resolved.source.dataset,
             workspace_dir=resolved.workspace_dir,
+            read_mode=resolved.source.read_mode,
             where=resolved.source.where,
             columns=columns,
         )
@@ -247,6 +251,7 @@ def iter_records_batches(
             resolved.source.root,
             resolved.source.dataset,
             workspace_dir=resolved.workspace_dir,
+            read_mode=resolved.source.read_mode,
             where=resolved.source.where,
             columns=columns,
             batch_size=batch_size,
@@ -257,6 +262,7 @@ def iter_records_batches(
             resolved.source.root,
             resolved.source.dataset,
             workspace_dir=resolved.workspace_dir,
+            read_mode=resolved.source.read_mode,
             where=resolved.source.where,
             columns=columns,
             batch_size=batch_size,
@@ -294,6 +300,7 @@ def source_provenance(
             resolved.source.root,
             resolved.source.dataset,
             workspace_dir=resolved.workspace_dir,
+            read_mode=resolved.source.read_mode,
             columns=columns,
         )
     if isinstance(resolved.source, InferFeatureScalarSidecarSourceConfig):
@@ -301,6 +308,7 @@ def source_provenance(
             resolved.source.root,
             resolved.source.dataset,
             workspace_dir=resolved.workspace_dir,
+            read_mode=resolved.source.read_mode,
             columns=columns,
         )
     if isinstance(resolved.source, MatrixBundleSourceConfig):

@@ -608,6 +608,7 @@ def _source_vector_dims(resolved, *, vector_column: str) -> int:
             vector_column,
             dimension_where,
             *payload_signature(payload_path),
+            resolved.source.read_mode,
         )
     for batch in iter_records_batches(resolved, columns=[vector_column], batch_size=1):
         column = batch.column(vector_column)
@@ -638,6 +639,7 @@ def _cached_infer_sidecar_vector_dims(
     dimension_where: tuple[tuple[str, str], ...],
     payload_mtime_ns: int,
     payload_size: int,
+    read_mode: str = "live",
 ) -> int:
     del payload_mtime_ns, payload_size
     for batch in infer_feature_sidecar_source.iter_batches(
@@ -645,6 +647,7 @@ def _cached_infer_sidecar_vector_dims(
         dataset,
         workspace_dir=Path(workspace_dir),
         where=dict(dimension_where),
+        read_mode=read_mode,
         columns=[vector_column],
         batch_size=1,
     ):

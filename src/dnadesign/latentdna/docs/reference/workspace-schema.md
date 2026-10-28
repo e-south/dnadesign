@@ -267,6 +267,14 @@ Current runtime limits:
   present. As with vector sidecars, aliases that omit a scalar key fail fast,
   and multiple aliases pointing at one `feature_scalar_key` remain separate
   materialized rows with the shared scalar payload.
+- Both Infer sidecar sources accept `read_mode: live` (default) or
+  `read_mode: snapshot`. Live reads coordinate with Infer writers through the
+  dataset-sidecar lock. Select snapshot mode for an immutable transferred
+  dataset, including read-only inputs; it creates no lock file. Committed parts
+  are verified against their manifest hashes, schemas, and row counts. File
+  changes invalidate process-local verification, and changes detected during a
+  snapshot read fail. Single-file payloads still require external transfer
+  checksums. Snapshot mode must not be used with concurrent writes or compaction.
 - Source-backed views with `role: planned` or `role: retired` are skipped by
   deep vector-column checks and omitted from notebook geometry controls. This
   is a visible degraded contract for upstream feature gaps; planned or retired

@@ -66,14 +66,14 @@ def _list_param(params: dict[str, Any], *keys: str) -> list[str]:
     return [str(value)]
 
 
-def _materialize_group_key(context, step) -> tuple[str, str] | None:
+def _materialize_group_key(context, step) -> tuple[str, str, str] | None:
     if step.op != "view.materialize":
         return None
     view_id = str(_require_param(step.params, "view_id", "view"))
     view = context.require_source_view(view_id)
     source = context.require_source(view.source)
     if isinstance(source, InferFeatureSidecarSourceConfig) and view.vector.kind == "column":
-        return (source.root, source.dataset)
+        return (source.root, source.dataset, source.read_mode)
     return None
 
 

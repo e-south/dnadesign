@@ -535,6 +535,7 @@ def materialize_grouped_infer_sidecar_view_artifacts(
     requests: list[infer_sidecar_join.SidecarBatchRequest] = []
     root: str | None = None
     dataset: str | None = None
+    read_mode: str | None = None
     for view_id in view_ids:
         view = context.require_source_view(view_id)
         source = context.require_source(view.source)
@@ -545,8 +546,9 @@ def materialize_grouped_infer_sidecar_view_artifacts(
         if root is None:
             root = source.root
             dataset = source.dataset
-        elif root != source.root or dataset != source.dataset:
-            raise ContractViolationError("grouped Infer sidecar materialization requires one root/dataset")
+            read_mode = source.read_mode
+        elif root != source.root or dataset != source.dataset or read_mode != source.read_mode:
+            raise ContractViolationError("grouped Infer sidecar materialization requires one root/dataset/read_mode")
         resolved = resolve_source(view.source, source, workspace_dir=context.workspace_dir)
         try:
             source_schema = inspect_source_schema(resolved)
@@ -599,6 +601,7 @@ def materialize_grouped_infer_sidecar_view_artifacts(
             dataset,
             workspace_dir=context.workspace_dir,
             requests=requests,
+            read_mode=read_mode,
             batch_size=_MATERIALIZE_BATCH_SIZE,
         ):
             for view_id, batch in grouped.items():
