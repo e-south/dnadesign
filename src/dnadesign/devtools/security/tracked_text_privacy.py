@@ -49,6 +49,7 @@ _PRIVATE_STUDY_TOKEN_SIGNATURES = {
     "cf2d78fc2c55e41542393b34031136028e82f69080ee14384ed92054e06e4a3a",  # pragma: allowlist secret
     "c494bdd3c55f7e7c3282eb86060c1899256b7118ecc8faca4783bfa8d0c33f72",  # pragma: allowlist secret
 }
+_PRIVATE_DOCUMENT_DIGESTS = frozenset({"31a5001333e23e2f81709a76c222ec8bd51ff1195ccc54afb69342641c2d3fd1"})
 _IDENTIFIER_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{9,}")
 _ACTIVE_REMOTES_CONFIG = Path("src/dnadesign/usr/remotes.yaml")
 _HOME_PATH_PATTERNS = (
@@ -154,6 +155,8 @@ def find_privacy_issues(repo_root: Path) -> tuple[PrivacyIssue, ...]:
             continue
         if text is None:
             continue
+        if hashlib.sha256(text.encode("utf-8")).hexdigest() in _PRIVATE_DOCUMENT_DIGESTS:
+            issues.append(PrivacyIssue(relative_path, 1, "private_study_document"))
         for line_number, line in enumerate(text.splitlines(), start=1):
             account = (
                 _SCHEDULER_ACCOUNT.search(line) if relative_path.suffix in {".md", ".txt", ".sh", ".qsub"} else None

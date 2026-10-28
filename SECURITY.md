@@ -2,7 +2,7 @@
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-27
+**Last verified:** 2026-10-28
 
 ## At a glance
 This document records security expectations for code, data, secrets, and dependency handling in `dnadesign`.
@@ -40,6 +40,10 @@ It is a policy map with links to operator runbooks and implementation details.
 
 ## Data handling expectations
 - Treat dataset and run artifacts as operational data, not source-of-truth code.
+- Scientific measurements and study interpretations belong to their study owner.
+  Review tracked source as well as distribution contents before publication.
+  Privacy scanning detects known identifiers and document digests; it does not
+  establish that novel scientific content is appropriate for release.
 - Do not hand-edit generated outputs; regenerate from code/config.
 - Validate external sync/remote operations explicitly; do not assume side effects succeeded.
 

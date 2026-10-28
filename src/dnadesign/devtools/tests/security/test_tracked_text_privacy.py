@@ -179,3 +179,23 @@ def test_public_tree_contains_no_tracked_study_implementations() -> None:
 
     forbidden_prefixes = ("docs/studies/", "src/dnadesign/studies/")
     assert not [path for path in tracked_paths if path.startswith(forbidden_prefixes)]
+
+
+def test_privacy_check_rejects_known_private_document_bytes_at_any_path(tmp_path: Path, monkeypatch) -> None:
+    import hashlib
+
+    from dnadesign.devtools.security import tracked_text_privacy
+
+    _init_repo(tmp_path)
+    content = b"Synthetic private study evidence for a regression test.\n"
+    monkeypatch.setattr(
+        tracked_text_privacy,
+        "_PRIVATE_DOCUMENT_DIGESTS",
+        frozenset({hashlib.sha256(content).hexdigest()}),
+        raising=False,
+    )
+    _track(tmp_path, "docs/renamed-note.md", content)
+
+    assert [(issue.path.as_posix(), issue.token_name) for issue in find_privacy_issues(tmp_path)] == [
+        ("docs/renamed-note.md", "private_study_document"),
+    ]
