@@ -172,6 +172,7 @@ def _candidate_descriptor_from_view(
     scope = str(scope_override or tags.get("scope") or "")
     label = label_override or humanize_candidate(
         {
+            "candidate_encoder": str(tags.get("encoder") or ""),
             "candidate_model": model,
             "candidate_scope": scope,
             "candidate_family": family,

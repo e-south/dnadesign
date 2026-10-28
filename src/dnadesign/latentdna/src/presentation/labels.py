@@ -256,7 +256,10 @@ def humanize_plot_title(slug: str) -> str:
 
 def humanize_candidate(candidate_key: str | Mapping[str, str]) -> str:
     if isinstance(candidate_key, Mapping):
+        encoder = humanize_label(candidate_key.get("encoder") or candidate_key.get("candidate_encoder") or "")
         model = humanize_label(candidate_key.get("model") or candidate_key.get("candidate_model") or "")
+        if encoder and model != encoder and not model.startswith(encoder + " "):
+            model = " ".join(part for part in (encoder, model) if part)
         family = humanize_label(candidate_key.get("family") or candidate_key.get("candidate_family") or "")
         scope = humanize_label(candidate_key.get("scope") or candidate_key.get("candidate_scope") or "")
         pieces = [piece for piece in (model, scope, family) if piece]

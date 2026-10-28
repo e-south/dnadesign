@@ -11,7 +11,12 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+import pytest
+
 from dnadesign.latentdna.src.presentation.labels import humanize_candidate, humanize_label, humanize_plot_title
+from dnadesign.latentdna.src.scalars.common import _candidate_descriptor_from_view
 
 
 def test_humanize_label_preserves_required_public_labels() -> None:
@@ -62,3 +67,19 @@ def test_humanize_label_keeps_distance_correlation_labels_consistent() -> None:
     assert humanize_label("geometry_distance_correlation") == "Pairwise distance Spearman correlation"
     assert humanize_label("pairwise distance correlation") == "Pairwise distance Spearman correlation"
     assert humanize_label("pairwise distance spearman") == "Pairwise distance Spearman correlation"
+
+
+@pytest.mark.parametrize(
+    ("tags", "label"),
+    [
+        ({"encoder": "evo2", "model": "7b"}, "Evo 2 7B"),
+        ({"encoder": "evo2", "model": "evo2_7b"}, "Evo 2 7B"),
+        ({"model": "7b"}, "7B"),
+        ({"model": "esm2"}, "ESM2"),
+    ],
+)
+def test_candidate_label_uses_declared_encoder_without_guessing(tags, label) -> None:
+    context = SimpleNamespace(require_view=lambda view_id: SimpleNamespace(tags=tags))
+    descriptor = _candidate_descriptor_from_view(context, view_id="example")
+    assert descriptor["candidate_label"] == label
+    assert descriptor["candidate_model"] == tags["model"]
