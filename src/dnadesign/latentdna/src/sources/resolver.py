@@ -56,7 +56,7 @@ class ResolvedSource:
 def _load_usr_dataset(resolved: ResolvedSource):
     source = resolved.source
     if not isinstance(source, USRSourceConfig):
-        raise SourceResolutionError(f"source {resolved.source_id} is not a USR dataset")
+        raise SourceResolutionError(f"source {resolved.source_id} is not a SeqLedger dataset")
     return usr_source.load_dataset(source.root, source.dataset, workspace_dir=resolved.workspace_dir)
 
 

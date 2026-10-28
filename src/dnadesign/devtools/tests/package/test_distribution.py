@@ -51,8 +51,8 @@ _EXCLUDED_PACKAGE_SENTINELS = {
     "dnadesign.cruncher.src.devtools",
     "dnadesign.archived.legacy",
     "dnadesign.prototypes.sketch",
-    "dnadesign.usr.archived.legacy",
-    "dnadesign.usr.datasets.usr_regulondb_native_promoters.local",
+    "dnadesign.seqledger.archived.legacy",
+    "dnadesign.seqledger.datasets.usr_regulondb_native_promoters.local",
     "dnadesign.opal.campaigns.demo.notebooks",
     "dnadesign.densegen.workspaces.demo.outputs.notebooks",
     "dnadesign.latentdna.workspaces.demo.outputs.notebooks",
@@ -77,7 +77,7 @@ _REQUIRED_WHEEL_MEMBERS = {
     "dnadesign/opal/campaigns/_fixtures/scalar-regression/labels.csv",
     "dnadesign/cruncher/src/ingest/certs/globalsign_rsa_ov_ssl_ca_2018.pem",
     "dnadesign/cruncher/workspaces/demo_yiu_payload/motifs/example_pwm_context.yaml",
-    "dnadesign/usr/datasets/registry.yaml",
+    "dnadesign/seqledger/datasets/registry.yaml",
 }
 _FORBIDDEN_WHEEL_PREFIXES = (
     "dnadesign/devtools/",
@@ -88,8 +88,8 @@ _FORBIDDEN_WHEEL_PREFIXES = (
     "dnadesign/tfkdanalysis/",
     "dnadesign/archived/",
     "dnadesign/prototypes/",
-    "dnadesign/usr/archived/",
-    "dnadesign/usr/datasets/usr_regulondb_native_promoters/",
+    "dnadesign/seqledger/archived/",
+    "dnadesign/seqledger/datasets/usr_regulondb_native_promoters/",
     "dnadesign/studies/",
     "dnadesign/cruncher/workspaces/project_",
     "dnadesign/cruncher/workspaces/pairwise_",
@@ -119,7 +119,7 @@ def test_opal_install_does_not_require_other_tool_runtimes() -> None:
     assert requirements.isdisjoint({"torch", "pymc", "scanpy", "ortools", "dense-arrays", "marimo"})
 
 
-@pytest.mark.parametrize("profile", ["usr", "permuter", "opal", "full"])
+@pytest.mark.parametrize("profile", ["seqledger", "permuter", "opal", "full"])
 def test_declared_pydantic_versions_require_the_runtime_validator_api(profile: str) -> None:
     project = tomllib.loads((_repo_root() / "pyproject.toml").read_text())["project"]
     requirement = next(
@@ -311,8 +311,8 @@ def test_distribution_excludes_private_and_generated_package_data() -> None:
             "workspaces/demo/config.probe.stall10.yaml",
         ),
         (
-            "dnadesign.usr",
-            repo_root / "src/dnadesign/usr",
+            "dnadesign.seqledger",
+            repo_root / "src/dnadesign/seqledger",
             "remotes.yaml",
         ),
         (
@@ -327,8 +327,8 @@ def test_distribution_excludes_private_and_generated_package_data() -> None:
 
     retained_cases = (
         (
-            "dnadesign.usr",
-            repo_root / "src/dnadesign/usr",
+            "dnadesign.seqledger",
+            repo_root / "src/dnadesign/seqledger",
             "ops/status.registry.yaml",
         ),
         (
@@ -402,7 +402,7 @@ def test_built_wheel_retains_runtime_resources_without_internal_shelves(tmp_path
     assert members.isdisjoint(_FORBIDDEN_WHEEL_MEMBERS)
     assert not any(member.startswith(_FORBIDDEN_WHEEL_PREFIXES) for member in members)
     assert not any("config.probe." in member for member in members)
-    assert "dnadesign/usr/remotes.yaml" not in members
+    assert "dnadesign/seqledger/remotes.yaml" not in members
     assert not any("/reader_spop_" in member for member in members)
 
     environment = tmp_path / "scoring-env"
@@ -464,7 +464,7 @@ assert result.behavior_score.tolist() == [0.0]
 
 def _check_focused_installs(repo_root: Path, tmp_path: Path, wheel: Path) -> None:
     for profile, arguments in (
-        ("usr", ["--help"]),
+        ("seqledger", ["--help"]),
         ("permuter", ["workspace", "list"]),
         ("infer", ["adapters", "list"]),
         ("ops", ["catalog", "list", "--simple"]),
@@ -730,7 +730,7 @@ for name in ('demo_monotypic_tetr', 'demo_yiu_payload'):
         assert help_result.returncode == 0, help_result.stderr
     for command in (
         ["ops", "catalog", "list", "--simple"],
-        ["ops", "progress", "explain", "usr.data-plane.promoter-feature-matrix"],
+        ["ops", "progress", "explain", "seqledger.data-plane.promoter-feature-matrix"],
         ["latentdna", "workspace", "init", "--workspace", str(tmp_path / "latent_workspace"), "--template", "minimal"],
         [
             "cruncher",
@@ -786,7 +786,7 @@ def test_tool_software_versions_follow_the_installed_distribution() -> None:
     for module in (
         "dnadesign",
         "dnadesign.opal.src",
-        "dnadesign.usr.src.version",
+        "dnadesign.seqledger.src.version",
         "dnadesign.latentdna.src.version",
         "dnadesign.permuter",
     ):

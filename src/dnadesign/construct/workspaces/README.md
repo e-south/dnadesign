@@ -7,7 +7,7 @@ List the local construct workspaces in the active root plus the packaged templat
 ### Start with one of these paths
 
 - [Packaged local demo](demo_anchor_template_local/README.md): a didactic anchor-into-template tracer bullet with both 1 kb window and full-context configs.
-- [Packaged shared-dataset demo](demo_anchor_template_shared_dataset/README.md): the same anchor/template contract, but with two audited projects writing into one downstream USR dataset.
+- [Packaged shared-dataset demo](demo_anchor_template_shared_dataset/README.md): the same anchor/template contract, but with two audited projects writing into one downstream SeqLedger dataset.
 - Blank workspace: scaffold a project and import your own input and template datasets.
 
 ### Quick start
@@ -31,7 +31,7 @@ cd demo_anchor_template # Enter the newly initialized demo workspace.
 # Packaged shared-dataset demo.
 uv run construct workspace init --id demo_construct_shared_dataset --profile anchor-template-shared-dataset-demo # Copy the packaged shared-dataset demo into a new workspace id.
 cd demo_construct_shared_dataset # Enter the newly initialized shared-dataset workspace.
-./runbook.sh --mode dry-run-all # Dry-run both packaged projects into one semantic USR dataset.
+./runbook.sh --mode dry-run-all # Dry-run both packaged projects into one semantic SeqLedger dataset.
 ```
 
 If you initialize a workspace outside the repo tree, reuse the `uv run --project <repo-root> construct ...` commands printed by `workspace init` or the packaged `runbook.sh` wrapper.
@@ -92,10 +92,10 @@ If you initialize a workspace outside the repo tree, reuse the `uv run --project
 - Blank workspaces also scaffold explicit `root: outputs/usr_datasets` entries so custom studies do not fall back to repo-package datasets implicitly.
 - That workspace-local root is a construct-owned export only.
   The shared study dataset exists only after an explicit copy or sync into a
-  named shared USR root.
-- External/shared USR roots remain allowed, but only through explicit `root:` fields or `construct seed --root <path>`.
+  named shared SeqLedger root.
+- External/shared SeqLedger roots remain allowed, but only through explicit `root:` fields or `construct seed --root <path>`.
 - One construct job uses one template; multi-template or slot-matrix studies are represented as multiple project entries and config files in the workspace registry.
 - The packaged local demo exposes `./runbook.sh --mode seed|validate|dry-run|run|validate-all` as the local workspace entrypoint.
-- The packaged shared-dataset demo exposes `./runbook.sh --mode seed|validate-all|dry-run-all|run-all` as the local workspace entrypoint for the shared-dataset flow; the authoritative cross-tool handoff still lives in `../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md`.
+- The packaged shared-dataset demo exposes `./runbook.sh --mode seed|validate-all|dry-run-all|run-all` as the local workspace entrypoint for the shared-dataset flow; the authoritative cross-tool handoff still lives in `../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md`.
 - Study workspaces keep their concrete Construct configs outside the public
   package and call the same workspace and CLI contracts.

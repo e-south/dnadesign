@@ -46,7 +46,7 @@ uv run cluster delete-columns --help
 
 ### Environment variables (common)
 
-* `DNADESIGN_USR_ROOT` (resolve datasets without passing full roots)
+* `DNADESIGN_SEQLEDGER_ROOT` (resolve datasets without passing full roots)
 * `DNADESIGN_OPAL_CAMPAIGNS_ROOT` (resolve OPAL campaign names for joins)
 
 ### Tests

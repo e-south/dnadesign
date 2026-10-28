@@ -42,7 +42,7 @@ class InnerJobConfig(StrictConfigModel):
     @model_validator(mode="after")
     def _validate_parts(self) -> "InnerJobConfig":
         if not str(self.input.source.root or "").strip():
-            raise ValueError("job.input.source.root is required for construct jobs that read USR datasets.")
+            raise ValueError("job.input.source.root is required for construct jobs that read SeqLedger datasets.")
         if self.mode == "normalize_anchor":
             if self.input.field is None:
                 raise ValueError("job.input.field is required when job.mode='normalize_anchor'.")

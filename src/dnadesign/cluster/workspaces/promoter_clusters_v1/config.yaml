@@ -1,6 +1,6 @@
 schema_version: 1
 input:
-  # Resolve this dataset via --usr-root or DNADESIGN_USR_ROOT when running
+  # Resolve this dataset via --seqledger-root or DNADESIGN_SEQLEDGER_ROOT when running
   # outside a source checkout.
   dataset: "60bp_dual_promoter_cpxR_LexA"
 

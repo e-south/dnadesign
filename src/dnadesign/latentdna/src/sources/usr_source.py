@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/latentdna/src/sources/usr_source.py
 
-USR source helpers.
+SeqLedger source helpers.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.usr import (
+from dnadesign.seqledger import (
     RESERVED_NAMESPACES,
     Dataset,
     load_overlay_catalog,

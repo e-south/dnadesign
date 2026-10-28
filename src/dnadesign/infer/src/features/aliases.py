@@ -28,7 +28,7 @@ from dnadesign.contracts.feature_payloads import (
     payload_exists,
     read_payload_table,
 )
-from dnadesign.usr import Dataset
+from dnadesign.seqledger import Dataset
 
 from .cache_keys import DNA_SEQUENCE_CASE_POLICY, stable_sha256
 from .payload_store import append_payload, compact_payload, migrate_payload, same_numeric_payload
@@ -129,7 +129,7 @@ def _payload_artifact_reference(dataset_dir: Path, relative_path: str) -> str:
 
 
 def _infer_sidecar_actor(*, default_run_id: str) -> dict[str, object]:
-    run_id = str(os.getenv("USR_ACTOR_RUN_ID") or "").strip() or default_run_id
+    run_id = str(os.getenv("SEQLEDGER_ACTOR_RUN_ID") or "").strip() or default_run_id
     return {
         "tool": "infer",
         "run_id": run_id,

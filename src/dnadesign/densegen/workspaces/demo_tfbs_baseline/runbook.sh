@@ -14,6 +14,6 @@ densegen_workspace_runbook_flow \
   --notebook "$NOTEBOOK" \
   --mode "$MODE" \
   --runner "uv" \
-  --ensure-usr-registry "false" \
+  --ensure-seqledger-registry "false" \
   --require-fimo "false" \
   "$@"

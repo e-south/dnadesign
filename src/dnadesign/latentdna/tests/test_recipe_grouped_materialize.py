@@ -27,7 +27,7 @@ from dnadesign.latentdna.src.io.parquet_io import read_table
 from dnadesign.latentdna.src.services.recipe_service import run_recipe
 from dnadesign.latentdna.src.services.scalar_service import build_scalar
 from dnadesign.latentdna.src.sources import infer_sidecar_join
-from dnadesign.usr import Dataset, SequenceViewRecord, ensure_sequence_contract_namespaces, write_sequence_views
+from dnadesign.seqledger import Dataset, SequenceViewRecord, ensure_sequence_contract_namespaces, write_sequence_views
 
 
 def _write_two_view_sidecar_workspace(tmp_path: Path) -> Path:

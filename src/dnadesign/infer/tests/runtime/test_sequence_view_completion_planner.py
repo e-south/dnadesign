@@ -43,7 +43,7 @@ from dnadesign.infer.src.features.execution import (
 )
 from dnadesign.infer.src.features.selectors import resolve_intermediate_selector
 from dnadesign.infer.src.features.sequence_views import load_sequence_view_input_records, resolve_sequence_view_contexts
-from dnadesign.usr import Dataset, SequenceViewRecord, ensure_sequence_contract_namespaces, write_sequence_views
+from dnadesign.seqledger import Dataset, SequenceViewRecord, ensure_sequence_contract_namespaces, write_sequence_views
 
 
 def _dataset_with_sequence_view(tmp_path: Path) -> tuple[Path, str]:

@@ -3,7 +3,7 @@ doc_id: opal-docs
 title: OPAL documentation
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-10-27
+last_verified: 2026-10-28
 ---
 
 # OPAL documentation
@@ -22,7 +22,7 @@ source .venv/bin/activate
 opal demo-matrix --rounds 0 --keep
 ```
 
-This installation supports local Parquet candidate tables without a USR dataset.
+This installation supports local Parquet candidate tables without a SeqLedger dataset.
 Add `--extra opal-notebook` when using interactive notebooks. See
 [installation choices](../../../../docs/setup/installation.md) for other tools.
 
@@ -50,7 +50,7 @@ starts from a complete configuration example and takes you through batch export.
 ### Start here
 
 1. Start with the [campaign round](./workflows/campaign-round.md) for the canonical validate, initialize, label, run, and verify loop.
-2. If Infer has already written the chosen feature column into USR, use the [USR-to-OPAL route](./workflows/usr-infer-x-active-learning.md).
+2. If Infer has already written the chosen feature column into SeqLedger, use the [SeqLedger-to-OPAL route](./workflows/seqledger-infer-x-active-learning.md).
 3. For configuration or CLI lookup, use [Configuration (`campaign.yaml`)](./reference/configuration.md) or [CLI commands](./reference/cli.md).
 4. If a downstream study needs physically valid selected sequences, check the
    generic [candidate and label contracts](./reference/configuration.md#candidate-and-label-contracts)
@@ -62,7 +62,7 @@ starts from a complete configuration example and takes you through batch export.
 ### Workflows
 
 - [Campaign round](./workflows/campaign-round.md): the one OPAL lifecycle, independent of model, objective, and selector choices.
-- [USR dataset with infer-derived X -> OPAL active learning](./workflows/usr-infer-x-active-learning.md): use a feature column already written into a USR dataset.
+- [SeqLedger dataset with infer-derived X -> OPAL active learning](./workflows/seqledger-infer-x-active-learning.md): use a feature column already written into a SeqLedger dataset.
 
 ### Plugin contracts
 

@@ -1,7 +1,7 @@
 ## OPS mental model
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-09
+**Last verified:** 2026-10-28
 
 OPS owns neutral command routing, read-only observation, and deterministic
 runbook control. Tool and study status runtime policy stays outside OPS core.
@@ -9,7 +9,7 @@ runbook control. Tool and study status runtime policy stays outside OPS core.
 ### What OPS is
 
 OPS is the neutral orchestration and status shell for cross-tool work in `dnadesign`.
-It does not own DenseGen, Infer, Notify, OPAL, USR, or study status runtime policy.
+It does not own DenseGen, Infer, Notify, OPAL, SeqLedger, or study status runtime policy.
 Repo-local scheduler assumptions must stay explicit: generic `ops runbook init` requires `--project <project>` or an explicit preset such as `--preset bu-scc-dunlop`; it does not silently infer site identity.
 It owns:
 

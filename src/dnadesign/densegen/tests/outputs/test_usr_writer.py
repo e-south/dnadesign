@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/densegen/tests/outputs/test_usr_writer.py
 
-Tests DenseGen USR output writer fidelity.
+Tests DenseGen SeqLedger output writer fidelity.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -20,7 +20,7 @@ import pyarrow.parquet as pq
 import pytest
 
 import dnadesign.densegen.src.adapters.outputs.usr_writer as usr_writer_module
-import dnadesign.usr as usr_pkg
+import dnadesign.seqledger as usr_pkg
 from dnadesign.densegen.src.adapters.outputs.record import OutputRecord
 from dnadesign.densegen.src.adapters.outputs.usr_writer import USRWriter
 from dnadesign.densegen.src.artifacts.npz_store import ArtifactInfo

@@ -61,13 +61,13 @@ feature_bundle:
   collect_log_likelihood: false
   sequence_view_inputs:
     - dataset: construct_prom_eth_cip_reference_core60
-      root: src/dnadesign/usr/datasets
+      root: src/dnadesign/seqledger/datasets
       view_selector:
         product_kind: analysis_window
       pooling:
         operation: core60_mean
     - dataset: construct_prom_eth_cip_reference_contexts
-      root: src/dnadesign/usr/datasets
+      root: src/dnadesign/seqledger/datasets
       view_selector:
         product_kind: realized_context
         orientation: reverse_complement
@@ -111,7 +111,7 @@ Sequence-view rules:
   `_derived/infer/feature_scalars.manifest.json`
 - `infer` consumes sequence views; it does not manufacture missing
   `analysis_window` or `realized_context` rows
-- missing required product kinds are a Construct/USR completion problem; the
+- missing required product kinds are a Construct/SeqLedger completion problem; the
   completion planner reports them as `missing_products` before model execution
 - Before large backfills, run `uv run infer validate sequence-view-completion
   --config <config.yaml> --format json` to classify vectors and scalars as
@@ -122,7 +122,7 @@ Sequence-view rules:
   every missing feature key for very large partial datasets. Keep the default
   exact mode for deeper batch planning when the runtime cost is acceptable.
   Sequence-view `root` values resolve relative to the config file directory.
-  USR row-overlay payload columns are not counted as sequence-view feature
+  SeqLedger row-overlay payload columns are not counted as sequence-view feature
   coverage.
 - Batch preflight can add `--max-missing-products 0 --max-stale-vectors 0
   --max-stale-scalars 0` to fail before submit when required sequence products

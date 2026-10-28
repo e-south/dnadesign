@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/notify/events/source_builtin.py
 
-Built-in tool config resolvers for notify USR events source discovery.
+Built-in tool config resolvers for notify SeqLedger events source discovery.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

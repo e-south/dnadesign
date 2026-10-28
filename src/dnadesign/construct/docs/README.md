@@ -3,7 +3,7 @@ doc_id: construct-docs
 title: Construct documentation
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-10-27
+last_verified: 2026-10-28
 ---
 
 # Construct documentation
@@ -17,11 +17,11 @@ intended product is linear ssDNA.
 
 - [Get to a first dry-run](getting-started.md): shortest path for the packaged demo and the blank custom-workspace flow.
 - [Run the packaged local demo](../workspaces/demo_anchor_template_local/README.md): inspect the packaged anchor/template workspace, then use the [demo runbook](../workspaces/demo_anchor_template_local/runbook.md) to seed, validate, dry-run, and materialize it.
-- [Run the packaged shared-dataset demo](../workspaces/demo_anchor_template_shared_dataset/README.md): inspect the packaged accumulation workspace, then use its [runbook](../workspaces/demo_anchor_template_shared_dataset/runbook.md) to materialize one consolidated USR dataset before switching to the shared infer and downstream handoff runbooks.
+- [Run the packaged shared-dataset demo](../workspaces/demo_anchor_template_shared_dataset/README.md): inspect the packaged accumulation workspace, then use its [runbook](../workspaces/demo_anchor_template_shared_dataset/runbook.md) to materialize one consolidated SeqLedger dataset before switching to the shared infer and downstream handoff runbooks.
 - [Create a custom Construct workspace](../workspaces/README.md): scaffold a blank workspace, then use the [seed/import manifest reference](reference/seed-manifest.md), [workspace registry reference](reference/workspace-registry.md), and [config reference](reference/config.md) to define the project.
 - [Run a workspace project by registry id](reference/workspace-registry.md): use the registry-backed workflow in the [CLI reference](reference/cli.md) and verify outputs with the [outputs reference](reference/outputs.md).
-- [Assemble multiple upstream USR datasets before Construct](../../usr/docs/operations/assembly/multi-source-shared-dataset.md): use the shared USR-owned runbook when DenseGen outputs, manual imports, or other USR-backed sources must be consolidated before Construct reads them.
-- [Hand off a Construct-backed shared dataset to infer](../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md): use the shared cross-tool runbook when one USR dataset should stay shared across Construct, infer, and downstream event consumers.
+- [Assemble multiple upstream SeqLedger datasets before Construct](../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md): use the shared SeqLedger-owned runbook when DenseGen outputs, manual imports, or other SeqLedger-backed sources must be consolidated before Construct reads them.
+- [Hand off a Construct-backed shared dataset to infer](../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md): use the shared cross-tool runbook when one SeqLedger dataset should stay shared across Construct, infer, and downstream event consumers.
 - [Debug a Construct run](reference/cli.md): start with runtime validation, then check the [config reference](reference/config.md), [workspace registry reference](reference/workspace-registry.md), and [outputs reference](reference/outputs.md).
 - [Compose a declared linear ssDNA product](reference/linear-ssdna-composition.md): use the specialized workspace-less route when sequence parts are already selected.
 
@@ -42,10 +42,10 @@ intended product is linear ssDNA.
 ### Boundary reminders
 
 - `construct` owns sequence realization, placement semantics, and `construct__*` lineage.
-- USR owns dataset persistence, dataset ids, and downstream reuse.
+- SeqLedger owns dataset persistence, dataset ids, and downstream reuse.
 - One Construct job uses one template plus one or more placed parts.
 - Larger workflows stay explicit as multiple workspace projects, not one oversized config.
-- Packaged workspaces default to workspace-local `outputs/usr_datasets`; shared USR roots are always explicit.
+- Packaged workspaces default to workspace-local `outputs/usr_datasets`; shared SeqLedger roots are always explicit.
 - `construct compose` writes caller-chosen local artifact bundles and does not create or register Construct workspaces.
 - Annotated-part placement preserves producer-owned sequence and feature authority; Construct owns only placement and coordinate transformation.
 - Provider and study names belong in caller-owned provenance values, not in the shared composition schema.
@@ -54,5 +54,5 @@ intended product is linear ssDNA.
 
 Use these only after the generic Construct flow is clear:
 
-- [Construct → USR → Infer shared dataset](../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
-- [Promoter characterization feature matrix](../../usr/docs/operations/promoter/characterization-feature-matrix.md)
+- [Construct → SeqLedger → Infer shared dataset](../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
+- [Promoter characterization feature matrix](../../seqledger/docs/operations/promoter/characterization-feature-matrix.md)

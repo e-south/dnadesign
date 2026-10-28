@@ -55,14 +55,14 @@ if [[ "$validate_rc" -ne 0 ]]; then
   exit "$validate_rc"
 fi
 
-export USR_ACTOR_TOOL="${USR_ACTOR_TOOL:-infer}"
+export SEQLEDGER_ACTOR_TOOL="${SEQLEDGER_ACTOR_TOOL:-infer}"
 JOB_ID_VALUE="${JOB_ID:-manual}"
 TASK_ID_VALUE="${SGE_TASK_ID:-}"
 DEFAULT_RUN_ID="${OPS_JOB_NAME_SLUG:-$JOB_ID_VALUE}"
 if [[ -n "$TASK_ID_VALUE" && "$TASK_ID_VALUE" != "undefined" && "$TASK_ID_VALUE" != "NONE" ]]; then
   DEFAULT_RUN_ID="${DEFAULT_RUN_ID}.${TASK_ID_VALUE}"
 fi
-export USR_ACTOR_RUN_ID="${USR_ACTOR_RUN_ID:-$DEFAULT_RUN_ID}"
+export SEQLEDGER_ACTOR_RUN_ID="${SEQLEDGER_ACTOR_RUN_ID:-$DEFAULT_RUN_ID}"
 
 infer_run_args=()
 if [[ -n "${INFER_RUN_ARGS:-}" ]]; then

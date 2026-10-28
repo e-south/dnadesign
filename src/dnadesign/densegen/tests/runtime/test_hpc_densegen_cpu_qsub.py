@@ -21,7 +21,7 @@ from pathlib import Path
 import pyarrow.parquet as pq
 import pytest
 
-import dnadesign.usr as usr_pkg
+import dnadesign.seqledger as usr_pkg
 
 
 def _repo_root() -> Path:
@@ -45,7 +45,7 @@ def _write_fake_uv(bin_dir: Path) -> tuple[Path, Path, Path]:
                 'echo "$*" >> "$UV_CAPTURE"',
                 'if [[ "$1" == "run" && "$2" == "dense" && "$3" == "run" ]]; then',
                 '  if [[ -n "${UV_ACTOR_CAPTURE:-}" ]]; then',
-                '    echo "${USR_ACTOR_TOOL:-}:${USR_ACTOR_RUN_ID:-}" >> "$UV_ACTOR_CAPTURE"',
+                '    echo "${SEQLEDGER_ACTOR_TOOL:-}:${SEQLEDGER_ACTOR_RUN_ID:-}" >> "$UV_ACTOR_CAPTURE"',
                 "  fi",
                 '  if [[ -n "${UV_RUN_COUNT_FILE:-}" ]]; then',
                 "    count=0",

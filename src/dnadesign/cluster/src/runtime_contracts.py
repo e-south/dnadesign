@@ -42,7 +42,7 @@ class InputSource:
     def source_clause(self) -> dict[str, str]:
         if self.kind == "usr":
             if self.dataset is None:
-                raise ValueError("USR input source requires a dataset name.")
+                raise ValueError("SeqLedger input source requires a dataset name.")
             return {"kind": "usr", "dataset": self.dataset}
         return {"kind": self.kind, "file": str(self.file)}
 

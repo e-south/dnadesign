@@ -80,7 +80,7 @@ def test_console_entrypoint_surfaces_runbook_contract_errors_to_stderr() -> None
 
 
 def test_console_entrypoint_surfaces_progress_input_errors_to_stderr() -> None:
-    argv = ["progress", "show", "opal.downstream.usr-infer-x-active-learning"]
+    argv = ["progress", "show", "opal.downstream.seqledger-infer-x-active-learning"]
     runner = CliRunner().invoke(app, argv)
     completed = _run_ops(*argv)
 

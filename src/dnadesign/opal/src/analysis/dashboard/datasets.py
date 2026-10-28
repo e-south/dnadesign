@@ -92,7 +92,7 @@ def resolve_usr_root(repo_root: Path | None, env_override: str | None) -> Path:
     if env_override:
         override_path = Path(env_override).expanduser().resolve()
         if not override_path.exists():
-            raise ValueError(f"DNADESIGN_USR_ROOT does not exist: {override_path}")
+            raise ValueError(f"DNADESIGN_SEQLEDGER_ROOT does not exist: {override_path}")
         return override_path
     if repo_root is None:
         raise ValueError("Could not find repo root (pyproject.toml). Provide an absolute path.")
@@ -127,7 +127,7 @@ def resolve_dataset_path(
             raise ValueError("Relative custom paths require a repo root.")
         return (repo_root / custom_path_obj).resolve(), "custom"
     if usr_root is None:
-        raise ValueError("USR root is unavailable; provide a custom path.")
+        raise ValueError("SeqLedger root is unavailable; provide a custom path.")
     if not dataset_name or dataset_name in {"(none found)", "(none)"}:
         raise ValueError("Select a dataset or provide a custom path.")
     return (usr_root / dataset_name / "records.parquet").resolve(), "usr"

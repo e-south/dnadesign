@@ -5,9 +5,9 @@ summary: Tool-owned tutorials, HPC runbooks, and event-producing demo flows.
 keywords:
   - promoter
   - anchors
-  - usr
+  - seqledger
   - feature matrix
 routes:
-  - id: usr-notify-tutorial
+  - id: seqledger-notify-tutorial
     path: tutorials/demo_usr_notify.md
-    summary: DenseGen-to-USR-to-Notify walkthrough for event-producing datasets and watcher validation.
+    summary: DenseGen-to-SeqLedger-to-Notify walkthrough for event-producing datasets and watcher validation.

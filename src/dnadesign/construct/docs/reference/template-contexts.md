@@ -3,7 +3,7 @@ doc_id: construct-template-contexts
 title: Construct template contexts
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-10-28
 ---
 
 # Construct template contexts
@@ -90,5 +90,5 @@ That keeps template choice explicit as workspace/config state instead of hiding 
 
 Use one of these next steps after construct materializes template-backed contexts:
 
-- [Construct -> USR -> Infer shared dataset runbook](../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md): generic shared-dataset handoff into infer and downstream watchers.
-- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter/characterization-feature-matrix.md): one study-specific example; it does not define the shared Construct contract.
+- [Construct -> SeqLedger -> Infer shared dataset runbook](../../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md): generic shared-dataset handoff into infer and downstream watchers.
+- [Promoter characterization feature matrix](../../../seqledger/docs/operations/promoter/characterization-feature-matrix.md): one study-specific example; it does not define the shared Construct contract.

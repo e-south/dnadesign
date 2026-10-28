@@ -343,7 +343,7 @@ def test_find_stale_overlay_guard_term_issues_accepts_usr_overlay_guard_terms(tm
                 "**Owner:** maintainers",
                 f"**Last verified:** {dt.date.today().isoformat()}",
                 "",
-                "Use usr-overlay-guard with densegen.overlay_guard.overlay_namespace.",
+                "Use seqledger-overlay-guard with densegen.overlay_guard.overlay_namespace.",
                 "",
             ]
         )
@@ -382,9 +382,12 @@ def test_ops_deprecated_semantics_check_flags_legacy_terms(tmp_path: Path) -> No
 
 
 def test_legacy_contract_surface_docs_check_flags_repo_root_contract_references(tmp_path: Path) -> None:
-    _write(tmp_path / "docs" / "README.md", "## Docs\n\nUse `dnadesign._contracts` and `src/dnadesign/usr_roots.py`.\n")
+    _write(
+        tmp_path / "docs" / "README.md",
+        "## Docs\n\nUse `dnadesign._contracts` and `src/dnadesign/seqledger_roots.py`.\n",
+    )
 
     issues = _find_legacy_contract_surface_doc_issues(tmp_path)
 
     assert any("dnadesign._contracts" in issue for issue in issues)
-    assert any("src/dnadesign/usr_roots.py" in issue for issue in issues)
+    assert any("src/dnadesign/seqledger_roots.py" in issue for issue in issues)

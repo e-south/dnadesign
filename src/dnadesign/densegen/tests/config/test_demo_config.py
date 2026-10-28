@@ -152,7 +152,7 @@ def test_demo_sampling_baseline_uses_both_outputs_and_cbc_solver() -> None:
     assert output.parquet is not None
     assert output.parquet.path == "outputs/tables/records.parquet"
     assert output.usr is not None
-    assert output.usr.root == "../../../usr/datasets"
+    assert output.usr.root == "../../../seqledger/datasets"
     assert output.usr.dataset == "densegen_demo_sampling_baseline"
     assert solver.backend == "CBC"
     assert solver.threads is None
@@ -162,7 +162,7 @@ def test_demo_sampling_baseline_uses_both_outputs_and_cbc_solver() -> None:
 
 def test_densegen_usr_output_dataset_rejects_nested_paths() -> None:
     with pytest.raises(ValueError, match="flat owner-first id"):
-        OutputUSRConfig(root="../../../usr/datasets", dataset="densegen/demo_sampling_baseline")
+        OutputUSRConfig(root="../../../seqledger/datasets", dataset="densegen/demo_sampling_baseline")
 
 
 def test_tfbs_baseline_demo_config_exists_and_loads() -> None:
@@ -772,8 +772,8 @@ def test_packaged_workspace_runbook_scripts_use_shared_helper_with_workspace_pol
         assert f'--runner "{expected_runner_by_workspace[workspace_id]}"' in content, (
             f"{script_path}: runbook script runner policy mismatch"
         )
-        assert f'--ensure-usr-registry "{expected_usr_registry_by_workspace[workspace_id]}"' in content, (
-            f"{script_path}: runbook script usr-registry policy mismatch"
+        assert f'--ensure-seqledger-registry "{expected_usr_registry_by_workspace[workspace_id]}"' in content, (
+            f"{script_path}: runbook script seqledger-registry policy mismatch"
         )
         assert f'--require-fimo "{expected_fimo_by_workspace[workspace_id]}"' in content, (
             f"{script_path}: runbook script FIMO policy mismatch"

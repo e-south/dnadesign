@@ -20,13 +20,13 @@ from typing import Iterable, List
 import pyarrow as pa
 import yaml
 
-from dnadesign.usr import (
+from dnadesign.seqledger import (
     Dataset,
     compute_id,
-    default_usr_root,
+    default_seqledger_root,
+    normalize_seqledger_root,
     normalize_sequence,
-    normalize_usr_root,
-    resolve_usr_root_from_env,
+    resolve_seqledger_root_from_env,
 )
 
 from ..contracts.errors import ConfigError
@@ -260,7 +260,7 @@ def _seed_dataset(
             "usr_label",
             _usr_label_overlay_table(entries),
             overwrite=True,
-            note="dnadesign.usr standardized human-readable sequence labels",
+            note="dnadesign.seqledger standardized human-readable sequence labels",
         )
     _materialize_usr_labels(dataset)
 
@@ -335,9 +335,9 @@ def _load_manifest_payload(path: Path) -> dict:
 
 def _resolve_seed_usr_root(root: str | Path | None) -> Path:
     if root is not None:
-        return normalize_usr_root(root)
+        return normalize_seqledger_root(root)
 
-    env_root = resolve_usr_root_from_env()
+    env_root = resolve_seqledger_root_from_env()
     if env_root is not None:
         return env_root
 
@@ -345,9 +345,11 @@ def _resolve_seed_usr_root(root: str | Path | None) -> Path:
     if repo_root is not None:
         usr_pkg_root = (repo_root / "src" / "dnadesign" / "usr").resolve()
         if (usr_pkg_root / "__init__.py").exists():
-            return default_usr_root(pkg_root=usr_pkg_root)
+            return default_seqledger_root(pkg_root=usr_pkg_root)
 
-    raise ConfigError("construct seed requires --root outside a dnadesign checkout unless DNADESIGN_USR_ROOT is set.")
+    raise ConfigError(
+        "construct seed requires --root outside a dnadesign checkout unless DNADESIGN_SEQLEDGER_ROOT is set."
+    )
 
 
 def _dataset_results_from_manifest(payload: dict) -> tuple[str, List[ManifestDatasetResult]]:

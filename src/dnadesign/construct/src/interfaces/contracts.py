@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/construct/src/interfaces/contracts.py
 
-Public construct contracts for USR output resolution and workspace registry.
+Public construct contracts for SeqLedger output resolution and workspace registry.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import ValidationError as PydanticValidationError
 
-from dnadesign.usr import resolve_usr_root_from_config
+from dnadesign.seqledger import resolve_seqledger_root_from_config
 
 from ..contracts.errors import ConfigError, ConstructError
 from ..workspaces.registry import load_workspace_registry, resolve_workspace_project_config_artifact_path
@@ -95,7 +95,7 @@ def resolve_construct_usr_output_contract(
 
     usr_dataset = _normalize_relative_dataset_path(loaded.job.output.target.dataset, label="job.output.target.dataset")
     root_value = loaded.job.output.target.root or loaded.job.input.source.root
-    usr_root = resolve_usr_root_from_config(
+    usr_root = resolve_seqledger_root_from_config(
         root_value,
         config_path=resolved_config_path,
         label="job.output.target.root or job.input.source.root",

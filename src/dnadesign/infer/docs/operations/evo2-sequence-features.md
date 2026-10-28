@@ -1,7 +1,7 @@
 ## Evo2 Sequence-Feature Runbook
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-24
+**Last verified:** 2026-10-28
 
 Use this runbook when you want the infer-owned part of an Evo2 sequence-feature flow.
 The examples use anchor-only and template-context DNA records because those are
@@ -34,7 +34,7 @@ sidecars instead of reusing old vectors.
 Use the current cross-tool promoter-study workflow only when the task is about
 that specific checked-in study:
 
-- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter/characterization-feature-matrix.md)
+- [Promoter characterization feature matrix](../../../seqledger/docs/operations/promoter/characterization-feature-matrix.md)
 
 ### Common path
 
@@ -54,7 +54,7 @@ that specific checked-in study:
 - let `construct` supply template-backed resolved sequences and anchor coordinates
 - let `feature_bundle` decide which feature groups and pooling modes are collected
 - accept Permuter-originated candidates only after they are materialized into a
-  USR/Construct-owned dataset with explicit sequence views
+  SeqLedger/Construct-owned dataset with explicit sequence views
 
 Minimal example:
 
@@ -106,13 +106,13 @@ For each job, the bundle writes:
 - `intermediate_embedding`
 - metadata columns including context ids, anchor spans, selector, schema version, and request digest
 
-The persisted USR columns still follow the generic infer contract:
+The persisted SeqLedger columns still follow the generic infer contract:
 
 - `infer__<model_id>__<job_id>__<out_id>`
 
 ### Permuter handoff boundary
 
-Permuter may emit a non-executing feature request that points at a USR dataset
+Permuter may emit a non-executing feature request that points at a SeqLedger dataset
 and this Infer feature-bundle surface. Infer remains the execution and writeback
 owner: it validates selectors, executes the model, writes `_derived/infer`
 sidecars, and classifies reusable, stale, or missing vector/scalar payloads.

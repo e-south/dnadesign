@@ -44,8 +44,8 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - OPS core is a neutral shell around discovery, observation/status, orchestration,
   and generic readiness evaluation; it must not own sibling-specific provider
   implementations or study-specific status/preflight policy.
-- Shared operational plane: Notify (`src/dnadesign/notify/`) consumes USR events as integration signals without controlling producer tools.
-- Shared storage semantics: USR overlay/compaction/file-shape contracts use USR domain terms and stay tool-agnostic so DenseGen, Infer, and future producers can share one records store.
+- Shared operational plane: Notify (`src/dnadesign/notify/`) consumes SeqLedger events as integration signals without controlling producer tools.
+- Shared storage semantics: SeqLedger overlay/compaction/file-shape contracts use SeqLedger domain terms and stay tool-agnostic so DenseGen, Infer, and future producers can share one records store.
 - Shared developer infrastructure: devtools modules provide repository-only CI scope detection, docs checks, coverage gates, and quality entropy reporting. Installed command launchers live in `src/dnadesign/_entrypoints.py` and do not import devtools.
 - Operator-facing HPC boundary: BU SCC guidance and templates live in `docs/bu-scc/`.
 
@@ -58,7 +58,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - Root docs route readers to one authoritative deep procedure; cross-tool runbooks may live either in top-level `docs/` or in the boundary-owning tool's operations docs when that tool owns the durable handoff.
 - `docs/runbooks/README.md` is the centralized inventory of authoritative cross-tool procedures and tool-local runbook sources; it is a discovery surface, not the owner of those procedures.
 - `docs/operations/` is the root control-plane orchestration surface only; it is not the generic registry for durable cross-tool data-plane workflows.
-- `src/dnadesign/usr/docs/operations/` is the default home for durable cross-tool data-plane procedures when the shared handoff artifact is a USR dataset, overlay set, or `.events.log`.
+- `src/dnadesign/seqledger/docs/operations/` is the default home for durable cross-tool data-plane procedures when the shared handoff artifact is a SeqLedger dataset, overlay set, or `.events.log`.
 
 ## Cross-tool information architecture
 - Plane semantics are explicit and non-interchangeable:
@@ -88,14 +88,14 @@ This file is the architecture map: it names system boundaries, major flows, and 
   workspaces, durable stores, and rebuildable tool caches while closing
   identity, ownership, retention, paths, and digests. The producing tool
   continues to own each object's internal schema and behavior.
-- USR owns durable dataset records and the integration event stream (`.events.log`) that downstream tooling consumes.
-- Active shared USR dataset ids are flat owner-first contracts, for example
+- SeqLedger owns durable dataset records and the integration event stream (`.events.log`) that downstream tooling consumes.
+- Active shared SeqLedger dataset ids are flat owner-first contracts, for example
   `construct_library`; provenance belongs in `root_kind`,
   `owner_tool`, overlays, event metadata, and study records rather than nested
   tool-routing folders.
-- Cross-dataset USR overlay transfer is explicit-only: maintenance merge defaults to base-row merge, while any overlay carry must be opt-in, namespace-scoped, schema-compatible, and auditable in events.
-- Workspaces that enable USR sinks must select an external dataset root explicitly.
-  USR's standalone default is `./usr_datasets`; installed package resources are
+- Cross-dataset SeqLedger overlay transfer is explicit-only: maintenance merge defaults to base-row merge, while any overlay carry must be opt-in, namespace-scoped, schema-compatible, and auditable in events.
+- Workspaces that enable SeqLedger sinks must select an external dataset root explicitly.
+  SeqLedger's standalone default is `./usr_datasets`; installed package resources are
   not writable dataset locations.
 - Workspace-local export roots remain allowed only as explicit opt-in producer
   mirrors, self-contained demos, or handoff surfaces named directly in a study
@@ -132,7 +132,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
   `producer-analysis`, `execution-surface`, or `downstream-analysis`.
 
 ## High-level data flows
-- Producer tools -> USR event stream (`.events.log`) -> observer tools and webhook sinks.
+- Producer tools -> SeqLedger event stream (`.events.log`) -> observer tools and webhook sinks.
 - Tool outputs -> dataset artifacts or workspace outputs -> downstream analysis or optimization tools.
 - Developer workflow -> core CI lane (lint/docs/standard tests + coverage gate) and external integration lane (FIMO/integration) when required.
 
@@ -151,7 +151,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
 - Cross-tool deep procedures must have one authoritative location with root-doc routing; do not duplicate the same operator sequence in multiple tool trees.
 - Cross-tool placement is ownership-driven:
   - use `docs/operations/` when the owner is scheduler/audit/log sequencing
-  - use `src/dnadesign/usr/docs/operations/` when the owner is a durable USR dataset, overlay set, or `.events.log`
+  - use `src/dnadesign/seqledger/docs/operations/` when the owner is a durable SeqLedger dataset, overlay set, or `.events.log`
   - use the downstream tool docs after the handoff when that tool owns the next state machine
 - Cross-tool path ownership is explicit: repeated runs accumulate in workspace-scoped directories, not repository-root runbook/log fan-out.
 - Repository-root generated artifact and transient operational directories (for example `outputs/`, `.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`) are disallowed by policy; disposable working state belongs under `/scratch` and durable state belongs under a tool or study workspace root.
@@ -159,7 +159,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
 ## Where to go deeper
 - Maintainer index: `docs/dev/README.md`
 - BU SCC operator references: `docs/bu-scc/README.md`, `docs/bu-scc/setup/quickstart.md`, `docs/bu-scc/runbooks/batch-notify.md`, and `docs/bu-scc/jobs/README.md`
-- Notify event contract: `docs/notify/usr-events.md`
+- Notify event contract: `docs/notify/seqledger-events.md`
 - Reliability operations: `RELIABILITY.md`
 - Security policy and secrets handling: `SECURITY.md`
 - Engineering invariants: `DESIGN.md`

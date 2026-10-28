@@ -55,7 +55,7 @@ class OutputUSRConfig(BaseModel):
         if len(path.parts) != 1:
             raise ValueError(
                 "output.usr.dataset must be a flat owner-first id placed directly under output.usr.root; "
-                "use USR metadata, overlays, and study records for provenance instead of nested paths"
+                "use SeqLedger metadata, overlays, and study records for provenance instead of nested paths"
             )
         if not value.startswith("densegen_"):
             raise ValueError("output.usr.dataset must be a DenseGen-owned owner-first id starting with 'densegen_'")

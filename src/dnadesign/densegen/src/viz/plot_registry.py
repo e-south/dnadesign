@@ -74,7 +74,7 @@ PLOT_SPECS = {
         ],
         "missing_hint": (
             "This plot can be generated from DenseGen output records alone. "
-            "Verify `plots.source` resolves to parquet or USR records with `densegen__used_tfbs_detail`, "
+            "Verify `plots.source` resolves to parquet or SeqLedger records with `densegen__used_tfbs_detail`, "
             "and that `plots.video` is configured, then run "
             "`uv run dense plot --only dense_array_showcase_video`."
         ),
@@ -228,7 +228,7 @@ PLOT_SPECS = {
         ],
         "missing_hint": (
             "This plot reads the selected DenseGen output records source directly. "
-            "Verify `plots.source` resolves to parquet or USR records, then run "
+            "Verify `plots.source` resolves to parquet or SeqLedger records, then run "
             "`uv run dense plot --only source_cohort_concentration`."
         ),
     },
@@ -247,7 +247,7 @@ PLOT_SPECS = {
         ],
         "missing_hint": (
             "This plot reads the selected DenseGen output records source directly. "
-            "Verify `plots.source` resolves to parquet or USR records, then run "
+            "Verify `plots.source` resolves to parquet or SeqLedger records, then run "
             "`uv run dense plot --only source_plan_input_heatmap`."
         ),
     },

@@ -20,7 +20,7 @@ from dnadesign.devtools.ci.test_targets import main, resolve_test_targets
 
 
 def test_provider_break_is_detected_by_selected_consumer_even_with_consumer_docs_edit(tmp_path: Path) -> None:
-    provider = tmp_path / "src/dnadesign/usr/__init__.py"
+    provider = tmp_path / "src/dnadesign/seqledger/__init__.py"
     provider.parent.mkdir(parents=True)
     provider.write_text("def require_root():\n    return None\n")
     consumer = tmp_path / "src/dnadesign/opal/tests/test_contract.py"
@@ -28,17 +28,17 @@ def test_provider_break_is_detected_by_selected_consumer_even_with_consumer_docs
     consumer.write_text(
         "import importlib.util\nfrom pathlib import Path\n"
         "def test_requires_explicit_root():\n"
-        "    path = Path(__file__).parents[2] / 'usr' / '__init__.py'\n"
+        "    path = Path(__file__).parents[2] / 'seqledger' / '__init__.py'\n"
         "    spec = importlib.util.spec_from_file_location('provider', path)\n"
         "    provider = importlib.util.module_from_spec(spec)\n"
         "    spec.loader.exec_module(provider)\n"
         "    assert provider.require_root() is not None\n"
     )
-    changed = ["src/dnadesign/usr/__init__.py", "src/dnadesign/opal/README.md"]
+    changed = ["src/dnadesign/seqledger/__init__.py", "src/dnadesign/opal/README.md"]
     scope = determine_scope(
         event_name="pull_request",
         changed_files=changed,
-        tool_names={"usr", "opal"},
+        tool_names={"seqledger", "opal"},
         external_integration_tool_names=set(),
     )
     targets = resolve_test_targets(repo_root=tmp_path, tool_names=scope.affected_tools, changed_files=changed)
@@ -52,20 +52,20 @@ def test_provider_break_is_detected_by_selected_consumer_even_with_consumer_docs
 
 
 def test_resolve_test_targets_returns_existing_test_dirs(tmp_path: Path) -> None:
-    usr_tests = tmp_path / "src" / "dnadesign" / "usr" / "tests"
+    usr_tests = tmp_path / "src" / "dnadesign" / "seqledger" / "tests"
     dense_tests = tmp_path / "src" / "dnadesign" / "densegen" / "tests"
     usr_tests.mkdir(parents=True, exist_ok=True)
     dense_tests.mkdir(parents=True, exist_ok=True)
 
-    targets = resolve_test_targets(repo_root=tmp_path, tool_names=["usr", "densegen"])
+    targets = resolve_test_targets(repo_root=tmp_path, tool_names=["seqledger", "densegen"])
 
     assert targets == [str(usr_tests), str(dense_tests)]
 
 
 def test_resolve_test_targets_skips_tools_without_tests(tmp_path: Path) -> None:
-    (tmp_path / "src" / "dnadesign" / "usr").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "src" / "dnadesign" / "seqledger").mkdir(parents=True, exist_ok=True)
 
-    targets = resolve_test_targets(repo_root=tmp_path, tool_names=["usr"])
+    targets = resolve_test_targets(repo_root=tmp_path, tool_names=["seqledger"])
 
     assert targets == []
 
@@ -111,7 +111,7 @@ def test_resolve_test_targets_includes_external_study_fixture_guard_for_notify_a
 
 
 def test_main_fails_for_unknown_tool(tmp_path: Path) -> None:
-    (tmp_path / "src" / "dnadesign" / "usr" / "tests").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "src" / "dnadesign" / "seqledger" / "tests").mkdir(parents=True, exist_ok=True)
 
     rc = main(
         [
@@ -126,7 +126,7 @@ def test_main_fails_for_unknown_tool(tmp_path: Path) -> None:
 
 
 def test_main_fails_for_empty_tool_list(tmp_path: Path) -> None:
-    (tmp_path / "src" / "dnadesign" / "usr" / "tests").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "src" / "dnadesign" / "seqledger" / "tests").mkdir(parents=True, exist_ok=True)
 
     rc = main(
         [
@@ -141,7 +141,7 @@ def test_main_fails_for_empty_tool_list(tmp_path: Path) -> None:
 
 
 def test_main_prints_one_target_per_line(tmp_path: Path, capsys) -> None:
-    usr_tests = tmp_path / "src" / "dnadesign" / "usr" / "tests"
+    usr_tests = tmp_path / "src" / "dnadesign" / "seqledger" / "tests"
     usr_tests.mkdir(parents=True, exist_ok=True)
 
     rc = main(
@@ -149,7 +149,7 @@ def test_main_prints_one_target_per_line(tmp_path: Path, capsys) -> None:
             "--repo-root",
             str(tmp_path),
             "--affected-tools-csv",
-            "usr",
+            "seqledger",
         ]
     )
 

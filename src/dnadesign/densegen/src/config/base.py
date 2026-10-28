@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any, Dict
 import yaml
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from dnadesign.usr import resolve_usr_root_from_config
+from dnadesign.seqledger import resolve_seqledger_root_from_config
 
 if TYPE_CHECKING:
     from .root import RootConfig
@@ -143,17 +143,17 @@ def resolve_usr_root_scoped_path(
 ) -> Path:
     try:
         if scope == "config":
-            resolved = resolve_usr_root_from_config(value, config_path=cfg_path, label=label)
+            resolved = resolve_seqledger_root_from_config(value, config_path=cfg_path, label=label)
         elif scope == "git_common_repo_root":
             root_text = str(value).strip()
             if not root_text:
                 raise ValueError(f"{label} must be a non-empty string")
             candidate = _expand_path(root_text)
             if candidate.is_absolute():
-                resolved = resolve_usr_root_from_config(candidate, config_path=cfg_path, label=label)
+                resolved = resolve_seqledger_root_from_config(candidate, config_path=cfg_path, label=label)
             else:
                 repo_root = _git_common_repo_root(cfg_path)
-                resolved = resolve_usr_root_from_config(repo_root / candidate, config_path=cfg_path, label=label)
+                resolved = resolve_seqledger_root_from_config(repo_root / candidate, config_path=cfg_path, label=label)
         else:
             raise ValueError(f"{label} has unsupported scope '{scope}'")
     except ValueError as exc:

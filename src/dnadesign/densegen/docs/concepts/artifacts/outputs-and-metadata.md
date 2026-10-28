@@ -1,7 +1,7 @@
 ## Outputs and metadata model
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-10-28
 This concept page explains how DenseGen artifacts are organized by runtime stage and how to interpret them together. Read it when you need to debug run outcomes, join tables correctly, or choose the right file for analysis.
 
 ### Output layout overview
@@ -22,7 +22,7 @@ This concept page explains how DenseGen artifacts are organized by runtime stage
 ### Records location
 
 - Parquet sink: `outputs/tables/records.parquet`.
-- USR sink: `<output.usr.root>/<dataset>/records.parquet`.
+- SeqLedger sink: `<output.usr.root>/<dataset>/records.parquet`.
 - Dual sink mode: both files exist; analysis commands resolve one source via `plots.source`.
 
 ### Join keys
@@ -33,7 +33,7 @@ This concept page explains how DenseGen artifacts are organized by runtime stage
 
 ### Event boundary
 
-Read **[observability and events](../runtime/observability-and-events.md)** for DenseGen diagnostics versus USR mutation events and Notify consumption rules. For end-to-end watcher setup, use the **[DenseGen to USR to Notify tutorial](../../tutorials/demo_usr_notify.md)**.
+Read **[observability and events](../runtime/observability-and-events.md)** for DenseGen diagnostics versus SeqLedger mutation events and Notify consumption rules. For end-to-end watcher setup, use the **[DenseGen to SeqLedger to Notify tutorial](../../tutorials/demo_usr_notify.md)**.
 
 ### Reference docs
 

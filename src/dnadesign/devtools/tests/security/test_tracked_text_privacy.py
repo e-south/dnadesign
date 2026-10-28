@@ -67,14 +67,14 @@ def test_find_privacy_issues_rejects_tracked_active_remotes_config(tmp_path: Pat
     _init_repo(tmp_path)
     _track(
         tmp_path,
-        "src/dnadesign/usr/remotes.yaml",
+        "src/dnadesign/seqledger/remotes.yaml",
         b"remotes:\n  cluster:\n    user: example-user\n",
     )
 
     issues = find_privacy_issues(tmp_path)
 
     assert [(issue.path.as_posix(), issue.token_name) for issue in issues] == [
-        ("src/dnadesign/usr/remotes.yaml", "tracked_active_remotes_config")
+        ("src/dnadesign/seqledger/remotes.yaml", "tracked_active_remotes_config")
     ]
 
 
@@ -111,7 +111,7 @@ def test_find_privacy_issues_allows_examples_and_skips_binary_files(tmp_path: Pa
     _init_repo(tmp_path)
     _track(
         tmp_path,
-        "src/dnadesign/usr/remotes.example.yaml",
+        "src/dnadesign/seqledger/remotes.example.yaml",
         b"remotes:\n  cluster:\n    user: example-user\n    local_repo_root: /Users/example/dnadesign\n",
     )
     _track(tmp_path, "docs/bu-scc/example.md", b"Use /Users/example/dnadesign for examples.\n")

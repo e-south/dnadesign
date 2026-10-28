@@ -15,7 +15,7 @@ from importlib import import_module
 # Unknown failures, including command/plugin defects, retain their traceback.
 _CLI_IMPORTS = frozenset({"pandas", "pyarrow", "pydantic", "yaml", "rich", "typer"})
 _PROFILE_IMPORTS = {
-    "usr": _CLI_IMPORTS | {"Bio", "duckdb", "psutil"},
+    "seqledger": _CLI_IMPORTS | {"Bio", "duckdb", "psutil"},
     "permuter": _CLI_IMPORTS | {"matplotlib", "seaborn", "psutil"},
     "opal": _CLI_IMPORTS | {"polars", "sklearn", "scipy", "joblib", "typing_extensions", "matplotlib", "openpyxl"},
     "full": _CLI_IMPORTS
@@ -64,15 +64,15 @@ _PROFILE_IMPORTS = {
     },
     "infer-evo2": {"evo2", "flash_attn", "transformer_engine"},
 }
-_PROFILE_IMPORTS["infer"] = _PROFILE_IMPORTS["usr"] | {"tqdm"}
+_PROFILE_IMPORTS["infer"] = _PROFILE_IMPORTS["seqledger"] | {"tqdm"}
 
 _PROFILE_IMPORTS["ops"] = {"pydantic", "yaml", "typer", "pyarrow", "click"}
 _PROFILE_IMPORTS["notify"] = {"typer", "click", "keyring", "certifi"}
 _PROFILE_IMPORTS["folding"] = {"pydantic", "yaml", "typer", "psutil", "RNA"}
-_PROFILE_IMPORTS["construct"] = _PROFILE_IMPORTS["usr"] | _PROFILE_IMPORTS["folding"] | {"vl_convert"}
+_PROFILE_IMPORTS["construct"] = _PROFILE_IMPORTS["seqledger"] | _PROFILE_IMPORTS["folding"] | {"vl_convert"}
 _PROFILE_IMPORTS["baserender"] = {"pydantic", "yaml", "typer", "pyarrow", "matplotlib", "PIL", "psutil"}
 _PROFILE_IMPORTS["junction"] = {"pydantic", "yaml", "typer", "matplotlib", "psutil"}
-_PROFILE_IMPORTS["cluster"] = _PROFILE_IMPORTS["usr"] | {
+_PROFILE_IMPORTS["cluster"] = _PROFILE_IMPORTS["seqledger"] | {
     "scanpy",
     "igraph",
     "leidenalg",
@@ -84,7 +84,7 @@ _PROFILE_IMPORTS["cluster"] = _PROFILE_IMPORTS["usr"] | {
     "Levenshtein",
     "click",
 }
-_PROFILE_IMPORTS["latentdna"] = _PROFILE_IMPORTS["usr"] | {
+_PROFILE_IMPORTS["latentdna"] = _PROFILE_IMPORTS["seqledger"] | {
     "anndata",
     "igraph",
     "leidenalg",
@@ -136,12 +136,12 @@ def _run(target: str, extra: str):
         ) from None
 
 
-def usr():
-    return _run("dnadesign.usr:main", "usr")
+def seqledger():
+    return _run("dnadesign.seqledger:main", "seqledger")
 
 
-def usr_sync_audit_drill():
-    return _run("dnadesign.usr.ops.sync_audit_drill:main", "usr")
+def seqledger_sync_audit_drill():
+    return _run("dnadesign.seqledger.ops.sync_audit_drill:main", "seqledger")
 
 
 def opal():

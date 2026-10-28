@@ -159,7 +159,7 @@ def test_usr_root_is_an_explicit_global_cli_coordinate(tmp_path: Path) -> None:
 
     result = CliRunner().invoke(
         _build(),
-        ["--no-color", "--usr-root", str(operator_root), "validate", "--config", str(campaign)],
+        ["--no-color", "--seqledger-root", str(operator_root), "validate", "--config", str(campaign)],
     )
 
     assert result.exit_code != 0
@@ -176,7 +176,7 @@ def test_usr_root_reaches_plot_campaign_analysis(tmp_path: Path) -> None:
         _build(),
         [
             "--no-color",
-            "--usr-root",
+            "--seqledger-root",
             str(operator_root),
             "plot",
             "--config",
@@ -198,7 +198,7 @@ def test_usr_root_reaches_notebook_campaign_analysis(tmp_path: Path) -> None:
         _build(),
         [
             "--no-color",
-            "--usr-root",
+            "--seqledger-root",
             str(operator_root),
             "notebook",
             "generate",
@@ -239,7 +239,7 @@ def test_marimo_subprocess_environment_attests_exact_usr_root(tmp_path: Path) ->
 
     assert environment == {
         "PATH": "/bin",
-        "OPAL_NOTEBOOK_USR_ROOT": str(operator_root.resolve()),
+        "OPAL_NOTEBOOK_SEQLEDGER_ROOT": str(operator_root.resolve()),
     }
 
 

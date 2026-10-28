@@ -19,10 +19,10 @@ import pyarrow.parquet as pq
 import yaml
 from typer.testing import CliRunner
 
-import dnadesign.usr as usr_pkg
+import dnadesign.seqledger as usr_pkg
 from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.ops.cli import app
-from dnadesign.usr import (
+from dnadesign.seqledger import (
     with_overlay_metadata,
 )
 
@@ -338,7 +338,7 @@ def test_cli_progress_show_reports_usr_sync_audit_surface() -> None:
             [
                 "progress",
                 "show",
-                "usr.data-plane.hpc-sync",
+                "seqledger.data-plane.hpc-sync",
                 "--repo-root",
                 str(_repo_root()),
                 "--sync-audit-json",
@@ -349,7 +349,7 @@ def test_cli_progress_show_reports_usr_sync_audit_surface() -> None:
 
         assert result.exit_code == 0
         payload = json.loads(result.output)
-        assert payload["status_kind"] == "usr-sync-audit"
+        assert payload["status_kind"] == "seqledger-sync-audit"
         assert payload["state"] == "attention"
         assert payload["evidence"]["transfer_state"] == "DRY-RUN"
 
@@ -365,7 +365,7 @@ def test_cli_progress_show_reports_wrapped_usr_diff_sync_audit_surface() -> None
             [
                 "progress",
                 "show",
-                "usr.data-plane.hpc-sync",
+                "seqledger.data-plane.hpc-sync",
                 "--repo-root",
                 str(_repo_root()),
                 "--sync-audit-json",
@@ -376,7 +376,7 @@ def test_cli_progress_show_reports_wrapped_usr_diff_sync_audit_surface() -> None
 
         assert result.exit_code == 0
         payload = json.loads(result.output)
-        assert payload["status_kind"] == "usr-sync-audit"
+        assert payload["status_kind"] == "seqledger-sync-audit"
         assert payload["state"] == "ok"
         assert payload["summary"] == "demo_dataset: DIFF-ONLY"
         assert payload["evidence"]["dataset"] == "demo_dataset"
@@ -394,10 +394,10 @@ def test_cli_progress_show_reports_usr_dataset_surface() -> None:
             [
                 "progress",
                 "show",
-                "usr.data-plane.promoter-feature-matrix",
+                "seqledger.data-plane.promoter-feature-matrix",
                 "--repo-root",
                 str(_repo_root()),
-                "--usr-root",
+                "--seqledger-root",
                 str(usr_root),
                 "--dataset",
                 "demo_dataset",
@@ -407,7 +407,7 @@ def test_cli_progress_show_reports_usr_dataset_surface() -> None:
 
         assert result.exit_code == 0
         payload = json.loads(result.output)
-        assert payload["status_kind"] == "usr-dataset-state"
+        assert payload["status_kind"] == "seqledger-dataset-state"
         assert payload["state"] == "ok"
         assert payload["evidence"]["rows"] == 2
 
@@ -462,7 +462,7 @@ def test_cli_progress_show_reports_opal_campaign_surface() -> None:
             [
                 "progress",
                 "show",
-                "opal.downstream.usr-infer-x-active-learning",
+                "opal.downstream.seqledger-infer-x-active-learning",
                 "--repo-root",
                 str(_repo_root()),
                 "--opal-config",
@@ -517,7 +517,7 @@ def test_cli_progress_show_rejects_incompatible_opal_state_schema() -> None:
             [
                 "progress",
                 "show",
-                "opal.downstream.usr-infer-x-active-learning",
+                "opal.downstream.seqledger-infer-x-active-learning",
                 "--repo-root",
                 str(_repo_root()),
                 "--opal-config",
@@ -545,7 +545,7 @@ def test_cli_progress_show_resolves_opal_workdir_relative_to_campaign_root() -> 
             [
                 "progress",
                 "show",
-                "opal.downstream.usr-infer-x-active-learning",
+                "opal.downstream.seqledger-infer-x-active-learning",
                 "--repo-root",
                 str(_repo_root()),
                 "--opal-config",
@@ -571,7 +571,7 @@ def test_cli_progress_show_reports_missing_opal_candidate_records_before_state_j
             [
                 "progress",
                 "show",
-                "opal.downstream.usr-infer-x-active-learning",
+                "opal.downstream.seqledger-infer-x-active-learning",
                 "--repo-root",
                 str(_repo_root()),
                 "--opal-config",
@@ -600,7 +600,7 @@ def test_cli_progress_show_reports_ready_opal_candidate_records_before_state_jso
             [
                 "progress",
                 "show",
-                "opal.downstream.usr-infer-x-active-learning",
+                "opal.downstream.seqledger-infer-x-active-learning",
                 "--repo-root",
                 str(_repo_root()),
                 "--opal-config",
@@ -696,7 +696,7 @@ def test_cli_progress_campaign_aggregates_explicit_steps() -> None:
                         },
                         {
                             "label": "feature-matrix",
-                            "registry_id": "usr.data-plane.promoter-feature-matrix",
+                            "registry_id": "seqledger.data-plane.promoter-feature-matrix",
                             "inputs": {
                                 "usr_root": "../usr_root",
                                 "dataset": "demo_dataset",
@@ -704,7 +704,7 @@ def test_cli_progress_campaign_aggregates_explicit_steps() -> None:
                         },
                         {
                             "label": "active-learning",
-                            "registry_id": "opal.downstream.usr-infer-x-active-learning",
+                            "registry_id": "opal.downstream.seqledger-infer-x-active-learning",
                             "inputs": {"opal_config": "../configs/campaign.yaml"},
                         },
                     ],
@@ -797,7 +797,7 @@ def test_cli_progress_show_reports_missing_opal_config_state_without_exiting() -
             [
                 "progress",
                 "show",
-                "opal.downstream.usr-infer-x-active-learning",
+                "opal.downstream.seqledger-infer-x-active-learning",
                 "--repo-root",
                 str(_repo_root()),
                 "--opal-config",
@@ -828,7 +828,7 @@ def test_cli_progress_campaign_rejects_scaffold_placeholder_paths() -> None:
                     "steps": [
                         {
                             "label": "active-learning",
-                            "registry_id": "opal.downstream.usr-infer-x-active-learning",
+                            "registry_id": "opal.downstream.seqledger-infer-x-active-learning",
                             "inputs": {"opal_config": "<opal-workdir>/configs/campaign.yaml"},
                         }
                     ],
@@ -907,7 +907,7 @@ def test_cli_progress_scaffold_emits_yaml_manifest() -> None:
             "progress",
             "scaffold",
             "ops.control-plane.orchestration",
-            "usr.data-plane.promoter-feature-matrix",
+            "seqledger.data-plane.promoter-feature-matrix",
             "--repo-root",
             str(_repo_root()),
         ],
@@ -926,9 +926,9 @@ def test_cli_progress_scaffold_emits_yaml_manifest() -> None:
         },
         {
             "label": "promoter-feature-matrix",
-            "registry_id": "usr.data-plane.promoter-feature-matrix",
+            "registry_id": "seqledger.data-plane.promoter-feature-matrix",
             "inputs": {
-                "usr_root": "<usr-root>",
+                "usr_root": "<seqledger-root>",
                 "dataset": "<dataset>",
             },
         },
@@ -943,7 +943,7 @@ def test_cli_progress_scaffold_emits_json_metadata() -> None:
         [
             "progress",
             "scaffold",
-            "opal.downstream.usr-infer-x-active-learning",
+            "opal.downstream.seqledger-infer-x-active-learning",
             "--repo-root",
             str(_repo_root()),
             "--campaign-id",
@@ -957,8 +957,8 @@ def test_cli_progress_scaffold_emits_json_metadata() -> None:
     assert payload["campaign_id"] == "active_learning_demo"
     assert payload["manifest"]["steps"] == [
         {
-            "label": "usr-infer-x-active-learning",
-            "registry_id": "opal.downstream.usr-infer-x-active-learning",
+            "label": "seqledger-infer-x-active-learning",
+            "registry_id": "opal.downstream.seqledger-infer-x-active-learning",
             "inputs": {"opal_config": "<opal-workdir>/configs/campaign.yaml"},
         }
     ]
@@ -984,7 +984,7 @@ def test_cli_progress_scaffold_supports_related_to_expansion() -> None:
             "--repo-root",
             str(_repo_root()),
             "--related-to",
-            "usr.data-plane.promoter-feature-matrix",
+            "seqledger.data-plane.promoter-feature-matrix",
             "--json",
         ],
     )
@@ -992,11 +992,11 @@ def test_cli_progress_scaffold_supports_related_to_expansion() -> None:
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert [step["registry_id"] for step in payload["steps"]] == [
-        "usr.data-plane.promoter-feature-matrix",
-        "usr.data-plane.multi-source-source-of-truth",
-        "usr.data-plane.construct-infer-source-of-truth",
+        "seqledger.data-plane.promoter-feature-matrix",
+        "seqledger.data-plane.multi-source-source-of-truth",
+        "seqledger.data-plane.construct-infer-source-of-truth",
         "cluster.downstream.exploratory-clustering",
-        "opal.downstream.usr-infer-x-active-learning",
+        "opal.downstream.seqledger-infer-x-active-learning",
     ]
     assert payload["manifest"]["steps"][0]["label"] == "promoter-feature-matrix"
     assert payload["manifest"]["steps"][0]["inputs"]["dataset"] == "<dataset>"
@@ -1010,11 +1010,11 @@ def test_cli_progress_scaffold_dedupes_related_to_expansion_and_explicit_ids() -
         [
             "progress",
             "scaffold",
-            "opal.downstream.usr-infer-x-active-learning",
+            "opal.downstream.seqledger-infer-x-active-learning",
             "--repo-root",
             str(_repo_root()),
             "--related-to",
-            "usr.data-plane.promoter-feature-matrix",
+            "seqledger.data-plane.promoter-feature-matrix",
             "--json",
         ],
     )
@@ -1022,8 +1022,8 @@ def test_cli_progress_scaffold_dedupes_related_to_expansion_and_explicit_ids() -
     assert result.exit_code == 0
     payload = json.loads(result.output)
     registry_ids = [step["registry_id"] for step in payload["steps"]]
-    assert registry_ids.count("opal.downstream.usr-infer-x-active-learning") == 1
-    assert registry_ids[0] == "usr.data-plane.promoter-feature-matrix"
+    assert registry_ids.count("opal.downstream.seqledger-infer-x-active-learning") == 1
+    assert registry_ids[0] == "seqledger.data-plane.promoter-feature-matrix"
 
 
 def test_cli_progress_scaffold_rejects_unknown_registry_id_with_suggestions() -> None:
@@ -1034,7 +1034,7 @@ def test_cli_progress_scaffold_rejects_unknown_registry_id_with_suggestions() ->
         [
             "progress",
             "scaffold",
-            "usr.data-plane.promoter-feature",
+            "seqledger.data-plane.promoter-feature",
             "--repo-root",
             str(_repo_root()),
         ],
@@ -1042,9 +1042,9 @@ def test_cli_progress_scaffold_rejects_unknown_registry_id_with_suggestions() ->
 
     assert result.exit_code == 2
     assert "Progress contract error: unknown registry id:" in result.output
-    assert "usr.data-plane.promoter-feature" in result.output
+    assert "seqledger.data-plane.promoter-feature" in result.output
     assert "Did you mean:" in result.output
-    assert "usr.data-plane.promoter-feature-matrix" in result.output
+    assert "seqledger.data-plane.promoter-feature-matrix" in result.output
 
 
 def test_cli_progress_scaffold_rejects_unknown_related_to_registry_id_with_suggestions() -> None:
@@ -1058,15 +1058,15 @@ def test_cli_progress_scaffold_rejects_unknown_related_to_registry_id_with_sugge
             "--repo-root",
             str(_repo_root()),
             "--related-to",
-            "usr.data-plane.promoter-feature",
+            "seqledger.data-plane.promoter-feature",
         ],
     )
 
     assert result.exit_code == 2
     assert "Progress contract error: unknown registry id:" in result.output
-    assert "usr.data-plane.promoter-feature" in result.output
+    assert "seqledger.data-plane.promoter-feature" in result.output
     assert "Did you mean:" in result.output
-    assert "usr.data-plane.promoter-feature-matrix" in result.output
+    assert "seqledger.data-plane.promoter-feature-matrix" in result.output
 
 
 def test_cli_progress_scaffold_writes_manifest_file_and_requires_force() -> None:
@@ -1137,7 +1137,7 @@ def test_cli_progress_show_suggests_close_registry_ids() -> None:
         [
             "progress",
             "show",
-            "usr.data-plane.promoter-feature",
+            "seqledger.data-plane.promoter-feature",
             "--repo-root",
             str(_repo_root()),
         ],
@@ -1145,9 +1145,9 @@ def test_cli_progress_show_suggests_close_registry_ids() -> None:
 
     assert result.exit_code == 2
     assert "Progress contract error: unknown registry id:" in result.output
-    assert "usr.data-plane.promoter-feature" in result.output
+    assert "seqledger.data-plane.promoter-feature" in result.output
     assert "Did you mean:" in result.output
-    assert "usr.data-plane.promoter-feature-matrix" in result.output
+    assert "seqledger.data-plane.promoter-feature-matrix" in result.output
 
 
 def test_cli_progress_show_rejects_missing_required_surface_arguments() -> None:
@@ -1181,7 +1181,7 @@ def test_cli_progress_show_surfaces_optional_opal_workdir_hint_when_inputs_are_m
         [
             "progress",
             "show",
-            "opal.downstream.usr-infer-x-active-learning",
+            "opal.downstream.seqledger-infer-x-active-learning",
             "--repo-root",
             str(_repo_root()),
         ],
@@ -1191,7 +1191,7 @@ def test_cli_progress_show_surfaces_optional_opal_workdir_hint_when_inputs_are_m
     assert "status kind 'opal-campaign-state' requires" in result.output
     assert "--opal-config" in result.output
     assert "--opal-workdir" in result.output
-    assert "Required inputs for opal.downstream.usr-infer-x-active-learning:" in result.output
+    assert "Required inputs for opal.downstream.seqledger-infer-x-active-learning:" in result.output
     assert "Also accepted:" in result.output
     assert "--opal-workdir" in result.output
 
@@ -1204,7 +1204,7 @@ def test_cli_progress_explain_reports_required_inputs_and_next_commands() -> Non
         [
             "progress",
             "explain",
-            "opal.downstream.usr-infer-x-active-learning",
+            "opal.downstream.seqledger-infer-x-active-learning",
             "--repo-root",
             str(_repo_root()),
             "--json",
@@ -1236,10 +1236,10 @@ def test_cli_progress_explain_reports_required_inputs_and_next_commands() -> Non
         }
     ]
     assert payload["next_commands"]["catalog_show"] == (
-        "uv run ops catalog show opal.downstream.usr-infer-x-active-learning"
+        "uv run ops catalog show opal.downstream.seqledger-infer-x-active-learning"
     )
     assert payload["next_commands"]["progress_show"] == (
-        "uv run ops progress show opal.downstream.usr-infer-x-active-learning "
+        "uv run ops progress show opal.downstream.seqledger-infer-x-active-learning "
         "--opal-config <opal-workdir>/configs/campaign.yaml"
     )
     assert payload["notes"] == [
@@ -1256,7 +1256,7 @@ def test_cli_progress_explain_text_reports_status_ontology() -> None:
         [
             "progress",
             "explain",
-            "opal.downstream.usr-infer-x-active-learning",
+            "opal.downstream.seqledger-infer-x-active-learning",
             "--repo-root",
             str(_repo_root()),
         ],
@@ -1307,7 +1307,7 @@ def test_cli_progress_explain_includes_related_scaffold_when_route_has_neighbors
         [
             "progress",
             "explain",
-            "usr.data-plane.promoter-feature-matrix",
+            "seqledger.data-plane.promoter-feature-matrix",
             "--repo-root",
             str(_repo_root()),
             "--json",
@@ -1317,7 +1317,7 @@ def test_cli_progress_explain_includes_related_scaffold_when_route_has_neighbors
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert payload["next_commands"]["progress_scaffold_related"] == (
-        "uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix"
+        "uv run ops progress scaffold --related-to seqledger.data-plane.promoter-feature-matrix"
     )
 
 

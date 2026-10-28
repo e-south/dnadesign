@@ -38,19 +38,19 @@ _CLI_USR_ROOT: ContextVar[Path | None] = ContextVar("opal_cli_usr_root", default
 
 
 def set_cli_usr_root(path: Path | None) -> None:
-    """Bind the operator-supplied USR root for one CLI invocation."""
+    """Bind the operator-supplied SeqLedger root for one CLI invocation."""
 
     _CLI_USR_ROOT.set(path)
 
 
 def get_cli_usr_root() -> Path | None:
-    """Return the operator-supplied USR coordinate for this CLI invocation."""
+    """Return the operator-supplied SeqLedger coordinate for this CLI invocation."""
 
     return _CLI_USR_ROOT.get()
 
 
 def load_cli_analysis(config_opt: Optional[Path], *, allow_dir: bool = False):
-    """Load one campaign analysis with the invocation's explicit USR coordinate."""
+    """Load one campaign analysis with the invocation's explicit SeqLedger coordinate."""
 
     from ...analysis.campaign import CampaignAnalysis
 

@@ -32,21 +32,24 @@ def _append_usr_event(event_log: Path, payload: dict[str, object]) -> None:
         with event_log.open("a", encoding="utf-8") as f:
             f.write(json.dumps(payload) + "\n")
     except Exception as exc:
-        raise RuntimeError(f"USR mutation completed but event logging failed at '{event_log}': {exc}") from exc
+        raise RuntimeError(f"SeqLedger mutation completed but event logging failed at '{event_log}': {exc}") from exc
 
 
 def attach_usr(usr_root: Path, dataset: str, cols_df: pd.DataFrame, allow_overwrite: bool = False) -> None:
-    """Attach columns to a USR dataset using its Python API. We require dnadesign.usr.Dataset."""
+    """Attach columns to a SeqLedger dataset using its Python API. We require dnadesign.seqledger.Dataset."""
     try:
-        from dnadesign.usr import Dataset
+        from dnadesign.seqledger import Dataset
     except Exception as e:
         raise RuntimeError(
-            "dnadesign.usr is required to attach columns to a USR dataset. Please install the dnadesign package."
+            (
+                "dnadesign.seqledger is required to attach columns to a "
+                "SeqLedger dataset. Please install the dnadesign package."
+            )
         ) from e
     ds = Dataset(usr_root, dataset)
     # We assume 'cols_df' contains 'id' plus one or more *namespaced* columns
     # (e.g., 'cluster__promoter_clusters_v1', 'cluster__promoter_clusters_v1__meta', ...).
-    # USR requires an explicit namespace; infer it and *fail fast* if ambiguous.
+    # SeqLedger requires an explicit namespace; infer it and *fail fast* if ambiguous.
     non_id = [c for c in cols_df.columns if c != "id"]
     if not non_id:
         return
@@ -83,9 +86,9 @@ def attach_usr(usr_root: Path, dataset: str, cols_df: pd.DataFrame, allow_overwr
 
 def drop_usr_columns(usr_root: Path, dataset: str, columns: list[str]) -> None:
     """
-    Delete namespaced columns from a USR dataset by editing records.parquet atomically.
+    Delete namespaced columns from a SeqLedger dataset by editing records.parquet atomically.
     ─ Only 'cluster__*' columns are allowed (defensive guard).
-    ─ Uses dnadesign.usr I/O helpers for snapshots + metadata preservation + event log.
+    ─ Uses dnadesign.seqledger I/O helpers for snapshots + metadata preservation + event log.
     """
     if not columns:
         return
@@ -103,14 +106,14 @@ def drop_usr_columns(usr_root: Path, dataset: str, columns: list[str]) -> None:
     records = ds_dir / "records.parquet"
     events = ds_dir / ".events.log"
     if not records.exists():
-        raise FileNotFoundError(f"USR dataset not found: {records}")
+        raise FileNotFoundError(f"SeqLedger dataset not found: {records}")
 
-    # Use public USR API and pyarrow for deterministic in-place rewrite.
+    # Use public SeqLedger API and pyarrow for deterministic in-place rewrite.
     try:
-        from dnadesign.usr import Dataset
+        from dnadesign.seqledger import Dataset
     except Exception as e:
         raise RuntimeError(
-            "dnadesign.usr is required to modify USR datasets. "
+            "dnadesign.seqledger is required to modify SeqLedger datasets. "
             "Please ensure the dnadesign package is installed and up to date."
         ) from e
 

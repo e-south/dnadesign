@@ -1,17 +1,17 @@
 ## Construct outputs reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-28
 
 ### Output root choices
 
 Two patterns are supported:
 
-1. Workspace-local USR root
+1. Workspace-local SeqLedger root
 - Default packaged-workspace pattern: `outputs/usr_datasets`
 - Best for study-scoped provenance, isolation, and replay
 
-2. Explicit shared USR root
+2. Explicit shared SeqLedger root
 - Use `output.target.root` plus matching input/template source roots when a shared dataset mirror is intentional
 - Best for curated shared datasets or downstream cross-workspace reuse
 
@@ -51,7 +51,7 @@ single base sequence row and the complete `construct__slots` audit trail.
 
 When the input dataset already carries `usr_label__primary` / `usr_label__aliases`, construct carries those labels onto the derived output rows as the analyst-facing source names. Those labels are convenience labels, not uniqueness guarantees for derived construct outputs; use `construct__*` lineage to disambiguate source/template/window context.
 
-Use `uv run usr head <dataset>` or `uv run usr validate <dataset> --strict` to inspect or verify the resulting records.
+Use `uv run seqledger head <dataset>` or `uv run seqledger validate <dataset> --strict` to inspect or verify the resulting records.
 
 ### Provenance surfaces
 
@@ -70,13 +70,13 @@ Use `uv run usr head <dataset>` or `uv run usr validate <dataset> --strict` to i
 - one anchor dataset, one template record, multiple output datasets across multiple workspace projects
 - one anchor dataset, one template record, one accumulating output dataset with `output.on_conflict=ignore`
 - one anchor dataset, one template record, one accumulating output dataset with `output.on_conflict=error` when distinct projects emit distinct output ids
-- workspace-local demo roots or explicit shared USR roots
+- workspace-local demo roots or explicit shared SeqLedger roots
 
 Matrix orchestration across multiple templates is expressed as multiple project
 entries in the workspace registry. Multiple slots within one template are
 first-class runtime schema.
 
-For the cross-tool pattern where multiple construct projects feed one canonical USR dataset before infer adds derived namespaces, use the shared runbook:
-[Construct -> USR -> Infer shared dataset runbook](../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md).
+For the cross-tool pattern where multiple construct projects feed one canonical SeqLedger dataset before infer adds derived namespaces, use the shared runbook:
+[Construct -> SeqLedger -> Infer shared dataset runbook](../../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md).
 
 For the explicit downstream infer handoff fields, see [template-contexts.md](template-contexts.md).

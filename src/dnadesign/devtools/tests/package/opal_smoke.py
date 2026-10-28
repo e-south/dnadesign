@@ -30,9 +30,9 @@ import sys
 attempts = []
 class RejectUSR(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
-        if fullname == 'dnadesign.usr' or fullname.startswith('dnadesign.usr.'):
+        if fullname == 'dnadesign.seqledger' or fullname.startswith('dnadesign.seqledger.'):
             attempts.append(fullname)
-            raise ImportError('Local OPAL must not import USR: ' + fullname)
+            raise ImportError('Local OPAL must not import SeqLedger: ' + fullname)
 sys.meta_path.insert(0, RejectUSR())
 from dnadesign.opal import main
 try:

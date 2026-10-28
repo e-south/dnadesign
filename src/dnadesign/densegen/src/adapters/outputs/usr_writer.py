@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/densegen/src/adapters/outputs/usr_writer.py
 
-Writes DenseGen records and metadata into USR datasets.
+Writes DenseGen records and metadata into SeqLedger datasets.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -23,7 +23,7 @@ from typing import Any, List, Optional
 import numpy as np
 import pyarrow as pa
 
-from dnadesign.usr import Dataset
+from dnadesign.seqledger import Dataset
 
 from ...adapters.outputs.parquet import _meta_arrow_type
 from ...artifacts.npz_store import describe_npz, write_npz_atomic
@@ -127,7 +127,7 @@ class USRWriter:
     def add(self, record: OutputRecord) -> bool:
         if record.bio_type != self.default_bio_type or record.alphabet != self.default_alphabet:
             raise ValueError(
-                "OutputRecord bio_type/alphabet mismatch for USR sink. "
+                "OutputRecord bio_type/alphabet mismatch for SeqLedger sink. "
                 f"record=({record.bio_type}, {record.alphabet}) "
                 f"sink=({self.default_bio_type}, {self.default_alphabet})"
             )
@@ -295,7 +295,7 @@ class USRWriter:
         if registry_path.exists():
             return
         raise RuntimeError(
-            f"USR registry not found at {registry_path}. Create registry.yaml before writing USR outputs."
+            f"Registry missing at {registry_path}. Create registry.yaml before writing SeqLedger outputs."
         )
 
     def _build_overlay_table(self, records: List[OutputRecord]) -> tuple[pa.Table, list[OrphanArtifact]]:
@@ -399,7 +399,7 @@ class USRWriter:
         try:
             import pyarrow.parquet as pq
         except Exception as exc:
-            raise RuntimeError(f"pyarrow.parquet is required to persist USR overlay backlog: {exc}") from exc
+            raise RuntimeError(f"pyarrow.parquet is required to persist SeqLedger overlay backlog: {exc}") from exc
         pq.write_table(table, tmp_path)
         os.replace(tmp_path, part_path)
         return part_path
@@ -428,13 +428,13 @@ class USRWriter:
         try:
             import pyarrow.parquet as pq
         except Exception as exc:
-            raise RuntimeError(f"pyarrow.parquet is required to replay USR overlay backlog: {exc}") from exc
+            raise RuntimeError(f"pyarrow.parquet is required to replay SeqLedger overlay backlog: {exc}") from exc
 
         for part_path in backlog_parts:
             try:
                 table = pq.read_table(part_path)
             except Exception as exc:
-                raise RuntimeError(f"Failed to read USR overlay backlog part: {part_path}") from exc
+                raise RuntimeError(f"Failed to read SeqLedger overlay backlog part: {part_path}") from exc
 
             run_id = self._overlay_run_id_from_table(table)
             actor = self._densegen_actor(run_id)

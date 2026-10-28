@@ -84,7 +84,7 @@ def test_ops_package_local_docs_index_routes_to_shared_runbook_surface() -> None
     assert "How to use Ops" in text
     assert "../../../../.agents/skills/sge-hpc-ops/SKILL.md" in text
     assert "../../../../.agents/skills/notify-ops/SKILL.md" in text
-    assert "../../../../.agents/skills/bu-scc-usr-sync/SKILL.md" in text
+    assert "../../../../.agents/skills/bu-scc-seqledger-sync/SKILL.md" in text
     assert "scheduler-shaped" in text
     assert "prints YAML to stdout unless you pass `--out`" in text
 
@@ -107,14 +107,14 @@ def test_ops_how_to_doc_carries_quick_usage_commands() -> None:
     assert "uv run ops catalog show <registry-id>" in text
     assert "--plane data-plane --query infer" in text
     assert "--section tool-sources" in text
-    assert "--related-to usr.data-plane.promoter-feature-matrix" in text
+    assert "--related-to seqledger.data-plane.promoter-feature-matrix" in text
     assert "related procedures" in text
     assert "related tool docs" in text
     assert "deeper docs when listed" in text
     assert "uv run ops progress explain <registry-id>" in text
     assert (
-        "uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>"
-        in text
+        "uv run ops progress show seqledger.data-plane.promoter-feature-matrix "
+        "--seqledger-root <seqledger-root> --dataset <dataset>" in text
     )
     assert "inspect the required status flags before you run `progress show`" in text
     assert "uv run ops progress scaffold <registry-id> ..." in text
@@ -160,19 +160,19 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
     assert "--section tool-sources" not in text
     assert "uv run ops catalog list --related-to" not in text
     progress_show = (
-        "uv run ops progress show usr.data-plane.promoter-feature-matrix "
-        "--repo-root <repo-root> --usr-root <usr-root> --dataset <dataset>"
+        "uv run ops progress show seqledger.data-plane.promoter-feature-matrix "
+        "--repo-root <repo-root> --seqledger-root <seqledger-root> --dataset <dataset>"
     )
     assert progress_show in text
     scaffold_example = (
         "uv run ops progress scaffold ops.control-plane.orchestration "
-        "usr.data-plane.promoter-feature-matrix --repo-root <repo-root>"
+        "seqledger.data-plane.promoter-feature-matrix --repo-root <repo-root>"
     )
     assert scaffold_example in text
     assert "prints to stdout unless you pass `--out`" in text
     assert "`ops progress show` and `ops progress campaign` are read-only" in text
     related_scaffold_example = (
-        "uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>"
+        "uv run ops progress scaffold --related-to seqledger.data-plane.promoter-feature-matrix --repo-root <repo-root>"
     )
     assert related_scaffold_example in text
     assert "uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>" in text
@@ -213,7 +213,7 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
     assert "**Type:** runbook" in text
     assert "**Plane:** control-plane" in text
     assert "**Owner-boundary:** ops" in text
-    assert "It does not own durable USR-backed data-plane workflows" in text
+    assert "It does not own durable SeqLedger-backed data-plane workflows" in text
     assert "default is `300`" in text
     assert "operator and agent review" not in text
     assert "--command-timeout-seconds" in text
@@ -228,9 +228,9 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
     assert "logging.retention.keep_last" in text
     assert "logging.retention.max_age_days" in text
     assert "outputs/logs/ops/runtime" in text
-    assert "usr-overlay-guard" in text
-    assert "usr-records-part-guard" in text
-    assert "usr-archived-overlay-guard" in text
+    assert "seqledger-overlay-guard" in text
+    assert "seqledger-records-part-guard" in text
+    assert "seqledger-archived-overlay-guard" in text
     assert "densegen-overlay-guard" not in text
     assert "densegen.overlay_guard.overlay_namespace" in text
     assert "densegen.overlay_guard.namespace" not in text
@@ -240,7 +240,7 @@ def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> No
     assert "model.parallelism" in text
     assert "gpu_capability=8.9 -> 45.0 GiB" in text
     assert "gpu_capability=9.0 -> 80.0 GiB" in text
-    assert "does not render `usr-overlay-guard`" in text
+    assert "does not render `seqledger-overlay-guard`" in text
     assert "does not pass `INFER_RUN_ARGS=--overwrite`" in text
     assert "without implicitly pruning the namespace" in text
     assert "python -m dnadesign.ops.orchestrator.gates" not in text
@@ -289,7 +289,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "### Command lookup" in text
     assert "--plane data-plane --query infer" in text
     assert "--section tool-sources" in text
-    assert "--related-to usr.data-plane.promoter-feature-matrix" in text
+    assert "--related-to seqledger.data-plane.promoter-feature-matrix" in text
     assert "uv run ops catalog show <registry-id>" in text
     assert "required status inputs" in text
     assert "linked deeper docs" in text
@@ -297,7 +297,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "uv run ops progress explain <registry-id>" in text
     assert "uv run ops progress show <registry-id> ..." in text
     assert "uv run ops progress scaffold <registry-id> ..." in text
-    assert "uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix" in text
+    assert "uv run ops progress scaffold --related-to seqledger.data-plane.promoter-feature-matrix" in text
     assert "uv run ops progress campaign --manifest <manifest.yaml>" in text
     assert "uv run ops runbook fill-infer --study-dir /path/to/study" in text
     assert "prints to stdout unless you pass `--out`" in text
@@ -308,17 +308,17 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "### Explicit campaign manifest shape" in text
     assert "### Boundary reminders" not in text
     assert "ops.control-plane.orchestration" in text
-    assert "usr.data-plane.hpc-sync" in text
-    assert "usr.data-plane.chained-densegen-infer-sync" in text
-    assert "usr.data-plane.multi-source-source-of-truth" in text
-    assert "usr.data-plane.construct-infer-source-of-truth" in text
-    assert "usr.data-plane.promoter-feature-matrix" in text
+    assert "seqledger.data-plane.hpc-sync" in text
+    assert "seqledger.data-plane.chained-densegen-infer-sync" in text
+    assert "seqledger.data-plane.multi-source-source-of-truth" in text
+    assert "seqledger.data-plane.construct-infer-source-of-truth" in text
+    assert "seqledger.data-plane.promoter-feature-matrix" in text
     assert "cluster.downstream.exploratory-clustering" in text
-    assert "opal.downstream.usr-infer-x-active-learning" in text
+    assert "opal.downstream.seqledger-infer-x-active-learning" in text
     assert "../operations/orchestration/runbooks.md" in text
-    assert "../../src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.md" in text
+    assert "../../src/dnadesign/seqledger/docs/operations/sync/hpc-agent-flow.md" in text
     assert "../../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md" in text
-    assert "../../src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md" in text
+    assert "../../src/dnadesign/opal/docs/workflows/seqledger-infer-x-active-learning.md" in text
     assert "../../src/dnadesign/densegen/docs/README.md" in text
     assert "../../src/dnadesign/construct/docs/README.md" in text
     assert "../../src/dnadesign/infer/docs/README.md" in text
@@ -390,8 +390,8 @@ def test_core_docs_avoid_contrived_doc_language() -> None:
         "src/dnadesign/ops/docs/README.md",
         "src/dnadesign/notify/README.md",
         "src/dnadesign/notify/docs/README.md",
-        "src/dnadesign/usr/README.md",
-        "src/dnadesign/usr/docs/README.md",
+        "src/dnadesign/seqledger/README.md",
+        "src/dnadesign/seqledger/docs/README.md",
         "ARCHITECTURE.md",
         "DESIGN.md",
         "RELIABILITY.md",

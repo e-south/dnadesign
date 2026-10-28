@@ -46,7 +46,7 @@ from dnadesign.infer.src.features.execution import (
     feature_metadata_output_ids,
 )
 from dnadesign.infer.src.features.shard_ledger import SHARD_STATUS_COMMITTED, load_shard_ledger
-from dnadesign.usr import Dataset, SequenceViewRecord, ensure_sequence_contract_namespaces, write_sequence_views
+from dnadesign.seqledger import Dataset, SequenceViewRecord, ensure_sequence_contract_namespaces, write_sequence_views
 
 
 def _assert_list_close(observed: list[float], expected: list[float]) -> None:
@@ -583,7 +583,7 @@ def test_existing_feature_metadata_values_reads_usr_metadata_columns_in_single_s
 
 def test_apply_digest_resume_guard_uses_prefetched_digests_without_usr_rescan(monkeypatch) -> None:
     def _fail_read(*args, **kwargs):
-        raise AssertionError("prefetched digest path should not rescan USR columns")
+        raise AssertionError("prefetched digest path should not rescan SeqLedger columns")
 
     monkeypatch.setattr("dnadesign.infer.src.features.execution.read_usr_columns", _fail_read)
     feature_values = {"log_likelihood__total": [3.0]}

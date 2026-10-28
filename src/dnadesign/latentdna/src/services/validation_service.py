@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 import pyarrow.parquet as pq
 
-from dnadesign.usr import SequencesError
+from dnadesign.seqledger import SequencesError
 
 from ..contracts.errors import SourceResolutionError, WorkspaceValidationError
 from ..contracts.notebook import WorkspaceNotebookControls

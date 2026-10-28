@@ -2,7 +2,7 @@
 doc_id: external-storage-objects
 surface: integration-contract
 owner: dnadesign-maintainers
-last_verified: 2026-08-27
+last_verified: 2026-10-28
 ---
 
 ## External storage objects
@@ -111,7 +111,7 @@ one-way, compare-and-swap-protected correction permits only `metadata` to
 `artifact`. Similarly, `--cache` may explicitly demote an existing artifact to
 rebuildable cache material while continuing to classify newly discovered cache
 files. Inputs remain immutable, and metadata cannot be reclassified as cache.
-For example, USR `.events.log` is an append-only artifact, not immutable
+For example, SeqLedger `.events.log` is an append-only artifact, not immutable
 metadata.
 Refresh uses the expected digest as a compare-and-swap guard against concurrent
 receipt changes. Writers lock

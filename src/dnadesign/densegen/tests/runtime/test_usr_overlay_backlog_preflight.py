@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/densegen/tests/runtime/test_usr_overlay_backlog_preflight.py
 
-Resume preflight tests for replaying pending USR overlay backlog parts.
+Resume preflight tests for replaying pending SeqLedger overlay backlog parts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -17,7 +17,7 @@ from types import SimpleNamespace
 import pyarrow.parquet as pq
 import pytest
 
-import dnadesign.usr as usr_pkg
+import dnadesign.seqledger as usr_pkg
 from dnadesign.densegen.src.adapters.outputs.record import OutputRecord
 from dnadesign.densegen.src.adapters.outputs.usr_writer import USRWriter
 from dnadesign.densegen.src.core.pipeline.orchestrator import _replay_usr_overlay_backlog_for_resume

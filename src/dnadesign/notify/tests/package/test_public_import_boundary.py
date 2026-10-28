@@ -24,7 +24,7 @@ def _runtime_root() -> Path:
 
 
 def test_notify_runtime_does_not_import_densegen_or_usr_internal_paths() -> None:
-    disallowed = ("dnadesign.densegen.src.", "dnadesign.usr.src.")
+    disallowed = ("dnadesign.densegen.src.", "dnadesign.seqledger.src.")
     violations: list[str] = []
     for path in sorted(_runtime_root().rglob("*.py")):
         if "tests" in path.parts:

@@ -28,17 +28,17 @@ This creates:
 - Existing workspace directories are never overwritten.
 - Config template defaults to:
   - `src/dnadesign/infer/docs/operations/examples/workspace_local_records_config.yaml` (`--profile local`)
-- Pressure-test USR template profile:
+- Pressure-test SeqLedger template profile:
   - `uv run infer workspace init --id demo_usr_pressure --profile usr-pressure`
   - `src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml`
   - `ingest.root: outputs/usr_datasets` resolves relative to the workspace `config.yaml`
 
-`outputs/usr_datasets` inside an infer workspace is a workspace-local USR export
+`outputs/usr_datasets` inside an infer workspace is a workspace-local SeqLedger export
 root. Use it for self-contained pressure tests or local ownership. Point infer
-at an explicit shared USR root when an external workspace owns the cross-tool
+at an explicit shared SeqLedger root when an external workspace owns the cross-tool
 dataset.
 
-### Local data path option (non-USR)
+### Local data path option (non-SeqLedger)
 
 For config-driven local files, set `ingest.source` and `ingest.path` in `config.yaml`:
 
@@ -48,12 +48,12 @@ For config-driven local files, set `ingest.source` and `ingest.path` in `config.
 
 Relative `ingest.path` values are resolved from the directory that contains `config.yaml`.
 
-### USR reset scope
+### SeqLedger reset scope
 
-For USR-backed workspaces, reset only infer outputs with:
+For SeqLedger-backed workspaces, reset only infer outputs with:
 
 ```bash
-uv run infer prune --usr <dataset-id> --usr-root <usr-root> # Archive infer output namespace for one dataset.
+uv run infer prune --seqledger <dataset-id> --seqledger-root <seqledger-root> # Archive infer output namespace for one dataset.
 ```
 
-This archives the `infer` overlay namespace only. It does not delete the workspace or the base USR records table.
+This archives the `infer` overlay namespace only. It does not delete the workspace or the base SeqLedger records table.

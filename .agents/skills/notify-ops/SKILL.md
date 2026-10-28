@@ -1,6 +1,6 @@
 ---
 name: notify-ops
-description: Operate dnadesign Notify setup, profile validation, watcher loops, and spool recovery. Use for Slack delivery or USR .events.log watches. Do not use for Slack admin, scheduler submits, or code changes.
+description: Operate dnadesign Notify setup, profile validation, watcher loops, and spool recovery. Use for Slack delivery or SeqLedger .events.log watches. Do not use for Slack admin, scheduler submits, or code changes.
 metadata:
   version: 0.1.1
   category: workflow-automation
@@ -20,7 +20,7 @@ operator docs and fail-fast command contracts without depending on subtree
 In scope:
 - file-backed webhook setup for reusable watcher profiles
 - resolver-mode and explicit-path Notify setup
-- `notify profile doctor`, `notify usr-events watch`, and `notify spool drain`
+- `notify profile doctor`, `notify seqledger-events watch`, and `notify spool drain`
 - repo-rooted workspace shorthand for DenseGen, Infer, and Construct
 - routing to scheduler-managed watcher flows when BU SCC batch is involved
 
@@ -35,7 +35,7 @@ Out of scope:
 - the user is routed through exactly one canonical setup/watch/recover path
 - the selected path uses repo-owned docs instead of hidden subtree-only
   instructions
-- Notify input stays USR `.events.log` only
+- Notify input stays SeqLedger `.events.log` only
 - reusable live delivery uses file-backed secret references instead of plaintext
   webhook URLs in profiles
 - one watcher is planned per live lane or destination dataset when Notify and
@@ -45,7 +45,7 @@ Out of scope:
 
 1. Route through the canonical docs first.
 - Start at `docs/notify/README.md` for workflow selection.
-- Use `docs/notify/usr-events.md` for ordered setup, run, and recovery steps.
+- Use `docs/notify/seqledger-events.md` for ordered setup, run, and recovery steps.
 - Use `src/dnadesign/notify/docs/reference/command-contracts.md` when the
   question is about CLI contracts or fail-fast behavior.
 - Use [workflow-router.md](references/workflow-router.md) to choose the next
@@ -56,7 +56,7 @@ Out of scope:
 - Validate profile and wiring: `uv run notify profile doctor --profile <profile.json>`
 - Resolve watcher inputs without writing profile artifacts:
   `uv run notify setup resolve-events --tool <tool> --workspace <workspace> --json`
-- Start watcher loop: `uv run notify usr-events watch ...`
+- Start watcher loop: `uv run notify seqledger-events watch ...`
 - Replay failed deliveries: `uv run notify spool drain --profile <profile.json>`
 
 3. Apply repo-specific guardrails.
@@ -99,7 +99,7 @@ Return:
 
 Should trigger:
 - "Set up Notify for this workspace and validate the profile."
-- "Start a Notify watcher for this USR event stream."
+- "Start a Notify watcher for this SeqLedger event stream."
 - "Recover failed Notify deliveries from spool."
 - "Why does `notify profile doctor` fail on this repo?"
 - "Which runbook should I use for Notify on BU SCC?"

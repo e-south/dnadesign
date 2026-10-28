@@ -1,7 +1,7 @@
 ## `infer` for agents
 
 Supplement to the repo-root `AGENTS.md` for Infer extraction, generation,
-feature sidecars, and USR writeback work.
+feature sidecars, and SeqLedger writeback work.
 
 ### Boundaries
 
@@ -37,11 +37,11 @@ feature sidecars, and USR writeback work.
   planners before submitting long jobs.
 
 ### Outputs / naming
-When writing back to USR, output columns follow:
+When writing back to SeqLedger, output columns follow:
 - `infer__<model_id>__<job_id>__<out_id>`
 
 For sequence-view feature bundles, prefer the sidecar contract above. Consumers
-should join aliases to vectors/scalars and USR sequence views rather than
+should join aliases to vectors/scalars and SeqLedger sequence views rather than
 depending on study-specific columns.
 
 ### Commands (copy/paste)

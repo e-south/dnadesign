@@ -22,7 +22,7 @@ def test_permuter_scc_template_is_public_surface_wrapper() -> None:
 
     assert "PERMUTER_WORKSPACE is required" in text
     assert "PERMUTER_REF is required" in text
-    assert 'export USR_ACTOR_TOOL="${USR_ACTOR_TOOL:-permuter}"' in text
+    assert 'export SEQLEDGER_ACTOR_TOOL="${SEQLEDGER_ACTOR_TOOL:-permuter}"' in text
     assert "uv run permuter workspace validate --workspace" in text
     assert "uv run permuter run" in text
     assert "uv run permuter evaluate" in text

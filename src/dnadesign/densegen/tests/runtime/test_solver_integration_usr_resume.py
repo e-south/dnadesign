@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/densegen/tests/runtime/test_solver_integration_usr_resume.py
 
-Runs a real solver workflow with USR output and verifies resume safety.
+Runs a real solver workflow with SeqLedger output and verifies resume safety.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pyarrow.parquet as pq
 
-import dnadesign.usr as usr_pkg
+import dnadesign.seqledger as usr_pkg
 from dnadesign.densegen.src.config import load_config
 from dnadesign.densegen.src.core.pipeline.orchestrator import run_pipeline
 
@@ -184,7 +184,7 @@ def test_real_solver_run_writes_usr_and_resume_is_safe(tmp_path: Path) -> None:
     _write_config(cfg_path)
     loaded = load_config(cfg_path)
 
-    # A registry-only USR root does not count as existing run outputs.
+    # A registry-only SeqLedger root does not count as existing run outputs.
     first = run_pipeline(loaded, resume=False, build_stage_a=True)
     assert first.total_generated >= 1
 

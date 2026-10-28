@@ -1,17 +1,17 @@
 # Permuter Handoffs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-28
 
 Permuter handoffs are boundary artifacts. They name generated variants and the
-next requested action, but they do not make Permuter the owner of USR, Infer,
+next requested action, but they do not make Permuter the owner of SeqLedger, Infer,
 Construct, Study, or Ops behavior.
 
 ## Handoff Rule
 
 Permuter proposes variants. The receiving plane executes its own contract:
 
-- USR records canonical sequence rows, overlays, events, and sidecar locations.
+- SeqLedger records canonical sequence rows, overlays, events, and sidecar locations.
 - Construct realizes named slots and writes sequence views.
 - Infer materializes model features and sidecars.
 - Studies bind biological meaning, promotion rules, and readiness gates.
@@ -20,9 +20,9 @@ Permuter proposes variants. The receiving plane executes its own contract:
 When a handoff crosses a tool boundary, prefer a machine-readable manifest plus
 public APIs over imports from sibling internals.
 
-## Permuter To USR
+## Permuter To SeqLedger
 
-Use `materialize_result(...)` when a caller needs a USR-shaped dataset:
+Use `materialize_result(...)` when a caller needs a SeqLedger-shaped dataset:
 
 ```python
 from dnadesign.permuter import (
@@ -43,7 +43,7 @@ result = generate_variants(
 dataset = materialize_result(result, "outputs/permuter_rt_cds_dms")
 ```
 
-The materialized rows use canonical USR `id` values and preserve the public API
+The materialized rows use canonical SeqLedger `id` values and preserve the public API
 variant identity in `permuter__var_id`.
 
 ## Permuter To Infer
@@ -129,13 +129,13 @@ RT-CDS DMS variants into Construct slot-input rows with:
 - `construct_subject__permuter_variant_id`
 
 The `construct_subject__permuter_variant_id` field is study overlay provenance. It is
-not a replacement for the canonical USR `id` column.
+not a replacement for the canonical SeqLedger `id` column.
 
 ## Rejected Patterns
 
 - Permuter writing `_derived/infer` files.
 - Infer importing `dnadesign.permuter.src.*`.
-- USR `id` values copied from study candidate ids.
+- SeqLedger `id` values copied from study candidate ids.
 - Duplicate variant id columns such as both `permuter__var_id` and
   `permuter__variant_id`.
 - Aliases for unsupported protocol or metric ids.

@@ -18,7 +18,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
-from dnadesign.usr import Dataset
+from dnadesign.seqledger import Dataset
 
 from ..contracts.errors import SourceResolutionError
 

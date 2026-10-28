@@ -18,8 +18,8 @@ from typer.testing import CliRunner
 
 from dnadesign.construct.src.cli import app
 from dnadesign.construct.tests.runtime.run_construct_helpers import write_registry as _write_registry
-from dnadesign.usr import Dataset
-from dnadesign.usr import SchemaError as USRSchemaError
+from dnadesign.seqledger import Dataset
+from dnadesign.seqledger import SchemaError as USRSchemaError
 
 _RUNNER = CliRunner()
 
@@ -319,7 +319,9 @@ job:
     result = _RUNNER.invoke(app, ["validate", "config", "--config", config_path.as_posix(), "--runtime"])
 
     assert result.exit_code == 1
-    assert "construct preflight failed while reading USR inputs: registry schema mismatch" in (result.stdout or "")
+    assert "construct preflight failed while reading SeqLedger inputs: registry schema mismatch" in (
+        result.stdout or ""
+    )
 
 
 def test_validate_config_runtime_missing_input_dataset_suggests_seed_or_import(tmp_path: Path) -> None:

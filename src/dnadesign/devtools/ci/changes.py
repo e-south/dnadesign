@@ -55,7 +55,7 @@ _GENERATED_ARTIFACT_DIRS = {"__pycache__", ".pytest_cache"}
 _GENERATED_ARTIFACT_SUFFIXES = {".pyc", ".pyo"}
 _RUNTIME_EXAMPLE_DOCS = {
     # test_docs_workflow_routing executes this document's YAML and transforms labels.
-    "src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md",
+    "src/dnadesign/opal/docs/workflows/seqledger-infer-x-active-learning.md",
 }
 
 

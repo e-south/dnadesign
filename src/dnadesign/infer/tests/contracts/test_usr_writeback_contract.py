@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/tests/contracts/test_usr_writeback_contract.py
 
-USR write-back contract tests for Infer.
+SeqLedger write-back contract tests for Infer.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -26,7 +26,7 @@ from dnadesign.infer.src.errors import RuntimeOOMError, WriteBackError
 from dnadesign.infer.src.runtime.resume_planner import read_usr_columns
 from dnadesign.infer.src.writers import usr as usr_writer
 from dnadesign.infer.src.writers.usr import write_back_usr
-from dnadesign.usr import Dataset
+from dnadesign.seqledger import Dataset
 
 
 def test_interleaved_write_rechecks_occupancy_inside_storage_transaction(tmp_path, monkeypatch) -> None:
@@ -280,7 +280,7 @@ def test_write_back_usr_respects_overwrite_flag_true() -> None:
 
 def test_write_back_usr_tags_attach_with_infer_actor(monkeypatch: pytest.MonkeyPatch) -> None:
     ds = _AttachCaptureDataset()
-    monkeypatch.setenv("USR_ACTOR_RUN_ID", "infer-run-42")
+    monkeypatch.setenv("SEQLEDGER_ACTOR_RUN_ID", "infer-run-42")
 
     write_back_usr(
         ds,

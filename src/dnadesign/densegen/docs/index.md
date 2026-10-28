@@ -1,7 +1,7 @@
 ## DenseGen docs index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-27
+**Last verified:** 2026-10-28
 
 
 Use **[docs/README.md](README.md)** as the primary docs entry. This page is a compact by-type index for direct browsing.
@@ -11,11 +11,11 @@ Use **[docs/README.md](README.md)** as the primary docs entry. This page is a co
 - **[Dense array showcase tutorial](tutorials/demo_dense_array_showcase.md)**
 - **[Sampling baseline tutorial](tutorials/demo_sampling_baseline.md)**
 - **[Constitutive sigma panel study tutorial](tutorials/study_constitutive_sigma_panel.md)**
-- **[DenseGen to USR to Notify tutorial](tutorials/demo_usr_notify.md)**
+- **[DenseGen to SeqLedger to Notify tutorial](tutorials/demo_usr_notify.md)**
 
 ### Cross-tool handoff routes
-- **[Multi-source shared dataset assembly](../../usr/docs/operations/assembly/multi-source-shared-dataset.md)**: merge DenseGen outputs with other USR-backed sources before construct and infer share one downstream dataset.
-- **[Promoter characterization feature matrix](../../usr/docs/operations/promoter/characterization-feature-matrix.md)**: continue from DenseGen outputs into infer-derived feature columns before clustering or OPAL.
+- **[Multi-source shared dataset assembly](../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md)**: merge DenseGen outputs with other SeqLedger-backed sources before construct and infer share one downstream dataset.
+- **[Promoter characterization feature matrix](../../seqledger/docs/operations/promoter/characterization-feature-matrix.md)**: continue from DenseGen outputs into infer-derived feature columns before clustering or OPAL.
 
 ### Workspace docs
 - **[Workspaces directory guide](../workspaces/README.md)**

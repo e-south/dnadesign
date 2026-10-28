@@ -23,7 +23,7 @@ README for commands, inputs, and outputs.
 
 | Tool | Description |
 | --- | --- |
-| [**usr**](src/dnadesign/usr/) | Store, check, and sync tables of sequence records. |
+| [**seqledger**](src/dnadesign/seqledger/) | Store, check, and sync tables of sequence records. |
 | [**infer**](src/dnadesign/infer/) | Run sequence models and add their predictions to datasets. |
 | [**densegen**](src/dnadesign/densegen/) | Generate sequence libraries from supplied parts and packing constraints. |
 | [**construct**](src/dnadesign/construct/) | Build DNA constructs from reusable templates. |

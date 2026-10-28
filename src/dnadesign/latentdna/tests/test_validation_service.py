@@ -17,7 +17,7 @@ import pyarrow.parquet as pq
 
 from dnadesign.latentdna.src.contracts.errors import WorkspaceValidationError
 from dnadesign.latentdna.src.services.validation_service import validate_workspace
-from dnadesign.usr import Dataset, ensure_sequence_contract_namespaces
+from dnadesign.seqledger import Dataset, ensure_sequence_contract_namespaces
 
 
 def _write_validation_workspace(tmp_path, *, role: str) -> tuple[object, object]:

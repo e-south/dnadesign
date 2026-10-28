@@ -43,10 +43,10 @@ Treat this file as a navigation map; canonical policy and operational detail liv
 - BU SCC batch + notify runbook: `docs/bu-scc/runbooks/batch-notify.md`
 - Submit-ready BU SCC jobs: `docs/bu-scc/jobs/README.md`
 - Notify operator docs: `docs/notify/README.md`
-- Notify event contract: `docs/notify/usr-events.md`
+- Notify event contract: `docs/notify/seqledger-events.md`
 - Repo-local notify operator skill: `.agents/skills/notify-ops/SKILL.md`
 - Repo-local SGE/HPC operator skill: `.agents/skills/sge-hpc-ops/SKILL.md`
-- Repo-local BU SCC USR sync skill: `.agents/skills/bu-scc-usr-sync/SKILL.md`
+- Repo-local BU SCC SeqLedger sync skill: `.agents/skills/bu-scc-seqledger-sync/SKILL.md`
 - Critical reusable operational workflows live under `.agents/skills/`.
   Native project-scope skill discovery only applies when the Codex session is launched from this repo root or another path inside this checkout. If the session started elsewhere, use the repo docs and explicit CLI entrypoints instead of assuming a repo-local skill will appear in the advertised skill list.
 - External study integration contract: `docs/integrations/study-workspaces.md`

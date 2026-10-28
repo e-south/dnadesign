@@ -1,15 +1,15 @@
-## DenseGen to USR to Notify tutorial
+## DenseGen to SeqLedger to Notify tutorial
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-10-28
 
 
-This tutorial shows the full event-driven operator path from DenseGen generation to USR mutation events to Notify webhook delivery. Read it when you need to verify watcher behavior end-to-end and avoid mixing DenseGen diagnostics with USR event streams; for campaign-scale runs use the stress-study workspace and apply the same watcher flow.
+This tutorial shows the full event-driven operator path from DenseGen generation to SeqLedger mutation events to Notify webhook delivery. Read it when you need to verify watcher behavior end-to-end and avoid mixing DenseGen diagnostics with SeqLedger event streams; for campaign-scale runs use the stress-study workspace and apply the same watcher flow.
 
 ### What this tutorial demonstrates
 
-- Running DenseGen in USR output mode.
-- Locating the resolved USR `.events.log` path from workspace outputs.
+- Running DenseGen in SeqLedger output mode.
+- Locating the resolved SeqLedger `.events.log` path from workspace outputs.
 - Resolving DenseGen-managed events for Notify without manual path guessing.
 - Validating webhook delivery with a local receiver through Notify's generic runtime mode.
 
@@ -31,8 +31,8 @@ uv run dense validate-config --probe-solver -c src/dnadesign/densegen/workspaces
 
 ### Key config knobs
 
-- `densegen.output.targets`: Must include `usr` for Notify workflows.
-- `densegen.output.usr.root`: Defines the USR datasets root.
+- `densegen.output.targets`: Must include `seqledger` for Notify workflows.
+- `densegen.output.usr.root`: Defines the SeqLedger datasets root.
 - `densegen.output.usr.dataset`: Defines the flat owner-first DenseGen dataset id (`workspace init --output-mode usr` rewrites this to `densegen_<workspace-id>`).
 - `densegen.output.usr.health_event_interval_seconds`: Controls heartbeat event cadence.
 - `densegen.run.root`: Anchors workspace-relative output paths.
@@ -63,7 +63,7 @@ HTTPServer(("127.0.0.1", 8787), Handler).serve_forever()
 PY
 ```
 
-#### 2) Create a USR-mode DenseGen workspace (terminal B)
+#### 2) Create a SeqLedger-mode DenseGen workspace (terminal B)
 Stage a workspace that writes dataset mutation events for Notify to consume.
 
 ```bash
@@ -72,7 +72,7 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 # Pin workspace root for deterministic init/output paths.
 WORKSPACE_ROOT="$REPO_ROOT/src/dnadesign/densegen/workspaces"
 
-# Create workspace from TFBS baseline in USR output mode.
+# Create workspace from TFBS baseline in SeqLedger output mode.
 uv run dense workspace init --id usr_notify_trial --root "$WORKSPACE_ROOT" --from-workspace demo_tfbs_baseline --copy-inputs --output-mode usr
 
 # Enter the workspace.
@@ -83,7 +83,7 @@ CONFIG="$PWD/config.yaml"
 ```
 
 #### 3) Run DenseGen and inspect event paths
-Execute the run and print the USR event path that Notify must consume.
+Execute the run and print the SeqLedger event path that Notify must consume.
 
 ```bash
 # Run generation from a fresh output state.
@@ -92,8 +92,8 @@ uv run dense run --fresh --no-plot -c "$CONFIG"
 # Print DenseGen diagnostics path (for runtime debugging only).
 ls -la outputs/meta/events.jsonl
 
-# Print the USR events path used by Notify.
-uv run dense inspect run --usr-events-path -c "$CONFIG"
+# Print the SeqLedger events path used by Notify.
+uv run dense inspect run --seqledger-events-path -c "$CONFIG"
 ```
 
 #### 4) Resolve Notify inputs from DenseGen config
@@ -103,7 +103,7 @@ Use resolver mode to confirm the exact `.events.log` path before delivery.
 # Export local webhook URL for env-backed secret resolution.
 export NOTIFY_WEBHOOK="http://127.0.0.1:8787/webhook"
 
-# Resolve the exact USR events path without writing profile artifacts.
+# Resolve the exact SeqLedger events path without writing profile artifacts.
 uv run notify setup resolve-events --tool densegen --config "$CONFIG" --json
 ```
 
@@ -112,10 +112,10 @@ Preview payloads with the generic provider, then start live delivery to the loca
 
 ```bash
 # Preview payloads without advancing cursor.
-uv run notify usr-events watch --tool densegen --config "$CONFIG" --provider generic --url "$NOTIFY_WEBHOOK" --dry-run --no-advance-cursor-on-dry-run
+uv run notify seqledger-events watch --tool densegen --config "$CONFIG" --provider generic --url "$NOTIFY_WEBHOOK" --dry-run --no-advance-cursor-on-dry-run
 
 # Start live watcher and wait for events.
-uv run notify usr-events watch --tool densegen --config "$CONFIG" --provider generic --url "$NOTIFY_WEBHOOK" --follow --wait-for-events --stop-on-terminal-status --idle-timeout 900
+uv run notify seqledger-events watch --tool densegen --config "$CONFIG" --provider generic --url "$NOTIFY_WEBHOOK" --follow --wait-for-events --stop-on-terminal-status --idle-timeout 900
 ```
 
 If you want a reusable Slack watcher profile instead of a local generic receiver, use the Notify operator docs with a real Slack webhook secret:
@@ -135,15 +135,15 @@ uv run notify profile doctor --profile "$PROFILE"
 Generate additional events after watcher startup to validate live watcher behavior.
 
 ```bash
-# Resume run and extend quota to generate additional USR mutation events.
+# Resume run and extend quota to generate additional SeqLedger mutation events.
 uv run dense run --resume --extend-quota 2 --no-plot -c "$CONFIG"
 ```
 
 ### Expected outputs
 
 - DenseGen diagnostics: `outputs/meta/events.jsonl`
-- USR dataset table: `<output.usr.root>/<dataset>/records.parquet`
-- USR event stream: `<output.usr.root>/<dataset>/.events.log`
+- SeqLedger dataset table: `<output.usr.root>/<dataset>/records.parquet`
+- SeqLedger event stream: `<output.usr.root>/<dataset>/.events.log`
 - Notify resolver output: the `notify setup resolve-events --tool densegen --config "$CONFIG"` JSON payload
 - Optional Notify Slack profile: `outputs/notify/densegen/profile.json`
 - Optional Notify cursor and spool: `outputs/notify/densegen/cursor`, `outputs/notify/densegen/spool/`
@@ -151,6 +151,6 @@ uv run dense run --resume --extend-quota 2 --no-plot -c "$CONFIG"
 ### Troubleshooting
 
 - No webhook posts appear: confirm terminal A receiver is running and `NOTIFY_WEBHOOK` is exported.
-- `notify profile doctor` fails against a localhost URL: that path only works with a real Slack webhook host; use the generic `notify usr-events watch --provider generic --url "$NOTIFY_WEBHOOK"` path for local receiver drills.
+- `notify profile doctor` fails against a localhost URL: that path only works with a real Slack webhook host; use the generic `notify seqledger-events watch --provider generic --url "$NOTIFY_WEBHOOK"` path for local receiver drills.
 - Watcher sees no events: rerun `uv run notify setup resolve-events --tool densegen --config "$CONFIG"` and verify it matches the active dataset `.events.log`.
 - Confusing event sources: use **[observability and events](../concepts/runtime/observability-and-events.md)** as the boundary definition.

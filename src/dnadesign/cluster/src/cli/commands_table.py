@@ -23,9 +23,9 @@ def register_delete_columns_command(app: typer.Typer, *, console: Console) -> No
         help="Delete cluster__*-namespaced columns from a dataset/file with a safety preview and confirmation.",
     )
     def cmd_delete_columns(
-        dataset: Optional[str] = typer.Option(None, help="USR dataset name"),
+        dataset: Optional[str] = typer.Option(None, help="SeqLedger dataset name"),
         file: Optional[str] = typer.Option(None, help="Parquet/CSV path"),
-        usr_root: Optional[str] = typer.Option(None, help="USR root directory"),
+        usr_root: Optional[str] = typer.Option(None, help="SeqLedger root directory"),
         all_: bool = typer.Option(False, "--all", help="Delete ALL cluster__* columns"),
         name: List[str] = typer.Option(
             [],

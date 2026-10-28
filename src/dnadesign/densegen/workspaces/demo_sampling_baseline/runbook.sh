@@ -14,6 +14,6 @@ densegen_workspace_runbook_flow \
   --notebook "$NOTEBOOK" \
   --mode "$MODE" \
   --runner "pixi" \
-  --ensure-usr-registry "true" \
+  --ensure-seqledger-registry "true" \
   --require-fimo "true" \
   "$@"

@@ -4,7 +4,7 @@
 - The workspace path printed by `construct workspace init` (default: `<cwd>/<your-workspace-id>/`).
 
 **Purpose**
-- Seed curated anchor-part and template datasets into the workspace-local USR root at `outputs/usr_datasets/`.
+- Seed curated anchor-part and template datasets into the workspace-local SeqLedger root at `outputs/usr_datasets/`.
 - Replace the explicit `anchor_part_short_ref` incumbents in both `slot_a` and `slot_b` with packaged anchor inputs.
 - Materialize both 1 kb window realizations into one semantic dataset, `anchor_template_shared_dataset_demo`.
 - Keep upstream `usr_label__primary` / `usr_label__aliases` visible on derived rows so analyst-facing reads stay human-scannable.
@@ -67,29 +67,29 @@ uv run construct workspace show --workspace . # Print workspace registry entries
 # Re-check the packaged registry/config contract before running anything.
 uv run construct workspace doctor --workspace .
 # Show seeded anchor-part labels and aliases.
-uv run usr --root "$PWD/outputs/usr_datasets" head anchor_parts_demo -n 10 --columns id,usr_label__primary,usr_label__aliases,sequence
+uv run seqledger --root "$PWD/outputs/usr_datasets" head anchor_parts_demo -n 10 --columns id,usr_label__primary,usr_label__aliases,sequence
 
 # Validate both packaged projects before any write.
 uv run construct workspace validate-project --workspace . --project slot_a_window --runtime # Validate slot_a runtime roots and template resolution.
 uv run construct workspace validate-project --workspace . --project slot_b_window --runtime # Validate slot_b runtime roots and template resolution.
 
 # Dry-run both projects into the shared output contract.
-uv run construct workspace run-project --workspace . --project slot_a_window --dry-run # Preview slot_a writes without mutating USR state.
-uv run construct workspace run-project --workspace . --project slot_b_window --dry-run # Preview slot_b writes without mutating USR state.
+uv run construct workspace run-project --workspace . --project slot_a_window --dry-run # Preview slot_a writes without mutating SeqLedger state.
+uv run construct workspace run-project --workspace . --project slot_b_window --dry-run # Preview slot_b writes without mutating SeqLedger state.
 
 # Materialize both windows into one semantic dataset.
 uv run construct workspace run-project --workspace . --project slot_a_window # Materialize slot_a rows into the shared dataset.
 uv run construct workspace run-project --workspace . --project slot_b_window # Materialize slot_b rows into the shared dataset.
 
 # Verify the shared dataset and inspect carried-through labels plus construct lineage.
-uv run usr --root "$PWD/outputs/usr_datasets" validate anchor_template_shared_dataset_demo --strict # Confirm the shared dataset satisfies the active USR registry.
+uv run seqledger --root "$PWD/outputs/usr_datasets" validate anchor_template_shared_dataset_demo --strict # Confirm the shared dataset satisfies the active SeqLedger registry.
 # Inspect the shared dataset with upstream labels plus construct lineage context.
-uv run usr --root "$PWD/outputs/usr_datasets" head anchor_template_shared_dataset_demo -n 10 --columns id,usr_label__primary,construct__input_dataset,construct__input_id,construct__template_id,construct__window_semantics
+uv run seqledger --root "$PWD/outputs/usr_datasets" head anchor_template_shared_dataset_demo -n 10 --columns id,usr_label__primary,construct__input_dataset,construct__input_id,construct__template_id,construct__window_semantics
 ```
 
 ### Variations
 
-- Write to a shared USR root instead of the workspace-local one:
+- Write to a shared SeqLedger root instead of the workspace-local one:
   - edit the config `root:` fields intentionally
   - re-run `uv run construct workspace show --workspace .`
   - re-run `validate-project --runtime` for both projects before `run-project`
@@ -102,5 +102,5 @@ uv run usr --root "$PWD/outputs/usr_datasets" head anchor_template_shared_datase
 
 For the infer and downstream handoff that continues from this workspace, use the shared runbooks:
 
-- [Construct -> USR -> Infer shared dataset runbook](../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
-- [Promoter characterization feature matrix](../../../usr/docs/operations/promoter/characterization-feature-matrix.md)
+- [Construct -> SeqLedger -> Infer shared dataset runbook](../../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
+- [Promoter characterization feature matrix](../../../seqledger/docs/operations/promoter/characterization-feature-matrix.md)

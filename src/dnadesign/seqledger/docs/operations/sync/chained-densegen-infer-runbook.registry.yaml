@@ -1,0 +1,12 @@
+schema_version: 1
+catalog_order: 30
+registry_id: seqledger.data-plane.chained-densegen-infer-sync
+type: runbook
+plane: data-plane
+owner_boundary: seqledger
+entry_artifact: one SeqLedger dataset updated asynchronously by DenseGen on HPC and infer locally
+exit_artifact: synchronized SeqLedger dataset with transfer-verified infer overlays on both hosts
+summary: Coordinate DenseGen-on-HPC and Infer-local writes against one SeqLedger dataset with explicit sync checkpoints.
+execution_kind: iterative
+status_kind: seqledger-sync-audit
+relations: []

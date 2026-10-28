@@ -1,7 +1,7 @@
 ## DenseGen on BU SCC
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-10-28
 
 
 This how-to guide captures BU SCC specifics that differ from the base DenseGen HPC runbook. Read it when running DenseGen on BU SCC and you need the correct scheduler flags, certificate setup, and BU docs.
@@ -38,4 +38,4 @@ This section points to BU SCC repo-level docs so this page stays concise and non
 ### Event boundary reminder
 This section links to the event-boundary doc to avoid semantic drift.
 
-For DenseGen diagnostics versus USR mutation event boundaries, read **[observability and events](../concepts/runtime/observability-and-events.md)**.
+For DenseGen diagnostics versus SeqLedger mutation event boundaries, read **[observability and events](../concepts/runtime/observability-and-events.md)**.

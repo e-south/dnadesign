@@ -164,7 +164,7 @@ def test_build_metadata_emits_curated_contract() -> None:
 
 
 def test_densegen_registry_columns_match_curated_contract() -> None:
-    reg_path = Path("src/dnadesign/usr/datasets/registry.yaml")
+    reg_path = Path("src/dnadesign/seqledger/datasets/registry.yaml")
     reg = yaml.safe_load(reg_path.read_text(encoding="utf-8"))
     densegen_cols = [
         str(item.get("name"))

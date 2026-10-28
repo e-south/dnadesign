@@ -38,7 +38,7 @@ from dnadesign.latentdna.src.sources import (
 )
 from dnadesign.latentdna.src.views.materialize import materialize_view_artifact
 from dnadesign.latentdna.src.workspaces.loader import load_workspace_config
-from dnadesign.usr import (
+from dnadesign.seqledger import (
     Dataset,
     SequenceViewRecord,
     ViewSemanticsRecord,

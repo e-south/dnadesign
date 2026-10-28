@@ -8,6 +8,6 @@ keywords:
   - infer
   - feature matrix
 routes:
-  - id: usr-infer-x-active-learning
-    path: workflows/usr-infer-x-active-learning.md
+  - id: seqledger-infer-x-active-learning
+    path: workflows/seqledger-infer-x-active-learning.md
     summary: OPAL-owned active-learning route once one candidate table with an explicit infer-derived X column exists.

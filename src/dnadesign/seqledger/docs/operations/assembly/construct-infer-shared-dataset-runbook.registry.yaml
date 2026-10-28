@@ -1,0 +1,29 @@
+schema_version: 1
+catalog_order: 50
+registry_id: seqledger.data-plane.construct-infer-source-of-truth
+type: runbook
+plane: data-plane
+owner_boundary: seqledger
+entry_artifact: construct workspace plus one shared SeqLedger dataset target
+exit_artifact: one infer-ready SeqLedger dataset plus downstream event stream
+summary: Realize construct outputs into one shared SeqLedger dataset and use that dataset as the durable Infer handoff.
+execution_kind: staged
+status_kind: seqledger-dataset-state
+related_tools:
+  - construct
+  - infer
+  - notify
+related_tool_routes:
+  - tool: construct
+    route: template-contexts
+  - tool: infer
+    route: evo2-sequence-features
+  - tool: notify
+    route: seqledger-events
+relations:
+  - type: alternative-to
+    target: seqledger.data-plane.multi-source-source-of-truth
+  - type: handoff-to
+    target: seqledger.data-plane.promoter-feature-matrix
+  - type: execution-support
+    target: ops.control-plane.orchestration

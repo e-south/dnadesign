@@ -1,7 +1,7 @@
 ## DenseGen HPC runbook
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-10-28
 
 
 This how-to guide provides scheduler-safe DenseGen execution patterns for long-running environments. Read it when you need predictable preflight checks, resume behavior, and clear separation between generation and analysis phases.
@@ -65,7 +65,7 @@ Single-workspace concurrency contract:
 - DenseGen keeps one active writer per workspace/run root using `outputs/meta/run.lock`.
 - Concurrent submits against the same workspace are expected to fail fast with a lock-held error.
 - For repeated contributions on one workspace, prefer `-hold_jid` chains.
-- For true parallel exploration (for example Stage-A mining/diversity variants), branch to separate workspaces/run roots and merge approved USR datasets later with `uv run usr maintenance merge`.
+- For true parallel exploration (for example Stage-A mining/diversity variants), branch to separate workspaces/run roots and merge approved SeqLedger datasets later with `uv run seqledger maintenance merge`.
 
 ### Post-run analysis flow
 This section runs analysis after generation is complete (or paused), without modifying sequence outputs.
@@ -96,4 +96,4 @@ Durability knobs for interruption tolerance:
 ### Notify event wiring
 This section points to the event-boundary docs instead of duplicating event semantics.
 
-Notify must consume USR `.events.log` rather than DenseGen diagnostics. Use **[observability and events](../concepts/runtime/observability-and-events.md)** plus the **[DenseGen to USR to Notify tutorial](../tutorials/demo_usr_notify.md)** for wiring and validation.
+Notify must consume SeqLedger `.events.log` rather than DenseGen diagnostics. Use **[observability and events](../concepts/runtime/observability-and-events.md)** plus the **[DenseGen to SeqLedger to Notify tutorial](../tutorials/demo_usr_notify.md)** for wiring and validation.

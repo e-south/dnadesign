@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/notify/tests/cli/test_profile_runtime_defaults.py
 
-Runtime profile-default tests for notify usr-events watch and spool commands.
+Runtime profile-default tests for notify seqledger-events watch and spool commands.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -67,7 +67,7 @@ def test_usr_events_watch_can_use_profile_defaults(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--profile",
             str(profile),
@@ -100,7 +100,7 @@ def test_usr_events_watch_can_use_profile_context_flags(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--profile",
             str(profile),
@@ -144,7 +144,7 @@ def test_usr_events_watch_can_use_profile_secret_ref(tmp_path: Path, monkeypatch
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--profile",
             str(profile),
@@ -175,7 +175,7 @@ def test_usr_events_watch_rejects_profiles_with_plain_url(tmp_path: Path) -> Non
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--profile",
             str(profile),
@@ -257,7 +257,7 @@ def test_usr_events_watch_resolves_profile_relative_events_path(tmp_path: Path, 
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--profile",
             str(profile),

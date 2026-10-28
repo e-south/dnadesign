@@ -22,7 +22,7 @@ Usage:
   ./runbook.sh --mode <seed|validate-all|dry-run-all|run-all>
 
 Modes:
-  seed          Bootstrap the curated demo USR datasets only.
+  seed          Bootstrap the curated demo SeqLedger datasets only.
   validate-all  Seed demo datasets, then runtime-validate both packaged projects.
   dry-run-all   Seed demo datasets, runtime-validate both packaged projects, then dry-run both.
   run-all       Seed demo datasets, runtime-validate both packaged projects, then materialize both.

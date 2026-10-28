@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List
 
-from dnadesign.usr import SequenceViewRecord
+from dnadesign.seqledger import SequenceViewRecord
 
 from ..contracts.errors import ValidationError
 from .usr_registry import _existing_output_ids

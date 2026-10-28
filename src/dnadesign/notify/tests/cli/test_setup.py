@@ -78,7 +78,7 @@ def test_setup_slack_can_resolve_densegen_events_from_config_without_existing_ev
     assert data["events"] == str(resolved_events.resolve())
     assert data["policy"] == "densegen"
     assert data["events_source"] == {"tool": "densegen", "config": str(config_path.resolve())}
-    assert f"notify usr-events watch --tool densegen --config {config_path.resolve()} --follow" in result.stdout
+    assert f"notify seqledger-events watch --tool densegen --config {config_path.resolve()} --follow" in result.stdout
     assert "--wait-for-events" in result.stdout
 
 
@@ -114,9 +114,9 @@ def test_setup_slack_next_steps_use_tool_config_watch_when_events_exist(tmp_path
         ],
     )
     assert result.exit_code == 0
-    assert f"notify usr-events watch --tool densegen --config {config_path.resolve()} --dry-run" in result.stdout
-    assert f"notify usr-events watch --tool densegen --config {config_path.resolve()} --follow" in result.stdout
-    assert "notify usr-events watch --profile" not in result.stdout
+    assert f"notify seqledger-events watch --tool densegen --config {config_path.resolve()} --dry-run" in result.stdout
+    assert f"notify seqledger-events watch --tool densegen --config {config_path.resolve()} --follow" in result.stdout
+    assert "notify seqledger-events watch --profile" not in result.stdout
 
 
 def test_setup_slack_next_steps_quote_paths_with_spaces(tmp_path: Path, monkeypatch) -> None:

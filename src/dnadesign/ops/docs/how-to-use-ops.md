@@ -21,8 +21,8 @@ specific checkout. External catalog providers are available in either mode.
 - `uv run ops catalog list --plane data-plane --query infer`: filter the catalog when you already know the downstream path.
 - `uv run ops catalog list --query "promoter feature matrix"`: find the registered route and adjacent tool docs for that topic without knowing the registry id first.
 - `uv run ops catalog list --section tool-sources`: show tool docs rather than the full procedure inventory.
-- `uv run ops catalog list --related-to usr.data-plane.promoter-feature-matrix`: inspect related procedures around one registered route once you know the anchor id.
-- `uv run ops catalog list --section tool-sources --related-to usr.data-plane.promoter-feature-matrix`: inspect related tool docs around one registered route once you know the anchor id.
+- `uv run ops catalog list --related-to seqledger.data-plane.promoter-feature-matrix`: inspect related procedures around one registered route once you know the anchor id.
+- `uv run ops catalog list --section tool-sources --related-to seqledger.data-plane.promoter-feature-matrix`: inspect related tool docs around one registered route once you know the anchor id.
 
 Tool-source listings and lookups of built-in procedures do not import optional
 catalog providers. Full procedure inventories and external procedure lookups
@@ -35,12 +35,12 @@ load those providers and report the responsible entry point if one fails.
 ### Check status or build a manifest
 
 - `uv run ops progress explain <registry-id>`: print the required status flags, a ready-to-paste `progress show` command, and any provider-specific notes before you touch artifacts.
-- `uv run ops progress show usr.data-plane.promoter-feature-matrix --usr-root <usr-root> --dataset <dataset>`: summarize one status surface once you have the explicit artifact inputs.
+- `uv run ops progress show seqledger.data-plane.promoter-feature-matrix --seqledger-root <seqledger-root> --dataset <dataset>`: summarize one status surface once you have the explicit artifact inputs.
 - `uv run ops catalog show <registry-id>`: inspect the required status flags before you run `progress show` if you do not already know the artifact contract.
 - `uv run ops progress scaffold <registry-id> ...`: emit an explicit manifest skeleton for one or more registered procedures. It prints YAML to stdout unless you pass `--out`.
 - `uv run ops progress scaffold --related-to <registry-id>`: expand one registered procedure into a manifest starting point. It can include more than one tool when the catalog links the procedures.
 - If you do not know the registry id yet, return to `uv run ops catalog list --simple`; bare `uv run ops progress scaffold` intentionally refuses to guess.
-- Replace scaffold placeholders such as `<usr-root>` and `n/a` with artifact paths before running `ops progress campaign`. Placeholder values are rejected.
+- Replace scaffold placeholders such as `<seqledger-root>` and `n/a` with artifact paths before running `ops progress campaign`. Placeholder values are rejected.
 - `uv run ops progress campaign --manifest <manifest.yaml>`: read-only multi-step summary driven by the manifest you provide.
 
 ### Continue reading

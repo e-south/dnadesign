@@ -28,7 +28,7 @@ from dnadesign.infer.src.features.aliases import (
     prune_stale_feature_alias_entries,
 )
 from dnadesign.infer.src.features.cache_keys import DNA_SEQUENCE_CASE_POLICY
-from dnadesign.usr import Dataset, ensure_sequence_contract_namespaces
+from dnadesign.seqledger import Dataset, ensure_sequence_contract_namespaces
 
 
 def _dataset(tmp_path: Path) -> tuple[Path, Dataset]:

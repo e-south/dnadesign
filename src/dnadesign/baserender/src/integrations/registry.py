@@ -26,7 +26,7 @@ from .generic import PROVIDER as GENERIC
 from .junction import PROVIDER as JUNCTION
 from .motif_annotation import PROVIDER as MOTIF_ANNOTATION
 from .promoter_panel import PROVIDER as PROMOTER_PANEL
-from .usr import PROVIDER as USR
+from .usr import PROVIDER as SeqLedger
 from .yiu import PROVIDER as YIU
 
 _PROVIDERS = (
@@ -37,7 +37,7 @@ _PROVIDERS = (
     JUNCTION,
     MOTIF_ANNOTATION,
     PROMOTER_PANEL,
-    USR,
+    SeqLedger,
     YIU,
 )
 

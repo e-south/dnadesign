@@ -36,7 +36,7 @@ def _write_fake_uv(bin_dir: Path) -> Path:
                 "#!/usr/bin/env bash",
                 "set -euo pipefail",
                 'echo "$*" >> "$UV_CAPTURE"',
-                'if [[ "$1" == "run" && "$2" == "notify" && "$3" == "usr-events" && "$4" == "watch" ]]; then',
+                'if [[ "$1" == "run" && "$2" == "notify" && "$3" == "seqledger-events" && "$4" == "watch" ]]; then',
                 '  if [[ " $* " == *" --dry-run "* ]] && [[ -n "${FAKE_WATCH_PROBE_STATUS:-}" ]]; then',
                 '    echo "{\\"status\\":\\"${FAKE_WATCH_PROBE_STATUS}\\"}"',
                 "    exit 0",
@@ -111,7 +111,7 @@ def test_qsub_script_profile_mode_uses_profile_and_follow(tmp_path: Path) -> Non
     )
     assert result.returncode == 0, result.stderr
     calls = capture_path.read_text(encoding="utf-8")
-    assert "run notify usr-events watch --profile" in calls
+    assert "run notify seqledger-events watch --profile" in calls
     assert str(profile_path) in calls
     assert "--follow" in calls
     assert "--wait-for-events" in calls
@@ -205,7 +205,7 @@ def test_qsub_script_profile_mode_can_load_webhook_from_file_when_env_is_unset(t
     )
     assert result.returncode == 0, result.stderr
     calls = capture_path.read_text(encoding="utf-8")
-    assert "run notify usr-events watch --profile" in calls
+    assert "run notify seqledger-events watch --profile" in calls
     assert str(profile_path) in calls
 
 
@@ -248,7 +248,7 @@ def test_qsub_script_can_resolve_events_from_tool_config(tmp_path: Path) -> None
     assert result.returncode == 0, result.stderr
     calls = capture_path.read_text(encoding="utf-8")
     assert "run notify setup resolve-events --tool densegen --config" in calls
-    assert "run notify usr-events watch" in calls
+    assert "run notify seqledger-events watch" in calls
     assert "--events" in calls
     assert str(events_path) in calls
     assert "--only-actions densegen_health,densegen_flush_failed,materialize" in calls
@@ -301,7 +301,7 @@ def test_qsub_script_accepts_missing_events_file_when_waiting(tmp_path: Path) ->
     )
     assert result.returncode == 0, result.stderr
     calls = capture_path.read_text(encoding="utf-8")
-    assert "run notify usr-events watch" in calls
+    assert "run notify seqledger-events watch" in calls
     assert "--events" in calls
     assert str(events_path) in calls
     assert "--wait-for-events" in calls
@@ -596,7 +596,7 @@ def test_qsub_script_can_enforce_terminal_status_on_idle_timeout(tmp_path: Path)
     )
     assert result.returncode == 3
     calls = capture_path.read_text(encoding="utf-8")
-    assert "run notify usr-events watch --events" in calls
+    assert "run notify seqledger-events watch --events" in calls
     assert "--dry-run --no-advance-cursor-on-dry-run --on-truncate restart --stop-on-terminal-status" in calls
     assert "run notify send --status failure" in calls
 
@@ -637,7 +637,7 @@ def test_qsub_script_terminal_enforcement_allows_terminal_probe_success(tmp_path
     )
     assert result.returncode == 0, result.stderr
     calls = capture_path.read_text(encoding="utf-8")
-    assert "run notify usr-events watch --events" in calls
+    assert "run notify seqledger-events watch --events" in calls
     assert "run notify send --status failure" not in calls
 
 

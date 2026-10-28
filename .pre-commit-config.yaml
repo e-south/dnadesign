@@ -61,7 +61,7 @@ repos:
               build/|
               src/dnadesign/archived/|
               src/dnadesign/prototypes/|
-              src/dnadesign/usr/datasets/|
+              src/dnadesign/seqledger/datasets/|
               src/dnadesign/opal/campaigns/.*/outputs/|
               src/dnadesign/cruncher/workspaces/.*/\\.cruncher/|
               src/dnadesign/cruncher/workspaces/.*/runs/|
@@ -80,7 +80,7 @@ repos:
             build/|
             src/dnadesign/archived/|
             src/dnadesign/prototypes/|
-            src/dnadesign/usr/datasets/|
+            src/dnadesign/seqledger/datasets/|
             src/dnadesign/opal/campaigns/.*/outputs/|
             src/dnadesign/cruncher/workspaces/.*/\\.cruncher/|
             src/dnadesign/cruncher/workspaces/.*/runs/|

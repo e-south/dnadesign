@@ -122,7 +122,7 @@ def test_guide_json_uses_usr_records_and_shared_label_source_sidecar(tmp_path: P
     assert out["campaign"]["label_source"]["path"] == str(sidecar.resolve())
     ingest_step = next(step for step in out["steps"] if step["title"] == "Ingest observed labels")
     assert "--unknown-sequences error" in ingest_step["command"]
-    assert "shared USR observed-label sidecar" in ingest_step["why"]
+    assert "shared SeqLedger observed-label sidecar" in ingest_step["why"]
     assert str(sidecar.resolve()) in ingest_step["writes"]
     assert "records.parquet" not in ingest_step["writes"]
     assert out["workflow_key"] == "rf_topn"

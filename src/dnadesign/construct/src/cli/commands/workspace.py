@@ -151,7 +151,7 @@ def init(
     else:
         typer.echo(
             "Then: update construct.workspace.yaml with your tracked config artifacts, "
-            "project contract, and USR root choice."
+            "project contract, and SeqLedger root choice."
         )
         typer.echo(f"Then: edit {workspace_dir / 'inputs' / 'import_manifest.template.yaml'} for your own inputs.")
         typer.echo(
@@ -269,8 +269,8 @@ def validate_project(
     ),
     usr_root: Path | None = typer.Option(
         None,
-        "--usr-root",
-        help="Operator-managed USR root used for every dataset during runtime validation.",
+        "--seqledger-root",
+        help="Operator-managed SeqLedger root used for every dataset during runtime validation.",
     ),
     output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
@@ -278,7 +278,7 @@ def validate_project(
     try:
         format_norm = validate_output_format(output_format)
         if usr_root is not None and not runtime:
-            raise ConstructError("--usr-root requires --runtime.")
+            raise ConstructError("--seqledger-root requires --runtime.")
         resolution = resolve_workspace_project(workspace, project_id=project)
     except (ConstructError, OSError) as exc:
         exit_with_error(exc, code=2, output_format=format_requested)
@@ -308,12 +308,12 @@ def run_project(
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        help="Validate inputs and build outputs without writing USR data.",
+        help="Validate inputs and build outputs without writing SeqLedger data.",
     ),
     usr_root: Path | None = typer.Option(
         None,
-        "--usr-root",
-        help="Absolute operator-managed USR root used for inputs and outputs.",
+        "--seqledger-root",
+        help="Absolute operator-managed SeqLedger root used for inputs and outputs.",
     ),
     output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:

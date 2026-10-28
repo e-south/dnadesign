@@ -31,7 +31,7 @@ from dnadesign.infer.src.features.aliases import (
 )
 from dnadesign.infer.src.features.cache_keys import DNA_SEQUENCE_CASE_POLICY
 from dnadesign.latentdna.src.cli import app
-from dnadesign.usr import (
+from dnadesign.seqledger import (
     Dataset,
     SequenceViewRecord,
     ViewSemanticsRecord,
@@ -39,7 +39,7 @@ from dnadesign.usr import (
     write_sequence_views,
     write_view_semantics,
 )
-from dnadesign.usr.src.datasets.demo.mock import MockSpec, create_mock_dataset
+from dnadesign.seqledger.src.datasets.demo.mock import MockSpec, create_mock_dataset
 
 _RUNNER = CliRunner()
 

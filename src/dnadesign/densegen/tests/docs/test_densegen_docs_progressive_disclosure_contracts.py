@@ -79,7 +79,7 @@ def test_densegen_usr_notify_tutorial_keeps_walkthrough_progression() -> None:
     )
     assert 'notify setup resolve-events --tool densegen --config "$CONFIG" --json' in text
     assert (
-        'notify usr-events watch --tool densegen --config "$CONFIG" --provider generic --url "$NOTIFY_WEBHOOK" '
+        'notify seqledger-events watch --tool densegen --config "$CONFIG" --provider generic --url "$NOTIFY_WEBHOOK" '
         "--dry-run --no-advance-cursor-on-dry-run" in text
     )
     assert (
@@ -89,8 +89,8 @@ def test_densegen_usr_notify_tutorial_keeps_walkthrough_progression() -> None:
 
 def test_densegen_docs_route_to_shared_multi_source_runbook() -> None:
     text = _read(DOCS_ROOT / "README.md")
-    assert "../../usr/docs/operations/assembly/multi-source-shared-dataset.md" in text
-    assert "../../usr/docs/operations/promoter/characterization-feature-matrix.md" in text
+    assert "../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md" in text
+    assert "../../seqledger/docs/operations/promoter/characterization-feature-matrix.md" in text
     _assert_token_order(
         text,
         [
@@ -98,8 +98,8 @@ def test_densegen_docs_route_to_shared_multi_source_runbook() -> None:
             "tutorials/demo_usr_notify.md",
             "concepts/runtime/observability-and-events.md",
             "#### Continue into shared downstream data-plane flows",
-            "../../usr/docs/operations/assembly/multi-source-shared-dataset.md",
-            "../../usr/docs/operations/promoter/characterization-feature-matrix.md",
+            "../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md",
+            "../../seqledger/docs/operations/promoter/characterization-feature-matrix.md",
         ],
         label="densegen/docs/README.md",
     )
@@ -116,8 +116,8 @@ def test_densegen_top_level_readme_routes_to_downstream_shared_flows() -> None:
     assert "## Boundary reminder" not in text
 
     docs_text = _read(DOCS_ROOT / "README.md")
-    assert "../../usr/docs/operations/assembly/multi-source-shared-dataset.md" in docs_text
-    assert "../../usr/docs/operations/promoter/characterization-feature-matrix.md" in docs_text
+    assert "../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md" in docs_text
+    assert "../../seqledger/docs/operations/promoter/characterization-feature-matrix.md" in docs_text
 
 
 def test_densegen_docs_index_keeps_cross_tool_handoff_routes_separate_from_tutorials() -> None:
@@ -128,8 +128,8 @@ def test_densegen_docs_index_keeps_cross_tool_handoff_routes_separate_from_tutor
             "### Tutorials",
             "tutorials/demo_usr_notify.md",
             "### Cross-tool handoff routes",
-            "../../usr/docs/operations/assembly/multi-source-shared-dataset.md",
-            "../../usr/docs/operations/promoter/characterization-feature-matrix.md",
+            "../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md",
+            "../../seqledger/docs/operations/promoter/characterization-feature-matrix.md",
             "### Workspace docs",
         ],
         label="densegen/docs/index.md",

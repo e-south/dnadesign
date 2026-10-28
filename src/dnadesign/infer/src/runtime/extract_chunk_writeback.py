@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/src/runtime/extract_chunk_writeback.py
 
-Builds extract chunk write-back callbacks with explicit USR contract checks.
+Builds extract chunk write-back callbacks with explicit SeqLedger contract checks.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -33,7 +33,7 @@ def build_extract_chunk_write_back(
     if source != "usr" or not write_back:
         return None
     if ids is None or ds is None:
-        raise WriteBackError("USR chunk write-back requires ids and dataset handle")
+        raise WriteBackError("SeqLedger chunk write-back requires ids and dataset handle")
 
     def _write_back_chunk(
         idx_chunk: List[int],
@@ -70,7 +70,7 @@ def build_extract_chunk_group_write_back(
     if source != "usr" or not write_back:
         return None
     if ids is None or ds is None:
-        raise WriteBackError("USR chunk write-back requires ids and dataset handle")
+        raise WriteBackError("SeqLedger chunk write-back requires ids and dataset handle")
 
     def _write_back_chunk_group(
         idx_chunk: List[int],

@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/opal/tests/config/test_local_independence.py
 
-Verify that local-table OPAL workflows do not load the optional USR integration.
+Verify that local-table OPAL workflows do not load the optional SeqLedger integration.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -31,12 +31,12 @@ attempted = []
 
 class NoUSR(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
-        if fullname == 'dnadesign.usr' or fullname.startswith('dnadesign.usr.'):
+        if fullname == 'dnadesign.seqledger' or fullname.startswith('dnadesign.seqledger.'):
             attempted.append(fullname)
-            raise ImportError('USR is unavailable for this standalone test')
+            raise ImportError('SeqLedger is unavailable for this standalone test')
 
 sys.meta_path.insert(0, NoUSR())
-os.environ.pop('OPAL_NOTEBOOK_USR_ROOT', None)
+os.environ.pop('OPAL_NOTEBOOK_SEQLEDGER_ROOT', None)
 from dnadesign.opal import load_config
 config = load_config(sys.argv[1])
 assert config.data.location.kind == 'local'

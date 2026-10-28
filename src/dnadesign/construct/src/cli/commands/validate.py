@@ -34,8 +34,8 @@ def validate_config(
     ),
     usr_root: Path | None = typer.Option(
         None,
-        "--usr-root",
-        help="Absolute operator-managed USR root used for runtime validation.",
+        "--seqledger-root",
+        help="Absolute operator-managed SeqLedger root used for runtime validation.",
     ),
     output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:
@@ -43,7 +43,7 @@ def validate_config(
     try:
         format_norm = validate_output_format(output_format)
         if usr_root is not None and not runtime:
-            raise ConstructError("--usr-root requires --runtime.")
+            raise ConstructError("--seqledger-root requires --runtime.")
         loaded, config_path = load_job_config(config)
     except (ConstructError, OSError) as exc:
         exit_with_error(exc, code=1, output_format=format_requested)

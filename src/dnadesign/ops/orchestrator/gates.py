@@ -600,7 +600,7 @@ def _existing_overlay_parts_count(*, usr_root: Path, usr_dataset: str, namespace
 
 
 def _compact_overlay_parts(*, usr_root: Path, usr_dataset: str, namespace: str) -> str:
-    from dnadesign.usr import Dataset
+    from dnadesign.seqledger import Dataset
 
     dataset = Dataset(usr_root, usr_dataset)
     with dataset.maintenance(reason="ops_overlay_compact"):
@@ -739,13 +739,13 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     usr_overlay_parser = subparsers.add_parser(
-        "usr-overlay-guard",
-        help="Fail-fast guard for USR overlay-part growth and optional pre-submit compaction.",
+        "seqledger-overlay-guard",
+        help="Fail-fast guard for SeqLedger overlay-part growth and optional pre-submit compaction.",
     )
     usr_overlay_parser.add_argument(
         "--tool",
         default="densegen",
-        help="Tool config adapter for USR overlay guard inputs.",
+        help="Tool config adapter for SeqLedger overlay guard inputs.",
     )
     usr_overlay_parser.add_argument("--config", required=True, help="Tool config path.")
     usr_overlay_parser.add_argument("--workspace-root", required=True, help="Tool workspace root path.")
@@ -776,7 +776,7 @@ def main(argv: list[str] | None = None) -> int:
     usr_overlay_parser.add_argument("--json", action="store_true", help="Print JSON payload.")
 
     usr_records_part_parser = subparsers.add_parser(
-        "usr-records-part-guard",
+        "seqledger-records-part-guard",
         help="Fail-fast guard for records__part growth with optional age/count-based pre-submit compaction.",
     )
     usr_records_part_parser.add_argument(
@@ -814,7 +814,7 @@ def main(argv: list[str] | None = None) -> int:
     usr_records_part_parser.add_argument("--json", action="store_true", help="Print JSON payload.")
 
     usr_archived_overlay_parser = subparsers.add_parser(
-        "usr-archived-overlay-guard",
+        "seqledger-archived-overlay-guard",
         help="Fail-fast guard for archived overlay growth under _derived/_archived.",
     )
     usr_archived_overlay_parser.add_argument(
@@ -1050,7 +1050,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
 
-    if args.command == "usr-overlay-guard":
+    if args.command == "seqledger-overlay-guard":
         try:
             inputs = parse_usr_overlay_guard_inputs(tool=args.tool, config_path=Path(args.config))
             workspace_root = Path(args.workspace_root).expanduser().resolve()
@@ -1109,7 +1109,7 @@ def main(argv: list[str] | None = None) -> int:
                 if not args.auto_compact_existing_overlay_parts:
                     _emit_stderr(
                         "existing_overlay_parts exceeds threshold; "
-                        "run 'uv run usr --root <usr-root> maintenance overlay-compact "
+                        "run 'uv run seqledger --root <seqledger-root> maintenance overlay-compact "
                         "<dataset> --namespace <namespace>' "
                         "or set --auto-compact-existing-overlay-parts."
                     )
@@ -1199,7 +1199,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
 
-    if args.command == "usr-records-part-guard":
+    if args.command == "seqledger-records-part-guard":
         try:
             inputs = parse_usr_overlay_guard_inputs(tool=args.tool, config_path=Path(args.config))
             workspace_root = Path(args.workspace_root).expanduser().resolve()
@@ -1370,7 +1370,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
 
-    if args.command == "usr-archived-overlay-guard":
+    if args.command == "seqledger-archived-overlay-guard":
         try:
             inputs = parse_usr_overlay_guard_inputs(tool=args.tool, config_path=Path(args.config))
             workspace_root = Path(args.workspace_root).expanduser().resolve()

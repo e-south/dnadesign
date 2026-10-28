@@ -161,7 +161,7 @@ class UsrOverlayGuardContract(StrictBaseModel):
         if _USR_OVERLAY_NAMESPACE_PATTERN.fullmatch(text) is None:
             raise ValueError(
                 "densegen.overlay_guard.overlay_namespace must match ^[a-z][a-z0-9_]*$ "
-                "for USR overlay namespace compatibility"
+                "for SeqLedger overlay namespace compatibility"
             )
         return text
 

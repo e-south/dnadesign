@@ -1,7 +1,7 @@
 ## OPAL Campaign Configuration v3
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-26
+**Last verified:** 2026-10-28
 
 `campaign.yaml` uses the strict schema `opal.campaign.v3`. OPAL rejects v2
 keys. There is no compatibility parser.
@@ -144,7 +144,7 @@ campaign:
   workdir: "."
 
 data:
-  location: {kind: usr, path: src/dnadesign/usr/datasets, dataset: candidates}
+  location: {kind: usr, path: src/dnadesign/seqledger/datasets, dataset: candidates}
   x_column_name: sequence_features
   y_column_name: response_window_y
   y_expected_length: 8
@@ -243,12 +243,12 @@ missing from `records.parquet` is an execution error; OPAL does not silently
 load the full candidate table or skip the rule. The configured X column cannot
 serve as candidate metadata; X stays in the bounded score-batch stream.
 
-`labels.source.kind` is `campaign_history` or `usr_sidecar`. A configured USR
+`labels.source.kind` is `campaign_history` or `usr_sidecar`. A configured SeqLedger
 sidecar must match the candidate dataset and must exist for execution. OPAL does
 not fall back to campaign history. v3 predictions are always ledger-only;
 `writeback.prediction_records` accepts only `ledger_only`.
 
-`labels.source.manifest_path` is optional for a USR sidecar and is relative to
+`labels.source.manifest_path` is optional for a SeqLedger sidecar and is relative to
 the same dataset root as `labels.source.path`. When present, it pins the label
 source to a study-published snapshot and requires `study_campaign` ownership.
 OPAL verifies the manifest each time it reads the sidecar and rejects generic

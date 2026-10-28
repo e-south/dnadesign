@@ -705,7 +705,7 @@ def test_usr_root_can_live_outside_outputs(tmp_path: Path) -> None:
 
 def test_usr_root_scope_can_resolve_from_git_common_repo_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo_root = tmp_path / "repo"
-    shared_usr_root = repo_root / "src" / "dnadesign" / "usr" / "datasets"
+    shared_usr_root = repo_root / "src" / "dnadesign" / "seqledger" / "datasets"
     shared_usr_root.mkdir(parents=True)
     cfg_path = repo_root / ".worktrees" / "audit-wt" / "cfg.yaml"
     cfg_path.parent.mkdir(parents=True)
@@ -717,7 +717,7 @@ def test_usr_root_scope_can_resolve_from_git_common_repo_root(tmp_path: Path, mo
     monkeypatch.setattr("dnadesign.densegen.src.config.base.subprocess.run", _fake_run)
     resolved = resolve_usr_root_scoped_path(
         cfg_path,
-        "src/dnadesign/usr/datasets",
+        "src/dnadesign/seqledger/datasets",
         label="output.usr.root",
         scope="git_common_repo_root",
     )

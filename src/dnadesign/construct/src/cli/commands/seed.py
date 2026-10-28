@@ -21,7 +21,7 @@ from ._errors import exit_with_error
 
 seed_app = typer.Typer(
     no_args_is_help=True,
-    help="Seed curated or manifest-driven local USR datasets for construct workflows.",
+    help="Seed curated or manifest-driven local SeqLedger datasets for construct workflows.",
 )
 
 
@@ -32,12 +32,15 @@ def import_manifest(
         "--manifest",
         exists=True,
         readable=True,
-        help="Manifest YAML describing one or more input/template datasets to materialize into USR.",
+        help="Manifest YAML describing one or more input/template datasets to materialize into SeqLedger.",
     ),
     root: Path | None = typer.Option(
         None,
         "--root",
-        help="Target local USR datasets root. Omit only inside a dnadesign checkout or when DNADESIGN_USR_ROOT is set.",
+        help=(
+            "Target local SeqLedger datasets root. Omit only inside a "
+            "dnadesign checkout or when DNADESIGN_SEQLEDGER_ROOT is set."
+        ),
     ),
 ) -> None:
     try:
@@ -66,7 +69,10 @@ def anchor_template_demo(
     root: Path | None = typer.Option(
         None,
         "--root",
-        help="Target local USR datasets root. Omit only inside a dnadesign checkout or when DNADESIGN_USR_ROOT is set.",
+        help=(
+            "Target local SeqLedger datasets root. Omit only inside a "
+            "dnadesign checkout or when DNADESIGN_SEQLEDGER_ROOT is set."
+        ),
     ),
     manifest: Path | None = typer.Option(
         None,

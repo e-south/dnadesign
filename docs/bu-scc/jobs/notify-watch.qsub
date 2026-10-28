@@ -208,7 +208,7 @@ probe_terminal_status_since_offset() {
   printf '%s' "$offset" > "$probe_cursor"
   local probe_output
   local -a probe_args=(
-    uv run notify usr-events watch
+    uv run notify seqledger-events watch
     --provider generic
     --events "$events_path"
     --cursor "$probe_cursor"
@@ -235,7 +235,7 @@ emit_timeout_notification() {
   local profile_path="${1:-}"
   local notify_tool_value
   notify_tool_value="$(resolve_timeout_tool "$profile_path")"
-  local notify_run_id="${USR_ACTOR_RUN_ID:-notify-watch-${JOB_ID:-manual}}"
+  local notify_run_id="${SEQLEDGER_ACTOR_RUN_ID:-notify-watch-${JOB_ID:-manual}}"
   local notify_message="Notify watcher idle-timeout reached before a terminal event matching the active notify filters (idle_timeout=${NOTIFY_IDLE_TIMEOUT_SECONDS}s)."
   local -a SEND_ARGS=(
     --status failure
@@ -309,7 +309,7 @@ if [[ -n "$NOTIFY_PROFILE" ]]; then
   PROFILE_EVENTS_PATH="$(resolve_profile_path_field "$NOTIFY_PROFILE" "events")"
   PROFILE_CURSOR_PATH="$(resolve_profile_path_field "$NOTIFY_PROFILE" "cursor")"
   PRE_WATCH_OFFSET="$(cursor_offset_or_zero "$PROFILE_CURSOR_PATH")"
-  uv run notify usr-events watch "${PROFILE_WATCH_ARGS[@]}"
+  uv run notify seqledger-events watch "${PROFILE_WATCH_ARGS[@]}"
   enforce_terminal_on_idle_if_enabled "$PROFILE_EVENTS_PATH" "$PROFILE_CURSOR_PATH" "$PRE_WATCH_OFFSET" "$NOTIFY_PROFILE"
   exit $?
 fi
@@ -408,5 +408,5 @@ if [[ -n "$NOTIFY_TLS_CA_BUNDLE" ]]; then
 fi
 
 PRE_WATCH_OFFSET="$(cursor_offset_or_zero "$CURSOR_PATH")"
-uv run notify usr-events watch "${WATCH_ARGS[@]}"
+uv run notify seqledger-events watch "${WATCH_ARGS[@]}"
 enforce_terminal_on_idle_if_enabled "$EVENTS_PATH" "$CURSOR_PATH" "$PRE_WATCH_OFFSET"

@@ -196,7 +196,7 @@ def _usr_root_has_run_artifacts(usr_root: Path) -> bool:
         if entry.name in USR_ROOT_NON_BLOCKING_FILES:
             continue
         if entry.is_dir():
-            # Any dataset/archive directory under the USR root indicates persisted output state.
+            # Any dataset/archive directory under the SeqLedger root indicates persisted output state.
             return True
         return True
     return False

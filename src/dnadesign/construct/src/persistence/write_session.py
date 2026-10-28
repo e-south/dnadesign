@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/construct/src/persistence/write_session.py
 
-Construct USR write-session and sequence-view persistence contracts.
+Construct SeqLedger write-session and sequence-view persistence contracts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,7 +16,7 @@ import socket
 from pathlib import Path
 from typing import Mapping
 
-from dnadesign.usr import Dataset, SequenceViewRecord, load_sequence_view_index, write_sequence_views
+from dnadesign.seqledger import Dataset, SequenceViewRecord, load_sequence_view_index, write_sequence_views
 
 from ..contracts.errors import ValidationError
 from .records import BuiltRecord, output_records_for_overlay, unique_records_by_output_id
@@ -34,7 +34,7 @@ def ensure_output_dataset(*, output_root: Path, output_dataset: str) -> Dataset:
 
 
 def construct_actor(job_id: str) -> dict[str, object]:
-    run_id = str(os.getenv("USR_ACTOR_RUN_ID") or "").strip() or f"construct-{job_id}"
+    run_id = str(os.getenv("SEQLEDGER_ACTOR_RUN_ID") or "").strip() or f"construct-{job_id}"
     return {
         "tool": "construct",
         "run_id": run_id,

@@ -20,12 +20,12 @@ from dnadesign.devtools.quality.coverage_summary import build_coverage_summary_p
 def test_build_coverage_summary_payload_computes_tool_rows_and_overall() -> None:
     coverage_json = {
         "files": {
-            "src/dnadesign/usr/src/storage/parquet.py": {"summary": {"covered_lines": 9, "num_statements": 10}},
+            "src/dnadesign/seqledger/src/storage/parquet.py": {"summary": {"covered_lines": 9, "num_statements": 10}},
             "src/dnadesign/densegen/src/main.py": {"summary": {"covered_lines": 3, "num_statements": 10}},
             "src/dnadesign/densegen/tests/test_main.py": {"summary": {"covered_lines": 1, "num_statements": 1}},
         }
     }
-    baseline = {"densegen": 40.0, "usr": 80.0}
+    baseline = {"densegen": 40.0, "seqledger": 80.0}
 
     payload = build_coverage_summary_payload(
         coverage_data=coverage_json, baseline=baseline, selected_tools=set(baseline)
@@ -36,7 +36,7 @@ def test_build_coverage_summary_payload_computes_tool_rows_and_overall() -> None
     assert payload["overall_core"] == 60.0
     assert payload["tools"] == {
         "densegen": {"actual": 30.0, "baseline": 40.0, "gate": "fail"},
-        "usr": {"actual": 90.0, "baseline": 80.0, "gate": "pass"},
+        "seqledger": {"actual": 90.0, "baseline": 80.0, "gate": "pass"},
     }
 
 
@@ -48,7 +48,7 @@ def test_main_scopes_summary_to_selected_tools(tmp_path: Path) -> None:
         json.dumps(
             {
                 "files": {
-                    "src/dnadesign/usr/src/storage/parquet.py": {
+                    "src/dnadesign/seqledger/src/storage/parquet.py": {
                         "summary": {"covered_lines": 90, "num_statements": 100}
                     },
                     "src/dnadesign/densegen/src/main.py": {"summary": {"covered_lines": 0, "num_statements": 100}},
@@ -57,7 +57,7 @@ def test_main_scopes_summary_to_selected_tools(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    baseline_path.write_text('{"usr": 80.0, "densegen": 70.0}', encoding="utf-8")
+    baseline_path.write_text('{"seqledger": 80.0, "densegen": 70.0}', encoding="utf-8")
 
     rc = main(
         [
@@ -66,7 +66,7 @@ def test_main_scopes_summary_to_selected_tools(tmp_path: Path) -> None:
             "--baseline-json",
             str(baseline_path),
             "--only-tools",
-            "usr",
+            "seqledger",
             "--output-json",
             str(output_path),
         ]
@@ -75,7 +75,7 @@ def test_main_scopes_summary_to_selected_tools(tmp_path: Path) -> None:
     assert rc == 0
     payload = json.loads(output_path.read_text(encoding="utf-8"))
     assert payload["gate_total_tools"] == 1
-    assert payload["tools"] == {"usr": {"actual": 90.0, "baseline": 80.0, "gate": "pass"}}
+    assert payload["tools"] == {"seqledger": {"actual": 90.0, "baseline": 80.0, "gate": "pass"}}
 
 
 def test_main_fails_when_only_tools_is_unknown(tmp_path: Path) -> None:
@@ -86,13 +86,15 @@ def test_main_fails_when_only_tools_is_unknown(tmp_path: Path) -> None:
         json.dumps(
             {
                 "files": {
-                    "src/dnadesign/usr/src/storage/parquet.py": {"summary": {"covered_lines": 1, "num_statements": 1}}
+                    "src/dnadesign/seqledger/src/storage/parquet.py": {
+                        "summary": {"covered_lines": 1, "num_statements": 1}
+                    }
                 }
             }
         ),
         encoding="utf-8",
     )
-    baseline_path.write_text('{"usr": 0.0}', encoding="utf-8")
+    baseline_path.write_text('{"seqledger": 0.0}', encoding="utf-8")
 
     rc = main(
         [

@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-# Notify boundary reminder: Notify watches USR <dataset>/.events.log, not DenseGen outputs/meta/events.jsonl.
+# Notify boundary reminder: Notify watches SeqLedger <dataset>/.events.log, not DenseGen outputs/meta/events.jsonl.
 
 DENSEGEN_CONFIG="${DENSEGEN_CONFIG:-$PWD/config.yaml}"
 DENSEGEN_VALIDATE_ARGS="${DENSEGEN_VALIDATE_ARGS:---probe-solver}"
@@ -68,8 +68,8 @@ if [[ "$has_fresh" -eq "$has_resume" ]]; then
   exit 2
 fi
 
-export USR_ACTOR_TOOL="${USR_ACTOR_TOOL:-densegen}"
-export USR_ACTOR_RUN_ID="${USR_ACTOR_RUN_ID:-${JOB_ID_VALUE}.${SGE_TASK_ID:-0}}"
+export SEQLEDGER_ACTOR_TOOL="${SEQLEDGER_ACTOR_TOOL:-densegen}"
+export SEQLEDGER_ACTOR_RUN_ID="${SEQLEDGER_ACTOR_RUN_ID:-${JOB_ID_VALUE}.${SGE_TASK_ID:-0}}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-${NSLOTS:-1}}"
 
 DENSEGEN_GUROBI_BOOTSTRAP="${DENSEGEN_GUROBI_BOOTSTRAP:-1}"

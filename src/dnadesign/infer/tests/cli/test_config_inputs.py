@@ -36,7 +36,7 @@ def test_resolve_config_job_inputs_usr_requires_explicit_root_or_env(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("DNADESIGN_USR_ROOT", raising=False)
+    monkeypatch.delenv("DNADESIGN_SEQLEDGER_ROOT", raising=False)
     job = JobConfig(
         id="j1",
         operation="extract",
@@ -44,7 +44,7 @@ def test_resolve_config_job_inputs_usr_requires_explicit_root_or_env(
         outputs=[{"id": "o1", "fn": "evo2.logits", "format": "list"}],
     )
 
-    with pytest.raises(ValidationError, match="USR ingest requires ingest.root or DNADESIGN_USR_ROOT"):
+    with pytest.raises(ValidationError, match="SeqLedger ingest requires ingest.root or DNADESIGN_SEQLEDGER_ROOT"):
         resolve_config_job_inputs(
             job=job,
             config_dir=tmp_path,
@@ -58,7 +58,7 @@ def test_resolve_config_job_inputs_usr_uses_env_root_when_explicit_root_absent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     env_root = tmp_path / "usr_root"
-    monkeypatch.setenv("DNADESIGN_USR_ROOT", str(env_root))
+    monkeypatch.setenv("DNADESIGN_SEQLEDGER_ROOT", str(env_root))
     job = JobConfig(
         id="j1",
         operation="extract",

@@ -2,7 +2,7 @@
 doc_id: quality-score
 surface: system-of-record
 owner: dnadesign-maintainers
-last_verified: 2026-07-13
+last_verified: 2026-10-28
 freshness_status: review_on_change
 verification_policy: change-aware
 ---
@@ -11,7 +11,7 @@ verification_policy: change-aware
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-10-28
 **Freshness:** verification dates are evidence timestamps, not expiry dates.
 Changed documents must be reviewed at or after their change; review age is a
 nonblocking maintenance signal.
@@ -85,7 +85,7 @@ Each score uses a `0-4` rubric:
 | Selected runbook metadata | `dnadesign.devtools.docs.checks` + CI | enforced |
 | Operational runbook path placement | `dnadesign.devtools.docs.checks` + CI | enforced |
 | Transient operational artifact placement (`.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`) | `dnadesign.devtools.docs.checks` + CI | enforced |
-| Active shared USR dataset id policy | `dnadesign.devtools.docs.checks` + CI | enforced |
+| Active shared SeqLedger dataset id policy | `dnadesign.devtools.docs.checks` + CI | enforced |
 | Cross-tool boundary terminology drift prevention | `dnadesign.devtools.docs.checks` stale-term checks + CI | enforced |
 | Tool-boundary utility placement (`src/dnadesign/utils` disallowed) | `dnadesign.devtools.docs.checks` shared-utils path check + CI | enforced |
 | Selected cross-tool runbook safety contracts | `dnadesign.ops.runbooks.schema`; orchestration contract tests | enforced |

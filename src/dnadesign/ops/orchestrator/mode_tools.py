@@ -96,11 +96,12 @@ def _resolve_infer_usr_output_for_mode_probe(infer_config: Path):
         message = str(exc)
         if "at least one job with ingest.source='usr' and io.write_back=true" in message:
             return None
-        if "multiple USR destinations" in message or "requires ingest.root for source='usr' write-back jobs" in message:
+        if (
+            "multiple SeqLedger destinations" in message
+            or "requires ingest.root for source='usr' write-back jobs" in message
+        ):
             raise InferModeProbeError(message) from exc
-        raise ValueError(
-            f"infer mode probe requires a single resolvable USR destination in infer config {infer_config}: {message}"
-        ) from exc
+        raise ValueError(f"infer probe requires one SeqLedger destination in config {infer_config}: {message}") from exc
 
 
 def _has_densegen_resume_artifacts(runbook: OrchestrationRunbookV1) -> bool:

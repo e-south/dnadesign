@@ -98,13 +98,13 @@ def _resolve_dataset_relative(
     posix_path = PurePosixPath(raw)
     windows_path = PureWindowsPath(raw)
     if not raw or "\\" in raw or posix_path.is_absolute() or windows_path.is_absolute() or ".." in posix_path.parts:
-        raise OpalError(f"Observed-label promotion {field} must remain within the USR dataset root.")
+        raise OpalError(f"Observed-label promotion {field} must remain within the SeqLedger dataset root.")
     root = Path(dataset_root).resolve()
     resolved = (root / Path(*posix_path.parts)).resolve()
     try:
         resolved.relative_to(root)
     except ValueError as exc:
-        raise OpalError(f"Observed-label promotion {field} must remain within the USR dataset root.") from exc
+        raise OpalError(f"Observed-label promotion {field} must remain within the SeqLedger dataset root.") from exc
     return posix_path.as_posix(), resolved
 
 

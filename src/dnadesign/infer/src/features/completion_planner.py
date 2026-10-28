@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass, field
 
 import pyarrow.parquet as pq
 
-from dnadesign.usr import Dataset, sequence_views_path
+from dnadesign.seqledger import Dataset, sequence_views_path
 
 from .aliases import (
     load_feature_alias_ids,

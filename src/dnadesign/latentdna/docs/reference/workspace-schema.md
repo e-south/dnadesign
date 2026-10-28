@@ -34,7 +34,7 @@ Core sections:
 
 Implemented schema slices:
 
-- Sources: `usr`, `parquet`, `matrix_bundle`, `infer_feature_sidecar`, and `infer_feature_scalar_sidecar`
+- Sources: `seqledger`, `parquet`, `matrix_bundle`, `infer_feature_sidecar`, and `infer_feature_scalar_sidecar`
 - Views: source-backed `vector.kind: column` and `vector.kind: bundle_matrix`, plus derived `vector_difference`, `normalize`, `aggregate_by_key`, `apply_reducer`, and `concatenate`
 - Alignments: named `intersection` support over `record_key`, `subject_key`, or explicit key columns
 - Scalars: `vector_norm`, safe `column_expression`, `select_columns`, `rename_columns`, and `join_tables`
@@ -234,7 +234,7 @@ Current runtime limits:
   windows unless observed lengths are exactly 60 bp.
 - `notebook generate` may return `attention` when the notebook is written before the default deliverable plot exists; the explicit degraded state is persisted and `notebook smoke` remains the gate.
 - `notebook generate` now refuses to overwrite or regenerate a notebook when the default deliverable has freshness drift; refresh the deliverable or its linked recipe first so the notebook remains a review surface over fresh artifacts.
-- `workspace refresh` clears only workspace-local LatentDNA outputs; it never mutates upstream `usr` datasets.
+- `workspace refresh` clears only workspace-local LatentDNA outputs; it never mutates upstream `seqledger` datasets.
 - `validate workspace --deep` currently performs schema-only pressure checks
   against declared sources, metadata derivation inputs, views, cohorts,
   landmarks, notebooks, and the bound study directory without loading embedding
@@ -244,7 +244,7 @@ Current runtime limits:
 - `infer_feature_sidecar` sources expose canonical Infer outputs from
   `<usr-dataset>/_derived/infer/feature_aliases.parquet` joined to
   the parts listed in `feature_vectors.manifest.json`, `_views/sequence_views.parquet`, mutable
-  `_views/view_semantics.parquet`, and the owning USR dataset rows. These
+  `_views/view_semantics.parquet`, and the owning SeqLedger dataset rows. These
   sources make `value` the vector column and keep sequence-view fields such as
   `view_id`, `product_kind`, `orientation`, `recommended_pooling`,
   `source_family`, `selection_basis`, and `view_collections` available as row
@@ -259,7 +259,7 @@ Current runtime limits:
 - `infer_feature_scalar_sidecar` sources expose canonical Infer scalar outputs
   from `<usr-dataset>/_derived/infer/feature_scalar_aliases.parquet` joined to
   the parts listed in `feature_scalars.manifest.json`, `_views/sequence_views.parquet`, mutable
-  `_views/view_semantics.parquet`, and the owning USR dataset rows. These
+  `_views/view_semantics.parquet`, and the owning SeqLedger dataset rows. These
   sources make `value` the scalar column for diagnostics such as
   `log_likelihood__total` and `log_likelihood__mean_per_token`. Missing scalar
   sidecar files expose a zero-row schema so planned scalar sources can coexist

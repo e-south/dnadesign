@@ -320,7 +320,7 @@ def _humanize_token(value: str) -> str:
         elif lowered == "dna":
             words.append("DNA")
         elif lowered == "usr":
-            words.append("USR")
+            words.append("SeqLedger")
         elif lowered and len(part) <= 4 and part.isupper():
             words.append(part)
         else:

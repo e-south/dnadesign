@@ -20,7 +20,7 @@ def test_notify_help_secret_ref_mentions_file_backend() -> None:
     runner = CliRunner()
     for args in (
         ["send", "--help"],
-        ["usr-events", "watch", "--help"],
+        ["seqledger-events", "watch", "--help"],
         ["spool", "drain", "--help"],
     ):
         result = runner.invoke(app, list(args))

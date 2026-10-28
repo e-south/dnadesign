@@ -1,0 +1,32 @@
+schema_version: 1
+catalog_order: 40
+registry_id: seqledger.data-plane.multi-source-source-of-truth
+type: runbook
+plane: data-plane
+owner_boundary: seqledger
+entry_artifact: multiple SeqLedger-backed input datasets plus explicit merge, carry, and construct intent
+exit_artifact: one construct-backed downstream SeqLedger dataset ready for infer and notify handoff
+summary: Merge multiple SeqLedger-backed sources, preserve explicit carry, and hand one construct-backed shared dataset to Infer and Notify.
+execution_kind: staged
+status_kind: seqledger-dataset-state
+related_tools:
+  - densegen
+  - construct
+  - infer
+  - notify
+related_tool_routes:
+  - tool: densegen
+    route: seqledger-notify-tutorial
+  - tool: construct
+    route: template-contexts
+  - tool: infer
+    route: evo2-sequence-features
+  - tool: notify
+    route: seqledger-events
+relations:
+  - type: alternative-to
+    target: seqledger.data-plane.construct-infer-source-of-truth
+  - type: handoff-to
+    target: seqledger.data-plane.promoter-feature-matrix
+  - type: execution-support
+    target: ops.control-plane.orchestration

@@ -1,7 +1,7 @@
 ## BU SCC Quickstart: dnadesign (Interactive -> Batch -> Notify)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-28
 
 ### Purpose
 
@@ -10,7 +10,7 @@
 **When to use:**
 - You need DenseGen CPU jobs or Evo2 GPU jobs on BU SCC.
 - You want scheduler-managed runtime/resource limits and durable logs.
-- You want webhook monitoring from USR `.events.log`.
+- You want webhook monitoring from SeqLedger `.events.log`.
 
 **Not for:**
 - Deep dependency/debugging workflows (use [BU SCC Install bootstrap](install.md)).
@@ -254,7 +254,7 @@ Operational guidance:
 
 ### 8) Add Notify
 
-Notify watches USR `.events.log` only. It does not consume DenseGen `outputs/meta/events.jsonl`.
+Notify watches SeqLedger `.events.log` only. It does not consume DenseGen `outputs/meta/events.jsonl`.
 
 Recommended deployment: submit a dedicated watcher batch job.
 
@@ -301,7 +301,7 @@ qsub -P <project> \
 ```
 
 Secure onboarding and wizard flow:
-[Notify USR events operator manual](../../notify/usr-events.md)
+[Notify SeqLedger events operator manual](../../notify/seqledger-events.md)
 
 Deployment patterns and transfer-node guidance:
 [BU SCC Batch + Notify runbook](../runbooks/batch-notify.md)

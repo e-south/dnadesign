@@ -29,7 +29,7 @@ def register(app: typer.Typer) -> None:
         help="Drop explicitly approved stale Infer overlay columns by prefix/name without reading payloads.",
     )
     def prune_stale_overlay_columns(
-        usr_root: Path = typer.Option(..., "--usr-root", help="USR datasets root."),
+        usr_root: Path = typer.Option(..., "--seqledger-root", help="SeqLedger datasets root."),
         dataset: str = typer.Option(..., "--dataset", help="Dataset id containing _derived/infer parts."),
         namespace: str = typer.Option("infer", "--namespace", help="Overlay namespace. Only infer is supported."),
         column_prefix: list[str] | None = typer.Option(

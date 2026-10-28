@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import NoReturn
 
-from dnadesign.usr import SequencesError as USRSequencesError
+from dnadesign.seqledger import SequencesError as USRSequencesError
 
 from ..composition.review import publish_composition_review_svg
 from ..composition.runtime import (
@@ -64,7 +64,7 @@ def preflight_from_config(path: str | Path, *, usr_root: str | Path | None = Non
     except USRSequencesError as exc:
         _wrap_usr_error(
             exc,
-            message="construct preflight failed while reading USR inputs",
+            message="construct preflight failed while reading SeqLedger inputs",
             error_type=ValidationError,
         )
 
@@ -80,7 +80,7 @@ def run_from_config(
     except USRSequencesError as exc:
         _wrap_usr_error(
             exc,
-            message="construct run planning failed while reading USR inputs",
+            message="construct run planning failed while reading SeqLedger inputs",
             error_type=ValidationError,
         )
     if dry_run:
@@ -90,7 +90,7 @@ def run_from_config(
     except USRSequencesError as exc:
         _wrap_usr_error(
             exc,
-            message="construct run failed while writing USR outputs",
+            message="construct run failed while writing SeqLedger outputs",
             error_type=ExecutionError,
         )
 

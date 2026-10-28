@@ -21,7 +21,7 @@ from typer.testing import CliRunner
 from dnadesign.construct.src.cli import app
 from dnadesign.construct.src.seeding.bootstrap import bootstrap_anchor_template_demo
 from dnadesign.construct.src.workspaces.registry import project_root
-from dnadesign.usr import Dataset
+from dnadesign.seqledger import Dataset
 
 _RUNNER = CliRunner()
 
@@ -67,7 +67,7 @@ def test_workspace_init_creates_default_layout_and_config(tmp_path: Path) -> Non
     assert "root: outputs/usr_datasets" in (workspace_dir / "config.yaml").read_text(encoding="utf-8")
     inputs_readme = (workspace_dir / "inputs" / "README.md").read_text(encoding="utf-8")
     assert "workspace's `outputs/usr_datasets/` root" in inputs_readme
-    assert "src/dnadesign/usr/datasets/" in inputs_readme
+    assert "src/dnadesign/seqledger/datasets/" in inputs_readme
     registry_payload = yaml.safe_load((workspace_dir / "construct.workspace.yaml").read_text(encoding="utf-8"))
     project_artifacts = registry_payload["workspace"]["projects"][0]["artifacts"]["config"]
     project_contract = registry_payload["workspace"]["projects"][0]["contract"]
@@ -120,9 +120,9 @@ def test_workspace_init_copies_packaged_promoter_swap_demo_profile(tmp_path: Pat
     assert (workspace_dir / "inputs" / "README.md").is_file()
     assert (workspace_dir / "outputs" / "logs" / "ops" / "audit").is_dir()
     assert "root: outputs/usr_datasets" in (workspace_dir / "config.slot_a.window.yaml").read_text(encoding="utf-8")
-    assert "workspace-local USR root `outputs/usr_datasets/`" in (workspace_dir / "inputs" / "README.md").read_text(
-        encoding="utf-8"
-    )
+    assert "workspace-local SeqLedger root `outputs/usr_datasets/`" in (
+        workspace_dir / "inputs" / "README.md"
+    ).read_text(encoding="utf-8")
     registry_payload = yaml.safe_load((workspace_dir / "construct.workspace.yaml").read_text(encoding="utf-8"))
     assert registry_payload["workspace"]["projects"][0]["artifacts"]["config"]["path"] == "config.slot_a.window.yaml"
     assert registry_payload["workspace"]["projects"][0]["artifacts"]["config"]["job_id"] == (
@@ -269,7 +269,7 @@ def test_workspace_show_reports_registry_summary(tmp_path: Path) -> None:
     output = result.stdout or ""
     assert "workspace_id: demo_construct" in output
     assert "profile: anchor-template-demo" in output
-    assert "shared_usr_root: src/dnadesign/usr/datasets (repo-relative hint)" in output
+    assert "shared_usr_root: src/dnadesign/seqledger/datasets (repo-relative hint)" in output
     assert "workspace_usr_root: outputs/usr_datasets (workspace-relative default)" in output
     assert "project: id=slot_a_window" in output
     assert "config.path=config.slot_a.window.yaml" in output
@@ -559,7 +559,7 @@ def test_workspace_validate_project_runtime_uses_explicit_usr_root(tmp_path: Pat
             "--project",
             "slot_a_window",
             "--runtime",
-            "--usr-root",
+            "--seqledger-root",
             usr_root.as_posix(),
             "--format",
             "json",
@@ -758,7 +758,7 @@ def test_workspace_run_project_dry_run_resolves_registry_project(tmp_path: Path)
             workspace_dir.as_posix(),
             "--project",
             "slot_a_window",
-            "--usr-root",
+            "--seqledger-root",
             usr_root.as_posix(),
             "--dry-run",
         ],

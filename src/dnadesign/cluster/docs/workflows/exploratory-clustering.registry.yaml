@@ -4,17 +4,17 @@ registry_id: cluster.downstream.exploratory-clustering
 type: workflow
 plane: downstream-tool
 owner_boundary: cluster
-entry_artifact: one chosen feature column or exported matrix in a USR dataset or file input
+entry_artifact: one chosen feature column or exported matrix in a SeqLedger dataset or file input
 exit_artifact: cluster run records, embeddings, plots, and downstream exploratory summaries
 summary: Explore one chosen feature column or exported matrix through clustering, UMAP, and downstream summaries.
 execution_kind: exploratory
 status_kind: cluster-run-index
 related_tools:
-  - usr
+  - seqledger
   - infer
   - opal
 relations:
   - type: depends-on
-    target: usr.data-plane.promoter-feature-matrix
+    target: seqledger.data-plane.promoter-feature-matrix
   - type: see-also
-    target: opal.downstream.usr-infer-x-active-learning
+    target: opal.downstream.seqledger-infer-x-active-learning

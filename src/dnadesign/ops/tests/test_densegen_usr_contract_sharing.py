@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/ops/tests/test_densegen_usr_contract_sharing.py
 
-Architecture contract tests for owner-owned USR contract parsing across tools.
+Architecture contract tests for owner-owned SeqLedger contract parsing across tools.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-import dnadesign.usr as usr_roots
+import dnadesign.seqledger as usr_roots
 from dnadesign.construct import resolve_construct_usr_output_contract
 from dnadesign.densegen.contracts import resolve_densegen_usr_output_contract
 from dnadesign.infer.contracts import resolve_infer_usr_output_contract
@@ -205,8 +205,8 @@ def test_construct_shared_usr_contract_supports_notify_and_ops(tmp_path: Path) -
 
 def test_usr_root_helpers_are_usr_owned() -> None:
     package_path = Path(usr_roots.__file__).resolve()
-    assert package_path.as_posix().endswith("/src/dnadesign/usr/__init__.py")
-    assert usr_roots.pkg_usr_root() == package_path.parent.resolve()
+    assert package_path.as_posix().endswith("/src/dnadesign/seqledger/__init__.py")
+    assert usr_roots.pkg_seqledger_root() == package_path.parent.resolve()
 
 
 def test_overlay_guard_uses_one_densegen_configuration_snapshot(tmp_path: Path, monkeypatch) -> None:

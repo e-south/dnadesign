@@ -1,7 +1,7 @@
 # Artifact Manifests
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-27
+**Last verified:** 2026-10-28
 
 Each persisted artifact directory contains a `manifest.json` with at least:
 
@@ -19,7 +19,7 @@ SHA-256 digests, and the producing implementation matches the current tool.
 A changed or missing payload, missing digest evidence, or implementation mismatch
 reports `attention` and causes recipes to rebuild that artifact.
 
-Manifests record `execution_identity` from the installed LatentDNA, USR and
+Manifests record `execution_identity` from the installed LatentDNA, SeqLedger and
 shared-contract Python sources plus the versions of NumPy, PyArrow, SciPy,
 scikit-learn, UMAP and Pydantic. This conservatively invalidates artifacts after
 implementation changes. External producers remain responsible for their own

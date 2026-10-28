@@ -1,7 +1,7 @@
 # LatentDNA Docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-09
+**Last verified:** 2026-10-28
 
 LatentDNA docs are organized by task. Start with a workflow when you are
 running or reviewing a comparison, use reference docs when editing contracts,
@@ -38,7 +38,7 @@ and use concepts when aligning terminology across workspaces.
 
 ### Adjacent handoffs
 
-- Upstream source-of-truth datasets: [USR README](../../usr/README.md)
+- Upstream source-of-truth datasets: [SeqLedger README](../../seqledger/README.md)
 - Upstream vector generation: [Infer docs](../../infer/docs/README.md)
 - External study integration: [study workspaces](../../../../docs/integrations/study-workspaces.md)
 - Study-facing status surfaces: [workspace snapshot contract](reference/workspace-snapshot-contract.md)

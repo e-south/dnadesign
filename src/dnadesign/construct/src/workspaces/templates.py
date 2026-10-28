@@ -19,7 +19,7 @@ _WORKSPACE_REGISTRY_NAME = "construct.workspace.yaml"
 
 _INPUTS_README = """# construct workspace inputs
 
-- `construct` now expects both anchors and templates to live in USR datasets.
+- `construct` now expects both anchors and templates to live in SeqLedger datasets.
 - Keep workspace-level project inventory and provenance in `construct.workspace.yaml`.
 - Use `uv run construct seed import-manifest --manifest inputs/import_manifest.template.yaml`
   when you want to materialize your own curated inputs and templates into this
@@ -29,11 +29,11 @@ _INPUTS_README = """# construct workspace inputs
   `construct workspace init --profile anchor-template-demo` or
   `construct workspace init --profile anchor-template-shared-dataset-demo`.
 - Omit `--root` only when you are running inside a dnadesign checkout and deliberately want to seed
-  the canonical shared USR root at `src/dnadesign/usr/datasets/`, or when `DNADESIGN_USR_ROOT`
+  the canonical shared SeqLedger root at `src/dnadesign/seqledger/datasets/`, or when `DNADESIGN_SEQLEDGER_ROOT`
   points at a writable datasets root.
 - Keep human-readable sequence names in `usr_label__primary` / `usr_label__aliases`; keep
   construct-specific seed provenance in `construct_seed__*`.
-- Keep canonical template records in USR; do not fall back to ad hoc FASTA files
+- Keep canonical template records in SeqLedger; do not fall back to ad hoc FASTA files
   for ordinary construct runs.
 - Prefer flat semantic output dataset ids such as
   `anchor_template_slot_a_window_1kb_demo`, not tool-owned dataset namespaces.
@@ -127,10 +127,10 @@ def default_workspace_registry_payload(*, workspace_id: str, profile: str) -> di
             "profile": profile,
             "description": (
                 "Construct workspace registry for explicit project inventory, "
-                "tracked config artifacts, and USR root hints."
+                "tracked config artifacts, and SeqLedger root hints."
             ),
             "roots": {
-                "shared_usr_root": "src/dnadesign/usr/datasets",
+                "shared_usr_root": "src/dnadesign/seqledger/datasets",
                 "workspace_usr_root": "outputs/usr_datasets",
             },
             "projects": [

@@ -201,13 +201,13 @@ def marimo_subprocess_environment(
     *,
     base_environment: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
-    """Bind an explicit USR coordinate into a marimo child process."""
+    """Bind an explicit SeqLedger coordinate into a marimo child process."""
 
     environment = dict(os.environ if base_environment is None else base_environment)
     if usr_root is not None:
-        from dnadesign.usr import require_explicit_usr_root
+        from dnadesign.seqledger import require_explicit_seqledger_root
 
-        environment["OPAL_NOTEBOOK_USR_ROOT"] = str(require_explicit_usr_root(usr_root))
+        environment["OPAL_NOTEBOOK_SEQLEDGER_ROOT"] = str(require_explicit_seqledger_root(usr_root))
     return environment
 
 

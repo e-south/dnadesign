@@ -85,7 +85,7 @@ Clarification policy:
 - prefer numeric GPU capability and memory floors from the runbook or config over queue-name assumptions; `gpu_c=9.0` means Hopper-class or newer, so a higher-capability lane such as Blackwell also satisfies the contract when the memory floor is met
 - when the runbook or operator evidence says the environment is GPU-family pinned, prefer an exact scheduler selector such as `gpu_t=<family>` in addition to the numeric floor; do not treat `gpu_c` alone as equivalent to a family-pinned submit
 - for Infer cold starts, prefer one lane config, one dataset, and one watcher per live run; multi-destination configs are not the safe default for Notify and resumable operations
-- when starting a live watcher against an existing USR event stream and replay is not desired, seed the watcher cursor to the current `.events.log` size before `notify usr-events watch --follow`
+- when starting a live watcher against an existing SeqLedger event stream and replay is not desired, seed the watcher cursor to the current `.events.log` size before `notify seqledger-events watch --follow`
 - align threaded workloads (`OMP_NUM_THREADS`) with `NSLOTS`
 - prefer arrays (`SGE_TASK_ID`) for fanout and `-hold_jid` chains for ordered pipelines
 - run `$SKILL_DIR/scripts/sge-submit-shape-advisor.sh --warn-over-running 3` before multi-submit plans

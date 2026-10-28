@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pyarrow as pa
 
-from dnadesign.usr.src.registry.models import SEQ_ANNOT_COLUMNS
-from dnadesign.usr.src.registry.typespec import arrow_type_from_str
+from dnadesign.seqledger.src.registry.models import SEQ_ANNOT_COLUMNS
+from dnadesign.seqledger.src.registry.typespec import arrow_type_from_str
 
 
 def write_registry(root: Path) -> None:

@@ -65,7 +65,7 @@ def test_build_extract_ingest_pt_invokes_pickle_guard(tmp_path: Path) -> None:
 
 
 def test_build_extract_ingest_requires_source() -> None:
-    with pytest.raises(ConfigError, match="Provide one of --seq/--seq-file/--usr/--pt/--records-jsonl"):
+    with pytest.raises(ConfigError, match="Provide one of --seq/--seq-file/--seqledger/--pt/--records-jsonl"):
         build_extract_ingest(
             seq=[],
             seq_file=None,

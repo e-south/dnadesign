@@ -314,7 +314,7 @@ def test_inspect_run_usr_events_path_prints_absolute_path(tmp_path: Path) -> Non
     (tmp_path / "inputs.csv").write_text("tf,tfbs\nTF1,AAA\n")
 
     runner = CliRunner()
-    result = runner.invoke(app, ["inspect", "run", "-c", str(cfg_path), "--usr-events-path"])
+    result = runner.invoke(app, ["inspect", "run", "-c", str(cfg_path), "--seqledger-events-path"])
 
     expected = tmp_path.parent / "usr_root" / "densegen_demo" / ".events.log"
     assert result.exit_code == 0, result.output
@@ -328,7 +328,7 @@ def test_inspect_run_usr_events_path_requires_usr_target(tmp_path: Path) -> None
     (tmp_path / "inputs.csv").write_text("tf,tfbs\nTF1,AAA\n")
 
     runner = CliRunner()
-    result = runner.invoke(app, ["inspect", "run", "-c", str(cfg_path), "--usr-events-path"])
+    result = runner.invoke(app, ["inspect", "run", "-c", str(cfg_path), "--seqledger-events-path"])
 
     assert result.exit_code == 1
     assert "output.targets must include 'usr'" in result.output

@@ -1,11 +1,11 @@
 ## DenseGen outputs reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-26
+**Last verified:** 2026-10-28
 This page defines what DenseGen writes, where it writes it, and which event stream each
 consumer should read.
 
-DenseGen can emit Parquet outputs locally and/or write through USR. When USR
+DenseGen can emit Parquet outputs locally and/or write through SeqLedger. When SeqLedger
 is enabled for a shared study, DenseGen writes to the shared root declared in
 the config rather than inventing a workspace-local mirror.
 
@@ -15,7 +15,7 @@ For a compact run-and-artifact checklist, use **[DenseGen quick checklist](../co
 
 - [Deterministic IDs](#deterministic-ids) - deterministic sequence identifiers.
 - [Parquet](#parquet) - dataset layout and deduplication.
-- [USR](#usr) - attach semantics and optional dependency.
+- [SeqLedger](#seqledger) - attach semantics and optional dependency.
 - [Shared metadata fields](#shared-metadata-fields) - namespaced record fields and retention labels.
 - [Run manifests](#run-manifests) - run-level JSON summaries.
 - [Library provenance artifacts](#library-provenance-artifacts) - solver-offered libraries and attempts.
@@ -29,17 +29,17 @@ For a compact run-and-artifact checklist, use **[DenseGen quick checklist](../co
 Use **[observability and events](../concepts/runtime/observability-and-events.md)** for stream-boundary behavior; this section lists only artifact paths.
 
 - DenseGen runtime diagnostics: `outputs/meta/events.jsonl`
-- USR mutation events: `<usr_root>/<dataset>/.events.log`
+- SeqLedger mutation events: `<usr_root>/<dataset>/.events.log`
 
 ---
 
 ### Deterministic IDs
 
 
-- Sequence IDs use USR's algorithm:
+- Sequence IDs use SeqLedger's algorithm:
   - `normalize_sequence(sequence, bio_type, alphabet)`
   - `compute_id(bio_type, normalized_sequence)`
-- Parquet and USR must return the same `id` for the same sequence.
+- Parquet and SeqLedger must return the same `id` for the same sequence.
 - `bio_type` and `alphabet` are defined once in `output.schema` and shared by all sinks.
 
 ---
@@ -59,17 +59,17 @@ Behavior:
 
 ---
 
-### USR
+### SeqLedger
 
-USR output uses the USR Dataset overlay-part writer with a fixed namespace (`densegen`). USR integration is
-optional; if you do not include `usr` in `output.targets`, DenseGen should not import USR code. USR output requires
+SeqLedger output uses the SeqLedger Dataset overlay-part writer with a fixed namespace (`densegen`). SeqLedger integration is
+optional; if you do not include `seqledger` in `output.targets`, DenseGen should not import SeqLedger code. SeqLedger output requires
 an explicit `output.usr.root` and a registry entry for the `densegen` namespace (repo-wide `usr/datasets/registry.yaml`).
 
 Behavior:
 - Base sequences are imported once; derived metadata is written as overlay parts under `_derived/densegen/part-*.parquet`.
 - Metadata values are stored as typed Arrow list/struct columns (no JSON encoding).
 - Existing IDs in `records.parquet` are skipped (resume-safe).
-- Overlay parts are append-only. Compact parts with `usr maintenance overlay-compact <dataset> --namespace densegen`.
+- Overlay parts are append-only. Compact parts with `seqledger maintenance overlay-compact <dataset> --namespace densegen`.
 - If `output.usr.npz_fields` is set, those metadata fields are offloaded into NPZ artifacts under
    `<dataset>/_artifacts/densegen_npz/<id>.npz`. Overlay columns `densegen__npz_ref`,
    `densegen__npz_sha256`, `densegen__npz_bytes`, and `densegen__npz_fields` are populated and the
@@ -87,10 +87,10 @@ does not (or IDs differ), DenseGen fails fast.
 
 Keys are namespaced as `densegen__<key>`.
 
-Overlay-first USR note:
-- Base `records.parquet` may contain only USR core columns (`id`, `bio_type`, `sequence`, `alphabet`, `length`, `source`, `created_at`).
-- DenseGen-derived columns are attached under `_derived/densegen/part-*.parquet` and are merged by default in USR reads (`usr head`, `usr schema`, `usr info`).
-- Use `usr materialize` when you need those merged columns physically written into base `records.parquet`.
+Overlay-first SeqLedger note:
+- Base `records.parquet` may contain only SeqLedger core columns (`id`, `bio_type`, `sequence`, `alphabet`, `length`, `source`, `created_at`).
+- DenseGen-derived columns are attached under `_derived/densegen/part-*.parquet` and are merged by default in SeqLedger reads (`seqledger head`, `seqledger schema`, `seqledger info`).
+- Use `seqledger materialize` when you need those merged columns physically written into base `records.parquet`.
 
 Retention labels in the table:
 - `record_keep`: keep at record level for downstream analysis/provenance.
@@ -126,10 +126,10 @@ Curated record fields:
 | `densegen__pad_literal` | record_conditional | Literal pad sequence written into the final output. |
 | `densegen__gc_total` | record_keep | GC fraction of final sequence. |
 | `densegen__gc_core` | record_keep | GC fraction of pre-pad core sequence. |
-| `densegen__npz_ref` | record_conditional | Relative NPZ artifact reference when `output.usr.npz_fields` is enabled (USR sink only). |
-| `densegen__npz_sha256` | record_conditional | NPZ payload SHA256 (USR sink only). |
-| `densegen__npz_bytes` | record_conditional | NPZ payload size in bytes (USR sink only). |
-| `densegen__npz_fields` | record_conditional | Fields offloaded to NPZ (USR sink only). |
+| `densegen__npz_ref` | record_conditional | Relative NPZ artifact reference when `output.usr.npz_fields` is enabled (SeqLedger sink only). |
+| `densegen__npz_sha256` | record_conditional | NPZ payload SHA256 (SeqLedger sink only). |
+| `densegen__npz_bytes` | record_conditional | NPZ payload size in bytes (SeqLedger sink only). |
+| `densegen__npz_fields` | record_conditional | Fields offloaded to NPZ (SeqLedger sink only). |
 
 For type definitions and validation logic, see `src/dnadesign/densegen/src/core/metadata_schema.py`.
 
@@ -144,7 +144,7 @@ DenseGen writes run-level JSON files under `outputs/meta/`:
 - `outputs/meta/inputs_manifest.json` — resolved input paths and Stage‑A PWM sampling settings used for the run.
 - `outputs/meta/effective_config.json` — resolved config with derived seeds and Stage‑A sampling caps.
 
-These are produced alongside Parquet/USR outputs and provide a compact audit trail.
+These are produced alongside Parquet/SeqLedger outputs and provide a compact audit trail.
 
 ---
 
@@ -159,9 +159,9 @@ DenseGen writes `outputs/meta/events.jsonl` (JSON lines) with structured events 
 
 See also:
 - DenseGen boundary and mistakes: **[observability and events](../concepts/runtime/observability-and-events.md)**
-- USR event schema: `../../../usr/docs/reference/event-log.md`
-- Notify operators doc: `../../../../../docs/notify/usr-events.md`
-- DenseGen watcher walkthrough: **[DenseGen to USR to Notify tutorial](../tutorials/demo_usr_notify.md)**
+- SeqLedger event schema: `../../../seqledger/docs/reference/event-log.md`
+- Notify operators doc: `../../../../../docs/notify/seqledger-events.md`
+- DenseGen watcher walkthrough: **[DenseGen to SeqLedger to Notify tutorial](../tutorials/demo_usr_notify.md)**
 
 ---
 
@@ -204,17 +204,17 @@ DenseGen -> BaseRender contract for the scaffolded notebook:
 - Contract source: `dnadesign.densegen:densegen_notebook_render_contract`
 - Adapter policy contract: `on_invalid_row=error` (invalid rows fail instead of skipping)
 - Records source path: resolved from output sink selection:
-  - single sink in `output.targets` -> that sink (`parquet` or `usr`)
+  - single sink in `output.targets` -> that sink (`parquet` or `seqledger`)
   - multiple sinks in `output.targets` -> `plots.source`
   - `parquet` source path: `densegen.output.parquet.path`
-  - `usr` source path: `<densegen.output.usr.root>/<densegen.output.usr.dataset>/records.parquet`
+  - `seqledger` source path: `<densegen.output.usr.root>/<densegen.output.usr.dataset>/records.parquet`
 - BaseRender API surface used by the notebook:
   - `dnadesign.baserender.load_records_from_parquet(...)`
   - `dnadesign.baserender.render_record_figure(...)`
 - Notebook records preview/export contract:
   - The notebook preview/export table is a curated projection of `records.parquet` focused on row-level signal.
   - Notebook preview fields are read directly from persisted records; the notebook does not reconstruct fixed elements or pad literals.
-- `densegen__parts_detail` is copied from `densegen__used_tfbs_detail` so preview/export matches Parquet and USR output rows.
+- `densegen__parts_detail` is copied from `densegen__used_tfbs_detail` so preview/export matches Parquet and SeqLedger output rows.
 - DenseGen does not provide back-compat shims for old part-detail keys (`tf`, `tfbs`, `stage_a_*`); mismatched payloads fail validation.
   - `densegen__pad_literal` is read from the persisted `densegen__pad_literal` column.
 - Rendering style preset: `presentation_default` (fixed in the DenseGen contract)

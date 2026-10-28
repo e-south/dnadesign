@@ -1,27 +1,27 @@
 ## Construct CLI reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-15
+**Last verified:** 2026-10-28
 
 ### Command map
 
-- `uv run construct run --config <path> [--usr-root <absolute-path>] [--dry-run] [--format text|json]`
+- `uv run construct run --config <path> [--seqledger-root <absolute-path>] [--dry-run] [--format text|json]`
 - `uv run construct compose validate --config <path> [--format text|json]`
 - `uv run construct compose run --config <path> [--format text|json]`
 - `uv run construct compose review --bundle <artifact-bundle> [--nucleotide-font-size-px <float>] [--format text|json]`
-- `uv run construct validate config --config <path> [--usr-root <absolute-path>] [--runtime] [--format text|json]`
-- `uv run construct seed import-manifest --manifest <path> [--root <usr-root>]`
-- `uv run construct seed anchor-template-demo [--root <usr-root>] [--manifest <path>]`
+- `uv run construct validate config --config <path> [--seqledger-root <absolute-path>] [--runtime] [--format text|json]`
+- `uv run construct seed import-manifest --manifest <path> [--root <seqledger-root>]`
+- `uv run construct seed anchor-template-demo [--root <seqledger-root>] [--manifest <path>]`
 - `uv run construct workspace where [--root <workspace-root>] [--profile <profile>]`
 - `uv run construct workspace init --id <workspace-id> [--root <workspace-root>] [--profile <profile>]`
 - `uv run construct workspace show --workspace <workspace-dir> [--format text|json]`
 - `uv run construct workspace doctor --workspace <workspace-dir> [--format text|json]`
-- `uv run construct workspace validate-project --workspace <workspace-dir> --project <id> [--usr-root <absolute-path>] [--runtime] [--format text|json]`
-- `uv run construct workspace run-project --workspace <workspace-dir> --project <id> [--usr-root <absolute-path>] [--dry-run] [--format text|json]`
+- `uv run construct workspace validate-project --workspace <workspace-dir> --project <id> [--seqledger-root <absolute-path>] [--runtime] [--format text|json]`
+- `uv run construct workspace run-project --workspace <workspace-dir> --project <id> [--seqledger-root <absolute-path>] [--dry-run] [--format text|json]`
 
-`--usr-root` is one coordinate for validation, dry-run, and persisted execution.
+`--seqledger-root` is one coordinate for validation, dry-run, and persisted execution.
 It must name an absolute, existing directory that is not a symbolic link. When
-present, it supplies the input, template, and output USR root; the command does
+present, it supplies the input, template, and output SeqLedger root; the command does
 not return to roots declared in the job config between preflight and execution.
 
 ### `validate config`
@@ -71,7 +71,7 @@ the dry-run flag, output root, and spec id.
 
 `compose` is the workspace-less route for declared linear ssDNA segment specs.
 Use it when the caller has already selected the parts and wants Construct to
-emit a local artifact bundle rather than a USR-backed template/context run.
+emit a local artifact bundle rather than a SeqLedger-backed template/context run.
 
 - `compose validate` parses `linear_ssdna_composition_v1`, checks segment
   transforms, span bounds, repeat policy, and planned sequence length, and
@@ -106,14 +106,14 @@ It also writes:
 - `usr_label__primary` / `usr_label__aliases`
 - an optional manifest with record ids and slot coordinates
 
-Standalone `construct seed` defaults to the canonical repo USR root when `--root` is omitted. Packaged workspaces should pass an explicit workspace-local root, typically `outputs/usr_datasets`.
+Standalone `construct seed` defaults to the canonical repo SeqLedger root when `--root` is omitted. Packaged workspaces should pass an explicit workspace-local root, typically `outputs/usr_datasets`.
 
 ### `seed import-manifest`
 
-Use this when you have your own anchors or templates and want construct to materialize them into USR without hand-editing datasets.
+Use this when you have your own anchors or templates and want construct to materialize them into SeqLedger without hand-editing datasets.
 
 - one manifest can create one or more datasets
-- dataset ids stay biological and semantic at the USR layer
+- dataset ids stay biological and semantic at the SeqLedger layer
 - record labels go into `usr_label__primary` / `usr_label__aliases`
 - construct bootstrap provenance goes into `construct_seed__*`
 - duplicate sequences stay idempotent because import uses append-only `on_conflict=ignore`

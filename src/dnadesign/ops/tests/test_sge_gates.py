@@ -707,7 +707,7 @@ def test_main_usr_overlay_guard_blocks_when_projected_overlay_parts_exceed_thres
 
     exit_code = main(
         [
-            "usr-overlay-guard",
+            "seqledger-overlay-guard",
             "--config",
             str(config_path),
             "--workspace-root",
@@ -732,7 +732,7 @@ def test_main_usr_overlay_guard_blocks_when_projected_overlay_parts_exceed_thres
 def test_main_usr_overlay_guard_auto_compacts_when_existing_parts_exceed_threshold(tmp_path: Path, capsys) -> None:
     pyarrow = pytest.importorskip("pyarrow")
 
-    import dnadesign.usr as usr_pkg
+    import dnadesign.seqledger as usr_pkg
 
     workspace_root = tmp_path / "workspace"
     workspace_root.mkdir(parents=True, exist_ok=True)
@@ -768,7 +768,7 @@ def test_main_usr_overlay_guard_auto_compacts_when_existing_parts_exceed_thresho
 
     exit_code = main(
         [
-            "usr-overlay-guard",
+            "seqledger-overlay-guard",
             "--config",
             str(config_path),
             "--workspace-root",
@@ -812,7 +812,7 @@ def test_main_usr_overlay_guard_resolves_usr_root_relative_to_densegen_config_pa
 
     exit_code = main(
         [
-            "usr-overlay-guard",
+            "seqledger-overlay-guard",
             "--tool",
             "densegen",
             "--config",
@@ -847,7 +847,7 @@ def test_main_usr_overlay_guard_rejects_workspace_root_mismatch(tmp_path: Path, 
 
     exit_code = main(
         [
-            "usr-overlay-guard",
+            "seqledger-overlay-guard",
             "--tool",
             "densegen",
             "--config",
@@ -878,7 +878,7 @@ def test_main_usr_overlay_guard_rejects_unsupported_tool(tmp_path: Path, capsys)
 
     exit_code = main(
         [
-            "usr-overlay-guard",
+            "seqledger-overlay-guard",
             "--tool",
             "unknown_tool",
             "--config",
@@ -898,7 +898,7 @@ def test_main_usr_overlay_guard_rejects_unsupported_tool(tmp_path: Path, capsys)
     captured = capsys.readouterr()
 
     assert exit_code == 2
-    assert "unsupported usr-overlay-guard tool" in captured.err
+    assert "unsupported seqledger-overlay-guard tool" in captured.err
 
 
 def test_main_usr_overlay_guard_infer_tool_is_explicitly_skipped(tmp_path: Path, capsys) -> None:
@@ -914,7 +914,7 @@ def test_main_usr_overlay_guard_infer_tool_is_explicitly_skipped(tmp_path: Path,
 
     exit_code = main(
         [
-            "usr-overlay-guard",
+            "seqledger-overlay-guard",
             "--tool",
             "infer",
             "--config",
@@ -989,7 +989,7 @@ def test_main_usr_overlay_guard_infer_tool_rejects_ambiguous_multi_job_configs(t
 
     exit_code = main(
         [
-            "usr-overlay-guard",
+            "seqledger-overlay-guard",
             "--tool",
             "infer",
             "--config",
@@ -1010,7 +1010,7 @@ def test_main_usr_overlay_guard_infer_tool_rejects_ambiguous_multi_job_configs(t
 
     assert exit_code == 2
     assert captured.out == ""
-    assert "multiple USR destinations" in captured.err
+    assert "multiple SeqLedger destinations" in captured.err
 
 
 def test_main_usr_records_part_guard_infer_tool_is_explicitly_skipped(tmp_path: Path, capsys) -> None:
@@ -1021,7 +1021,7 @@ def test_main_usr_records_part_guard_infer_tool_is_explicitly_skipped(tmp_path: 
 
     exit_code = main(
         [
-            "usr-records-part-guard",
+            "seqledger-records-part-guard",
             "--tool",
             "infer",
             "--config",
@@ -1066,7 +1066,7 @@ def test_main_usr_records_part_guard_blocks_when_projected_records_parts_exceed_
 
     exit_code = main(
         [
-            "usr-records-part-guard",
+            "seqledger-records-part-guard",
             "--config",
             str(config_path),
             "--workspace-root",
@@ -1114,7 +1114,7 @@ def test_main_usr_records_part_guard_auto_compacts_when_existing_parts_are_stale
 
     exit_code = main(
         [
-            "usr-records-part-guard",
+            "seqledger-records-part-guard",
             "--config",
             str(config_path),
             "--workspace-root",
@@ -1171,7 +1171,7 @@ def test_main_usr_records_part_guard_blocks_when_existing_parts_are_stale_withou
 
     exit_code = main(
         [
-            "usr-records-part-guard",
+            "seqledger-records-part-guard",
             "--config",
             str(config_path),
             "--workspace-root",
@@ -1210,7 +1210,7 @@ def test_main_usr_archived_overlay_guard_blocks_when_archived_entries_exceed_thr
 
     exit_code = main(
         [
-            "usr-archived-overlay-guard",
+            "seqledger-archived-overlay-guard",
             "--tool",
             "densegen",
             "--config",
@@ -1245,7 +1245,7 @@ def test_main_usr_archived_overlay_guard_blocks_when_archived_bytes_exceed_thres
 
     exit_code = main(
         [
-            "usr-archived-overlay-guard",
+            "seqledger-archived-overlay-guard",
             "--tool",
             "densegen",
             "--config",

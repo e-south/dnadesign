@@ -4,9 +4,9 @@
 - The workspace path printed by `construct workspace init` (default: `<cwd>/<your-workspace-id>/`).
 
 **Purpose**
-- Seed curated anchor-part and template datasets into the workspace-local USR root at `outputs/usr_datasets/`.
+- Seed curated anchor-part and template datasets into the workspace-local SeqLedger root at `outputs/usr_datasets/`.
 - Replace one explicit `anchor_part_short_ref` interval inside the circular `template_backbone_dual_slot` template record.
-- Emit either a 1 kb centered window or a full realized template context into separate USR datasets.
+- Emit either a 1 kb centered window or a full realized template context into separate SeqLedger datasets.
 
 **Registry first**
 - Inspect the project inventory before running anything:
@@ -60,19 +60,19 @@ uv run construct seed anchor-template-demo \
 uv run construct workspace show --workspace . # Print workspace registry entries and resolved paths.
 uv run construct workspace doctor --workspace . # Check workspace registry/config consistency.
 # Inspect seeded anchor-part records and label fields.
-uv run usr --root "$PWD/outputs/usr_datasets" head anchor_parts_demo -n 10 \
+uv run seqledger --root "$PWD/outputs/usr_datasets" head anchor_parts_demo -n 10 \
   --columns id,usr_label__primary,usr_label__aliases,sequence # Show seeded anchor-part labels and aliases.
 # Inspect seeded template records and label fields.
-uv run usr --root "$PWD/outputs/usr_datasets" head template_parts_demo -n 10 \
+uv run seqledger --root "$PWD/outputs/usr_datasets" head template_parts_demo -n 10 \
   --columns id,usr_label__primary,usr_label__aliases,sequence # Show seeded template labels and aliases.
 
 # Validate and dry-run a 1 kb context realization around the slot_a incumbent.
 uv run construct validate config --config "$PWD/config.slot_a.window.yaml" --runtime # Validate slot_a window config with runtime paths.
-uv run construct run --config "$PWD/config.slot_a.window.yaml" --dry-run # Preview slot_a window outputs without mutating USR state.
+uv run construct run --config "$PWD/config.slot_a.window.yaml" --dry-run # Preview slot_a window outputs without mutating SeqLedger state.
 
-# Materialize the slot_a 1 kb outputs into workspace-local USR.
+# Materialize the slot_a 1 kb outputs into workspace-local SeqLedger.
 uv run construct run --config "$PWD/config.slot_a.window.yaml" # Materialize slot_a window outputs.
-uv run usr --root "$PWD/outputs/usr_datasets" validate anchor_template_slot_a_window_1kb_demo --strict # Confirm the written output dataset satisfies the active USR registry.
+uv run seqledger --root "$PWD/outputs/usr_datasets" validate anchor_template_slot_a_window_1kb_demo --strict # Confirm the written output dataset satisfies the active SeqLedger registry.
 
 # Validate and dry-run the full-template realization for the same slot.
 uv run construct validate config --config "$PWD/config.slot_a.full.yaml" --runtime # Validate slot_a full-template config with runtime paths.
@@ -83,7 +83,7 @@ uv run construct run --config "$PWD/config.slot_a.full.yaml" --dry-run # Preview
 
 - Target the second incumbent location:
   - swap `slot_a` for `slot_b`
-- Write to a shared USR root instead of the workspace-local one:
+- Write to a shared SeqLedger root instead of the workspace-local one:
   - edit the config `input.source.root`, `template.source.root`, and `output.target.root` fields intentionally
   - re-run `uv run construct workspace show --workspace .`
   - re-run `validate --runtime` before `run`
@@ -94,8 +94,8 @@ uv run construct run --config "$PWD/config.slot_a.full.yaml" --dry-run # Preview
 
 ### SCC and remote sync
 
-Construct does not define its own remote-sync contract. For BU SCC and other remote USR workflows, use the USR operations docs:
+Construct does not define its own remote-sync contract. For BU SCC and other remote SeqLedger workflows, use the SeqLedger operations docs:
 
-- [USR workflow map](../../../usr/docs/operations/routes/workflow-map.md)
-- [USR HPC sync flow](../../../usr/docs/operations/sync/hpc-agent-flow.md)
-- [USR sync command contract](../../../usr/docs/operations/sync/README.md)
+- [SeqLedger workflow map](../../../seqledger/docs/operations/routes/workflow-map.md)
+- [SeqLedger HPC sync flow](../../../seqledger/docs/operations/sync/hpc-agent-flow.md)
+- [SeqLedger sync command contract](../../../seqledger/docs/operations/sync/README.md)

@@ -99,7 +99,7 @@ printf 'notify_job_id=%s\ndensegen_job_id=%s\n' "$NOTIFY_JOB_ID" "$DENSEGEN_JOB_
 
 Notes:
 - `notify-watch.qsub` uses `--wait-for-events`, so watcher-first submit is valid.
-- Notify watches USR `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
+- Notify watches SeqLedger `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
 
 ### OnDemand session handoff in dnadesign context
 

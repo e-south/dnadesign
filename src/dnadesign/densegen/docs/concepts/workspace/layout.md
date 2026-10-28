@@ -1,7 +1,7 @@
 ## Workspace model
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-10-28
 This concept page explains the expected DenseGen workspace layout and why DenseGen commands are designed around that layout. Read it when you need predictable path resolution, safe reset behavior, and clear artifact boundaries.
 
 ### Expected layout
@@ -45,7 +45,7 @@ uv run dense workspace where --format json
 
 - `dense run` resumes by default when prior run state is present.
 - `dense run --fresh` clears run artifacts under `outputs/` before running while preserving `outputs/notify` and `outputs/logs` scaffolding.
-- `dense campaign-reset` applies the same reset contract and preserves `config.yaml` and `inputs/`; it preserves USR registry by default.
+- `dense campaign-reset` applies the same reset contract and preserves `config.yaml` and `inputs/`; it preserves SeqLedger registry by default.
 
 ### Related documents
 

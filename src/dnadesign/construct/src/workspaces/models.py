@@ -24,7 +24,7 @@ class _StrictWorkspaceModel(BaseModel):
 
 
 class WorkspaceRootsConfig(_StrictWorkspaceModel):
-    shared_usr_root: str = "src/dnadesign/usr/datasets"
+    shared_usr_root: str = "src/dnadesign/seqledger/datasets"
     workspace_usr_root: str = "outputs/usr_datasets"
 
     @field_validator("shared_usr_root", "workspace_usr_root")

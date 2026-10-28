@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/tests/package/test_prune_module_layout.py
 
-Layout contract tests for infer prune delegation into USR overlay maintenance.
+Layout contract tests for infer prune delegation into SeqLedger overlay maintenance.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -21,7 +21,7 @@ def test_prune_usr_overlay_delegates_to_usr_overlay_maintenance() -> None:
     source = inspect.getsource(prune_usr_overlay)
     assert "Dataset(" in source
     assert ".remove_overlay(" in source
-    assert "dnadesign.usr.src." not in source
+    assert "dnadesign.seqledger.src." not in source
 
 
 def test_prune_usr_overlay_normalizes_usr_package_root(tmp_path: Path, monkeypatch) -> None:

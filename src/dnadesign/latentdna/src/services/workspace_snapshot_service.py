@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from dnadesign.usr import SequencesError
+from dnadesign.seqledger import SequencesError
 
 from ..contracts.deliverable import DeliverableEntryStatus
 from ..contracts.errors import SourceResolutionError

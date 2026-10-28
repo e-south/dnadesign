@@ -1,7 +1,7 @@
 ## Evo2 Provider Reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-28
+**Last verified:** 2026-10-28
 
 Use this page for the repo-aligned Evo2 sequence-feature contract inside `infer`.
 
@@ -70,13 +70,13 @@ Rules:
   emitted orientation; pooling a span does not make earlier token states aware
   of downstream bases
 
-When writing to USR, the persisted outputs for `output_layer_mean` and
+When writing to SeqLedger, the persisted outputs for `output_layer_mean` and
 `intermediate_embedding` are the pooled summaries. The pooling mode is part of
 the stored semantic id, for example `seq_mean` or `anchor_mean`.
 For explicit 60 bp sequence views, `core60_mean` is semantically distinct from
 `seq_mean` and receives a distinct feature-vector key. Exact repeated input
 sequences can still share one Evo2 forward pass through the `forward_pass_key`.
-A natively 60 bp `construct_insert` should stay an anchor insert in USR, while a
+A natively 60 bp `construct_insert` should stay an anchor insert in SeqLedger, while a
 true `analysis_window` row means Construct derived a 60 bp analysis-only view.
 
 ### Context ownership
@@ -94,7 +94,7 @@ Templated context bundles require these construct columns alongside the resolved
 
 ### Stored outputs
 
-The generic USR persistence contract remains:
+The generic SeqLedger persistence contract remains:
 
 - `infer__<model_id>__<job_id>__<out_id>`
 

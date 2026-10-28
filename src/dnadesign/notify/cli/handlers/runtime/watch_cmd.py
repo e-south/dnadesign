@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/notify/cli/handlers/runtime/watch_cmd.py
 
-Execution logic for notify usr-events watch runtime command.
+Execution logic for notify seqledger-events watch runtime command.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

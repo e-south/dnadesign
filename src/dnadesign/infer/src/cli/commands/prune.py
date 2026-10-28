@@ -20,10 +20,10 @@ from ..common import raise_cli_error
 
 
 def register(app: typer.Typer) -> None:
-    @app.command("prune", help="Prune infer write-back overlays from a USR dataset.")
+    @app.command("prune", help="Prune infer write-back overlays from a SeqLedger dataset.")
     def prune(
-        dataset: str = typer.Option(..., "--usr", help="USR dataset identifier."),
-        usr_root: Path = typer.Option(..., "--usr-root", help="USR datasets root path."),
+        dataset: str = typer.Option(..., "--seqledger", help="SeqLedger dataset identifier."),
+        usr_root: Path = typer.Option(..., "--seqledger-root", help="SeqLedger datasets root path."),
         mode: str = typer.Option("archive", "--mode", help="Prune mode: archive | delete."),
     ) -> None:
         try:

@@ -68,7 +68,7 @@ def test_resolve_profile_path_for_setup_namespaces_infer_lane_configs(tmp_path: 
                 "    ingest:",
                 "      source: usr",
                 "      dataset: promoter/demo_anchor_set",
-                "      root: ../../../usr/datasets",
+                "      root: ../../../seqledger/datasets",
                 "      field: sequence",
                 "    io:",
                 "      write_back: true",

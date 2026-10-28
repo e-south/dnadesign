@@ -1,7 +1,7 @@
 ## Runbook Catalog
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-22
+**Last verified:** 2026-10-28
 
 For command-first routing, start with `uv run ops catalog list --simple`, then
 open the linked runbook or tool doc once you know the route.
@@ -27,10 +27,10 @@ Use the command table first. The generated tables later on are reference.
 ### Common examples
 
 - `uv run ops catalog list --simple`: shorter inventory when you are new to the registry and do not need the taxonomy first.
-- `uv run ops catalog show usr.data-plane.promoter-feature-matrix`: one procedure with its owner docs, related tool docs, linked deeper docs, required status inputs, and next commands.
-- `uv run ops progress explain usr.data-plane.promoter-feature-matrix`: required flags, direct `progress show` command, and notes before you read that status view.
+- `uv run ops catalog show seqledger.data-plane.promoter-feature-matrix`: one procedure with its owner docs, related tool docs, linked deeper docs, required status inputs, and next commands.
+- `uv run ops progress explain seqledger.data-plane.promoter-feature-matrix`: required flags, direct `progress show` command, and notes before you read that status view.
 - `uv run ops runbook fill-infer --study-dir /path/to/study`: study-level Infer completion plan for all runbooks declared by that explicit workspace; add `--submit` only from the target HPC batch environment after Notify is configured.
-- `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix`: expand one registered procedure into a starting manifest with the named procedure first and its related procedures after it.
+- `uv run ops progress scaffold --related-to seqledger.data-plane.promoter-feature-matrix`: expand one registered procedure into a starting manifest with the named procedure first and its related procedures after it.
 - `uv run ops progress campaign --manifest <manifest.yaml>`: read-only summary for the steps listed in the manifest.
 - For study status, install the study package and use its concrete registered
   provider. See the [external study integration contract](../integrations/study-workspaces.md).
@@ -44,14 +44,14 @@ This table is generated from `*.registry.yaml` sidecars. Edit those files instea
 | Registry id | Procedure | Type | Plane | Execution kind | Status kind | Summary |
 | --- | --- | --- | --- | --- | --- | --- |
 | `ops.control-plane.orchestration` | [Orchestration runbooks](../operations/orchestration/runbooks.md) | `runbook` | `control-plane` | `executable` | `ops-audit-json` | Deterministic control-plane runbook contract for DenseGen or Infer batch submit flows with optional Notify chaining. |
-| `usr.data-plane.hpc-sync` | [USR HPC Sync Flow](../../src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.md) | `runbook` | `data-plane` | `iterative` | `usr-sync-audit` | Keep one USR dataset synchronized between HPC and local analysis with explicit diff, pull, and push verification. |
-| `usr.data-plane.chained-densegen-infer-sync` | [Chained DenseGen and Infer Sync Runbook](../../src/dnadesign/usr/docs/operations/sync/chained-densegen-infer-runbook.md) | `runbook` | `data-plane` | `iterative` | `usr-sync-audit` | Coordinate DenseGen-on-HPC and Infer-local writes against one USR dataset with explicit sync checkpoints. |
-| `usr.data-plane.multi-source-source-of-truth` | [Multi-Source Shared Dataset Assembly](../../src/dnadesign/usr/docs/operations/assembly/multi-source-shared-dataset.md) | `runbook` | `data-plane` | `staged` | `usr-dataset-state` | Merge multiple USR-backed sources, preserve explicit carry, and hand one construct-backed shared dataset to Infer and Notify. |
-| `usr.data-plane.construct-infer-source-of-truth` | [Construct -> USR -> Infer Shared Dataset Runbook](../../src/dnadesign/usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md) | `runbook` | `data-plane` | `staged` | `usr-dataset-state` | Realize construct outputs into one shared USR dataset and use that dataset as the durable Infer handoff. |
-| `usr.data-plane.permuter-construct-infer-handoff` | [Permuter -> Construct -> Infer Shared Dataset Runbook](../../src/dnadesign/usr/docs/operations/assembly/permuter-construct-infer-shared-dataset.md) | `runbook` | `data-plane` | `staged` | `usr-dataset-state` | Route Permuter-originated RT-lnRNA (rt_lnrna) variants through study-owned construct-subject promotion, Construct context realization, and Infer-owned sidecars without coupling tool internals. |
-| `usr.data-plane.promoter-feature-matrix` | [Promoter Characterization Feature Matrix](../../src/dnadesign/usr/docs/operations/promoter/characterization-feature-matrix.md) | `runbook` | `data-plane` | `staged` | `usr-dataset-state` | Build one infer-annotated feature matrix from mixed promoter sources before branching into Cluster or OPAL. |
+| `seqledger.data-plane.hpc-sync` | [SeqLedger HPC Sync Flow](../../src/dnadesign/seqledger/docs/operations/sync/hpc-agent-flow.md) | `runbook` | `data-plane` | `iterative` | `seqledger-sync-audit` | Keep one SeqLedger dataset synchronized between HPC and local analysis with explicit diff, pull, and push verification. |
+| `seqledger.data-plane.chained-densegen-infer-sync` | [Chained DenseGen and Infer Sync Runbook](../../src/dnadesign/seqledger/docs/operations/sync/chained-densegen-infer-runbook.md) | `runbook` | `data-plane` | `iterative` | `seqledger-sync-audit` | Coordinate DenseGen-on-HPC and Infer-local writes against one SeqLedger dataset with explicit sync checkpoints. |
+| `seqledger.data-plane.multi-source-source-of-truth` | [Multi-Source Shared Dataset Assembly](../../src/dnadesign/seqledger/docs/operations/assembly/multi-source-shared-dataset.md) | `runbook` | `data-plane` | `staged` | `seqledger-dataset-state` | Merge multiple SeqLedger-backed sources, preserve explicit carry, and hand one construct-backed shared dataset to Infer and Notify. |
+| `seqledger.data-plane.construct-infer-source-of-truth` | [Construct -> SeqLedger -> Infer Shared Dataset Runbook](../../src/dnadesign/seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md) | `runbook` | `data-plane` | `staged` | `seqledger-dataset-state` | Realize construct outputs into one shared SeqLedger dataset and use that dataset as the durable Infer handoff. |
+| `seqledger.data-plane.permuter-construct-infer-handoff` | [Permuter -> Construct -> Infer Shared Dataset Runbook](../../src/dnadesign/seqledger/docs/operations/assembly/permuter-construct-infer-shared-dataset.md) | `runbook` | `data-plane` | `staged` | `seqledger-dataset-state` | Route Permuter-originated RT-lnRNA (rt_lnrna) variants through study-owned construct-subject promotion, Construct context realization, and Infer-owned sidecars without coupling tool internals. |
+| `seqledger.data-plane.promoter-feature-matrix` | [Promoter Characterization Feature Matrix](../../src/dnadesign/seqledger/docs/operations/promoter/characterization-feature-matrix.md) | `runbook` | `data-plane` | `staged` | `seqledger-dataset-state` | Build one infer-annotated feature matrix from mixed promoter sources before branching into Cluster or OPAL. |
 | `cluster.downstream.exploratory-clustering` | [Exploratory clustering workflow](../../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) | `workflow` | `downstream-tool` | `exploratory` | `cluster-run-index` | Explore one chosen feature column or exported matrix through clustering, UMAP, and downstream summaries. |
-| `opal.downstream.usr-infer-x-active-learning` | [USR Dataset With Infer-Derived X -> OPAL Active Learning](../../src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md) | `workflow` | `downstream-tool` | `round-loop` | `opal-campaign-state` | Start the label, train, and select loop once one OPAL-ready candidate table with an explicit infer-derived X column exists. |
+| `opal.downstream.seqledger-infer-x-active-learning` | [SeqLedger Dataset With Infer-Derived X -> OPAL Active Learning](../../src/dnadesign/opal/docs/workflows/seqledger-infer-x-active-learning.md) | `workflow` | `downstream-tool` | `round-loop` | `opal-campaign-state` | Start the label, train, and select loop once one OPAL-ready candidate table with an explicit infer-derived X column exists. |
 
 ### Tool docs
 
@@ -61,7 +61,7 @@ This table is generated from `*.tool-source.yaml` sidecars. Edit those files ins
 | --- | --- | --- |
 | `densegen` | [DenseGen documentation](../../src/dnadesign/densegen/docs/README.md) | Tool-owned tutorials, HPC runbooks, and event-producing demo flows. |
 | `construct` | [Construct documentation](../../src/dnadesign/construct/docs/README.md) | Tool-owned workspace demos, sequence realization docs, and named-part placement contracts. |
-| `usr` | [USR docs](../../src/dnadesign/usr/docs/README.md) | Tool-owned dataset lifecycle docs, dataset handoffs, sync routes, and promoter feature assembly. |
+| `seqledger` | [SeqLedger docs](../../src/dnadesign/seqledger/docs/README.md) | Tool-owned dataset lifecycle docs, dataset handoffs, sync routes, and promoter feature assembly. |
 | `infer` | [infer docs](../../src/dnadesign/infer/docs/README.md) | Tool-owned feature extraction runbooks, Evo2 docs, feature-schema contracts, and pressure-test flows. |
 | `cluster` | [Cluster docs](../../src/dnadesign/cluster/docs/README.md) | Tool-owned exploratory analysis workflow plus CLI, results, and artifact contracts. |
 | `opal` | [OPAL documentation](../../src/dnadesign/opal/docs/index.md) | Tool-owned active-learning workflows, campaign configuration references, and downstream infer-to-OPAL routes. |
@@ -71,7 +71,7 @@ This table is generated from `*.tool-source.yaml` sidecars. Edit those files ins
 | `ops` | [Ops docs](../../src/dnadesign/ops/docs/README.md) | Ops commands, packaged presets, and runbook lifecycle docs. |
 | `baserender` | [BaseRender documentation](../../src/dnadesign/baserender/docs/README.md) | Contract renderer for producer-emitted visual jobs, plus optional demo/ad hoc workspaces. |
 | `folding` | [Folding Docs](../../src/dnadesign/folding/docs/README.md) | Stateless secondary-structure preflight, ViennaRNA execution, and native structure plot publication for producer-owned artifacts. |
-| `permuter` | [Permuter Docs](../../src/dnadesign/permuter/docs/README.md) | Tool-owned variant generation, workspace execution, plotting, and handoff contracts for USR, Construct, Infer, and study-owned promotion. |
+| `permuter` | [Permuter Docs](../../src/dnadesign/permuter/docs/README.md) | Tool-owned variant generation, workspace execution, plotting, and handoff contracts for SeqLedger, Construct, Infer, and study-owned promotion. |
 | `junction` | [Documentation index](../../src/dnadesign/junction/docs/README.md) | Turns DNA sequences from text, FASTA, or a request into checked oligo plans for three-way-junction assembly. |
 
 ### Status views
@@ -83,8 +83,8 @@ You only need this section after `uv run ops progress explain <registry-id>` or 
 | Status kind | Meaning | Check next |
 | --- | --- | --- |
 | `ops-audit-json` | Workspace-scoped control-plane audit payload emitted by `ops runbook execute`. | Inspect `<workspace-root>/outputs/logs/ops/audit/*.json` plus the orchestration audit contract in [orchestration runbooks](../operations/orchestration/runbooks.md). |
-| `usr-sync-audit` | USR sync parity and drift review for iterative cross-host updates. | Inspect the linked USR sync runbook and the [USR sync audit loop](../../src/dnadesign/usr/docs/operations/sync/audit-loop.md). |
-| `usr-dataset-state` | Current USR dataset shape, overlays, and validation state after staged data-plane work. | Inspect the linked USR runbook plus `usr validate`, `usr head`, and related dataset-state checks named there. |
+| `seqledger-sync-audit` | SeqLedger sync parity and drift review for iterative cross-host updates. | Inspect the linked SeqLedger sync runbook and the [SeqLedger sync audit loop](../../src/dnadesign/seqledger/docs/operations/sync/audit-loop.md). |
+| `seqledger-dataset-state` | Current SeqLedger dataset shape, overlays, and validation state after staged data-plane work. | Inspect the linked SeqLedger runbook plus `seqledger validate`, `seqledger head`, and related dataset-state checks named there. |
 | `latentdna-workspace-snapshot` | LatentDNA workspace snapshot with representation inventories, deliverable ids, and artifact roots. | Inspect the linked LatentDNA docs and the workspace snapshot output for the selected workspace. |
 | `cluster-run-index` | Cluster workspace run records, embeddings, plots, and analysis outputs. | Inspect the linked cluster workflow and the cluster results root for the chosen workspace or direct run. |
 | `opal-campaign-state` | OPAL round state, run ledgers, and latest selection outputs. | Inspect the linked OPAL workflow and its `opal status`, `opal runs list`, and `opal ctx audit` commands. |
@@ -103,18 +103,18 @@ steps:
     inputs:
       audit_json: repo:<workspace-root>/outputs/logs/ops/audit/latest.json
   - label: feature-matrix
-    registry_id: usr.data-plane.promoter-feature-matrix
+    registry_id: seqledger.data-plane.promoter-feature-matrix
     inputs:
-      usr_root: repo:<usr-root>
+      usr_root: repo:<seqledger-root>
       dataset: <dataset>
   - label: active-learning
-    registry_id: opal.downstream.usr-infer-x-active-learning
+    registry_id: opal.downstream.seqledger-infer-x-active-learning
     inputs:
       opal_config: manifest:./opal/configs/campaign.yaml
 ```
 
-- Generate the same skeleton from registry ids with `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix opal.downstream.usr-infer-x-active-learning`.
-- Expand one registered procedure into a relation-based starting point with `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix`.
+- Generate the same skeleton from registry ids with `uv run ops progress scaffold ops.control-plane.orchestration seqledger.data-plane.promoter-feature-matrix opal.downstream.seqledger-infer-x-active-learning`.
+- Expand one registered procedure into a relation-based starting point with `uv run ops progress scaffold --related-to seqledger.data-plane.promoter-feature-matrix`.
 - For a live study, store the manifest in its external workspace and keep the
   paired dataset registry and status record there. See the
   [external study integration contract](../integrations/study-workspaces.md).

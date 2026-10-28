@@ -27,7 +27,7 @@ identity from a directory name.
 - `dnadesign.ops.study` loads and evaluates an explicit `operations/ops.study.yaml`
   contract.
 - `dnadesign.ops.contracts.resolve_usr_destination()` resolves a producer's
-  configured USR root and dataset for artifact lookup. Use
+  configured SeqLedger root and dataset for artifact lookup. Use
   `resolve_usr_producer_contract()` when planning also needs its chunking,
   scheduling and quota rules. Both delegate configuration validation to the
   producer; destination lookup does not require generation settings.

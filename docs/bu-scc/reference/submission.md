@@ -19,9 +19,9 @@ Use this with:
 - Evo2 `evo2_7b` runs require GPU resources (`-l gpus=1 -l gpu_c=8.9`).
 - Evo2 `evo2_20b` runs require Hopper-class-or-newer GPU resources
   (`-l gpus=1 -l gpu_c=9.0`) plus enough VRAM for the run config.
-- Notify watches USR `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
+- Notify watches SeqLedger `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
 - Prefer `WEBHOOK_FILE` for watcher submits so webhook values are not exposed in `qstat -j` env metadata.
-- Notify/USR contract requires structured events with `event_version`; legacy logs are rejected.
+- Notify/SeqLedger contract requires structured events with `event_version`; legacy logs are rejected.
 - Use transfer-node queue (`-l download`) for large model/data transfers.
 - OnDemand policy: sessions requesting >12h and/or extra resources count toward the 5 active-session limit.
 
@@ -97,7 +97,7 @@ uv run notify setup webhook \
   --secret-source file \
   --secret-ref "file://$WEBHOOK_FILE"
 
-# Preflight resolver: fails fast if config is not wired for USR .events.log output.
+# Preflight resolver: fails fast if config is not wired for SeqLedger .events.log output.
 uv run notify setup resolve-events --tool densegen --config "$CONFIG"
 
 uv run notify setup slack \

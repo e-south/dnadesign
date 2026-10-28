@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-from dnadesign.usr import normalize_usr_root, resolve_usr_root_from_env
+from dnadesign.seqledger import normalize_seqledger_root, resolve_seqledger_root_from_env
 
 from .._logging import get_logger
 from ..errors import ValidationError
@@ -73,10 +73,10 @@ def load_pt_file_input(path: str, field: str) -> Tuple[List[str], List[Dict]]:
 
 
 def _default_usr_root() -> Path:
-    """Return the configured USR root from DNADESIGN_USR_ROOT."""
-    resolved = resolve_usr_root_from_env()
+    """Return the configured SeqLedger root from DNADESIGN_SEQLEDGER_ROOT."""
+    resolved = resolve_seqledger_root_from_env()
     if resolved is None:
-        raise ValidationError("USR ingest requires ingest.root or DNADESIGN_USR_ROOT.")
+        raise ValidationError("SeqLedger ingest requires ingest.root or DNADESIGN_SEQLEDGER_ROOT.")
     return resolved
 
 
@@ -88,16 +88,16 @@ def load_usr_input(
     ids: List[str] | None = None,
 ):
     try:
-        from dnadesign.usr import Dataset  # local package, same repo
+        from dnadesign.seqledger import Dataset  # local package, same repo
     except Exception as e:
-        raise ValidationError("dnadesign.usr is not importable. Is dnadesign installed in editable mode?") from e
+        raise ValidationError("dnadesign.seqledger is not importable. Is dnadesign installed in editable mode?") from e
 
-    ds_root = normalize_usr_root(root) if root else _default_usr_root()
+    ds_root = normalize_seqledger_root(root) if root else _default_usr_root()
     ds = Dataset(ds_root, dataset_name)
 
     rec_path = ds.records_path
     if not rec_path.exists():
-        raise ValidationError(f"USR dataset not initialized or missing: {rec_path}")
+        raise ValidationError(f"SeqLedger dataset not initialized or missing: {rec_path}")
 
     import pyarrow.parquet as pq
 
@@ -125,10 +125,10 @@ def load_usr_input(
         ids, seqs = all_ids, all_seqs
 
     if not seqs:
-        raise ValidationError("No sequences found for the requested USR dataset/ids.")
+        raise ValidationError("No sequences found for the requested SeqLedger dataset/ids.")
     bad = [i for i, s in enumerate(seqs) if not isinstance(s, str) or not s]
     if bad:
-        raise ValidationError(f"{len(bad)} empty/invalid sequences found in USR ingest.")
+        raise ValidationError(f"{len(bad)} empty/invalid sequences found in SeqLedger ingest.")
     return seqs, ids, ds
 
 
@@ -138,26 +138,26 @@ def preflight_usr_input(
     field: str = "sequence",
     root: str | Path | None = None,
 ) -> None:
-    """Validate that a USR dataset exists and exposes the required columns."""
+    """Validate that a SeqLedger dataset exists and exposes the required columns."""
     try:
-        from dnadesign.usr import Dataset  # local package, same repo
+        from dnadesign.seqledger import Dataset  # local package, same repo
     except Exception as e:
-        raise ValidationError("dnadesign.usr is not importable. Is dnadesign installed in editable mode?") from e
+        raise ValidationError("dnadesign.seqledger is not importable. Is dnadesign installed in editable mode?") from e
 
-    ds_root = normalize_usr_root(root) if root else _default_usr_root()
+    ds_root = normalize_seqledger_root(root) if root else _default_usr_root()
     ds = Dataset(ds_root, dataset_name)
     rec_path = ds.records_path
     if not rec_path.exists():
-        raise ValidationError(f"USR dataset not initialized or missing: {rec_path}")
+        raise ValidationError(f"SeqLedger dataset not initialized or missing: {rec_path}")
 
     import pyarrow.parquet as pq
 
     try:
         schema_names = set(pq.read_schema(rec_path).names)
     except Exception as error:
-        raise ValidationError(f"Unable to read USR dataset schema: {rec_path}") from error
+        raise ValidationError(f"Unable to read SeqLedger dataset schema: {rec_path}") from error
 
     missing = [name for name in ("id", field) if name not in schema_names]
     if missing:
         rendered = ", ".join(missing)
-        raise ValidationError(f"USR dataset missing required column(s): {rendered}")
+        raise ValidationError(f"SeqLedger dataset missing required column(s): {rendered}")

@@ -84,7 +84,9 @@ def test_empty_pr_scope_cannot_select_documentation_preparation() -> None:
         )
 
 
-@pytest.mark.parametrize(("provider", "consumer"), [("usr", "opal"), ("infer", "permuter"), ("baserender", "cruncher")])
+@pytest.mark.parametrize(
+    ("provider", "consumer"), [("seqledger", "opal"), ("infer", "permuter"), ("baserender", "cruncher")]
+)
 def test_public_provider_changes_select_consumer_suites(provider: str, consumer: str) -> None:
     scope = determine_scope(
         event_name="pull_request",
@@ -100,11 +102,11 @@ def test_public_provider_changes_select_consumer_suites(provider: str, consumer:
 def test_consumer_scope_follows_transitive_edges_and_terminates_on_cycles() -> None:
     scope = determine_scope(
         event_name="pull_request",
-        changed_files=["src/dnadesign/usr/__init__.py"],
-        tool_names={"usr", "ops", "opal", "junction"},
+        changed_files=["src/dnadesign/seqledger/__init__.py"],
+        tool_names={"seqledger", "ops", "opal", "junction"},
         external_integration_tool_names=set(),
     )
-    assert scope.affected_tools == ["opal", "ops", "usr"]
+    assert scope.affected_tools == ["opal", "ops", "seqledger"]
 
 
 def test_non_pr_documentation_changes_still_run_full_validation() -> None:
@@ -118,8 +120,8 @@ def test_non_pr_documentation_changes_still_run_full_validation() -> None:
 def test_executable_documentation_keeps_its_runtime_contract() -> None:
     scope = determine_scope(
         event_name="pull_request",
-        changed_files=["src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md"],
-        tool_names={"opal", "usr"},
+        changed_files=["src/dnadesign/opal/docs/workflows/seqledger-infer-x-active-learning.md"],
+        tool_names={"opal", "seqledger"},
         external_integration_tool_names=set(),
     )
     assert scope.affected_tools == ["opal"]
@@ -130,27 +132,27 @@ def test_determine_scope_non_pr_runs_full_core_and_external_integration() -> Non
     result = determine_scope(
         event_name="push",
         changed_files=[],
-        tool_names={"densegen", "usr"},
+        tool_names={"densegen", "seqledger"},
         external_integration_tool_names={"densegen"},
     )
 
     assert result.run_full_core is True
     assert result.run_external_integration is True
-    assert result.affected_tools == ["densegen", "usr"]
+    assert result.affected_tools == ["densegen", "seqledger"]
     assert result.external_integration_tools == ["densegen"]
 
 
 def test_determine_scope_pr_selects_provider_and_declared_consumer() -> None:
     result = determine_scope(
         event_name="pull_request",
-        changed_files=["src/dnadesign/usr/src/cli.py"],
-        tool_names={"densegen", "usr"},
+        changed_files=["src/dnadesign/seqledger/src/cli.py"],
+        tool_names={"densegen", "seqledger"},
         external_integration_tool_names={"densegen"},
     )
 
     assert result.run_full_core is False
     assert result.run_external_integration is True
-    assert result.affected_tools == ["densegen", "usr"]
+    assert result.affected_tools == ["densegen", "seqledger"]
     assert result.external_integration_tools == ["densegen"]
 
 
@@ -158,7 +160,7 @@ def test_determine_scope_pr_densegen_change_triggers_external_integration_lane()
     result = determine_scope(
         event_name="pull_request",
         changed_files=["src/dnadesign/densegen/src/cli/main.py"],
-        tool_names={"densegen", "usr"},
+        tool_names={"densegen", "seqledger"},
         external_integration_tool_names={"densegen"},
     )
 
@@ -173,13 +175,13 @@ def test_package_configuration_change_triggers_full_core_and_external_integratio
     result = determine_scope(
         event_name="pull_request",
         changed_files=[path],
-        tool_names={"densegen", "usr"},
+        tool_names={"densegen", "seqledger"},
         external_integration_tool_names={"densegen"},
     )
 
     assert result.run_full_core is True
     assert result.run_external_integration is True
-    assert result.affected_tools == ["densegen", "usr"]
+    assert result.affected_tools == ["densegen", "seqledger"]
     assert result.external_integration_tools == ["densegen"]
 
 
@@ -187,13 +189,13 @@ def test_determine_scope_pr_python_version_change_triggers_full_compatibility() 
     result = determine_scope(
         event_name="pull_request",
         changed_files=[".python-version"],
-        tool_names={"densegen", "usr"},
+        tool_names={"densegen", "seqledger"},
         external_integration_tool_names={"densegen"},
     )
 
     assert result.run_full_core is True
     assert result.run_external_integration is True
-    assert result.affected_tools == ["densegen", "usr"]
+    assert result.affected_tools == ["densegen", "seqledger"]
     assert result.external_integration_tools == ["densegen"]
 
 
@@ -201,7 +203,7 @@ def test_determine_scope_pr_docs_only_skips_tool_coverage_gate() -> None:
     result = determine_scope(
         event_name="pull_request",
         changed_files=["docs/README.md"],
-        tool_names={"densegen", "usr"},
+        tool_names={"densegen", "seqledger"},
         external_integration_tool_names={"densegen"},
     )
 
@@ -229,13 +231,13 @@ def test_determine_scope_pr_shared_code_change_triggers_full_core_and_external_i
     result = determine_scope(
         event_name="pull_request",
         changed_files=["src/dnadesign/devtools/quality/tool_coverage.py"],
-        tool_names={"densegen", "usr"},
+        tool_names={"densegen", "seqledger"},
         external_integration_tool_names={"densegen"},
     )
 
     assert result.run_full_core is True
     assert result.run_external_integration is True
-    assert result.affected_tools == ["densegen", "usr"]
+    assert result.affected_tools == ["densegen", "seqledger"]
     assert result.external_integration_tools == ["densegen"]
 
 
@@ -243,13 +245,13 @@ def test_determine_scope_pr_shared_package_root_change_triggers_full_core_and_ex
     result = determine_scope(
         event_name="pull_request",
         changed_files=["src/dnadesign/__init__.py"],
-        tool_names={"densegen", "usr"},
+        tool_names={"densegen", "seqledger"},
         external_integration_tool_names={"densegen"},
     )
 
     assert result.run_full_core is True
     assert result.run_external_integration is True
-    assert result.affected_tools == ["densegen", "usr"]
+    assert result.affected_tools == ["densegen", "seqledger"]
     assert result.external_integration_tools == ["densegen"]
 
 
@@ -257,13 +259,13 @@ def test_determine_scope_pr_shared_contract_package_change_triggers_full_core() 
     result = determine_scope(
         event_name="pull_request",
         changed_files=["src/dnadesign/contracts/artifacts.py"],
-        tool_names={"contracts", "densegen", "usr"},
+        tool_names={"contracts", "densegen", "seqledger"},
         external_integration_tool_names={"densegen"},
     )
 
     assert result.run_full_core is True
     assert result.run_external_integration is True
-    assert result.affected_tools == ["contracts", "densegen", "usr"]
+    assert result.affected_tools == ["contracts", "densegen", "seqledger"]
     assert result.external_integration_tools == ["densegen"]
 
 
@@ -271,13 +273,13 @@ def test_determine_scope_pr_external_integration_tool_is_not_densegen() -> None:
     result = determine_scope(
         event_name="pull_request",
         changed_files=["src/dnadesign/cruncher/src/cli.py"],
-        tool_names={"cruncher", "densegen", "usr"},
+        tool_names={"cruncher", "densegen", "seqledger"},
         external_integration_tool_names={"cruncher", "densegen"},
     )
 
     assert result.run_full_core is False
     assert result.run_external_integration is True
-    assert result.affected_tools == ["cruncher", "densegen", "usr"]
+    assert result.affected_tools == ["cruncher", "densegen", "seqledger"]
     assert result.external_integration_tools == ["cruncher", "densegen"]
 
 
@@ -285,13 +287,13 @@ def test_determine_scope_pr_baseline_file_triggers_full_core() -> None:
     result = determine_scope(
         event_name="pull_request",
         changed_files=[".github/tool-coverage-baseline.json"],
-        tool_names={"densegen", "usr"},
+        tool_names={"densegen", "seqledger"},
         external_integration_tool_names={"densegen"},
     )
 
     assert result.run_full_core is True
     assert result.run_external_integration is False
-    assert result.affected_tools == ["densegen", "usr"]
+    assert result.affected_tools == ["densegen", "seqledger"]
     assert result.external_integration_tools == ["densegen"]
 
 
@@ -299,13 +301,13 @@ def test_determine_scope_disables_heavy_when_no_external_integration_tools_exist
     result = determine_scope(
         event_name="push",
         changed_files=[],
-        tool_names={"usr"},
+        tool_names={"seqledger"},
         external_integration_tool_names=set(),
     )
 
     assert result.run_full_core is True
     assert result.run_external_integration is False
-    assert result.affected_tools == ["usr"]
+    assert result.affected_tools == ["seqledger"]
     assert result.external_integration_tools == []
 
 
@@ -344,7 +346,7 @@ def test_discover_external_integration_tools_detects_marked_conftest(tmp_path: P
 
 def test_discover_repo_tools_excludes_devtools_and_dunder_dirs(tmp_path: Path) -> None:
     src_root = tmp_path / "src" / "dnadesign"
-    (src_root / "usr").mkdir(parents=True, exist_ok=True)
+    (src_root / "seqledger").mkdir(parents=True, exist_ok=True)
     (src_root / "densegen").mkdir(parents=True, exist_ok=True)
     (src_root / "devtools").mkdir(parents=True, exist_ok=True)
     (src_root / "__pycache__").mkdir(parents=True, exist_ok=True)
@@ -352,19 +354,19 @@ def test_discover_repo_tools_excludes_devtools_and_dunder_dirs(tmp_path: Path) -
     (src_root / "prototypes").mkdir(parents=True, exist_ok=True)
 
     tool_names = discover_repo_tools(repo_root=tmp_path)
-    assert tool_names == {"densegen", "usr"}
+    assert tool_names == {"densegen", "seqledger"}
 
 
 def test_discover_repo_tools_excludes_legacy_data_directories(tmp_path: Path) -> None:
     src_root = tmp_path / "src" / "dnadesign"
-    (src_root / "usr").mkdir(parents=True, exist_ok=True)
+    (src_root / "seqledger").mkdir(parents=True, exist_ok=True)
     (src_root / "densegen").mkdir(parents=True, exist_ok=True)
     (src_root / "densehairpins").mkdir(parents=True, exist_ok=True)
     (src_root / "evoinference").mkdir(parents=True, exist_ok=True)
     (src_root / "sequences").mkdir(parents=True, exist_ok=True)
 
     tool_names = discover_repo_tools(repo_root=tmp_path)
-    assert tool_names == {"densegen", "usr"}
+    assert tool_names == {"densegen", "seqledger"}
 
 
 def test_discover_repo_tools_keeps_latentdna_and_ignores_cache_only_dirs(tmp_path: Path) -> None:
@@ -523,12 +525,12 @@ def test_discover_external_integration_tools_detects_param_level_markers(tmp_pat
 
 
 def test_main_fails_when_changed_files_input_is_missing(tmp_path: Path) -> None:
-    src_root = tmp_path / "src" / "dnadesign" / "usr" / "tests"
+    src_root = tmp_path / "src" / "dnadesign" / "seqledger" / "tests"
     src_root.mkdir(parents=True, exist_ok=True)
     (src_root / "test_a.py").write_text("def test_a():\n    assert True\n", encoding="utf-8")
 
     baseline_path = tmp_path / "tool-coverage-baseline.json"
-    baseline_path.write_text('{"usr": 0.0}', encoding="utf-8")
+    baseline_path.write_text('{"seqledger": 0.0}', encoding="utf-8")
 
     rc = main(
         [
@@ -547,12 +549,12 @@ def test_main_fails_when_changed_files_input_is_missing(tmp_path: Path) -> None:
 
 
 def test_main_fails_when_pr_changed_files_are_empty(tmp_path: Path) -> None:
-    usr_tests = tmp_path / "src" / "dnadesign" / "usr" / "tests"
+    usr_tests = tmp_path / "src" / "dnadesign" / "seqledger" / "tests"
     usr_tests.mkdir(parents=True, exist_ok=True)
     (usr_tests / "test_a.py").write_text("def test_a():\n    assert True\n", encoding="utf-8")
 
     baseline_path = tmp_path / "tool-coverage-baseline.json"
-    baseline_path.write_text('{"usr": 0.0}', encoding="utf-8")
+    baseline_path.write_text('{"seqledger": 0.0}', encoding="utf-8")
 
     changed_files = tmp_path / "changed.txt"
     changed_files.write_text("", encoding="utf-8")
@@ -574,7 +576,7 @@ def test_main_fails_when_pr_changed_files_are_empty(tmp_path: Path) -> None:
 
 
 def test_main_fails_when_baseline_is_missing_repo_tool(tmp_path: Path) -> None:
-    usr_tests = tmp_path / "src" / "dnadesign" / "usr" / "tests"
+    usr_tests = tmp_path / "src" / "dnadesign" / "seqledger" / "tests"
     infer_tests = tmp_path / "src" / "dnadesign" / "infer" / "tests"
     usr_tests.mkdir(parents=True, exist_ok=True)
     infer_tests.mkdir(parents=True, exist_ok=True)
@@ -582,7 +584,7 @@ def test_main_fails_when_baseline_is_missing_repo_tool(tmp_path: Path) -> None:
     (infer_tests / "test_b.py").write_text("def test_b():\n    assert True\n", encoding="utf-8")
 
     baseline_path = tmp_path / "tool-coverage-baseline.json"
-    baseline_path.write_text('{"usr": 0.0}', encoding="utf-8")
+    baseline_path.write_text('{"seqledger": 0.0}', encoding="utf-8")
 
     rc = main(
         [
@@ -599,12 +601,12 @@ def test_main_fails_when_baseline_is_missing_repo_tool(tmp_path: Path) -> None:
 
 
 def test_main_fails_when_baseline_has_unknown_tool(tmp_path: Path) -> None:
-    usr_tests = tmp_path / "src" / "dnadesign" / "usr" / "tests"
+    usr_tests = tmp_path / "src" / "dnadesign" / "seqledger" / "tests"
     usr_tests.mkdir(parents=True, exist_ok=True)
     (usr_tests / "test_a.py").write_text("def test_a():\n    assert True\n", encoding="utf-8")
 
     baseline_path = tmp_path / "tool-coverage-baseline.json"
-    baseline_path.write_text('{"usr": 0.0, "ghost": 0.0}', encoding="utf-8")
+    baseline_path.write_text('{"seqledger": 0.0, "ghost": 0.0}', encoding="utf-8")
 
     rc = main(
         [
@@ -621,12 +623,12 @@ def test_main_fails_when_baseline_has_unknown_tool(tmp_path: Path) -> None:
 
 
 def test_main_fails_when_baseline_payload_is_not_object(tmp_path: Path) -> None:
-    usr_tests = tmp_path / "src" / "dnadesign" / "usr" / "tests"
+    usr_tests = tmp_path / "src" / "dnadesign" / "seqledger" / "tests"
     usr_tests.mkdir(parents=True, exist_ok=True)
     (usr_tests / "test_a.py").write_text("def test_a():\n    assert True\n", encoding="utf-8")
 
     baseline_path = tmp_path / "tool-coverage-baseline.json"
-    baseline_path.write_text('["usr"]', encoding="utf-8")
+    baseline_path.write_text('["seqledger"]', encoding="utf-8")
 
     rc = main(
         [

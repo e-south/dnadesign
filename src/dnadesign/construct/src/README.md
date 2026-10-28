@@ -4,8 +4,8 @@
 - `interfaces/contracts.py`: public contract helpers exported by `dnadesign.construct`
 - `contracts/config.py`: canonical import surface for YAML config contracts
 - `contracts/base.py`: strict Pydantic model base shared by config contracts
-- `contracts/datasets.py`: USR dataset locators and input selection contracts
-- `contracts/templates.py`: literal, path, and USR-backed template source schemas
+- `contracts/datasets.py`: SeqLedger dataset locators and input selection contracts
+- `contracts/templates.py`: literal, path, and SeqLedger-backed template source schemas
 - `contracts/parts.py`: part sequence, placement locator, and placement guard schemas
 - `contracts/realization.py`: realized-window and focal-part schemas
 - `contracts/normalize_anchor.py`: normalize-anchor selector, retention, and policy schemas
@@ -31,8 +31,8 @@
 - `composition/svg_geometry.py`: SVG geometry, font-size, and style parsing helpers
 - `composition/visual.py`: component-span visualization primitives
 - `persistence/records.py`: output-record collision, duplicate-id, overlay, and conflict-policy contracts
-- `persistence/usr_registry.py`: USR output registry discovery and sequence-view index helpers
-- `persistence/write_session.py`: USR dataset write-session and sequence-view idempotence contracts
+- `persistence/usr_registry.py`: SeqLedger output registry discovery and sequence-view index helpers
+- `persistence/write_session.py`: SeqLedger dataset write-session and sequence-view idempotence contracts
 - `products/classic.py`: template-backed emitted-record, slot-lineage, and output-variant builders
 - `products/normalize_anchor.py`: normalize-anchor emitted-record and derived-overlay builders
 - `products/sequence_views.py`: sequence-view builders for realized contexts and analysis windows
@@ -47,9 +47,9 @@
 - `realization/sequences.py`: shared DNA text and alphabet normalization contracts
 - `realization/slots.py`: named-slot lineage and emitted-coordinate checks
 - `realization/windows.py`: focal-window geometry and boundary checks
-- `sources/input_rows.py`: USR input-row scanning, scan-field selection, label carry-through, and recursive output guards
-- `sources/paths.py`: filesystem and USR root resolution helpers
-- `sources/templates.py`: literal, path, and USR-backed template loading contracts
+- `sources/input_rows.py`: SeqLedger input-row scanning, scan-field selection, label carry-through, and recursive output guards
+- `sources/paths.py`: filesystem and SeqLedger root resolution helpers
+- `sources/templates.py`: literal, path, and SeqLedger-backed template loading contracts
 - `seeding/bootstrap.py`: demo and manifest-driven input dataset bootstrap helpers
 - `sequences/orientation.py`: sequence orientation and reverse-complement contracts
 - `workspaces/models.py`: typed workspace registry contracts

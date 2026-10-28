@@ -56,17 +56,17 @@ def test_equivalent_import_forms_reject_undeclared_dependency(tmp_path: Path, so
 @pytest.mark.parametrize(
     "source",
     [
-        "from dnadesign.usr import src as internal\n",
-        "from ..usr import src as internal\n",
-        "from importlib import import_module\ninternal = import_module('..usr.src', 'dnadesign.opal')\n",
+        "from dnadesign.seqledger import src as internal\n",
+        "from ..seqledger import src as internal\n",
+        "from importlib import import_module\ninternal = import_module('..seqledger.src', 'dnadesign.opal')\n",
     ],
 )
 def test_from_and_dynamic_imports_cannot_access_private_subpackage(tmp_path: Path, source: str) -> None:
     _write(tmp_path / "src/dnadesign/opal/api.py", source)
-    _write(tmp_path / "src/dnadesign/usr/src/__init__.py", "")
+    _write(tmp_path / "src/dnadesign/seqledger/src/__init__.py", "")
     violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
     assert len(violations) == 1
-    assert violations[0].import_target == "dnadesign.usr.src"
+    assert violations[0].import_target == "dnadesign.seqledger.src"
 
 
 @pytest.mark.parametrize(
@@ -80,33 +80,33 @@ def test_from_and_dynamic_imports_cannot_access_private_subpackage(tmp_path: Pat
     ],
 )
 def test_runtime_directories_and_shared_contracts_enforce_tool_boundaries(tmp_path: Path, relative: str) -> None:
-    _write(tmp_path / "src/dnadesign" / relative, "from dnadesign.usr.src import dataset\n")
-    _write(tmp_path / "src/dnadesign/usr/src/__init__.py", "")
+    _write(tmp_path / "src/dnadesign" / relative, "from dnadesign.seqledger.src import dataset\n")
+    _write(tmp_path / "src/dnadesign/seqledger/src/__init__.py", "")
     violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
     assert len(violations) == 1
-    assert violations[0].import_target == "dnadesign.usr.src"
+    assert violations[0].import_target == "dnadesign.seqledger.src"
 
 
 def test_shared_contracts_cannot_depend_on_a_public_tool_facade(tmp_path: Path) -> None:
-    _write(tmp_path / "src/dnadesign/contracts/sequence/probe.py", "from dnadesign.usr import Dataset\n")
-    _write(tmp_path / "src/dnadesign/usr/__init__.py", "")
+    _write(tmp_path / "src/dnadesign/contracts/sequence/probe.py", "from dnadesign.seqledger import Dataset\n")
+    _write(tmp_path / "src/dnadesign/seqledger/__init__.py", "")
     assert len(find_undeclared_cross_tool_imports(repo_root=tmp_path)) == 1
 
 
 def test_generated_workspace_and_test_files_are_outside_runtime_boundary_checks(tmp_path: Path) -> None:
     for relative in ("latentdna/workspaces/local/outputs/probe.py", "latentdna/tests/probe.py"):
-        _write(tmp_path / "src/dnadesign" / relative, "from dnadesign.usr.src import dataset\n")
-    _write(tmp_path / "src/dnadesign/usr/src/__init__.py", "")
+        _write(tmp_path / "src/dnadesign" / relative, "from dnadesign.seqledger.src import dataset\n")
+    _write(tmp_path / "src/dnadesign/seqledger/src/__init__.py", "")
     assert find_undeclared_cross_tool_imports(repo_root=tmp_path) == []
 
 
 def test_dynamic_public_facade_and_public_attribute_remain_allowed(tmp_path: Path) -> None:
     _write(
         tmp_path / "src/dnadesign/opal/api.py",
-        "from dnadesign.usr import Dataset as D\n"
-        "from importlib import import_module\nusr = import_module('dnadesign.usr')\n",
+        "from dnadesign.seqledger import Dataset as D\n"
+        "from importlib import import_module\nusr = import_module('dnadesign.seqledger')\n",
     )
-    _write(tmp_path / "src/dnadesign/usr/__init__.py", "class Dataset: pass\n")
+    _write(tmp_path / "src/dnadesign/seqledger/__init__.py", "class Dataset: pass\n")
     assert find_undeclared_cross_tool_imports(repo_root=tmp_path) == []
 
 
@@ -232,8 +232,8 @@ def test_find_undeclared_cross_tool_imports_reports_clean_absolute_import_target
 
 
 def test_find_undeclared_cross_tool_imports_allows_ops_to_usr_default_edge(tmp_path: Path) -> None:
-    _write(tmp_path / "src" / "dnadesign" / "ops" / "gates.py", "from dnadesign.usr import Dataset\n")
-    _write(tmp_path / "src" / "dnadesign" / "usr" / "__init__.py", "class Dataset:\n    pass\n")
+    _write(tmp_path / "src" / "dnadesign" / "ops" / "gates.py", "from dnadesign.seqledger import Dataset\n")
+    _write(tmp_path / "src" / "dnadesign" / "seqledger" / "__init__.py", "class Dataset:\n    pass\n")
 
     violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
 
@@ -243,16 +243,16 @@ def test_find_undeclared_cross_tool_imports_allows_ops_to_usr_default_edge(tmp_p
 def test_find_undeclared_cross_tool_imports_rejects_ops_to_usr_non_contract_surface(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "ops" / "gates.py",
-        "from dnadesign.usr.storage import DatasetStore\n",
+        "from dnadesign.seqledger.storage import DatasetStore\n",
     )
-    _write(tmp_path / "src" / "dnadesign" / "usr" / "storage.py", "class DatasetStore:\n    pass\n")
+    _write(tmp_path / "src" / "dnadesign" / "seqledger" / "storage.py", "class DatasetStore:\n    pass\n")
 
     violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
 
     assert len(violations) == 1
     assert violations[0].owner_tool == "ops"
-    assert violations[0].imported_tool == "usr"
-    assert violations[0].import_target == "dnadesign.usr.storage"
+    assert violations[0].imported_tool == "seqledger"
+    assert violations[0].import_target == "dnadesign.seqledger.storage"
 
 
 def test_find_undeclared_cross_tool_imports_rejects_ops_to_studies_edge(tmp_path: Path) -> None:
@@ -267,8 +267,8 @@ def test_find_undeclared_cross_tool_imports_rejects_ops_to_studies_edge(tmp_path
 
 
 def test_find_undeclared_cross_tool_imports_allows_construct_to_usr_default_edge(tmp_path: Path) -> None:
-    _write(tmp_path / "src" / "dnadesign" / "construct" / "runtime.py", "from dnadesign.usr import Dataset\n")
-    _write(tmp_path / "src" / "dnadesign" / "usr" / "__init__.py", "class Dataset:\n    pass\n")
+    _write(tmp_path / "src" / "dnadesign" / "construct" / "runtime.py", "from dnadesign.seqledger import Dataset\n")
+    _write(tmp_path / "src" / "dnadesign" / "seqledger" / "__init__.py", "class Dataset:\n    pass\n")
 
     violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
 
@@ -277,9 +277,13 @@ def test_find_undeclared_cross_tool_imports_allows_construct_to_usr_default_edge
 
 def test_find_undeclared_cross_tool_imports_allows_opal_to_usr_public_facade(tmp_path: Path) -> None:
     _write(
-        tmp_path / "src" / "dnadesign" / "opal" / "config.py", "from dnadesign.usr import require_explicit_usr_root\n"
+        tmp_path / "src" / "dnadesign" / "opal" / "config.py",
+        "from dnadesign.seqledger import require_explicit_seqledger_root\n",
     )
-    _write(tmp_path / "src" / "dnadesign" / "usr" / "__init__.py", "def require_explicit_usr_root():\n    pass\n")
+    _write(
+        tmp_path / "src" / "dnadesign" / "seqledger" / "__init__.py",
+        "def require_explicit_seqledger_root():\n    pass\n",
+    )
 
     violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
 
@@ -289,18 +293,18 @@ def test_find_undeclared_cross_tool_imports_allows_opal_to_usr_public_facade(tmp
 def test_find_undeclared_cross_tool_imports_rejects_opal_to_usr_internal_surface(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "dnadesign" / "opal" / "config.py",
-        "from dnadesign.usr.src.cli.support.resolution.roots import require_explicit_usr_root\n",
+        "from dnadesign.seqledger.src.cli.support.resolution.roots import require_explicit_seqledger_root\n",
     )
     _write(
-        tmp_path / "src" / "dnadesign" / "usr" / "src" / "cli" / "support" / "resolution" / "roots.py",
-        "def require_explicit_usr_root():\n    pass\n",
+        tmp_path / "src" / "dnadesign" / "seqledger" / "src" / "cli" / "support" / "resolution" / "roots.py",
+        "def require_explicit_seqledger_root():\n    pass\n",
     )
 
     violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
 
     assert len(violations) == 1
     assert violations[0].owner_tool == "opal"
-    assert violations[0].imported_tool == "usr"
+    assert violations[0].imported_tool == "seqledger"
 
 
 def test_find_undeclared_cross_tool_imports_allows_construct_to_folding_public_facade(tmp_path: Path) -> None:
@@ -325,8 +329,8 @@ def test_find_undeclared_cross_tool_imports_rejects_construct_to_folding_non_fac
 
 
 def test_find_undeclared_cross_tool_imports_allows_latentdna_to_usr_default_edge(tmp_path: Path) -> None:
-    _write(tmp_path / "src" / "dnadesign" / "latentdna" / "runtime.py", "from dnadesign.usr import Dataset\n")
-    _write(tmp_path / "src" / "dnadesign" / "usr" / "__init__.py", "class Dataset:\n    pass\n")
+    _write(tmp_path / "src" / "dnadesign" / "latentdna" / "runtime.py", "from dnadesign.seqledger import Dataset\n")
+    _write(tmp_path / "src" / "dnadesign" / "seqledger" / "__init__.py", "class Dataset:\n    pass\n")
 
     violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
 
@@ -398,7 +402,7 @@ def test_find_undeclared_cross_tool_imports_rejects_permuter_to_infer_non_facade
 
 def test_find_undeclared_cross_tool_imports_allows_usr_cruncher_promoter_export_edge(tmp_path: Path) -> None:
     _write(
-        tmp_path / "src" / "dnadesign" / "usr" / "scripts" / "import_promoters.py",
+        tmp_path / "src" / "dnadesign" / "seqledger" / "scripts" / "import_promoters.py",
         "from dnadesign.cruncher.ingest.promoters import load_promoter_export\n",
     )
     _write(
@@ -413,7 +417,7 @@ def test_find_undeclared_cross_tool_imports_allows_usr_cruncher_promoter_export_
 
 def test_find_undeclared_cross_tool_imports_rejects_usr_cruncher_unspecified_edge(tmp_path: Path) -> None:
     _write(
-        tmp_path / "src" / "dnadesign" / "usr" / "scripts" / "import_promoters.py",
+        tmp_path / "src" / "dnadesign" / "seqledger" / "scripts" / "import_promoters.py",
         "from dnadesign.cruncher.ingest.other import load_rows\n",
     )
     _write(
@@ -424,7 +428,7 @@ def test_find_undeclared_cross_tool_imports_rejects_usr_cruncher_unspecified_edg
     violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
 
     assert len(violations) == 1
-    assert violations[0].owner_tool == "usr"
+    assert violations[0].owner_tool == "seqledger"
     assert violations[0].imported_tool == "cruncher"
     assert violations[0].import_target == "dnadesign.cruncher.ingest.other"
 

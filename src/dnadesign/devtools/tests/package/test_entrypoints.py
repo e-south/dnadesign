@@ -26,8 +26,8 @@ def test_missing_optional_dependency_reports_install_profile(monkeypatch):
         raise ModuleNotFoundError("No module named pandas", name="pandas")
 
     monkeypatch.setattr(entrypoints, "import_module", missing)
-    with pytest.raises(SystemExit, match=r"dnadesign-tools\[usr\].*pandas"):
-        entrypoints.usr()
+    with pytest.raises(SystemExit, match=r"dnadesign-tools\[seqledger\].*pandas"):
+        entrypoints.seqledger()
 
 
 @pytest.mark.parametrize(
@@ -44,11 +44,11 @@ def test_cpu_command_recommends_its_own_runtime_profile(monkeypatch, command):
 
 def test_internal_import_failure_is_not_misreported_as_an_optional_dependency(monkeypatch):
     def missing(name):
-        raise ModuleNotFoundError("Internal module missing", name="dnadesign.usr.missing")
+        raise ModuleNotFoundError("Internal module missing", name="dnadesign.seqledger.missing")
 
     monkeypatch.setattr(entrypoints, "import_module", missing)
     with pytest.raises(ModuleNotFoundError):
-        entrypoints.usr()
+        entrypoints.seqledger()
 
 
 def test_launcher_preserves_command_return_value(monkeypatch):
@@ -58,7 +58,7 @@ def test_launcher_preserves_command_return_value(monkeypatch):
             return 7
 
     monkeypatch.setattr(entrypoints, "import_module", lambda name: App)
-    assert entrypoints.usr() == 7
+    assert entrypoints.seqledger() == 7
 
 
 @pytest.mark.parametrize("during_execution", [False, True])
@@ -73,7 +73,7 @@ def test_unknown_dependency_keeps_original_error_and_context(monkeypatch, during
 
     monkeypatch.setattr(entrypoints, "import_module", (lambda name: App) if during_execution else missing)
     with pytest.raises(ModuleNotFoundError) as caught:
-        entrypoints.usr()
+        entrypoints.seqledger()
     assert caught.value is error
     assert caught.value.__traceback__ is not None
 
@@ -85,8 +85,8 @@ def test_known_lazy_optional_dependency_keeps_actionable_advice(monkeypatch):
             raise ModuleNotFoundError("No module named pandas", name="pandas")
 
     monkeypatch.setattr(entrypoints, "import_module", lambda name: App)
-    with pytest.raises(SystemExit, match=r"dnadesign-tools\[usr\].*pandas"):
-        entrypoints.usr()
+    with pytest.raises(SystemExit, match=r"dnadesign-tools\[seqledger\].*pandas"):
+        entrypoints.seqledger()
 
 
 @pytest.mark.parametrize("dependency", ["matplotlib", "torch", "flash_attn"])
@@ -96,7 +96,7 @@ def test_known_dependency_not_in_selected_profile_is_not_misattributed(monkeypat
 
     monkeypatch.setattr(entrypoints, "import_module", missing)
     with pytest.raises(ModuleNotFoundError):
-        entrypoints.usr()
+        entrypoints.seqledger()
 
 
 def test_missing_submodule_is_not_misreported_as_missing_distribution(monkeypatch):
@@ -105,7 +105,7 @@ def test_missing_submodule_is_not_misreported_as_missing_distribution(monkeypatc
 
     monkeypatch.setattr(entrypoints, "import_module", missing)
     with pytest.raises(ModuleNotFoundError):
-        entrypoints.usr()
+        entrypoints.seqledger()
 
 
 def test_diagnostic_profiles_actually_supply_the_named_dependencies():

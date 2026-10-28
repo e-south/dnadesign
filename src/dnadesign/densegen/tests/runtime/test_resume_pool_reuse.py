@@ -20,7 +20,7 @@ import pandas as pd
 import pytest
 import yaml
 
-import dnadesign.usr as usr_pkg
+import dnadesign.seqledger as usr_pkg
 from dnadesign.densegen.src.adapters.optimizer import OptimizerRun
 from dnadesign.densegen.src.adapters.outputs import ParquetSink, USRSink
 from dnadesign.densegen.src.adapters.outputs.usr_writer import USRWriter

@@ -62,11 +62,11 @@ execution order and diagnostic precedence.
 `uv run python -m dnadesign.devtools.architecture.boundaries --repo-root .`
 6. Run the repo-local skill audits when changing `.agents/skills/`:
 `bash .agents/skills/notify-ops/scripts/audit-notify-ops-skill.sh`
-`bash .agents/skills/bu-scc-usr-sync/scripts/audit-bu-scc-usr-sync-skill.sh`
+`bash .agents/skills/bu-scc-usr-sync/scripts/audit-bu-scc-seqledger-sync-skill.sh`
 `bash .agents/skills/sge-hpc-ops/scripts/audit-sge-hpc-ops-skill.sh`
 7. Run the subtree routing contract checks when changing critical `AGENTS.md` surfaces or repo-local workflow skills:
 `uv run pytest -q src/dnadesign/notify/tests/docs/test_progressive_disclosure_contracts.py`
-`uv run pytest -q src/dnadesign/usr/tests/docs_contract`
+`uv run pytest -q src/dnadesign/seqledger/tests/docs_contract`
 8. Run the OPS subprocess failure suite when changing console wiring or CLI contract text:
 `uv run pytest -q src/dnadesign/ops/tests/test_cli_failure_contract.py`
 9. Run the native gate stderr regression when changing `dnadesign.ops.orchestrator.gates` or any audit-fidelity path that executes those commands:

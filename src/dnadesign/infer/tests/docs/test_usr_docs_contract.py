@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/tests/docs/test_usr_docs_contract.py
 
-Infer docs contract tests for USR write-back naming.
+Infer docs contract tests for SeqLedger write-back naming.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

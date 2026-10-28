@@ -1,7 +1,7 @@
 ## OPAL Data and Artifact Contracts v3
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+**Last verified:** 2026-10-28
 
 ### Candidate records
 
@@ -26,7 +26,7 @@ the same candidate may appear again in a strictly later round. Cumulative
 training applies the campaign's declared cross-round policy, and run-scoped
 observed-event snapshots retain every verified event and exact `batch_id`.
 
-A USR sidecar may declare `labels.source.manifest_path`. That manifest must use
+A SeqLedger sidecar may declare `labels.source.manifest_path`. That manifest must use
 `opal.observed_label_promotion.v1` and bind the artifact to the configured
 campaign slug, study ID, Y-space ID, a digest-pinned study-provenance manifest,
 the exact `records.parquet` candidate/X snapshot, and the relative sidecar path,

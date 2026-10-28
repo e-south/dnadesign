@@ -602,7 +602,7 @@ def _dataset_row_count(config_path: Path, root_cfg, run_root: Path, actual_recor
             scope=usr_cfg.root_scope,
         )
         try:
-            from dnadesign.usr import Dataset
+            from dnadesign.seqledger import Dataset
         except Exception:
             return None
         dataset = Dataset(usr_root, usr_cfg.dataset)

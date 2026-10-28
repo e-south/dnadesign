@@ -1,8 +1,17 @@
-"""Read committed Infer feature payloads without importing the inference runtime.
-
-A manifest selects immutable Parquet parts. Unlisted files are never visible.
-Single-file Parquet payloads remain readable until explicitly migrated.
 """
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/contracts/feature_payloads/__init__.py
+
+Read committed Infer feature payloads without importing the inference runtime.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+#
+# A manifest selects immutable Parquet parts. Unlisted files are never visible.
+# Single-file Parquet payloads remain readable until explicitly migrated.
 
 from __future__ import annotations
 

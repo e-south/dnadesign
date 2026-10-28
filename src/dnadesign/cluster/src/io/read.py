@@ -38,14 +38,14 @@ def peek_columns(ctx: dict) -> list[str]:
     """
     Return top-level column names without loading the full dataset.
     • CSV: header-only read.
-    • Parquet (USR or generic): use PyArrow schema (top-level).
+    • Parquet (SeqLedger or generic): use PyArrow schema (top-level).
     This is assertive — we do not silently fall back to engines that may
     misreport nested/struct columns.
     """
     p: Path = ctx["file"]
     if ctx["kind"] == "csv":
         return list(pd.read_csv(p, nrows=0).columns)
-    # Parquet (USR or generic): require PyArrow; always return top‑level names
+    # Parquet (SeqLedger or generic): require PyArrow; always return top‑level names
     try:
         import pyarrow.parquet as pq  # type: ignore
     except Exception as e:

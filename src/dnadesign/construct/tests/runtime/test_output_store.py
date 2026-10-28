@@ -25,8 +25,8 @@ from dnadesign.construct.src.persistence.usr_registry import (
     _existing_output_ids,
     _usr_label_table,
 )
-from dnadesign.usr import Dataset
-from dnadesign.usr.src.registry.models import DERIVED_COLUMNS, SEQ_ANNOT_COLUMNS
+from dnadesign.seqledger import Dataset
+from dnadesign.seqledger.src.registry.models import DERIVED_COLUMNS, SEQ_ANNOT_COLUMNS
 
 
 def _repo_root() -> Path:
@@ -60,7 +60,9 @@ def test_ensure_construct_registry_writes_required_namespaces(tmp_path: Path) ->
 
 
 def test_checked_in_shared_usr_registry_matches_construct_contract() -> None:
-    payload = yaml.safe_load((_repo_root() / "src/dnadesign/usr/datasets/registry.yaml").read_text(encoding="utf-8"))
+    payload = yaml.safe_load(
+        (_repo_root() / "src/dnadesign/seqledger/datasets/registry.yaml").read_text(encoding="utf-8")
+    )
     namespaces = payload["namespaces"]
 
     assert _column_pairs(namespaces["construct"]["columns"]) == _column_pairs(_CONSTRUCT_COLUMNS)
@@ -69,7 +71,7 @@ def test_checked_in_shared_usr_registry_matches_construct_contract() -> None:
 
 
 def test_ensure_construct_registry_is_idempotent_for_checked_in_shared_registry(tmp_path: Path) -> None:
-    source = _repo_root() / "src/dnadesign/usr/datasets/registry.yaml"
+    source = _repo_root() / "src/dnadesign/seqledger/datasets/registry.yaml"
     root = tmp_path / "usr_root"
     root.mkdir(parents=True, exist_ok=True)
     target = root / "registry.yaml"

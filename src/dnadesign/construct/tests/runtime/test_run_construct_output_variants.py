@@ -21,14 +21,18 @@ from Bio.Seq import Seq
 from dnadesign.construct.src.contracts.errors import ValidationError
 from dnadesign.construct.src.interfaces.api import run_from_config
 from dnadesign.construct.tests.runtime.run_construct_helpers import write_registry as _write_registry
-from dnadesign.usr import (
+from dnadesign.seqledger import (
     Dataset,
     SequenceViewRecord,
     ensure_sequence_contract_namespaces,
     load_sequence_views,
     write_sequence_views,
 )
-from dnadesign.usr.src.sequence_views.store import _rows_to_table, _write_sequence_views_atomic, sequence_views_path
+from dnadesign.seqledger.src.sequence_views.store import (
+    _rows_to_table,
+    _write_sequence_views_atomic,
+    sequence_views_path,
+)
 
 
 def _register_candidate_slot_overlay(root: Path) -> None:

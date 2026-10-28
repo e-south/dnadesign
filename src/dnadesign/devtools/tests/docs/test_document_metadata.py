@@ -64,27 +64,40 @@ def test_find_repo_local_skill_frontmatter_issues_rejects_overlong_description(t
 
 def test_shared_usr_dataset_layout_check_flags_nested_dataset_roots(tmp_path: Path) -> None:
     _write(
-        tmp_path / "src" / "dnadesign" / "usr" / "datasets" / "densegen" / "demo_sampling_baseline" / "records.parquet",
+        tmp_path
+        / "src"
+        / "dnadesign"
+        / "seqledger"
+        / "datasets"
+        / "densegen"
+        / "demo_sampling_baseline"
+        / "records.parquet",
         "placeholder\n",
     )
 
     issues = _find_shared_usr_dataset_layout_issues(tmp_path)
 
     assert any("densegen/demo_sampling_baseline" in issue for issue in issues)
-    assert all("Shared repo USR dataset roots must be flat" in issue for issue in issues)
+    assert all("Shared repo SeqLedger dataset roots must be flat" in issue for issue in issues)
     assert all("archived/ is the only special top-level bucket" in issue for issue in issues)
 
 
 def test_shared_usr_dataset_layout_check_allows_flat_roots_and_archived_bucket(tmp_path: Path) -> None:
     _write(
-        tmp_path / "src" / "dnadesign" / "usr" / "datasets" / "densegen_demo_sampling_baseline" / "records.parquet",
+        tmp_path
+        / "src"
+        / "dnadesign"
+        / "seqledger"
+        / "datasets"
+        / "densegen_demo_sampling_baseline"
+        / "records.parquet",
         "placeholder\n",
     )
     _write(
         tmp_path
         / "src"
         / "dnadesign"
-        / "usr"
+        / "seqledger"
         / "datasets"
         / "archived"
         / "densegen"
@@ -769,22 +782,22 @@ def test_runbook_catalog_check_flags_missing_registered_doc_entries(tmp_path: Pa
         execution_kind="executable",
         status_kind="ops-audit-json",
     )
-    hpc_sync_doc = tmp_path / "src" / "dnadesign" / "usr" / "docs" / "operations" / "sync" / "hpc-agent-flow.md"
+    hpc_sync_doc = tmp_path / "src" / "dnadesign" / "seqledger" / "docs" / "operations" / "sync" / "hpc-agent-flow.md"
     _write(
         hpc_sync_doc,
         "\n".join(
             [
-                "## USR HPC Sync Flow",
+                "## SeqLedger HPC Sync Flow",
                 "",
                 "**Type:** runbook",
                 "**Plane:** data-plane",
                 "**Owner-boundary:** usr",
                 "**Entry artifact:** sync intent",
                 "**Exit artifact:** synchronized dataset",
-                "**Registry-id:** usr.data-plane.hpc-sync",
+                "**Registry-id:** seqledger.data-plane.hpc-sync",
                 "**Summary:** HPC and local sync flow.",
                 "**Execution-kind:** iterative",
-                "**Status-kind:** usr-sync-audit",
+                "**Status-kind:** seqledger-sync-audit",
                 "**Owner:** maintainers",
                 f"**Last verified:** {today}",
             ]
@@ -799,7 +812,7 @@ def test_runbook_catalog_check_flags_missing_registered_doc_entries(tmp_path: Pa
     issues = _find_runbook_catalog_issues(tmp_path)
 
     assert any("missing registry metadata sidecar" in issue for issue in issues)
-    assert any("src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.registry.yaml" in issue for issue in issues)
+    assert any("src/dnadesign/seqledger/docs/operations/sync/hpc-agent-flow.registry.yaml" in issue for issue in issues)
 
 
 def test_runbook_catalog_check_flags_metadata_drift_against_owner_local_doc(tmp_path: Path) -> None:
@@ -1063,7 +1076,7 @@ def test_runbook_catalog_check_flags_missing_progress_surface_glossary_entry(tmp
     )
     _write_generated_runbook_catalog_readme(
         tmp_path,
-        glossary_rows=["| `usr-sync-audit` | Sync drift review. | Inspect the sync audit. |"],
+        glossary_rows=["| `seqledger-sync-audit` | Sync drift review. | Inspect the sync audit. |"],
     )
 
     issues = _find_runbook_catalog_issues(tmp_path)

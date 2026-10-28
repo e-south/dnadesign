@@ -1,7 +1,7 @@
 ## Infer Architecture
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-27
+**Last verified:** 2026-10-28
 
 ### Package shape
 
@@ -36,7 +36,7 @@
 
 ### Cross-Tool Boundaries
 
-- `usr`: dataset ingest + write-back columns/overlay interactions.
+- `seqledger`: dataset ingest + write-back columns/overlay interactions.
 - `notify`: infer events source resolution via the public infer contract surface (`dnadesign.infer.contracts`).
 - `ops`: infer runbook workflow contracts and scheduler planning/validation hooks through public infer API (`dnadesign.infer.validate_runbook_gpu_resources`), not `dnadesign.infer.src.*` internals.
 

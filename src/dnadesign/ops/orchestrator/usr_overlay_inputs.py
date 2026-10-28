@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/ops/orchestrator/usr_overlay_inputs.py
 
-Tool-adapter contract for parsing USR overlay guard inputs from producer configs.
+Tool-adapter contract for parsing SeqLedger overlay guard inputs from producer configs.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -40,7 +40,7 @@ def parse_usr_overlay_guard_inputs(*, tool: str, config_path: Path) -> UsrOverla
         message = str(exc)
         if message.startswith("unsupported usr producer tool:"):
             supported = message.split("(supported:", maxsplit=1)[-1].rstrip(")")
-            raise ValueError(f"unsupported usr-overlay-guard tool: {tool_name} (supported: {supported})") from exc
+            raise ValueError(f"unsupported seqledger-overlay-guard tool: {tool_name} (supported: {supported})") from exc
         raise
     return UsrOverlayGuardInputs(
         run_root=contract.run_root,

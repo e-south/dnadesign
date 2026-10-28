@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/tests/runtime/test_ingest_sources_usr.py
 
-Contracts for infer USR ingest loading and id-subset behavior.
+Contracts for infer SeqLedger ingest loading and id-subset behavior.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -21,7 +21,7 @@ from dnadesign.infer.src.ingest.sources import _default_usr_root, load_usr_input
 
 
 def _install_fake_usr_dataset(monkeypatch, records_path: Path) -> None:
-    import dnadesign.usr as usr_mod
+    import dnadesign.seqledger as usr_mod
 
     class _FakeDataset:
         def __init__(self, dataset_root, dataset_name):
@@ -33,13 +33,13 @@ def _install_fake_usr_dataset(monkeypatch, records_path: Path) -> None:
 
 
 def test_default_usr_root_requires_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("DNADESIGN_USR_ROOT", raising=False)
-    with pytest.raises(ValidationError, match="USR ingest requires ingest.root or DNADESIGN_USR_ROOT"):
+    monkeypatch.delenv("DNADESIGN_SEQLEDGER_ROOT", raising=False)
+    with pytest.raises(ValidationError, match="SeqLedger ingest requires ingest.root or DNADESIGN_SEQLEDGER_ROOT"):
         _default_usr_root()
 
 
 def test_default_usr_root_uses_env_usr_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("DNADESIGN_USR_ROOT", str(tmp_path))
+    monkeypatch.setenv("DNADESIGN_SEQLEDGER_ROOT", str(tmp_path))
     assert _default_usr_root() == tmp_path.resolve()
 
 
@@ -111,9 +111,9 @@ def test_load_usr_input_reads_full_table_when_ids_are_omitted(monkeypatch, tmp_p
 
 
 def test_load_usr_input_requires_explicit_root_or_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("DNADESIGN_USR_ROOT", raising=False)
+    monkeypatch.delenv("DNADESIGN_SEQLEDGER_ROOT", raising=False)
 
-    with pytest.raises(ValidationError, match="USR ingest requires ingest.root or DNADESIGN_USR_ROOT"):
+    with pytest.raises(ValidationError, match="SeqLedger ingest requires ingest.root or DNADESIGN_SEQLEDGER_ROOT"):
         load_usr_input(dataset_name="demo", field="sequence", root=None, ids=None)
 
 
@@ -144,5 +144,5 @@ def test_preflight_usr_input_requires_existing_dataset(tmp_path: Path) -> None:
     root = tmp_path / "usr_root"
     root.mkdir(parents=True, exist_ok=True)
 
-    with pytest.raises(ValidationError, match="USR dataset not initialized or missing"):
+    with pytest.raises(ValidationError, match="SeqLedger dataset not initialized or missing"):
         preflight_usr_input(dataset_name="missing", field="sequence", root=root)

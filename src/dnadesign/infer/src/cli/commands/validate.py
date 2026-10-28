@@ -59,11 +59,11 @@ def register(app: typer.Typer) -> None:
         except Exception as error:
             raise_cli_error(error)
 
-    @validate_app.command("usr", help="Validate a USR dataset can be read (id + field).")
+    @validate_app.command("seqledger", help="Validate a SeqLedger dataset can be read (id + field).")
     def validate_usr(
         dataset: str = typer.Option(..., "--dataset"),
         field: str = typer.Option("sequence", "--field"),
-        usr_root: Optional[Path] = typer.Option(None, "--usr-root"),
+        usr_root: Optional[Path] = typer.Option(None, "--seqledger-root"),
         ids: Optional[str] = typer.Option(None, "--ids", help="Path or CSV of ids to subset"),
     ) -> None:
         try:
@@ -73,14 +73,14 @@ def register(app: typer.Typer) -> None:
                 root=(usr_root.as_posix() if usr_root else None),
                 ids=read_ids_arg(ids),
             )
-            console.print(f"[green]✔ USR OK[/green]  dataset={dataset}  rows={len(seqs)}  field={field}")
+            console.print(f"[green]✔ SeqLedger OK[/green]  dataset={dataset}  rows={len(seqs)}  field={field}")
             console.print(f"[accent]records:[/accent] {ds.records_path}")
         except Exception as error:
             raise_cli_error(error)
 
     @validate_app.command(
-        "usr-registry",
-        help="Render the required USR namespace registration spec for infer write-back jobs.",
+        "seqledger-registry",
+        help="Render the required SeqLedger namespace registration spec for infer write-back jobs.",
     )
     def validate_usr_registry(
         config: Optional[Path] = typer.Option(None, "--config"),

@@ -171,9 +171,9 @@ def test_run_preflight_command_captures_native_gate_failure_text(tmp_path: Path)
 
 def test_run_preflight_command_binds_explicit_environment(tmp_path: Path) -> None:
     execution = run_preflight_command(
-        (sys.executable, "-c", "import os; print(os.environ['DNADESIGN_USR_ROOT'])"),
+        (sys.executable, "-c", "import os; print(os.environ['DNADESIGN_SEQLEDGER_ROOT'])"),
         cwd=tmp_path,
-        env={"DNADESIGN_USR_ROOT": str(tmp_path)},
+        env={"DNADESIGN_SEQLEDGER_ROOT": str(tmp_path)},
     )
 
     assert execution.returncode == 0

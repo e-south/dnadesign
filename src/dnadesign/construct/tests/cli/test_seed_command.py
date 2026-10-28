@@ -20,7 +20,7 @@ from typer.testing import CliRunner
 
 from dnadesign.construct.src.cli import app
 from dnadesign.construct.src.seeding import bootstrap as seed_module
-from dnadesign.usr import Dataset
+from dnadesign.seqledger import Dataset
 
 _RUNNER = CliRunner()
 
@@ -234,7 +234,7 @@ datasets:
 """,
         encoding="utf-8",
     )
-    monkeypatch.setenv("DNADESIGN_USR_ROOT", str(usr_root))
+    monkeypatch.setenv("DNADESIGN_SEQLEDGER_ROOT", str(usr_root))
 
     result = _RUNNER.invoke(
         app,
@@ -268,12 +268,12 @@ datasets:
 """,
         encoding="utf-8",
     )
-    monkeypatch.delenv("DNADESIGN_USR_ROOT", raising=False)
+    monkeypatch.delenv("DNADESIGN_SEQLEDGER_ROOT", raising=False)
     monkeypatch.setattr(seed_module, "project_root_or_none", lambda: None)
 
     with pytest.raises(
         seed_module.ConfigError,
-        match="construct seed requires --root outside a dnadesign checkout unless DNADESIGN_USR_ROOT is set",
+        match="construct seed requires --root outside a dnadesign checkout unless DNADESIGN_SEQLEDGER_ROOT is set",
     ):
         seed_module.import_seed_manifest(root=None, manifest=manifest_path)
 

@@ -26,7 +26,7 @@ from dnadesign.construct.src.sources.input_rows import (
 )
 from dnadesign.construct.src.sources.templates import load_normalize_template, load_template_sequence
 from dnadesign.construct.tests.runtime.run_construct_helpers import write_registry
-from dnadesign.usr import Dataset
+from dnadesign.seqledger import Dataset
 
 
 @dataclass(frozen=True)

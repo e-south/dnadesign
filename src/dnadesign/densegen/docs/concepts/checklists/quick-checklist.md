@@ -1,7 +1,7 @@
 ## DenseGen quick checklist
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-10-28
 This concept page is a compact contract checklist for correct DenseGen execution and artifact interpretation. Read it when you need quick command recall and clear output-path expectations.
 
 For full walkthroughs, use the **[TFBS baseline tutorial](../../tutorials/demo_tfbs_baseline.md)** or **[sampling baseline tutorial](../../tutorials/demo_sampling_baseline.md)**.
@@ -42,13 +42,13 @@ uv run dense notebook generate -c "$CONFIG"
 - Stage-A pools: `outputs/pools/` and `outputs/pools/pool_manifest.json`
 - Stage-B libraries: `outputs/libraries/`
 - Parquet records: `outputs/tables/records.parquet`
-- USR records: `<output.usr.root>/<dataset>/records.parquet`
-- USR event stream: `<output.usr.root>/<dataset>/.events.log`
+- SeqLedger records: `<output.usr.root>/<dataset>/records.parquet`
+- SeqLedger event stream: `<output.usr.root>/<dataset>/.events.log`
 
 ### Output mode rules
 
 - `local` writes parquet artifacts only.
-- `usr` writes USR dataset artifacts only.
+- `seqledger` writes SeqLedger dataset artifacts only.
 - `both` writes both sinks and requires explicit `plots.source` selection for analysis surfaces.
 
 ### Resume rules
@@ -59,4 +59,4 @@ uv run dense notebook generate -c "$CONFIG"
 
 ### Event stream rules
 
-DenseGen diagnostics and USR mutation events are distinct streams with distinct consumers. Read **[observability and events](../runtime/observability-and-events.md)** before wiring Notify.
+DenseGen diagnostics and SeqLedger mutation events are distinct streams with distinct consumers. Read **[observability and events](../runtime/observability-and-events.md)** before wiring Notify.

@@ -1,7 +1,7 @@
 ## BU SCC Install: `dnadesign` Interactive Bootstrap (CPU + Evo2 GPU)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-26
+**Last verified:** 2026-10-28
 
 ### Purpose
 
@@ -14,7 +14,7 @@
 
 **Not for:**
 - Long-running production jobs (use [BU SCC Batch + Notify runbook](../runbooks/batch-notify.md)).
-- Operational monitoring setup (use [BU SCC Batch + Notify runbook](../runbooks/batch-notify.md) and [Notify USR events operator manual](../../notify/usr-events.md)).
+- Operational monitoring setup (use [BU SCC Batch + Notify runbook](../runbooks/batch-notify.md) and [Notify SeqLedger events operator manual](../../notify/seqledger-events.md)).
 - Large model or dataset transfers on compute nodes (use BU data transfer node workflows).
 
 ### Scope

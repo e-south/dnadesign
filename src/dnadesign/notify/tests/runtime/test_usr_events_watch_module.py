@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/notify/tests/runtime/test_usr_events_watch_module.py
 
-Module contract test for the notify USR events watch loop entrypoint.
+Module contract test for the notify SeqLedger events watch loop entrypoint.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

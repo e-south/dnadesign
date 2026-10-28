@@ -1,7 +1,7 @@
 ## infer end-to-end pressure-test demo (usr + ops + notify)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-25
+**Last verified:** 2026-10-28
 
 This demo executes infer in an end-to-end pressure-test loop that can run standalone or via ops orchestration.
 
@@ -9,7 +9,7 @@ This demo executes infer in an end-to-end pressure-test loop that can run standa
 
 1. Validate infer config and dry-run contracts.
 2. Execute infer extraction pressure path.
-3. Verify USR dataset state after write-back.
+3. Verify SeqLedger dataset state after write-back.
 4. Execute ops runbook in no-submit and submit modes.
 5. Optionally enable notify phases for delivery smoke checks.
 
@@ -19,28 +19,28 @@ This demo executes infer in an end-to-end pressure-test loop that can run standa
 uv run infer workspace init --id demo_usr_pressure --profile usr-pressure # Create pressure-test workspace and config.
 export WORKSPACE_ROOT="$PWD/workspaces/demo_usr_pressure" # Reuse workspace root across steps.
 export INFER_CONFIG="$WORKSPACE_ROOT/config.yaml" # Pin infer config path.
-export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets" # Point USR tools at workspace-local datasets.
+export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets" # Point SeqLedger tools at workspace-local datasets.
 export DATASET_ID="infer_pressure_demo" # Set dataset id for repeatable commands.
 ```
 
 
 The scaffold creates directories and a config, but no input dataset. First
-prepare the USR registry from the configured output types:
+prepare the SeqLedger registry from the configured output types:
 
 ```bash
 # Print the namespace registration command for this config.
-uv run infer validate usr-registry --config "$INFER_CONFIG"
+uv run infer validate seqledger-registry --config "$INFER_CONFIG"
 ```
 
 Run the command printed after `register:` to create the registry. Then create
 the dataset and import the included sequences:
 
 ```bash
-# Create the dataset under the registered USR root.
-uv run usr --root "$USR_ROOT" init "$DATASET_ID" --source "infer demo"
+# Create the dataset under the registered SeqLedger root.
+uv run seqledger --root "$USR_ROOT" init "$DATASET_ID" --source "infer demo"
 # Import the included DNA sequences.
-uv run usr --root "$USR_ROOT" import "$DATASET_ID" --from csv \
-  --path src/dnadesign/usr/assets/demo_material/demo_sequences.csv \
+uv run seqledger --root "$USR_ROOT" import "$DATASET_ID" --from csv \
+  --path src/dnadesign/seqledger/assets/demo_material/demo_sequences.csv \
   --bio-type dna --alphabet dna_4
 ```
 
@@ -48,7 +48,7 @@ uv run usr --root "$USR_ROOT" import "$DATASET_ID" --from csv \
 
 ```bash
 uv run infer validate config --config "$INFER_CONFIG" # Validate infer config contract.
-uv run infer validate usr-registry --config "$INFER_CONFIG" # Derive the exact infer namespace registration command for this config.
+uv run infer validate seqledger-registry --config "$INFER_CONFIG" # Derive the exact infer namespace registration command for this config.
 uv run infer run --config "$INFER_CONFIG" --dry-run # Exercise run path without mutation.
 ```
 
@@ -60,18 +60,18 @@ If output definitions change, rerun namespace registration before inference.
 uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr # Execute local pressure job.
 ```
 
-### 4) Verify USR write-back and events
+### 4) Verify SeqLedger write-back and events
 
 ```bash
-uv run usr --root "$USR_ROOT" head "$DATASET_ID" -n 5 # Inspect top rows after write-back.
-uv run usr --root "$USR_ROOT" events tail "$DATASET_ID" -n 20 # Confirm infer event stream updates.
+uv run seqledger --root "$USR_ROOT" head "$DATASET_ID" -n 5 # Inspect top rows after write-back.
+uv run seqledger --root "$USR_ROOT" events tail "$DATASET_ID" -n 20 # Confirm infer event stream updates.
 ```
 
 ### 5) Resume and prune infer output state
 
 ```bash
 uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr # Confirm resume behavior.
-uv run infer prune --usr "$DATASET_ID" --usr-root "$USR_ROOT" # Archive infer namespace for reset.
+uv run infer prune --seqledger "$DATASET_ID" --seqledger-root "$USR_ROOT" # Archive infer namespace for reset.
 uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr # Re-run after prune reset.
 ```
 
@@ -126,7 +126,7 @@ uv run ops runbook init \
 
 ### 9) Contract reminder
 
-- USR write-back column pattern is `infer__<model_id>__<job_id>__<out_id>`.
-- Invalid or unreadable USR `records.parquet` fails fast during resume scan.
-- Fresh USR test datasets must register exact infer output types before write-back.
+- SeqLedger write-back column pattern is `infer__<model_id>__<job_id>__<out_id>`.
+- Invalid or unreadable SeqLedger `records.parquet` fails fast during resume scan.
+- Fresh SeqLedger test datasets must register exact infer output types before write-back.
 - `evo2.embedding` accepts semantic `layer` values `mid` and `final` for the common pooled embedding checks.

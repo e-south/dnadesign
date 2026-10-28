@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from dnadesign.usr import compute_id, normalize_sequence
+from dnadesign.seqledger import compute_id, normalize_sequence
 
 from ..contracts.config import JobConfig
 from ..contracts.errors import ValidationError

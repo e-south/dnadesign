@@ -21,7 +21,7 @@ from dnadesign.construct.src.contracts.errors import ValidationError
 from dnadesign.construct.src.interfaces.api import run_from_config
 from dnadesign.construct.tests.runtime.run_construct_helpers import seq_annot_table as _seq_annot_table
 from dnadesign.construct.tests.runtime.run_construct_helpers import write_registry as _write_registry
-from dnadesign.usr import Dataset, ensure_sequence_contract_namespaces, load_sequence_views
+from dnadesign.seqledger import Dataset, ensure_sequence_contract_namespaces, load_sequence_views
 
 
 def test_run_construct_normalize_anchor_selects_annotation_pair_midpoint_and_writes_sequence_view(

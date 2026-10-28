@@ -78,7 +78,7 @@ def build_extract_ingest(
             inputs=seq,
         )
 
-    raise ConfigError("Provide one of --seq/--seq-file/--usr/--pt/--records-jsonl")
+    raise ConfigError("Provide one of --seq/--seq-file/--seqledger/--pt/--records-jsonl")
 
 
 def build_generate_ingest(
@@ -114,4 +114,4 @@ def build_generate_ingest(
             inputs=prompt,
         )
 
-    raise ConfigError("Provide prompts via --prompt/--prompt-file or use --usr.")
+    raise ConfigError("Provide prompts via --prompt/--prompt-file or use --seqledger.")

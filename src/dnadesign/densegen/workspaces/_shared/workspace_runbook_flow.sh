@@ -106,7 +106,7 @@ densegen_workspace_runbook_flow() {
         runner="$2"
         shift 2
         ;;
-      --ensure-usr-registry)
+      --ensure-seqledger-registry)
         ensure_usr_registry="$2"
         shift 2
         ;;
@@ -181,9 +181,9 @@ print((workspace_dir / Path(root)).resolve())
     )"
     local usr_registry="$usr_root/registry.yaml"
     local root_registry
-    root_registry="$(git rev-parse --show-toplevel)/src/dnadesign/usr/datasets/registry.yaml"
+    root_registry="$(git rev-parse --show-toplevel)/src/dnadesign/seqledger/datasets/registry.yaml"
     if [[ ! -f "$root_registry" ]]; then
-      echo "USR registry source not found at: $root_registry" >&2
+      echo "SeqLedger registry source not found at: $root_registry" >&2
       return 2
     fi
     if [[ ! -f "$usr_registry" ]]; then

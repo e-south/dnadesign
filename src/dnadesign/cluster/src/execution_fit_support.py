@@ -122,7 +122,7 @@ def apply_fit_attachment(
 ) -> None:
     if ctx["kind"] == "usr":
         attach_usr(ctx["usr_root"], ctx["dataset"], attach_cols, allow_overwrite=allow_overwrite)
-        _log(console, "print", f"[green]Attached[/green] columns to USR dataset '{ctx['dataset']}'.")
+        _log(console, "print", f"[green]Attached[/green] columns to SeqLedger dataset '{ctx['dataset']}'.")
         return
 
     if ctx["kind"] == "parquet":

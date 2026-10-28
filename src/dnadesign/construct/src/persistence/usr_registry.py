@@ -17,7 +17,7 @@ from pathlib import Path
 import pyarrow as pa
 import yaml
 
-from dnadesign.usr import DERIVED_COLUMNS, Dataset, ensure_sequence_contract_namespaces
+from dnadesign.seqledger import DERIVED_COLUMNS, Dataset, ensure_sequence_contract_namespaces
 
 from ..contracts.errors import ValidationError
 
@@ -115,10 +115,10 @@ def _load_registry_payload(root: Path) -> dict:
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except OSError as exc:
-        raise ValidationError(f"USR registry could not be read: {path}") from exc
+        raise ValidationError(f"SeqLedger registry could not be read: {path}") from exc
     namespaces = data.get("namespaces") or {}
     if not isinstance(namespaces, dict):
-        raise ValidationError(f"USR registry at {path} must contain a 'namespaces' mapping.")
+        raise ValidationError(f"SeqLedger registry at {path} must contain a 'namespaces' mapping.")
     return {"namespaces": namespaces}
 
 
@@ -128,19 +128,21 @@ def _validated_registry_columns(namespace_name: str, payload: dict) -> dict[str,
         payload["columns"] = []
         return {}
     if not isinstance(columns, list):
-        raise ValidationError(f"USR registry namespace '{namespace_name}' must define columns as a list.")
+        raise ValidationError(f"SeqLedger registry namespace '{namespace_name}' must define columns as a list.")
     observed: dict[str, str] = {}
     for index, item in enumerate(columns):
         if not isinstance(item, dict):
-            raise ValidationError(f"USR registry namespace '{namespace_name}' column #{index + 1} must be a mapping.")
+            raise ValidationError(
+                f"SeqLedger registry namespace '{namespace_name}' column #{index + 1} must be a mapping."
+            )
         name = str(item.get("name") or "").strip()
         type_name = str(item.get("type") or "").strip()
         if not name or not type_name:
             raise ValidationError(
-                f"USR registry namespace '{namespace_name}' column #{index + 1} must define name and type."
+                f"SeqLedger registry namespace '{namespace_name}' column #{index + 1} must define name and type."
             )
         if name in observed:
-            raise ValidationError(f"USR registry namespace '{namespace_name}' duplicates column '{name}'.")
+            raise ValidationError(f"SeqLedger registry namespace '{namespace_name}' duplicates column '{name}'.")
         observed[name] = type_name
     return observed
 
@@ -162,7 +164,7 @@ def _ensure_registry_namespace(
         },
     )
     if not isinstance(payload, dict):
-        raise ValidationError(f"USR registry namespace '{namespace_name}' must be a mapping.")
+        raise ValidationError(f"SeqLedger registry namespace '{namespace_name}' must be a mapping.")
     payload.setdefault("owner", owner)
     payload.setdefault("description", description)
     observed = _validated_registry_columns(namespace_name, payload)
@@ -174,7 +176,7 @@ def _ensure_registry_namespace(
             continue
         if observed_type != column["type"]:
             raise ValidationError(
-                f"USR registry namespace '{namespace_name}' column '{column['name']}' has type "
+                f"SeqLedger registry namespace '{namespace_name}' column '{column['name']}' has type "
                 f"'{observed_type}', expected '{column['type']}'."
             )
     if missing:

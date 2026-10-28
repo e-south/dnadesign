@@ -40,7 +40,7 @@ def validate_dataset(data: DatasetRef | str | Path, *, strict: bool = False) -> 
 def _validate_frame(df, *, strict: bool) -> None:
     missing = [column for column in _CORE if column not in df.columns]
     if missing:
-        raise ValueError(f"USR core columns missing: {missing}")
+        raise ValueError(f"SeqLedger core columns missing: {missing}")
     recomputed = df.apply(lambda row: _sha1(str(row["bio_type"]), str(row["sequence"])), axis=1)
     bad = (recomputed != df["id"]).sum()
     if bad:

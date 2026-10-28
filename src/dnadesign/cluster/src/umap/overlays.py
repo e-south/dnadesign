@@ -64,7 +64,7 @@ def write_umap_overlays(
             if "Columns already exist" in str(exc) and not allow_overwrite:
                 raise RuntimeError("Columns already exist for attachment. Re-run with `-y/--allow-overwrite`.") from exc
             raise
-        _log(console, "print", "[green]Attached[/green] columns to USR dataset.")
+        _log(console, "print", "[green]Attached[/green] columns to SeqLedger dataset.")
         return
 
     if ictx["kind"] == "parquet":

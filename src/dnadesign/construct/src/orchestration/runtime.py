@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
-from dnadesign.usr import Dataset, require_explicit_usr_root
+from dnadesign.seqledger import Dataset, require_explicit_seqledger_root
 
 from ..contracts.config import (
     JobConfig,
@@ -87,7 +87,7 @@ from ..sources.input_rows import (
     scan_usr_rows as _scan_usr_rows,
 )
 from ..sources.paths import (
-    default_usr_root as _source_default_usr_root,
+    default_seqledger_root as _source_default_usr_root,
 )
 from ..sources.paths import (
     resolve_usr_root as _resolve_usr_root,
@@ -389,9 +389,9 @@ def _plan_loaded_config(
 ) -> tuple[PreflightResult, List[_BuiltRecord]]:
     base_dir = config_path.parent
     try:
-        root_override = require_explicit_usr_root(usr_root) if usr_root is not None else None
+        root_override = require_explicit_seqledger_root(usr_root) if usr_root is not None else None
     except ValueError as exc:
-        raise ValidationError(f"Invalid explicit USR root: {exc}") from exc
+        raise ValidationError(f"Invalid explicit SeqLedger root: {exc}") from exc
     input_root = root_override or _resolve_usr_root(base_dir, cfg.job.input.source.root, label="job.input.source.root")
     output_root = root_override or _resolve_usr_root(
         base_dir,

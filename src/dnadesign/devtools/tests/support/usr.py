@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/devtools/tests/support/usr.py
 
-Repo-level USR fixture helpers shared across sibling package tests.
+Repo-level SeqLedger fixture helpers shared across sibling package tests.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dnadesign.usr import (
+from dnadesign.seqledger import (
     SchemaError,
     parse_columns_spec,
     register_namespace,

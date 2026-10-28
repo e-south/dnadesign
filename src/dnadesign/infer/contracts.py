@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/contracts.py
 
-Public infer contracts for USR write-back destination resolution and default.
+Public infer contracts for SeqLedger write-back destination resolution and default.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -18,7 +18,7 @@ from pathlib import Path
 
 import yaml
 
-from dnadesign.usr import resolve_usr_root_from_config
+from dnadesign.seqledger import resolve_seqledger_root_from_config
 
 from .src.config import RootConfig
 
@@ -223,7 +223,7 @@ def resolve_infer_usr_output_contract(config_path: Path) -> InferUSROutputContra
         root_value = ingest.get("root")
         if root_value is None:
             raise ValueError("infer resolver requires ingest.root for source='usr' write-back jobs")
-        usr_root = resolve_usr_root_from_config(
+        usr_root = resolve_seqledger_root_from_config(
             root_value,
             config_path=resolved_config_path,
             label="infer resolver ingest.root",
@@ -237,7 +237,7 @@ def resolve_infer_usr_output_contract(config_path: Path) -> InferUSROutputContra
     if len(destinations) > 1:
         rendered = ", ".join(sorted(f"{root_path}/{dataset}" for root_path, dataset in destinations))
         raise ValueError(
-            f"infer resolver found multiple USR destinations in config: {rendered}. "
+            f"infer resolver found multiple SeqLedger destinations in config: {rendered}. "
             "Pass --events explicitly to select one stream."
         )
     usr_root, dataset = next(iter(destinations))
@@ -312,7 +312,7 @@ def _sequence_view_event_destinations(
             root_value = input_payload.get("root")
             if root_value is None:
                 raise ValueError("infer resolver requires sequence_view_inputs.root for sequence-view jobs")
-            usr_root = resolve_usr_root_from_config(
+            usr_root = resolve_seqledger_root_from_config(
                 root_value,
                 config_path=config_path,
                 label="infer resolver sequence_view_inputs.root",

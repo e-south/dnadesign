@@ -64,7 +64,7 @@ def test_notify_docs_readme_keeps_operator_progressive_disclosure() -> None:
 
 
 def test_notify_usr_events_manual_keeps_setup_run_recover_flow() -> None:
-    text = _read(_repo_root() / "docs" / "notify" / "usr-events.md")
+    text = _read(_repo_root() / "docs" / "notify" / "seqledger-events.md")
     _assert_token_order(
         text,
         [
@@ -75,7 +75,7 @@ def test_notify_usr_events_manual_keeps_setup_run_recover_flow() -> None:
             "### Recover flow",
             "### Common mistakes",
         ],
-        label="docs/notify/usr-events.md",
+        label="docs/notify/seqledger-events.md",
     )
     assert "--secret-source file" in text
     assert "--secret-ref file://" in text
@@ -100,7 +100,7 @@ def test_notify_module_readme_is_lightweight_router_and_links_top_level_runbook(
         label="src/dnadesign/notify/README.md",
     )
     assert "docs/README.md" in text
-    assert "docs/notify/usr-events.md" in text
+    assert "docs/notify/seqledger-events.md" in text
     assert "../../../docs/notify/README.md" in text
     assert "docs/reference/README.md" in text
     assert "docs/dev/architecture.md" in text
@@ -128,11 +128,11 @@ def test_notify_module_docs_index_has_progressive_disclosure_workflow_and_type_m
     assert "Runtime evidence pointers" in text
     assert "Shared watcher and scheduler docs" in text
     assert "Run cross-tool or cluster workflows" not in text
-    assert "../../../../docs/notify/usr-events.md" in text
+    assert "../../../../docs/notify/seqledger-events.md" in text
     assert "Use this page for Notify command contracts and maintainer docs." in text
-    assert "Use [Notify USR events runbook]" in text
+    assert "Use [Notify SeqLedger events runbook]" in text
     assert "notify setup list-workspaces" not in text
-    assert "notify usr-events watch --tool <tool> --workspace <workspace-name> --follow" not in text
+    assert "notify seqledger-events watch --tool <tool> --workspace <workspace-name> --follow" not in text
 
 
 def test_notify_reference_index_keeps_reference_first_and_routes_operator_steps_outward() -> None:
@@ -142,9 +142,9 @@ def test_notify_reference_index_keeps_reference_first_and_routes_operator_steps_
         [
             "### Read order",
             "[Command contracts](command-contracts.md)",
-            "[USR event schema reference](../../../usr/docs/reference/event-log.md)",
+            "[SeqLedger event schema reference](../../../seqledger/docs/reference/event-log.md)",
             "### Need operator steps instead?",
-            "../../../../docs/notify/usr-events.md",
+            "../../../../docs/notify/seqledger-events.md",
             "### Coverage",
             "### Verify next",
         ],
@@ -163,7 +163,7 @@ def test_notify_command_contracts_cover_setup_helpers_and_send() -> None:
             "### notify setup resolve-events",
             "### notify setup slack",
             "### notify send",
-            "### notify usr-events watch",
+            "### notify seqledger-events watch",
             "### notify profile doctor",
             "### notify spool drain",
             "### profile schema contract",
@@ -175,7 +175,7 @@ def test_notify_command_contracts_cover_setup_helpers_and_send() -> None:
     )
     assert "Workspace shorthand is repo-rooted for all resolver-mode tools." in text
     assert "ingest.root" in text
-    assert "one USR write-back destination or exactly one sequence-view" in text
+    assert "one SeqLedger write-back destination or exactly one sequence-view" in text
     assert "Multi-destination infer configs must use explicit `--events <path>`" in text
 
 
@@ -198,14 +198,14 @@ def test_notify_agents_route_operator_workflow_to_repo_skill_and_docs() -> None:
     assert ".agents/skills/notify-ops/SKILL.md" in root_agents
     assert ".agents/skills/notify-ops/SKILL.md" in notify_agents
     assert "docs/notify/README.md" in notify_agents
-    assert "docs/notify/usr-events.md" in notify_agents
+    assert "docs/notify/seqledger-events.md" in notify_agents
     assert "src/dnadesign/notify/docs/reference/command-contracts.md" in notify_agents
     assert "Default low-friction flow" not in notify_agents
     assert "notify setup slack" not in notify_agents
-    assert "notify usr-events watch --tool <tool> --workspace <workspace-name> --follow" not in notify_agents
+    assert "notify seqledger-events watch --tool <tool> --workspace <workspace-name> --follow" not in notify_agents
     assert "--secret-source auto" not in notify_agents
     assert "docs/notify/README.md" in skill
-    assert "docs/notify/usr-events.md" in skill
+    assert "docs/notify/seqledger-events.md" in skill
     assert "src/dnadesign/notify/docs/reference/command-contracts.md" in skill
     assert "docs/bu-scc/runbooks/batch-notify.md" in skill
     assert ".events.log" in skill
@@ -214,7 +214,7 @@ def test_notify_agents_route_operator_workflow_to_repo_skill_and_docs() -> None:
     assert "one watcher per live Infer lane config" in skill
     assert "one watcher per destination" in skill
     assert "docs/notify/README.md" in workflow_router
-    assert "docs/notify/usr-events.md#setup-flow" in workflow_router
+    assert "docs/notify/seqledger-events.md#setup-flow" in workflow_router
     assert ".agents/skills/sge-hpc-ops/SKILL.md" in workflow_router
 
 

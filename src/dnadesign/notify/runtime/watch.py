@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/notify/runtime/watch.py
 
-USR events watch-loop execution for notify CLI.
+SeqLedger events watch-loop execution for notify CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

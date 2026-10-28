@@ -34,7 +34,7 @@ class InferFeatureSourceDataset:
         object.__setattr__(self, "usr_root", _required_text(self.usr_root, label="source_dataset.usr_root"))
         dataset_id = _required_text(self.dataset_id, label="source_dataset.dataset_id")
         if "/" in dataset_id or "\\" in dataset_id:
-            raise ValueError("source_dataset.dataset_id must be a flat USR dataset id, not a path")
+            raise ValueError("source_dataset.dataset_id must be a flat SeqLedger dataset id, not a path")
         object.__setattr__(self, "dataset_id", dataset_id)
 
     @classmethod

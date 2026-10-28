@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/baserender/src/integrations/usr/__init__.py
 
-Adapt USR GenBank annotations for BaseRender.
+Adapt SeqLedger GenBank annotations for BaseRender.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -107,8 +107,8 @@ PROVIDER = IntegrationProvider(
         RenderContractDescriptor(
             kind="usr_genbank_annotation_render_v1",
             schema_version=1,
-            display_name="USR GenBank annotation render contract",
-            purpose="Linear sequence rows for USR records with declared GenBank feature overlays.",
+            display_name="SeqLedger GenBank annotation render contract",
+            purpose="Linear sequence rows for SeqLedger records with declared GenBank feature overlays.",
             accepted_renderers=("sequence_rows",),
             docs_slug="usr-genbank-annotation-render-v1",
         ),

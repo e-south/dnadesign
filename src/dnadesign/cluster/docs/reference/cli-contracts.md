@@ -1,7 +1,7 @@
 ## Cluster CLI contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-26
+**Last verified:** 2026-10-28
 
 This page collects the stable command, layout, and data-shape contracts for `cluster`.
 
@@ -21,11 +21,11 @@ This page collects the stable command, layout, and data-shape contracts for `clu
 - External tools that need in-process execution should use the public [`../../api.py`](../../api.py) surface instead of importing `dnadesign.cluster.src.*`.
 - Supported ad hoc helpers are `run_fit()`, `run_umap()`, `run_analyze()`, `run_sweep()`, and `list_runs()`.
 - Supported workspace helpers are `run_fit_workspace()`, `run_umap_workspace()`, `run_analyze_workspace()`, `run_sweep_workspace()`, and `list_workspace_runs()`.
-- Use workspaces for reusable configurations, or explicit file and USR inputs for one-off executions.
+- Use workspaces for reusable configurations, or explicit file and SeqLedger inputs for one-off executions.
 
 ### Dataset and feature-column contract
 
-- Work against a USR dataset (`--dataset`) or a CSV/Parquet file (`--file`).
+- Work against a SeqLedger dataset (`--dataset`) or a CSV/Parquet file (`--file`).
 - `cluster` assumes one feature column or exported matrix already exists.
 - `fit` can consume one vector column (`--x-col`) or a multi-column matrix (`--x-cols`).
 - `fit` is method-based: built-in method ids are `leiden` and `kmeans`, and method presets live under `presets/method/`.
@@ -97,7 +97,7 @@ The CLI resolves the OPAL slice and records which parquet parts were used.
 - `analysis/<run-slug>/analysis.json` records the resolved downstream analysis contract, including any OPAL join inputs, when `cluster analyze` runs
 - `sweep.json` records the resolved method-scoped sweep contract, and `cluster runs list` includes sweep rows via `sweep_path`
 - `cluster` fails fast instead of defaulting runtime state under `src/dnadesign/cluster/` outside an explicitly selected workspace output root, or inferring from the current directory
-- All attached overlay columns use one namespace contract for both USR datasets and generic files: `cluster__<run>__...`
+- All attached overlay columns use one namespace contract for both SeqLedger datasets and generic files: `cluster__<run>__...`
 - Use `--reuse auto|require|reattach` when reusing fit attachments
 - Fit reuse is exact on both input signature and method signature; cached labels are not reused across method-contract changes.
 - Repeated runs may reuse one stable alias, but they do not overwrite prior ledger-targeted artifact paths.
@@ -107,7 +107,7 @@ The CLI resolves the OPAL slice and records which parquet parts were used.
 
 ### Environment variables
 
-- `DNADESIGN_USR_ROOT`: resolve USR datasets without passing full roots
+- `DNADESIGN_SEQLEDGER_ROOT`: resolve SeqLedger datasets without passing full roots
 - `DNADESIGN_OPAL_CAMPAIGNS_ROOT`: resolve OPAL campaign names for joins
 
 ### Workspace utilities

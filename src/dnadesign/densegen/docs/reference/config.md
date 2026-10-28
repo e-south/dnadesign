@@ -1,7 +1,7 @@
 ## DenseGen config reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-10-28
 Use this page when you need exact YAML keys and constraints.
 Unknown keys are hard errors.
 All relative paths resolve from the config file directory.
@@ -180,14 +180,14 @@ PWM inputs perform **Stage‑A sampling** (sampling sites from PWMs) via
     onto the base `sampling`, so partial overrides are allowed)
     - `uniqueness.cross_regulator_core_collisions` must stay consistent across base and overrides
 - `type: usr_sequences`
-  - `dataset` - USR dataset name
-  - `root` - USR root path (required; no fallback)
+  - `dataset` - SeqLedger dataset name
+  - `root` - SeqLedger root path (required; no fallback)
   - `limit` (optional) - max rows
   - Sequences must be A/C/G/T only
 
 Input paths resolve relative to the config file directory.
 Outputs (tables), logs, and plots must resolve inside `outputs/` under `densegen.run.root`.
-The USR sink may point at an explicit shared USR root outside `outputs/` when
+The SeqLedger sink may point at an explicit shared SeqLedger root outside `outputs/` when
 the study record routes DenseGen directly to the shared dataset.
 
 ---
@@ -204,19 +204,19 @@ the study record routes DenseGen directly to the shared dataset.
 
 
 - `schema`: shared output schema (`bio_type`, `alphabet`) used for IDs and validation (required).
-- `targets`: list of sinks to write (`usr`, `parquet`)
+- `targets`: list of sinks to write (`seqledger`, `parquet`)
 - When multiple targets are set, outputs must be in sync before a run; mismatches are errors.
-- `usr` (required when `targets` includes `usr`)
+- `seqledger` (required when `targets` includes `seqledger`)
   - `dataset`, `root`, `chunk_size`, `health_event_interval_seconds`
-  - `dataset` must be a flat DenseGen-owned owner-first id such as `densegen_demo_sampling_baseline`; keep provenance in USR metadata and study records instead of nested dataset paths
-  - `health_event_interval_seconds` (float > 0; default 60) controls cadence for `densegen_health` USR events
+  - `dataset` must be a flat DenseGen-owned owner-first id such as `densegen_demo_sampling_baseline`; keep provenance in SeqLedger metadata and study records instead of nested dataset paths
+  - `health_event_interval_seconds` (float > 0; default 60) controls cadence for `densegen_health` SeqLedger events
   - `npz_fields` (optional list of metadata keys to offload into NPZ artifacts; see outputs doc)
   - `npz_root` (optional path for NPZ artifacts; defaults to `<dataset>/_artifacts/densegen_npz`)
 - `parquet` (required when `targets` includes `parquet`)
   - `path` (file), `deduplicate`, `chunk_size`
   - `path` must be a `.parquet` file (single-file output)
 - `output.parquet.path` must be inside `outputs/` under `densegen.run.root`
-- `output.usr.root` may point at a shared USR root outside `outputs/` when the
+- `output.usr.root` may point at a shared SeqLedger root outside `outputs/` when the
   study routes DenseGen directly to the shared dataset
 
 ---
@@ -454,7 +454,7 @@ densegen:
 ### `plots`
 
 
-- `source`: `usr | parquet` (required if `output.targets` has multiple sinks)
+- `source`: `seqledger | parquet` (required if `output.targets` has multiple sinks)
 - `out_dir` (optional; default `outputs/plots`; must be inside `outputs/` under `densegen.run.root`)
 - `format` (optional; `png | pdf | svg`, default `pdf`)
 - `default`: list of plot names to run when `dense plot` is invoked

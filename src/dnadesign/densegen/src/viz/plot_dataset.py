@@ -25,7 +25,7 @@ from .plot_common import _apply_style, _save_figure, _style
 _MISSING_LABEL = "(missing)"
 _OTHER_LABEL = "(other)"
 _KNOWN_LABELS = {
-    "usr": "USR",
+    "usr": "SeqLedger",
     "dna": "DNA",
     "tfbs": "TFBS",
     "metadata": "Metadata",

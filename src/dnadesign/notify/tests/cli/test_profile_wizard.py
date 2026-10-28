@@ -108,7 +108,7 @@ def test_profile_wizard_writes_v2_profile_with_env_source(tmp_path: Path, monkey
     assert "url_env" not in data
     assert "Next steps:" in result.stdout
     assert "notify profile doctor --profile" in result.stdout
-    assert "notify usr-events watch --profile" in result.stdout
+    assert "notify seqledger-events watch --profile" in result.stdout
     assert "--dry-run" in result.stdout
     assert "export DENSEGEN_WEBHOOK" in result.stdout
     assert "NOTIFY_PROFILE" in result.stdout
@@ -340,7 +340,7 @@ def test_profile_wizard_stores_secret_ref_when_requested(tmp_path: Path, monkeyp
     assert data["webhook"] == {"source": "secret_ref", "ref": "keychain://dnadesign.notify/demo"}
     assert "Next steps:" in result.stdout
     assert "notify profile doctor --profile" in result.stdout
-    assert "notify usr-events watch --profile" in result.stdout
+    assert "notify seqledger-events watch --profile" in result.stdout
     assert "NOTIFY_PROFILE" in result.stdout
     assert "docs/bu-scc/jobs/notify-watch.qsub" in result.stdout
     assert "export " not in result.stdout
@@ -400,8 +400,8 @@ def test_profile_wizard_rejects_yaml_path_for_events(tmp_path: Path, monkeypatch
         ],
     )
     assert result.exit_code == 1
-    assert "USR .events.log" in result.stdout
-    assert "inspect run --usr-events-path" in result.stdout
+    assert "SeqLedger .events.log" in result.stdout
+    assert "inspect run --seqledger-events-path" in result.stdout
 
 
 def test_profile_wizard_reports_actionable_cursor_directory_error(tmp_path: Path, monkeypatch) -> None:

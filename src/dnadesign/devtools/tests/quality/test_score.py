@@ -23,12 +23,12 @@ def test_build_quality_score_inputs_uses_coverage_summary_and_baseline() -> None
         "gate_passed_tools": 3,
         "gate_total_tools": 3,
         "tools": {
-            "usr": {"actual": 57.0, "baseline": 57.0, "gate": "pass"},
+            "seqledger": {"actual": 57.0, "baseline": 57.0, "gate": "pass"},
             "notify": {"actual": 80.0, "baseline": 80.0, "gate": "pass"},
             "aligner": {"actual": 0.0, "baseline": 0.0, "gate": "pass"},
         },
     }
-    baseline = {"usr": 57.0, "notify": 80.0, "aligner": 0.0}
+    baseline = {"seqledger": 57.0, "notify": 80.0, "aligner": 0.0}
 
     payload = build_quality_score_inputs(
         coverage_summary=coverage_summary,
@@ -52,9 +52,9 @@ def test_build_quality_score_inputs_fails_on_tool_inventory_mismatch() -> None:
         "overall_core": 65.0,
         "gate_passed_tools": 1,
         "gate_total_tools": 1,
-        "tools": {"usr": {"actual": 57.0, "baseline": 57.0, "gate": "pass"}},
+        "tools": {"seqledger": {"actual": 57.0, "baseline": 57.0, "gate": "pass"}},
     }
-    baseline = {"usr": 57.0, "notify": 80.0}
+    baseline = {"seqledger": 57.0, "notify": 80.0}
 
     try:
         build_quality_score_inputs(
@@ -76,10 +76,10 @@ def test_build_quality_score_inputs_fails_on_missing_actual_value() -> None:
         "gate_passed_tools": 1,
         "gate_total_tools": 1,
         "tools": {
-            "usr": {"baseline": 57.0, "gate": "pass"},
+            "seqledger": {"baseline": 57.0, "gate": "pass"},
         },
     }
-    baseline = {"usr": 57.0}
+    baseline = {"seqledger": 57.0}
 
     try:
         build_quality_score_inputs(
@@ -101,10 +101,10 @@ def test_build_quality_score_inputs_fails_on_gate_count_mismatch() -> None:
         "gate_passed_tools": 999,
         "gate_total_tools": 1,
         "tools": {
-            "usr": {"actual": 57.0, "baseline": 57.0, "gate": "pass"},
+            "seqledger": {"actual": 57.0, "baseline": 57.0, "gate": "pass"},
         },
     }
-    baseline = {"usr": 57.0}
+    baseline = {"seqledger": 57.0}
 
     try:
         build_quality_score_inputs(
@@ -126,10 +126,10 @@ def test_build_quality_score_inputs_rejects_bool_gate_counts() -> None:
         "gate_passed_tools": True,
         "gate_total_tools": 1,
         "tools": {
-            "usr": {"actual": 57.0, "baseline": 57.0, "gate": "pass"},
+            "seqledger": {"actual": 57.0, "baseline": 57.0, "gate": "pass"},
         },
     }
-    baseline = {"usr": 57.0}
+    baseline = {"seqledger": 57.0}
 
     try:
         build_quality_score_inputs(
@@ -157,13 +157,13 @@ def test_main_writes_quality_score_inputs(tmp_path: Path) -> None:
                 "gate_passed_tools": 1,
                 "gate_total_tools": 1,
                 "tools": {
-                    "usr": {"actual": 70.0, "baseline": 57.0, "gate": "pass"},
+                    "seqledger": {"actual": 70.0, "baseline": 57.0, "gate": "pass"},
                 },
             }
         ),
         encoding="utf-8",
     )
-    baseline_path.write_text(json.dumps({"usr": 57.0}), encoding="utf-8")
+    baseline_path.write_text(json.dumps({"seqledger": 57.0}), encoding="utf-8")
 
     rc = main(
         [
@@ -185,7 +185,7 @@ def test_main_writes_quality_score_inputs(tmp_path: Path) -> None:
     assert rc == 0
     payload = json.loads(output_path.read_text(encoding="utf-8"))
     assert payload["coverage"]["overall_core"] == 70.0
-    assert payload["tools"][0]["tool"] == "usr"
+    assert payload["tools"][0]["tool"] == "seqledger"
 
 
 def test_main_fails_for_invalid_lane_result(tmp_path: Path) -> None:
@@ -200,13 +200,13 @@ def test_main_fails_for_invalid_lane_result(tmp_path: Path) -> None:
                 "gate_passed_tools": 1,
                 "gate_total_tools": 1,
                 "tools": {
-                    "usr": {"actual": 70.0, "baseline": 57.0, "gate": "pass"},
+                    "seqledger": {"actual": 70.0, "baseline": 57.0, "gate": "pass"},
                 },
             }
         ),
         encoding="utf-8",
     )
-    baseline_path.write_text(json.dumps({"usr": 57.0}), encoding="utf-8")
+    baseline_path.write_text(json.dumps({"seqledger": 57.0}), encoding="utf-8")
 
     rc = main(
         [

@@ -366,7 +366,7 @@ def test_format_workspace_heading_converts_workspace_id_to_readable_title() -> N
 
 
 def test_format_workspace_heading_preserves_known_acronyms() -> None:
-    assert _format_workspace_heading("demo_tfbs_usr_dna") == "Demo TFBS USR DNA"
+    assert _format_workspace_heading("demo_tfbs_usr_dna") == "Demo TFBS SeqLedger DNA"
 
 
 def test_build_workspace_intro_reports_missing_manifest_with_source_tagged_summary(tmp_path: Path) -> None:

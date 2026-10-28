@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/ops/contracts/usr.py
 
-USR producer destination contract adapters for Ops runbook planning.
+SeqLedger producer destination contract adapters for Ops runbook planning.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

@@ -118,7 +118,7 @@ def test_load_config_rejects_ambiguous_operator_roots(tmp_path: Path, root_kind:
         operator_root = tmp_path / "linked-data"
         operator_root.symlink_to(real_root, target_is_directory=True)
 
-    with pytest.raises(ConfigError, match="explicit USR root"):
+    with pytest.raises(ConfigError, match="explicit SeqLedger root"):
         load_config(
             _write(tmp_path / "campaign.yaml", _payload()),
             usr_root=operator_root,
@@ -141,7 +141,7 @@ def test_load_config_rejects_label_source_paths_outside_dataset_root(
     payload = _payload()
     payload["labels"]["source"][field] = value
 
-    with pytest.raises(ConfigError, match=rf"labels\.source\.{field} must be relative to the USR dataset root"):
+    with pytest.raises(ConfigError, match=rf"labels\.source\.{field} must be relative to the SeqLedger dataset root"):
         load_config(_write(tmp_path / "campaign.yaml", payload))
 
 

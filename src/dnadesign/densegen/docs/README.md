@@ -1,7 +1,7 @@
 ## DenseGen documentation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-27
+**Last verified:** 2026-10-28
 
 ### Documentation by workflow
 
@@ -12,12 +12,12 @@
 - [Constitutive sigma panel tutorial](tutorials/study_constitutive_sigma_panel.md): execute a constitutive sigma study workflow.
 
 #### Run with Notify
-- [DenseGen to USR to Notify tutorial](tutorials/demo_usr_notify.md): run event-producing flow across DenseGen, USR, and Notify.
+- [DenseGen to SeqLedger to Notify tutorial](tutorials/demo_usr_notify.md): run event-producing flow across DenseGen, SeqLedger, and Notify.
 - [Observability and events](concepts/runtime/observability-and-events.md): interpret run events, status transitions, and emitted metadata.
 
 #### Continue into shared downstream data-plane flows
-- [Multi-source shared dataset assembly](../../usr/docs/operations/assembly/multi-source-shared-dataset.md): treat DenseGen outputs as one upstream USR source when construct and infer should share one downstream dataset.
-- [Promoter characterization feature matrix](../../usr/docs/operations/promoter/characterization-feature-matrix.md): treat DenseGen outputs as one upstream source when downstream clustering or active learning should consume infer-derived feature columns.
+- [Multi-source shared dataset assembly](../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md): treat DenseGen outputs as one upstream SeqLedger source when construct and infer should share one downstream dataset.
+- [Promoter characterization feature matrix](../../seqledger/docs/operations/promoter/characterization-feature-matrix.md): treat DenseGen outputs as one upstream source when downstream clustering or active learning should consume infer-derived feature columns.
 
 #### Debug a run
 1. [Quick checklist](concepts/checklists/quick-checklist.md): run preflight checks before executing jobs.

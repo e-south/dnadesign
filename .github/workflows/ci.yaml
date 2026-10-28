@@ -220,7 +220,7 @@ jobs:
             src/dnadesign/devtools/tests/docs/test_operations_contracts.py
             src/dnadesign/devtools/tests/docs/test_public_surface_contracts.py
             src/dnadesign/opal/tests/cli/test_docs_workflow_routing.py
-            src/dnadesign/usr/tests/cli/test_cli_command_surface.py
+            src/dnadesign/seqledger/tests/cli/test_cli_command_surface.py
           )
 
           if [ "${{ needs.detect-ci-scope.outputs.run-full-core }}" = "true" ]; then

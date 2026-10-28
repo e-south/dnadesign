@@ -71,7 +71,7 @@ Required evidence:
 - densegen job handle
 
 Boundary:
-- Notify consumes USR `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
+- Notify consumes SeqLedger `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
 
 #### `ondemand_session_request`
 

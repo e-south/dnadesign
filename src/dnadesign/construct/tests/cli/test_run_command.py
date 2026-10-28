@@ -17,8 +17,8 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from dnadesign.construct.src.cli import app
-from dnadesign.usr import Dataset
-from dnadesign.usr import SchemaError as USRSchemaError
+from dnadesign.seqledger import Dataset
+from dnadesign.seqledger import SchemaError as USRSchemaError
 
 _RUNNER = CliRunner()
 
@@ -279,4 +279,4 @@ def test_run_command_shapes_usr_write_errors(tmp_path: Path, monkeypatch) -> Non
     result = _RUNNER.invoke(app, ["run", "--config", config_path.as_posix()])
 
     assert result.exit_code == 1
-    assert "construct run failed while writing USR outputs: overlay attach rejected" in (result.stdout or "")
+    assert "construct run failed while writing SeqLedger outputs: overlay attach rejected" in (result.stdout or "")

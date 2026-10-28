@@ -89,7 +89,7 @@ def test_profile_doctor_rejects_non_usr_events_file(tmp_path: Path, monkeypatch)
     runner = CliRunner()
     result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile)])
     assert result.exit_code == 1
-    assert "USR .events.log" in result.stdout
+    assert "SeqLedger .events.log" in result.stdout
 
 
 def test_profile_doctor_rejects_non_usr_events_file_v2_secret_ref(tmp_path: Path, monkeypatch) -> None:
@@ -114,8 +114,8 @@ def test_profile_doctor_rejects_non_usr_events_file_v2_secret_ref(tmp_path: Path
     runner = CliRunner()
     result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile)])
     assert result.exit_code == 1
-    assert "USR .events.log" in result.stdout
-    assert "inspect run --usr-events-path" in result.stdout
+    assert "SeqLedger .events.log" in result.stdout
+    assert "inspect run --seqledger-events-path" in result.stdout
 
 
 def test_profile_doctor_rejects_legacy_profile_version_1(tmp_path: Path, monkeypatch) -> None:

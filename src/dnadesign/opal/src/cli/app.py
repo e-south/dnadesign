@@ -43,11 +43,11 @@ def _root_callback(
     ),
     usr_root: Path | None = typer.Option(
         None,
-        "--usr-root",
+        "--seqledger-root",
         file_okay=False,
         dir_okay=True,
         resolve_path=False,
-        help="Absolute operator-managed USR dataset root for campaigns with data.location.kind=usr.",
+        help="Absolute operator-managed SeqLedger dataset root for campaigns with data.location.kind=usr.",
     ),
 ) -> None:
     """

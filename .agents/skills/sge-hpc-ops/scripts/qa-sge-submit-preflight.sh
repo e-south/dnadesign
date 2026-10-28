@@ -115,7 +115,7 @@ check_template() {
     return
   fi
 
-  if rg -q 'notify[[:space:]]+usr-events[[:space:]]+watch' "$template"; then
+  if rg -q 'notify[[:space:]]+seqledger-events[[:space:]]+watch' "$template"; then
     is_notify_watcher=1
   fi
 

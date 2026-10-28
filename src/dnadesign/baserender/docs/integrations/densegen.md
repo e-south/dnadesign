@@ -1,7 +1,7 @@
 # DenseGen Integration Contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-10-28
 
 
 This page defines how DenseGen record outputs map into `baserender`.
@@ -77,7 +77,7 @@ Do not import from `dnadesign.baserender.src.*`.
 ## DenseGen notebook boundary
 
 `dense notebook generate` resolves one records parquet source from DenseGen output wiring:
-- single sink -> that sink (`parquet` or `usr`)
+- single sink -> that sink (`parquet` or `seqledger`)
 - multiple sinks -> `plots.source`
 The scaffolded notebook then uses BaseRender public API helpers (`load_records_from_parquet`, `render_record_figure`) with the DenseGen contract module.
 

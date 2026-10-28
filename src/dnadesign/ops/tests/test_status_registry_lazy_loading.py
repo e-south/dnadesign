@@ -52,11 +52,11 @@ def test_status_registry_fragments_load_provider_owned_specs() -> None:
     )
     assert supported_specs["ops-audit-json"].owner_boundary == "ops"
     assert supported_specs["ops-audit-json"].observes_plane == "control"
-    assert supported_specs["usr-dataset-state"].provider_ref == (
-        "dnadesign.usr.ops.status_providers:provide_usr_dataset_state_status"
+    assert supported_specs["seqledger-dataset-state"].provider_ref == (
+        "dnadesign.seqledger.ops.status_providers:provide_usr_dataset_state_status"
     )
-    assert supported_specs["usr-dataset-state"].owner_boundary == "usr"
-    assert supported_specs["usr-dataset-state"].observes_plane == "data"
+    assert supported_specs["seqledger-dataset-state"].owner_boundary == "seqledger"
+    assert supported_specs["seqledger-dataset-state"].observes_plane == "data"
     assert supported_specs["cluster-run-index"].provider_ref == (
         "dnadesign.cluster.ops.status_providers:provide_cluster_run_index_status"
     )
@@ -89,8 +89,8 @@ def test_builtin_lookup_does_not_load_optional_registry_plugins(monkeypatch: pyt
 
     monkeypatch.setattr(registry_loader, "entry_points", discover)
     registry_loader.list_status_kind_specs.cache_clear()
-    spec = registry_loader.load_status_kind_spec("usr-dataset-state")
-    assert spec.owner_boundary == "usr"
+    spec = registry_loader.load_status_kind_spec("seqledger-dataset-state")
+    assert spec.owner_boundary == "seqledger"
 
 
 def test_full_registry_inventory_identifies_a_broken_plugin(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -117,7 +117,7 @@ print(json.dumps(sorted(
     name for name in sys.modules
     if name in {
         'dnadesign.ops.providers.builtin.status_provider',
-        'dnadesign.usr.ops.status_providers',
+        'dnadesign.seqledger.ops.status_providers',
         'dnadesign.latentdna.ops.status_providers',
         'dnadesign.opal.src.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
@@ -331,7 +331,7 @@ def test_status_registry_fragments_are_included_as_package_data() -> None:
         "dnadesign.latentdna": ("ops/status.registry.yaml",),
         "dnadesign.opal": ("src/ops/status.registry.yaml",),
         "dnadesign.ops": ("providers/builtin/status.registry.yaml",),
-        "dnadesign.usr": ("ops/status.registry.yaml",),
+        "dnadesign.seqledger": ("ops/status.registry.yaml",),
     }
     for package_name, patterns in expected_patterns.items():
         for pattern in patterns:
@@ -519,7 +519,7 @@ print(json.dumps(sorted(
     name for name in sys.modules
     if name in {
         'dnadesign.ops.providers.builtin.status_provider',
-        'dnadesign.usr.ops.status_providers',
+        'dnadesign.seqledger.ops.status_providers',
         'dnadesign.latentdna.ops.status_providers',
         'dnadesign.opal.src.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
@@ -545,7 +545,7 @@ print(json.dumps(sorted(
     name for name in sys.modules
     if name in {
         'dnadesign.ops.providers.builtin.status_provider',
-        'dnadesign.usr.ops.status_providers',
+        'dnadesign.seqledger.ops.status_providers',
         'dnadesign.latentdna.ops.status_providers',
         'dnadesign.opal.src.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
@@ -695,7 +695,7 @@ print(json.dumps(sorted(
         'dnadesign.ops.status.campaign',
         'dnadesign.ops.status.service',
         'dnadesign.ops.providers.builtin.status_provider',
-        'dnadesign.usr.ops.status_providers',
+        'dnadesign.seqledger.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
         'dnadesign.opal.src.ops.status_providers',
     }
@@ -723,7 +723,7 @@ print(json.dumps(sorted(
     name for name in sys.modules
     if name in {
         'dnadesign.ops.providers.builtin.status_provider',
-        'dnadesign.usr.ops.status_providers',
+        'dnadesign.seqledger.ops.status_providers',
         'dnadesign.cluster.ops.status_providers',
         'dnadesign.opal.src.ops.status_providers',
     }

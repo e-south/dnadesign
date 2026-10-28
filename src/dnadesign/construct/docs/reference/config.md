@@ -1,7 +1,7 @@
 ## Construct config reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-24
+**Last verified:** 2026-10-28
 
 ### Job shape
 
@@ -65,21 +65,21 @@ job:
 
 ### Input
 
-- `input.source.kind`: current backend selector; today this must be `usr`
-- `input.source.dataset`: required USR dataset id
-- `input.source.root`: required explicit USR root for construct jobs that read USR datasets
+- `input.source.kind`: current backend selector; today this must be `seqledger`
+- `input.source.dataset`: required SeqLedger dataset id
+- `input.source.root`: required explicit SeqLedger root for construct jobs that read SeqLedger datasets
 - `input.field`: primary sequence-bearing field for one-slot jobs; set this to
   `null` only when every variable `input_field` part declares its own
   `part.sequence.field`
 - `input.ids`: optional subset of record ids for selective realization
-- construct decides whether a sequence is used as a focal part or as a template; do not encode that role in the USR dataset id itself
+- construct decides whether a sequence is used as a focal part or as a template; do not encode that role in the SeqLedger dataset id itself
 - flat `input.dataset`, `input.root`, and scalar `input.source: usr` are rejected; `input.source` must be a mapping
 
 ### Template
 
 Supported sources:
 
-- `template.source.kind: usr`: resolve from a USR record
+- `template.source.kind: usr`: resolve from a SeqLedger record
 - `template.source.kind: path`: load from a path-backed single-sequence file or single-record FASTA
 - `template.source.kind: literal`: inline sequence in config
 
@@ -170,7 +170,7 @@ native/reference sequence.
 - `job.normalize_anchor.under_length_policy.kind=expand_from_template`: expand a short parent sequence only from an explicit template context
 - `job.normalize_anchor.feature_retention_policy`: fail/warn rules for retained, clipped, and lost annotated roles
 - `job.normalize_anchor.fallback_policy.allow_low_confidence`: opt-in gate for low-confidence selectors such as `sequence_midpoint`
-- `job.normalize_anchor.output_sequence_view.create`: emit a USR `_views/sequence_views.parquet` row for the derived product
+- `job.normalize_anchor.output_sequence_view.create`: emit a SeqLedger `_views/sequence_views.parquet` row for the derived product
 
 Supported focal selectors:
 
@@ -258,10 +258,10 @@ whole-output reverse-complement products from one realized forward construct.
 
 ### Output
 
-- `output.target.kind`: current write backend selector; today this must be `usr`
-- `output.target.dataset`: required USR dataset id
-- `output.target.root`: explicit output USR root; when omitted it defaults to `input.source.root`
-- `output.record_source`: optional human-readable source string written onto emitted USR rows
+- `output.target.kind`: current write backend selector; today this must be `seqledger`
+- `output.target.dataset`: required SeqLedger dataset id
+- `output.target.root`: explicit output SeqLedger root; when omitted it defaults to `input.source.root`
+- `output.record_source`: optional human-readable source string written onto emitted SeqLedger rows
 - `output.on_conflict`:
   - `error`: fail during preflight if any planned output id already exists
   - `ignore`: skip already-present output ids during run

@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Mapping
 
-from dnadesign.usr import (
+from dnadesign.seqledger import (
     OVERLAY_DIGEST_LEDGER_FILENAME,
     OVERLAY_PART_PREFIX,
     build_overlay_digest_ledger,

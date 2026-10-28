@@ -17,10 +17,10 @@ from typing import Any
 
 import pyarrow.parquet as pq
 
-from dnadesign.usr import (
+from dnadesign.seqledger import (
     Dataset,
-    normalize_usr_root,
-    resolve_usr_root_from_env,
+    normalize_seqledger_root,
+    resolve_seqledger_root_from_env,
     sequence_views_path,
 )
 
@@ -63,10 +63,10 @@ def bundle_uses_sequence_views(bundle: SequenceFeatureBundleConfig) -> bool:
 
 def _resolve_usr_root(value: str | None) -> Path:
     if value is not None and str(value).strip():
-        return normalize_usr_root(value)
-    resolved = resolve_usr_root_from_env()
+        return normalize_seqledger_root(value)
+    resolved = resolve_seqledger_root_from_env()
     if resolved is None:
-        raise ValidationError("Sequence-view feature bundles require input.root or DNADESIGN_USR_ROOT.")
+        raise ValidationError("Sequence-view feature bundles require input.root or DNADESIGN_SEQLEDGER_ROOT.")
     return resolved
 
 

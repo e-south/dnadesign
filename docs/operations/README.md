@@ -7,10 +7,10 @@
 **Exit artifact:** Ops schema, plan, execute, or read-only progress docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-09
+**Last verified:** 2026-10-28
 
 Batch orchestration and read-only Ops status checks start here. Dataset
-assembly, construct realization, and infer write-back stay in the shared USR
+assembly, construct realization, and infer write-back stay in the shared SeqLedger
 runbooks. Detailed command behavior and schema rules live in
 [orchestration runbooks](orchestration/runbooks.md); command lookup lives in
 the [runbook catalog](../runbooks/README.md).
@@ -40,7 +40,7 @@ the [runbook catalog](../runbooks/README.md).
 4. Use [Contracts](#contracts) when you need the exact schema or command rules.
 5. Use [Status and manifest routes](#status-and-manifest-routes) when you need a read-only summary or an explicit manifest.
 6. Run the [Verification loop](#verification-loop) before any submit.
-7. Leave Ops for the shared USR runbooks when the next step changes datasets rather than scheduler state.
+7. Leave Ops for the shared SeqLedger runbooks when the next step changes datasets rather than scheduler state.
 
 ### Command lookup
 
@@ -74,18 +74,18 @@ Use these when you still need command lookup before choosing a runbook lifecycle
 
 1. Use `uv run ops progress explain <registry-id>` to see the required flags and a ready-to-paste `progress show` command before you touch artifacts.
 2. Use `uv run ops progress show ops.control-plane.orchestration --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json` to summarize one control-plane runbook execution from the registered progress contract.
-3. Use `uv run ops progress show usr.data-plane.promoter-feature-matrix --repo-root <repo-root> --usr-root <usr-root> --dataset <dataset>` to summarize one staged USR-backed data-plane procedure from explicit artifacts.
+3. Use `uv run ops progress show seqledger.data-plane.promoter-feature-matrix --repo-root <repo-root> --seqledger-root <seqledger-root> --dataset <dataset>` to summarize one staged SeqLedger-backed data-plane procedure from explicit artifacts.
 4. `ops progress show` and `ops progress campaign` are read-only status commands. Inspect the required flags in `ops progress explain <registry-id>` or `ops catalog show <registry-id>` before you run them if you do not already know the artifact contract.
-5. Use `uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` to emit a manifest template with the right required fields. It prints to stdout unless you pass `--out`.
-6. Use `uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>` when you want the named registered procedure plus its related procedures as a starting point.
+5. Use `uv run ops progress scaffold ops.control-plane.orchestration seqledger.data-plane.promoter-feature-matrix --repo-root <repo-root>` to emit a manifest template with the right required fields. It prints to stdout unless you pass `--out`.
+6. Use `uv run ops progress scaffold --related-to seqledger.data-plane.promoter-feature-matrix --repo-root <repo-root>` when you want the named registered procedure plus its related procedures as a starting point.
 7. Use `uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>` when the work spans multiple runtimes or pauses between steps.
 8. Keep the manifest explicit. Ops reads the files you name there; it does not infer hidden campaign state.
 9. For external study status, install the study package and use its registered provider. Dnadesign does not select or interpret a study workspace.
 10. For status-kind meanings and the next checks for each one, see the [runbook catalog status views](../runbooks/README.md#status-views).
-11. If the next step is dataset assembly, construct realization, or infer write-back, leave Ops and continue in the shared USR runbooks:
-    [Multi-source shared dataset assembly](../../src/dnadesign/usr/docs/operations/assembly/multi-source-shared-dataset.md),
-    [Construct -> USR -> Infer shared dataset runbook](../../src/dnadesign/usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md),
-    or [Promoter characterization feature matrix](../../src/dnadesign/usr/docs/operations/promoter/characterization-feature-matrix.md).
+11. If the next step is dataset assembly, construct realization, or infer write-back, leave Ops and continue in the shared SeqLedger runbooks:
+    [Multi-source shared dataset assembly](../../src/dnadesign/seqledger/docs/operations/assembly/multi-source-shared-dataset.md),
+    [Construct -> SeqLedger -> Infer shared dataset runbook](../../src/dnadesign/seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md),
+    or [Promoter characterization feature matrix](../../src/dnadesign/seqledger/docs/operations/promoter/characterization-feature-matrix.md).
 
 ### Verification loop
 
@@ -110,8 +110,8 @@ uv run ops runbook diagnostics submit-shape-advisor --qstat-file <fixture> --pla
 uv run ops runbook diagnostics operator-brief --qstat-file <fixture> --planned-submits <N> --warn-over-running 3
 uv run ops progress explain ops.control-plane.orchestration
 uv run ops progress show ops.control-plane.orchestration --repo-root <repo-root> --audit-json <workspace-root>/outputs/logs/ops/audit/<file>.json
-uv run ops progress scaffold ops.control-plane.orchestration usr.data-plane.promoter-feature-matrix --repo-root <repo-root>
-uv run ops progress scaffold --related-to usr.data-plane.promoter-feature-matrix --repo-root <repo-root>
+uv run ops progress scaffold ops.control-plane.orchestration seqledger.data-plane.promoter-feature-matrix --repo-root <repo-root>
+uv run ops progress scaffold --related-to seqledger.data-plane.promoter-feature-matrix --repo-root <repo-root>
 uv run ops progress campaign --repo-root <repo-root> --manifest <manifest.yaml>
 ```
 

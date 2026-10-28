@@ -67,8 +67,8 @@ if command -v gcc >/dev/null 2>&1; then
   export CUDAHOSTCXX="${CUDAHOSTCXX:-$(which g++)}"
 fi
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-${NSLOTS:-1}}"
-export USR_ACTOR_TOOL="${USR_ACTOR_TOOL:-permuter}"
-export USR_ACTOR_RUN_ID="${USR_ACTOR_RUN_ID:-$trace_suffix}"
+export SEQLEDGER_ACTOR_TOOL="${SEQLEDGER_ACTOR_TOOL:-permuter}"
+export SEQLEDGER_ACTOR_RUN_ID="${SEQLEDGER_ACTOR_RUN_ID:-$trace_suffix}"
 
 out_args=()
 if [[ -n "${PERMUTER_OUT:-}" ]]; then

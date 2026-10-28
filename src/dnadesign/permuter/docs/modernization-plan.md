@@ -4,7 +4,7 @@
 **Owner:** dnadesign-maintainers
 **Owner-boundary:** `src/dnadesign/permuter`
 **Status:** core contract slices implemented
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-28
 
 ## Outcome
 
@@ -14,7 +14,7 @@ workspace-scoped CLI execution, explicit dataset identity, namespaced metric
 columns, and a non-executing Infer feature-request handoff.
 
 The package owns variant intent and materialization mechanics. It does not own
-USR synchronization, Construct placement, study interpretation, Infer feature
+SeqLedger synchronization, Construct placement, study interpretation, Infer feature
 sidecars, or Ops run-state semantics.
 
 ## Current Architecture
@@ -68,7 +68,7 @@ materialized.
 
 Materialized identity is deliberately split:
 
-- `id` is the canonical USR sequence identity derived from `bio_type` and
+- `id` is the canonical SeqLedger sequence identity derived from `bio_type` and
   `sequence`.
 - `permuter__var_id` is the Permuter request/variant identity preserved from
   `VariantRecord.id`.
@@ -164,7 +164,7 @@ workflow directly.
 - Protein-native and coding-DNA-backed DMS are separate explicit request types.
 - Checked-in runnable examples remain workspace scopes under
   `src/dnadesign/permuter/workspaces/`.
-- Generated datasets remain workspace-Parquet artifacts. USR event logs,
+- Generated datasets remain workspace-Parquet artifacts. SeqLedger event logs,
   overlay synchronization, and Infer sidecar reuse belong to their owning
   tools.
 - Unsupported protocol, metric, identity, and layout names fail; do not add

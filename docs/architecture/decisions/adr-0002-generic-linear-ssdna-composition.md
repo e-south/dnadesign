@@ -31,7 +31,7 @@ The workflow:
   `annotation_spans`
 - expands repeated units deterministically with copy-level spans
 - validates declared reverse-complement transforms and assertions
-- writes local artifact bundles before any optional USR persistence
+- writes local artifact bundles before any optional SeqLedger persistence
 - emits FASTA, GenBank, feature CSV, and `sequence_evidence_map_v1` sidecars
 
 Folding remains a separate backend-neutral contract under
@@ -44,7 +44,7 @@ does not run folding or assemble sequences.
 - keeps Construct generic rather than Retron-specific
 - preserves Cruncher as the primitive solver boundary
 - makes sequence, span, and provenance artifacts inspectable without requiring
-  USR schema decisions in the first slice
+  SeqLedger schema decisions in the first slice
 - keeps scar-nick source refs as provenance/projection inputs rather than raw
   sequence imports
 - creates a typed handoff to later folding and rendering phases
@@ -59,7 +59,7 @@ does not run folding or assemble sequences.
   - BaseRender-ready component-span visualization
   - explicit preflight, version capture, and advisory missing-backend states
     for the ViennaRNA Python API and the ViennaRNA `RNAfold` CLI interface
-  - later USR import from stable local artifacts
+  - later SeqLedger import from stable local artifacts
 
 - What becomes harder
   - Construct has a second runtime family beside template-anchor jobs
@@ -72,7 +72,7 @@ does not run folding or assemble sequences.
 ### Boundaries
 - Construct must not import Cruncher private modules.
 - Cruncher artifacts are consumed later through declared source refs, public
-  contracts, files, or USR rows.
+  contracts, files, or SeqLedger rows.
 - YIU remains contrast-only for the retron hairpin study.
 - Folding is advisory by default until a future config makes it a hard gate.
 - Folding request execution must go through `dnadesign.folding` public API or

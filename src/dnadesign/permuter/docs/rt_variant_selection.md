@@ -2,7 +2,7 @@
 ### Multi‑site mutant variant selection
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-24
+**Last verified:** 2026-10-28
 
 This is a historical RT multi-site selection note refreshed for the current
 workspace and metric-column contracts. Treat the concrete embedding sizes and
@@ -54,7 +54,7 @@ From the source multi‑mutant dataset (`records.parquet`, e.g. from a `combine_
 * **Proposal info**
 
   * `permuter__proposal_score` (optional scalar)
-* **USR core columns** (from `run.py`)
+* **SeqLedger core columns** (from `run.py`)
 
   * `id`, `sequence`, `bio_type`, `alphabet`, `length`, `source`, `created_at`
 * **Optional sidecars**

@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/tests/cli/test_prune_command.py
 
-CLI contract tests for infer namespace prune workflows against USR datasets.
+CLI contract tests for infer namespace prune workflows against SeqLedger datasets.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -18,7 +18,7 @@ from typer.testing import CliRunner
 from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.infer.cli import app
 from dnadesign.infer.src.writers.usr import write_back_usr
-from dnadesign.usr import Dataset
+from dnadesign.seqledger import Dataset
 
 _RUNNER = CliRunner()
 
@@ -47,7 +47,7 @@ def test_prune_usr_archives_infer_overlay_by_default(tmp_path: Path) -> None:
         overwrite=False,
     )
 
-    result = _RUNNER.invoke(app, ["prune", "--usr", "demo", "--usr-root", root.as_posix()])
+    result = _RUNNER.invoke(app, ["prune", "--seqledger", "demo", "--seqledger-root", root.as_posix()])
 
     assert result.exit_code == 0, result.stdout
     output = result.stdout or ""
@@ -70,7 +70,7 @@ def test_prune_usr_fails_fast_when_infer_overlay_is_missing(tmp_path: Path) -> N
     ds = Dataset(root, "demo")
     ds.init(source="unit-test")
 
-    result = _RUNNER.invoke(app, ["prune", "--usr", "demo", "--usr-root", root.as_posix()])
+    result = _RUNNER.invoke(app, ["prune", "--seqledger", "demo", "--seqledger-root", root.as_posix()])
 
     assert result.exit_code == 2
     assert "Overlay 'infer' not found." in (result.stdout or "")

@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/densegen/tests/runtime/test_usr_sequences_source.py
 
-USR sequence source behavior tests.
+SeqLedger sequence source behavior tests.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -16,8 +16,8 @@ from pathlib import Path
 import pyarrow.parquet as pq
 
 from dnadesign.densegen.src.adapters.sources.usr_sequences import USRSequencesDataSource
-from dnadesign.usr import Dataset
-from dnadesign.usr.src.registry import USR_STATE_COLUMNS, USR_STATE_NAMESPACE, register_namespace
+from dnadesign.seqledger import Dataset
+from dnadesign.seqledger.src.registry import USR_STATE_COLUMNS, USR_STATE_NAMESPACE, register_namespace
 
 
 def test_usr_sequences_source_streams_without_full_parquet_read(monkeypatch, tmp_path: Path) -> None:

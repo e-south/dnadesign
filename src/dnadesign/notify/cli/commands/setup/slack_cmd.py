@@ -29,7 +29,7 @@ def register_setup_slack_command(
             "--profile",
             help="Path to profile JSON file.",
         ),
-        events: Path | None = typer.Option(None, "--events", help="USR .events.log path for existing runs."),
+        events: Path | None = typer.Option(None, "--events", help="SeqLedger .events.log path for existing runs."),
         tool: str | None = typer.Option(
             None,
             "--tool",
@@ -66,7 +66,7 @@ def register_setup_slack_command(
         include_raw_event: bool = typer.Option(
             False,
             "--include-raw-event/--no-include-raw-event",
-            help="Whether to include the full USR event blob in payload meta.",
+            help="Whether to include the full SeqLedger event blob in payload meta.",
         ),
         progress_step_pct: int | None = typer.Option(
             None,

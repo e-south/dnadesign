@@ -36,7 +36,7 @@ _KNOWN_ACRONYMS = {
     "gurobi": "GUROBI",
     "pwm": "PWM",
     "tfbs": "TFBS",
-    "usr": "USR",
+    "usr": "SeqLedger",
 }
 _DENSEGEN_BASERENDER_FONT_SIZE = 24
 _DENSEGEN_BASERENDER_LEGEND_HEIGHT_PX = 136.0

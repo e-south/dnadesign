@@ -35,9 +35,9 @@ Runbook mode is explicit: `fresh|resume|analysis`. Wrappers default to `fresh` a
 - `archived/`: preserved historical local runs.
 - Local workspaces created by `dense workspace init` are expected under this root unless you set `DENSEGEN_WORKSPACE_ROOT`.
 
-### USR root semantics
+### SeqLedger root semantics
 
-- DenseGen `usr` workspaces write to an explicit shared USR root.
+- DenseGen `seqledger` workspaces write to an explicit shared SeqLedger root.
 - Use a workspace-local export root only when the calling project deliberately
   keeps the dataset local.
 - Downstream tools must read the same declared shared root rather than infer a

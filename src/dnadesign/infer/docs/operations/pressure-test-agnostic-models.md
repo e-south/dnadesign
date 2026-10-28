@@ -1,9 +1,9 @@
-## Infer Pressure Test: Agnostic Model Namespaces + USR Write-Back
+## Infer Pressure Test: Agnostic Model Namespaces + SeqLedger Write-Back
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-25
+**Last verified:** 2026-10-28
 
-This guide pressure-tests infer as a model-agnostic extraction engine with explicit namespace contracts and USR write-back.
+This guide pressure-tests infer as a model-agnostic extraction engine with explicit namespace contracts and SeqLedger write-back.
 
 For a full walkthrough, use the [end-to-end demo tutorial](../tutorials/demo_pressure_test_usr_ops_notify.md).
 
@@ -12,7 +12,7 @@ For deterministic SCC GPU environment setup before pressure runs, use the [SCC E
 ### Objective
 
 - run extract jobs that produce multiple outputs (for example logits + log-likelihood ratio variants),
-- ensure outputs attach to USR with infer-prefixed namespaced columns:
+- ensure outputs attach to SeqLedger with infer-prefixed namespaced columns:
   - `infer__<model_id>__<job_id>__<out_id>`
 - support local CLI execution and ops runbook orchestration.
 
@@ -21,10 +21,10 @@ For deterministic SCC GPU environment setup before pressure runs, use the [SCC E
 - Use `--dry-run` and `--no-submit` first.
 - Use read-only scheduler checks before submit (`qstat -u "$USER"`).
 - Keep `ingest.root` explicit for workspace and cluster runs.
-- For fresh USR test datasets, register exact infer output types before write-back:
+- For fresh SeqLedger test datasets, register exact infer output types before write-back:
   - pooled Evo2 likelihoods are `float64`
   - pooled Evo2 logits are `list<float64>`
-- Use `infer validate usr-registry --config ...` to derive the exact namespace registration command from the active infer config.
+- Use `infer validate seqledger-registry --config ...` to derive the exact namespace registration command from the active infer config.
 
 ## Ordered procedure
 
@@ -34,28 +34,28 @@ For deterministic SCC GPU environment setup before pressure runs, use the [SCC E
 uv run infer workspace init --id demo_usr_pressure --profile usr-pressure # Create the pressure-test workspace scaffold.
 export WORKSPACE_ROOT="$PWD/workspaces/demo_usr_pressure" # Pin workspace root for subsequent commands.
 export INFER_CONFIG="$WORKSPACE_ROOT/config.yaml" # Reuse one config path across checks and runs.
-export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets" # Point USR tooling at workspace-local datasets.
+export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets" # Point SeqLedger tooling at workspace-local datasets.
 export DATASET_ID="infer_pressure_demo" # Set target dataset id once for repeatable CLI calls.
 ```
 
 
 The scaffold creates directories and a config, but no input dataset. First
-prepare the USR registry from the configured output types:
+prepare the SeqLedger registry from the configured output types:
 
 ```bash
 # Print the namespace registration command for this config.
-uv run infer validate usr-registry --config "$INFER_CONFIG"
+uv run infer validate seqledger-registry --config "$INFER_CONFIG"
 ```
 
 Run the command printed after `register:` to create the registry. Then create
 the dataset and import the included sequences:
 
 ```bash
-# Create the dataset under the registered USR root.
-uv run usr --root "$USR_ROOT" init "$DATASET_ID" --source "infer demo"
+# Create the dataset under the registered SeqLedger root.
+uv run seqledger --root "$USR_ROOT" init "$DATASET_ID" --source "infer demo"
 # Import the included DNA sequences.
-uv run usr --root "$USR_ROOT" import "$DATASET_ID" --from csv \
-  --path src/dnadesign/usr/assets/demo_material/demo_sequences.csv \
+uv run seqledger --root "$USR_ROOT" import "$DATASET_ID" --from csv \
+  --path src/dnadesign/seqledger/assets/demo_material/demo_sequences.csv \
   --bio-type dna --alphabet dna_4
 ```
 
@@ -63,8 +63,8 @@ uv run usr --root "$USR_ROOT" import "$DATASET_ID" --from csv \
 
 ```bash
 uv run infer validate config --config "$INFER_CONFIG" # Check config schema and runtime contracts.
-uv run infer validate usr-registry --config "$INFER_CONFIG" # Derive/verify namespace registration requirements.
-uv run infer run --config "$INFER_CONFIG" --dry-run # Exercise execution-path contracts without mutating datasets; USR jobs still preflight the resolved dataset.
+uv run infer validate seqledger-registry --config "$INFER_CONFIG" # Derive/verify namespace registration requirements.
+uv run infer run --config "$INFER_CONFIG" --dry-run # Exercise execution-path contracts without mutating datasets; SeqLedger jobs still preflight the resolved dataset.
 ```
 
 If output definitions change, rerun namespace registration before inference.
@@ -75,11 +75,11 @@ If output definitions change, rerun namespace registration before inference.
 uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr # Run the pressure job locally.
 ```
 
-### 4) Verify USR state and events
+### 4) Verify SeqLedger state and events
 
 ```bash
-uv run usr --root "$USR_ROOT" head "$DATASET_ID" -n 5 # Inspect resulting records after write-back.
-uv run usr --root "$USR_ROOT" events tail "$DATASET_ID" -n 20 # Confirm infer event emission for the dataset.
+uv run seqledger --root "$USR_ROOT" head "$DATASET_ID" -n 5 # Inspect resulting records after write-back.
+uv run seqledger --root "$USR_ROOT" events tail "$DATASET_ID" -n 20 # Confirm infer event emission for the dataset.
 ```
 
 ### 5) Resume and prune the infer namespace when needed
@@ -93,7 +93,7 @@ uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr # Confi
 To reset only infer outputs for the dataset, archive the infer overlay and rerun:
 
 ```bash
-uv run infer prune --usr "$DATASET_ID" --usr-root "$USR_ROOT" # Archive infer overlay columns for a clean rerun.
+uv run infer prune --seqledger "$DATASET_ID" --seqledger-root "$USR_ROOT" # Archive infer overlay columns for a clean rerun.
 uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr # Re-run pressure job after infer namespace reset.
 ```
 
@@ -157,8 +157,8 @@ uv run infer extract \
   --model-id evo2_7b \
   --fn evo2.log_likelihood \
   --format float \
-  --usr "$DATASET_ID" \
-  --usr-root "$USR_ROOT" \
+  --seqledger "$DATASET_ID" \
+  --seqledger-root "$USR_ROOT" \
   --field sequence \
   --write-back
 ```

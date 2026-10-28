@@ -18,7 +18,7 @@ import pytest
 from dnadesign.construct.src.contracts.errors import ValidationError
 from dnadesign.construct.src.interfaces.api import preflight_from_config, run_from_config
 from dnadesign.construct.tests.runtime.run_construct_helpers import write_registry as _write_registry
-from dnadesign.usr import Dataset
+from dnadesign.seqledger import Dataset
 
 
 def test_preflight_uses_one_explicit_usr_root_for_all_dataset_roles(tmp_path: Path) -> None:

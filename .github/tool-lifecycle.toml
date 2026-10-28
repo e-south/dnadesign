@@ -17,7 +17,7 @@ opal = {status = "active", catalog = true}
 ops = {status = "active", catalog = true}
 permuter = {status = "active", catalog = true}
 thread = {status = "active", catalog = true}
-usr = {status = "active", catalog = true}
+seqledger = {status = "active", catalog = true}
 contracts = {status = "active", catalog = true}
 artifacts = {status = "active", catalog = false}
 devtools = {status = "active", catalog = false, installed = false}

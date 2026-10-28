@@ -1,4 +1,13 @@
-"""Committed feature parts retain exact values across append and migration."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/infer/tests/runtime/test_payload_parts.py
+
+Committed feature parts retain exact values across append and migration.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 import json
 import math
@@ -11,7 +20,7 @@ import pytest
 
 from dnadesign.contracts.feature_payloads import manifest_path, parts_path, payload_files
 from dnadesign.infer.src.features import aliases, payload_store
-from dnadesign.usr import Dataset, ensure_sequence_contract_namespaces
+from dnadesign.seqledger import Dataset, ensure_sequence_contract_namespaces
 
 
 def _dataset(tmp_path: Path) -> Dataset:

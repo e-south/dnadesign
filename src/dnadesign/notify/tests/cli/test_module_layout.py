@@ -110,7 +110,7 @@ def test_notify_help_lists_usr_events_and_spool_groups() -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "usr-events" in result.stdout
+    assert "seqledger-events" in result.stdout
     assert "spool" in result.stdout
     assert "profile" in result.stdout
 

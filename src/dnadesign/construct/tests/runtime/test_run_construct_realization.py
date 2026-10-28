@@ -16,7 +16,7 @@ from pathlib import Path
 
 from dnadesign.construct.src.interfaces.api import run_from_config
 from dnadesign.construct.tests.runtime.run_construct_helpers import write_registry as _write_registry
-from dnadesign.usr import Dataset
+from dnadesign.seqledger import Dataset
 
 
 def test_run_construct_realizes_multi_part_linear_window(tmp_path: Path) -> None:

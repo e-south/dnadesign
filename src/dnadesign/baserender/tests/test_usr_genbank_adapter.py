@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/baserender/tests/test_usr_genbank_adapter.py
 
-USR GenBank annotation adapter and render-contract tests.
+SeqLedger GenBank annotation adapter and render-contract tests.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

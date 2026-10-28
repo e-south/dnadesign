@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from dnadesign.usr import SequencesError
+from dnadesign.seqledger import SequencesError
 
 from ..contracts.errors import SourceResolutionError
 from ..contracts.workspace import (

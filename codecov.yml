@@ -39,10 +39,10 @@ component_management:
         if_ci_failed: error
         if_not_found: failure
   individual_components:
-    - component_id: usr
-      name: usr
+    - component_id: seqledger
+      name: seqledger
       paths:
-        - src/dnadesign/usr/**
+        - src/dnadesign/seqledger/**
     - component_id: ops
       name: ops
       paths:

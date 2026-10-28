@@ -3,7 +3,7 @@ id: opal-campaign-round
 title: OPAL campaign round
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-10-26
+last_verified: 2026-10-28
 ---
 
 # Campaign round
@@ -36,8 +36,8 @@ into your campaign's `configs/campaign.yaml`. Adapt these fields:
 
 The example fits a scalar response and requests the top five candidates,
 preserving ties at the selection cutoff.
-For a USR dataset with existing features, follow the
-[USR workflow](usr-infer-x-active-learning.md). Plugin replacements must agree
+For a SeqLedger dataset with existing features, follow the
+[SeqLedger workflow](seqledger-infer-x-active-learning.md). Plugin replacements must agree
 on target shape, score channels and uncertainty channels.
 
 `expected_improvement` requires both `score_ref` and `uncertainty_ref`. The
@@ -48,7 +48,7 @@ objective. OPAL stops if the channel is absent or incompatible.
 
 With the [OPAL environment activated](../index.md#try-a-complete-selection-round),
 run these commands from your campaign directory. The campaign does not need its
-own Python project or USR dataset:
+own Python project or SeqLedger dataset:
 
 ```bash
 # Check the config and input records without writing campaign state.

@@ -207,7 +207,7 @@ def export(
 
 @app.command(
     "validate",
-    help="Validate USR core columns, ID integrity, and required permuter columns (strict mode).",
+    help="Validate SeqLedger core columns, ID integrity, and required permuter columns (strict mode).",
 )
 def validate(
     data: Path = typer.Option(..., "--data", "-d", exists=True, readable=True),

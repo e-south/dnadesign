@@ -21,7 +21,7 @@ from Bio.Seq import Seq
 from dnadesign.construct.src.contracts.errors import ValidationError
 from dnadesign.construct.src.interfaces.api import run_from_config
 from dnadesign.construct.src.persistence.usr_registry import _ensure_construct_registry
-from dnadesign.usr import Dataset
+from dnadesign.seqledger import Dataset
 
 
 def _register_candidate_slot_overlay(root: Path) -> None:

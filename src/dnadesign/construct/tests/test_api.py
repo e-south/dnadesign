@@ -17,7 +17,7 @@ import pytest
 
 from dnadesign.construct import preflight_from_config, run_from_config
 from dnadesign.construct.src.contracts.errors import ExecutionError, ValidationError
-from dnadesign.usr import SchemaError as USRSchemaError
+from dnadesign.seqledger import SchemaError as USRSchemaError
 
 
 def _raise_usr_schema_error(path: str | Path, *, usr_root: str | Path | None = None) -> None:
@@ -34,7 +34,7 @@ def test_preflight_api_wraps_usr_errors_as_construct_validation_errors(monkeypat
         _raise_usr_schema_error,
     )
 
-    with pytest.raises(ValidationError, match="construct preflight failed while reading USR inputs"):
+    with pytest.raises(ValidationError, match="construct preflight failed while reading SeqLedger inputs"):
         preflight_from_config(tmp_path / "config.yaml")
 
 
@@ -49,7 +49,7 @@ def test_run_api_wraps_usr_write_errors_as_construct_execution_errors(monkeypatc
         _raise_usr_schema_error_on_write,
     )
 
-    with pytest.raises(ExecutionError, match="construct run failed while writing USR outputs"):
+    with pytest.raises(ExecutionError, match="construct run failed while writing SeqLedger outputs"):
         run_from_config(tmp_path / "config.yaml")
 
 

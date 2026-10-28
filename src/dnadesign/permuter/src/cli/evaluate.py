@@ -181,7 +181,7 @@ def evaluate(
 
     df = read_parquet(records)
     if "sequence" not in df.columns or "bio_type" not in df.columns:
-        raise ValueError("records.parquet missing USR core columns (sequence, bio_type)")
+        raise ValueError("records.parquet missing SeqLedger core columns (sequence, bio_type)")
 
     # Explicit CLI metrics replace workspace defaults so smoke/adversarial probes
     # do not accidentally invoke closed-loop evaluators from config.

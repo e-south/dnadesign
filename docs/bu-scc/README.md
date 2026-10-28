@@ -1,7 +1,7 @@
 ## BU SCC Operations
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-05-18
+**Last verified:** 2026-10-28
 
 This directory is the canonical source for BU SCC platform policy, submission vocabulary, and job templates for `dnadesign`.
 
@@ -27,12 +27,12 @@ This directory is the canonical source for BU SCC platform policy, submission vo
 
 - BU-specific scheduler keys, examples, and constraints belong in this `bu-scc/` directory.
 - Execution flow, queue fairness guidance, and status-first checks are documented in `setup/quickstart.md`, `runbooks/batch-notify.md`, and `reference/submission.md`.
-- Notify watcher semantics and onboarding belong in `../notify/usr-events.md`.
+- Notify watcher semantics and onboarding belong in `../notify/seqledger-events.md`.
 - Repo-local Codex automation lives in `../../.agents/skills/sge-hpc-ops/`; treat it as an optional overlay, not the source of truth.
 
 ### Fast links
 
-- Notify watcher setup and event-stream operations: [../notify/usr-events.md](../notify/usr-events.md).
+- Notify watcher setup and event-stream operations: [../notify/seqledger-events.md](../notify/seqledger-events.md).
 - Large model and dataset transfer patterns on SCC: [runbooks/batch-notify.md#7-large-downloads-and-datasetmodel-transfer](runbooks/batch-notify.md#7-large-downloads-and-datasetmodel-transfer).
 - Optional Codex repo-local skill overlay: [../../.agents/skills/sge-hpc-ops/SKILL.md](../../.agents/skills/sge-hpc-ops/SKILL.md).
 - SCC OnDemand entrypoint and service overview: [https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/](https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/).

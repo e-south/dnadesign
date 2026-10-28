@@ -1,7 +1,7 @@
 # Permuter CLI And Data Contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-26
+**Last verified:** 2026-10-28
 
 Permuter mutates biological sequences, scores variants with pluggable
 evaluators, and writes one scoped dataset per workspace run.
@@ -96,13 +96,13 @@ workspaces/<scope>/outputs/
   plots/
 ```
 
-The Parquet table contains USR core columns plus canonical Permuter columns such
+The Parquet table contains SeqLedger core columns plus canonical Permuter columns such
 as `permuter__scope`, `permuter__var_id`, `permuter__ref`, `permuter__protocol`,
 `permuter__modifications`, and `permuter__observed__<metric_id>`.
 
 Materialized row identity is split deliberately:
 
-- `id` is the canonical USR sequence id derived from `(bio_type, sequence)`.
+- `id` is the canonical SeqLedger sequence id derived from `(bio_type, sequence)`.
 - `permuter__var_id` is the Permuter variant/provenance id carried by the
   public `VariantRecord.id`.
 
@@ -147,7 +147,7 @@ The public API is filesystem-free and returns typed in-memory records for
 nucleotide, protein, and coding-DNA-backed DMS requests. Coding-DNA requests can
 set `max_variants` to fail before materializing oversized scans.
 
-`materialize_result(...)` writes canonical USR ids even when an in-memory
+`materialize_result(...)` writes canonical SeqLedger ids even when an in-memory
 `VariantRecord.id` is a Permuter variant id. The variant id is preserved as
 `permuter__var_id`.
 

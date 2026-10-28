@@ -106,7 +106,7 @@ def _ordered_usr_rows(ds, *, ids: List[str]) -> List[Dict[str, object]]:
     missing = [str(row_id) for row_id in ids if str(row_id) not in found]
     preview = ", ".join(missing[:5])
     raise CapabilityError(
-        f"Unable to resolve infer feature-bundle context rows from USR overlays. Missing ids: {preview}."
+        f"Unable to resolve infer feature-bundle context rows from SeqLedger overlays. Missing ids: {preview}."
     )
 
 
@@ -206,7 +206,7 @@ def resolve_sequence_contexts(
 
     if source == "usr":
         if ids is None or ds is None:
-            raise CapabilityError("USR-backed templated feature-bundle jobs require ids and dataset handle.")
+            raise CapabilityError("SeqLedger-backed templated feature-bundle jobs require ids and dataset handle.")
         rows = _ordered_usr_rows(ds, ids=ids)
         return _build_templated_contexts(seqs=seqs, rows=rows, bundle=bundle)
 

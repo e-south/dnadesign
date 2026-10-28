@@ -1,7 +1,7 @@
 ## Cruncher to DenseGen PWM handoff
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-27
+**Last verified:** 2026-10-28
 
 
 This how-to guide explains the current handoff contract from Cruncher motif artifacts into DenseGen PWM-driven workspaces. Read it when you need a reproducible path from motif discovery to Stage-A pools, Stage-B libraries, and solve-to-quota outputs.
@@ -94,4 +94,4 @@ uv run dense notebook generate
 ### Step 6: Optional Notify handoff
 This section points to watcher docs instead of repeating full watcher setup.
 
-Use **[DenseGen to USR to Notify tutorial](../tutorials/demo_usr_notify.md)** for end-to-end watcher setup and use **[Notify USR events guide](../../../../../docs/notify/usr-events.md)** for spool/drain operations.
+Use **[DenseGen to SeqLedger to Notify tutorial](../tutorials/demo_usr_notify.md)** for end-to-end watcher setup and use **[Notify SeqLedger events guide](../../../../../docs/notify/seqledger-events.md)** for spool/drain operations.

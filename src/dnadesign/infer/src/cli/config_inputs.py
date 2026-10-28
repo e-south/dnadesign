@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
-from dnadesign.usr import normalize_usr_root, resolve_usr_root_from_env
+from dnadesign.seqledger import normalize_seqledger_root, resolve_seqledger_root_from_env
 
 from ..config import JobConfig
 from ..errors import ConfigError, ValidationError
@@ -41,11 +41,11 @@ def resolve_config_usr_root(*, usr_root: str | None, config_dir: Path) -> str | 
     if candidate.is_absolute():
         if candidate.exists() and not candidate.is_dir():
             raise ConfigError(f"ingest.root is not a directory: {candidate}")
-        return normalize_usr_root(candidate).as_posix()
+        return normalize_seqledger_root(candidate).as_posix()
     resolved = (config_dir / candidate).resolve()
     if resolved.exists() and not resolved.is_dir():
         raise ConfigError(f"ingest.root is not a directory: {resolved}")
-    return normalize_usr_root(resolved).as_posix()
+    return normalize_seqledger_root(resolved).as_posix()
 
 
 def resolve_config_sequence_view_roots(*, job: JobConfig, config_dir: Path) -> None:
@@ -72,9 +72,9 @@ def resolve_config_job_inputs(
     if source == "usr":
         resolved_root = resolve_config_usr_root(usr_root=job.ingest.root, config_dir=config_dir)
         if resolved_root is None:
-            env_root = resolve_usr_root_from_env()
+            env_root = resolve_seqledger_root_from_env()
             if env_root is None:
-                raise ValidationError("USR ingest requires ingest.root or DNADESIGN_USR_ROOT.")
+                raise ValidationError("SeqLedger ingest requires ingest.root or DNADESIGN_SEQLEDGER_ROOT.")
             resolved_root = env_root.as_posix()
         job.ingest.root = resolved_root
         return None

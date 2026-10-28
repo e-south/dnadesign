@@ -1,7 +1,7 @@
 ## DenseGen architecture guide
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-10-28
 
 
 This page is maintainer-focused. It maps DenseGen runtime behavior to the key files you should start from when debugging or extending the system.
@@ -48,7 +48,7 @@ If behavior is surprising, confirm the resolved config first (including expanded
 
 ### Stage-A pipeline
 
-Stage-A owns "input realization": building pools from binding sites, PWM artifacts, background mining, or USR-backed sources.
+Stage-A owns "input realization": building pools from binding sites, PWM artifacts, background mining, or SeqLedger-backed sources.
 
 Key files:
 
@@ -74,7 +74,7 @@ If you are debugging "why did this plan never fill quota," start by inspecting S
 
 ### Outputs and metadata
 
-Outputs are produced via configured sinks (local parquet and/or USR datasets). Sink creation is config-driven and strict.
+Outputs are produced via configured sinks (local parquet and/or SeqLedger datasets). Sink creation is config-driven and strict.
 
 Key files:
 

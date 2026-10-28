@@ -289,7 +289,7 @@ def to_sfxi_reference_overlay_records(
 ) -> list[dict[str, object]]:
     """Return registry-compatible, namespaced SFXI reference-overlay records.
 
-    ``reference_instance_id`` and ``sequence_source_id`` are the canonical USR
+    ``reference_instance_id`` and ``sequence_source_id`` are the canonical SeqLedger
     overlay fields. ``design_id`` and ``source_id`` remain accepted aliases so
     callers can migrate without changing the scoring math.
     """

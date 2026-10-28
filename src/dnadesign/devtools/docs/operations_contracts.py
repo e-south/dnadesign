@@ -361,7 +361,7 @@ def _find_stale_overlay_guard_term_issues(repo_root: Path) -> list[str]:
             if term in content:
                 issues.append(
                     f"{path}: stale overlay guard term '{term}' is not allowed; "
-                    "use usr-overlay-guard and overlay_namespace."
+                    "use seqledger-overlay-guard and overlay_namespace."
                 )
     return issues
 

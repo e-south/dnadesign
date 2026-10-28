@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/baserender/src/integrations/usr/genbank_annotations_v1.py
 
-Adapter for USR GenBank annotation overlays projected into Record v1 features.
+Adapter for SeqLedger GenBank annotation overlays projected into Record v1 features.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -394,7 +394,7 @@ class UsrGenbankAnnotationsV1Adapter:
 
         min_required = int(self.policies["min_per_record"])
         if len(features) < min_required:
-            self._invalid(f"USR GenBank row produced {len(features)} features < min_per_record={min_required}")
+            self._invalid(f"SeqLedger GenBank row produced {len(features)} features < min_per_record={min_required}")
 
         display = self._display(row, record_id=record_id)
         tag_labels = dict(display.tag_labels)

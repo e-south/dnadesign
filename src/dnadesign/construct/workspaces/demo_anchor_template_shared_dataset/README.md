@@ -15,7 +15,7 @@ uv run construct workspace show --workspace .
 This workspace keeps construct IO inside `outputs/usr_datasets` by default and
 routes both packaged window projects into one semantic dataset,
 `anchor_template_shared_dataset_demo`. Use it when Construct should hand one
-USR-backed dataset to downstream consumers without relying on implicit config
+SeqLedger-backed dataset to downstream consumers without relying on implicit config
 repointing. The workspace registry tracks both config artifacts and shared
 dataset assertions, so `workspace doctor` can fail on drift before a run.
 
@@ -26,6 +26,6 @@ dataset assertions, so `workspace doctor` can fail on drift before a run.
   - [config.slot_a.window.yaml](config.slot_a.window.yaml)
   - [config.slot_b.window.yaml](config.slot_b.window.yaml)
 - Inputs notes: [inputs/README.md](inputs/README.md)
-- Shared cross-tool runbook: [../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md](../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
-- Broader feature-matrix runbook: [../../../usr/docs/operations/promoter/characterization-feature-matrix.md](../../../usr/docs/operations/promoter/characterization-feature-matrix.md)
+- Shared cross-tool runbook: [../../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md](../../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
+- Broader feature-matrix runbook: [../../../seqledger/docs/operations/promoter/characterization-feature-matrix.md](../../../seqledger/docs/operations/promoter/characterization-feature-matrix.md)
 - All workspaces: [../README.md](../README.md)

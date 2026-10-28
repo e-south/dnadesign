@@ -87,7 +87,7 @@ def test_latentdna_runtime_does_not_import_usr_src_internals() -> None:
     offenders: list[str] = []
     for path in _python_files(_latentdna_src()):
         for imported in _resolve_imports(path):
-            if imported.startswith("dnadesign.usr.src"):
+            if imported.startswith("dnadesign.seqledger.src"):
                 offenders.append(f"{path.relative_to(_repo_root())}: {imported}")
 
     assert offenders == []

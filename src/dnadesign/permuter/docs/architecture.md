@@ -1,10 +1,10 @@
 # Permuter Architecture
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-28
 
 Permuter is the variant-intent surface for dnadesign. It generates explicit
-sequence variants, records what changed, and materializes USR-shaped candidate
+sequence variants, records what changed, and materializes SeqLedger-shaped candidate
 rows when a caller asks for a dataset. It does not own model-feature sidecars,
 Construct placement semantics, study biology, or Ops execution lanes.
 
@@ -15,7 +15,7 @@ Use Permuter when the primary question is "what variants should exist?"
 | Plane | Owner | Contract |
 | --- | --- | --- |
 | Variant intent | Permuter | request id, reference, protocol, modifications, `permuter__var_id` |
-| Canonical data plane | USR | sequence id, overlays, events, dataset roots, sidecar locations |
+| Canonical data plane | SeqLedger | sequence id, overlays, events, dataset roots, sidecar locations |
 | Physical context | Construct | named slots, template realization, spans, sequence views |
 | Model-derived evidence | Infer | feature bundles, aliases, `_derived/infer`, completion, resume, stale detection |
 | Biological meaning | Study | candidate roles, source overlays, assay labels, promotion gates |
@@ -31,7 +31,7 @@ their internal logic. Cross-tool callers import `dnadesign.permuter`, not
   protocol, scope, and bounded selector such as codon or amino-acid positions.
 - A variant record describes one emitted variant: variant identity, sequence,
   modifications, and Permuter-owned provenance.
-- A materialized dataset is a USR-shaped table with canonical sequence identity
+- A materialized dataset is a SeqLedger-shaped table with canonical sequence identity
   plus Permuter namespaced columns.
 - A handoff describes what the next owner should do; it is not execution by
   Permuter.
@@ -45,7 +45,7 @@ stable public import.
 
 Materialized `records.parquet` rows use two distinct identifiers:
 
-- `id`: canonical USR sequence id derived from `(bio_type, sequence)`.
+- `id`: canonical SeqLedger sequence id derived from `(bio_type, sequence)`.
 - `permuter__var_id`: Permuter variant/provenance identity from the public
   `VariantRecord.id`.
 
@@ -81,10 +81,10 @@ for generic variant generation.
 
 - Reject mismatched record reference or bio-type during materialization.
 - Preserve `VariantRecord.id` as `permuter__var_id`; do not silently reinterpret
-  it as a USR sequence id.
+  it as a SeqLedger sequence id.
 - Reject conflicting `metadata.permuter.var_id` if present.
 - Reject `metadata.permuter.variant_id`; it would materialize the forbidden
   duplicate `permuter__variant_id` spelling.
 - Reject unsupported `permuter__metric__*` columns in strict validation.
-- Treat missing Construct sequence views as upstream Construct/USR completion,
+- Treat missing Construct sequence views as upstream Construct/SeqLedger completion,
   not a Permuter fallback.

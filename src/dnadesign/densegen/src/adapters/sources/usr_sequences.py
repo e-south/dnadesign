@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/densegen/src/adapters/sources/usr_sequences.py
 
-USR sequences input source.
+SeqLedger sequences input source.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -29,9 +29,9 @@ class USRSequencesDataSource(BaseDataSource):
 
     def load_data(self, *, rng=None, outputs_root: Path | None = None, run_id: str | None = None):
         try:
-            from dnadesign.usr import Dataset as USRDataset  # type: ignore
-        except Exception as e:  # pragma: no cover - depends on optional USR install
-            raise RuntimeError(f"USR dataset reader not available: {e}") from e
+            from dnadesign.seqledger import Dataset as USRDataset  # type: ignore
+        except Exception as e:  # pragma: no cover - depends on optional SeqLedger install
+            raise RuntimeError(f"SeqLedger dataset reader not available: {e}") from e
 
         if not self.root:
             raise ValueError("usr_sequences requires an explicit root path.")
@@ -39,7 +39,7 @@ class USRSequencesDataSource(BaseDataSource):
 
         ds = USRDataset(root_path, self.dataset)
         if not ds.records_path.exists():
-            raise FileNotFoundError(f"USR records not found at {ds.records_path}")
+            raise FileNotFoundError(f"SeqLedger records not found at {ds.records_path}")
 
         import pyarrow.dataset as ds_scan
 
@@ -55,13 +55,16 @@ class USRSequencesDataSource(BaseDataSource):
             for raw in batch.column(0).to_pylist():
                 if not isinstance(raw, str) or not raw.strip():
                     raise ValueError(
-                        f"USR dataset contains null/empty sequences (rows: {row_idx}). "
+                        f"SeqLedger dataset contains null/empty sequences (rows: {row_idx}). "
                         "DenseGen requires non-empty sequence strings."
                     )
                 seq = raw.strip().upper()
                 if any(ch not in _VALID_DNA_BASES for ch in seq):
                     raise ValueError(
-                        f"USR dataset contains invalid sequences (rows: {row_idx}). DenseGen requires A/C/G/T only."
+                        (
+                            f"SeqLedger dataset contains invalid sequences "
+                            f"(rows: {row_idx}). DenseGen requires A/C/G/T only."
+                        )
                     )
                 seqs.append(seq)
                 row_idx += 1

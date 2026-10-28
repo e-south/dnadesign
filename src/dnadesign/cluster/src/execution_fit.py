@@ -168,7 +168,7 @@ def run_fit(
                         console,
                         "print",
                         "[green]Reattached[/green] labels from cache to "
-                        + ("USR dataset." if ictx["kind"] == "usr" else "file."),
+                        + ("SeqLedger dataset." if ictx["kind"] == "usr" else "file."),
                     )
                     return CommandExecution(
                         command="fit",

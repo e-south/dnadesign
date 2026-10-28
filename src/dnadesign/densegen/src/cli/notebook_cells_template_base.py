@@ -80,10 +80,10 @@ def _():
         usr_root: Path,
         usr_dataset: str,
     ) -> tuple[pd.DataFrame, int, list[str], Path]:
-        from dnadesign.usr import Dataset
+        from dnadesign.seqledger import Dataset
 
         ds = Dataset(usr_root, str(usr_dataset))
-        require(not ds.records_path.exists(), f"USR records not found: {ds.records_path}")
+        require(not ds.records_path.exists(), f"SeqLedger records not found: {ds.records_path}")
         stats = ds.stats()
         total_rows = int(getattr(stats, "rows", 0) or 0)
         require(total_rows <= 0, f"`{ds.records_path.name}` is empty.")
@@ -122,7 +122,7 @@ def _():
         if str(output_source or "").strip() == "usr":
             require(
                 usr_root is None or not str(usr_dataset or "").strip(),
-                "Notebook source is USR but generation context does not include a dataset path.",
+                "Notebook source is SeqLedger but generation context does not include a dataset path.",
             )
             df_window, total_rows, missing, preview_source_path = _load_usr_preview_dataframe(
                 pd=pd,

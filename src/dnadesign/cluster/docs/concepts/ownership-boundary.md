@@ -1,7 +1,7 @@
 ## Cluster ownership boundary
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-28
 
 Use this page when you need the package-role decision before choosing a downstream route.
 
@@ -14,7 +14,7 @@ Use this page when you need the package-role decision before choosing a downstre
 
 ### What cluster does not own
 
-- upstream USR shared-dataset assembly
+- upstream SeqLedger shared-dataset assembly
 - construct-based context expansion
 - upstream feature generation when the feature column or exported matrix does not yet exist
 - supervised label/train/select loops
@@ -32,8 +32,8 @@ Use this page when you need the package-role decision before choosing a downstre
 
 ### Do not stay in cluster when
 
-- the feature column or exported matrix does not exist yet: return to [promoter characterization feature matrix](../../../usr/docs/operations/promoter/characterization-feature-matrix.md) or [infer docs](../../../infer/docs/README.md)
-- the next task is supervised label/train/select: continue with [USR dataset with infer-derived X -> OPAL active learning](../../../opal/docs/workflows/usr-infer-x-active-learning.md)
+- the feature column or exported matrix does not exist yet: return to [promoter characterization feature matrix](../../../seqledger/docs/operations/promoter/characterization-feature-matrix.md) or [infer docs](../../../infer/docs/README.md)
+- the next task is supervised label/train/select: continue with [SeqLedger dataset with infer-derived X -> OPAL active learning](../../../opal/docs/workflows/seqledger-infer-x-active-learning.md)
 
 ### Related docs
 

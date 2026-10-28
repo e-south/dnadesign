@@ -21,7 +21,11 @@ from typing import Callable, Optional
 import typer
 import yaml
 
-from dnadesign.usr import normalize_usr_root, resolve_usr_root_from_config, resolve_usr_root_from_env
+from dnadesign.seqledger import (
+    normalize_seqledger_root,
+    resolve_seqledger_root_from_config,
+    resolve_seqledger_root_from_env,
+)
 
 from ..config import LATEST_SCHEMA_VERSION, resolve_relative_path
 from .context import CliContext
@@ -62,11 +66,11 @@ def _workspace_source_root() -> Path:
 
 
 def _repo_shared_usr_root(repo_root: Path) -> Path:
-    return (repo_root / "src" / "dnadesign" / "usr" / "datasets").resolve()
+    return (repo_root / "src" / "dnadesign" / "seqledger" / "datasets").resolve()
 
 
 def _default_shared_usr_root(*, workspace_dir: Path) -> Path:
-    env_root = resolve_usr_root_from_env()
+    env_root = resolve_seqledger_root_from_env()
     if env_root is not None:
         return env_root
 
@@ -78,14 +82,12 @@ def _default_shared_usr_root(*, workspace_dir: Path) -> Path:
         if candidate.parent.exists():
             return candidate
 
-    raise ValueError(
-        "Shared USR root is ambiguous outside a dnadesign checkout. Pass --usr-root or set DNADESIGN_USR_ROOT."
-    )
+    raise ValueError("Set --seqledger-root or DNADESIGN_SEQLEDGER_ROOT to select a shared dataset root.")
 
 
 def _shared_usr_root_for_workspace(workspace_dir: Path, *, usr_root: Path | None = None) -> str:
     shared_root = (
-        normalize_usr_root(usr_root.expanduser().resolve())
+        normalize_seqledger_root(usr_root.expanduser().resolve())
         if usr_root is not None
         else _default_shared_usr_root(workspace_dir=workspace_dir)
     )
@@ -152,7 +154,7 @@ def _note_missing_usr_registry(*, run_dir: Path, output: dict, console, display_
     root_raw = usr_cfg.get("root")
     if not isinstance(root_raw, str) or not root_raw.strip():
         return
-    usr_root = resolve_usr_root_from_config(
+    usr_root = resolve_seqledger_root_from_config(
         root_raw,
         config_path=run_dir / "config.yaml",
         label="output.usr.root",
@@ -163,7 +165,7 @@ def _note_missing_usr_registry(*, run_dir: Path, output: dict, console, display_
     if registry_path.exists():
         return
     console.print(
-        "[yellow]Shared USR registry is not present yet.[/] "
+        "[yellow]Shared SeqLedger registry is not present yet.[/] "
         "Workspace init leaves shared dataset roots unchanged; create "
         f"{display_path(registry_path, run_dir, absolute=False)} manually or let "
         "`uv run dense run` seed it when writes are intended."
@@ -180,7 +182,7 @@ def _seed_usr_registry(*, run_dir: Path, output: dict, console, display_path: Ca
     root_raw = usr_cfg.get("root")
     if not isinstance(root_raw, str) or not root_raw.strip():
         return
-    usr_root = resolve_usr_root_from_config(
+    usr_root = resolve_seqledger_root_from_config(
         root_raw,
         config_path=run_dir / "config.yaml",
         label="output.usr.root",
@@ -193,19 +195,20 @@ def _seed_usr_registry(*, run_dir: Path, output: dict, console, display_path: Ca
     repo_root = _repo_root_from(Path(__file__).resolve())
     seed_path = None
     if repo_root is not None:
-        candidate = repo_root / "src" / "dnadesign" / "usr" / "datasets" / "registry.yaml"
+        candidate = repo_root / "src" / "dnadesign" / "seqledger" / "datasets" / "registry.yaml"
         if candidate.exists() and candidate.is_file():
             seed_path = candidate
     if seed_path is None:
         console.print(
-            "[yellow]USR output selected but no registry seed file was found.[/] "
-            "Create the configured USR root `registry.yaml` before running `uv run dense run`."
+            "[yellow]SeqLedger output selected but no registry seed file was found.[/] "
+            "Create the configured SeqLedger root `registry.yaml` before running `uv run dense run`."
         )
         return
     usr_root.mkdir(parents=True, exist_ok=True)
     shutil.copy2(seed_path, registry_path)
     console.print(
-        f":bookmark_tabs: [bold green]Seeded USR registry[/]: {display_path(registry_path, run_dir, absolute=False)}"
+        ":bookmark_tabs: [bold green]Seeded SeqLedger registry[/]: "
+        f"{display_path(registry_path, run_dir, absolute=False)}"
     )
 
 
@@ -319,10 +322,10 @@ def register_workspace_commands(
         ),
         usr_root: Optional[Path] = typer.Option(
             None,
-            "--usr-root",
+            "--seqledger-root",
             help=(
-                "Shared USR datasets root for --output-mode usr|both. "
-                "Required outside a dnadesign checkout unless DNADESIGN_USR_ROOT is set."
+                "Shared SeqLedger datasets root for --output-mode usr|both. "
+                "Required outside a dnadesign checkout unless DNADESIGN_SEQLEDGER_ROOT is set."
             ),
         ),
     ):

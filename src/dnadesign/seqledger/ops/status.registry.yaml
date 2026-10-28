@@ -1,0 +1,39 @@
+version: 1
+provider_id: builtin.seqledger
+entries:
+  - status_kind: seqledger-sync-audit
+    owner_boundary: seqledger
+    observes_plane: data
+    provider_ref: dnadesign.seqledger.ops.status_providers:provide_usr_sync_audit_status
+    description: Read one SeqLedger sync audit JSON emitted by `seqledger diff`, `seqledger pull`, or `seqledger push`.
+    surface_type: sync_audit
+    cost_class: cheap
+    summary_scope: workspace
+    input_schema:
+      - name: sync_audit_json
+        manifest_key: sync_audit_json
+        cli_flag: --sync-audit-json
+        placeholder: <audit-dir>/pull.json
+        summary: Machine-readable SeqLedger sync audit JSON from seqledger diff, pull, or push.
+        type: path
+  - status_kind: seqledger-dataset-state
+    owner_boundary: seqledger
+    observes_plane: data
+    provider_ref: dnadesign.seqledger.ops.status_providers:provide_usr_dataset_state_status
+    description: Read one SeqLedger dataset directory, its records.parquet, and related overlay sidecars.
+    surface_type: dataset_snapshot
+    cost_class: cheap
+    summary_scope: workspace
+    input_schema:
+      - name: usr_root
+        manifest_key: usr_root
+        cli_flag: --seqledger-root
+        placeholder: <seqledger-root>
+        summary: SeqLedger root containing the target dataset directory.
+        type: path
+      - name: dataset
+        manifest_key: dataset
+        cli_flag: --dataset
+        placeholder: <dataset>
+        summary: SeqLedger dataset id to summarize.
+        type: str

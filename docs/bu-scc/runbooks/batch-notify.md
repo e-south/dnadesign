@@ -1,7 +1,7 @@
 ## BU SCC Batch + Notify Runbook (`dnadesign` platform workflows)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-10-28
 
 ### Purpose
 
@@ -12,13 +12,13 @@
 - Any run that needs explicit runtime/resource control.
 - Any run that needs event-driven webhook notifications.
 
-**Key boundary:** Notify consumes **USR `<dataset>/.events.log`** (JSONL), not DenseGen `outputs/meta/events.jsonl`.
+**Key boundary:** Notify consumes **SeqLedger `<dataset>/.events.log`** (JSONL), not DenseGen `outputs/meta/events.jsonl`.
 
 Related docs:
 - Install/bootstrap: [BU SCC Install bootstrap](../setup/install.md)
 - End-to-end quick path: [BU SCC Quickstart](../setup/quickstart.md)
 - Job templates: [BU SCC jobs README](../jobs/README.md)
-- Notify operator manual: [Notify USR events operator manual](../../notify/usr-events.md)
+- Notify operator manual: [Notify SeqLedger events operator manual](../../notify/seqledger-events.md)
 
 ---
 
@@ -262,7 +262,7 @@ For durable delivery, keep watchers in batch.
 ### 7) Large downloads and dataset/model transfer
 
 Recommended pattern:
-- Use BU Data Transfer Node for large model prefetch and large USR dataset push/pull.
+- Use BU Data Transfer Node for large model prefetch and large SeqLedger dataset push/pull.
 - Keep compute-heavy work off transfer-only nodes.
 
 Example transfer-node request:
@@ -281,7 +281,7 @@ set -euo pipefail
 
 # Example: transfer-only operations
 # uv run python scripts/prefetch_models.py
-# uv run usr pull densegen_demo_hpc bu-scc -y
+# uv run seqledger pull densegen_demo_hpc bu-scc -y
 QSUB
 ```
 
@@ -293,7 +293,7 @@ Transfer reference:
 ### 8) Package boundary reminders
 
 - DenseGen runtime diagnostics: `outputs/meta/events.jsonl` (DenseGen-only diagnostics)
-- Notify input: USR `<dataset>/.events.log`
+- Notify input: SeqLedger `<dataset>/.events.log`
 
 Do not configure Notify against DenseGen runtime events.
 

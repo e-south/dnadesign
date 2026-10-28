@@ -8,6 +8,6 @@ keywords:
   - events
   - scheduler
 routes:
-  - id: usr-events
-    path: usr-events.md
+  - id: seqledger-events
+    path: seqledger-events.md
     summary: Notify-owned operator manual for watcher setup, profile validation, delivery, and recovery.

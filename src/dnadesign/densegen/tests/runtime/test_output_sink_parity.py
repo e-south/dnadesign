@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/densegen/tests/runtime/test_output_sink_parity.py
 
-Parity checks for DenseGen metadata between Parquet and USR sinks.
+Parity checks for DenseGen metadata between Parquet and SeqLedger sinks.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -17,7 +17,7 @@ from pathlib import Path
 import pyarrow.parquet as pq
 import pytest
 
-import dnadesign.usr as usr_pkg
+import dnadesign.seqledger as usr_pkg
 from dnadesign.densegen.src.adapters.outputs.parquet import ParquetSink
 from dnadesign.densegen.src.adapters.outputs.record import OutputRecord
 from dnadesign.densegen.src.adapters.outputs.usr_writer import USRWriter
@@ -170,7 +170,7 @@ def test_usr_writer_import_skips_full_existing_id_scan_when_ids_are_prevalidated
         alphabet="dna_4",
     )
 
-    import dnadesign.usr.src.datasets.core.ingest as dataset_ingest
+    import dnadesign.seqledger.src.datasets.core.ingest as dataset_ingest
 
     original_iter = dataset_ingest.iter_parquet_batches
 

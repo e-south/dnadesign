@@ -1,7 +1,7 @@
 ## Workspace templates
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-27
+**Last verified:** 2026-10-28
 This concept page explains how to use the installed demos and checkout examples. Read it when you need a consistent path from first-run tutorials to real study workspaces.
 
 For the full DenseGen doc map, use the **[DenseGen documentation index](../../index.md)**.
@@ -25,7 +25,7 @@ For the full DenseGen doc map, use the **[DenseGen documentation index](../../in
 - Use **[dense array showcase tutorial](../../tutorials/demo_dense_array_showcase.md)** for `demo_dense_array_showcase`.
 - Use **[sampling baseline tutorial](../../tutorials/demo_sampling_baseline.md)** for `demo_sampling_baseline`.
 - The **[constitutive sigma panel study tutorial](../../tutorials/study_constitutive_sigma_panel.md)** uses a checkout example through `--from-config`.
-- Use **[DenseGen to USR to Notify tutorial](../../tutorials/demo_usr_notify.md)** when validating watcher delivery on any USR-enabled workspace.
+- Use **[DenseGen to SeqLedger to Notify tutorial](../../tutorials/demo_usr_notify.md)** when validating watcher delivery on any SeqLedger-enabled workspace.
 
 ### Standard study workflow
 

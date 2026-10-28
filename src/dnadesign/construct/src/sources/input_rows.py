@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/construct/src/sources/input_rows.py
 
-USR input-row selection and label contracts for Construct.
+SeqLedger input-row selection and label contracts for Construct.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

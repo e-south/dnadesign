@@ -169,9 +169,9 @@ BANNERS = (
         "junction",
     ),
     BannerSpec(
-        "src/dnadesign/usr/assets/usr-banner.svg",
-        "src/dnadesign/usr/README.md",
-        "usr",
+        "src/dnadesign/seqledger/assets/seqledger-banner.svg",
+        "src/dnadesign/seqledger/README.md",
+        "seqledger",
         "MANAGE SEQUENCE TABLES",
         "Store, check, and sync tables of sequence records.",
         "records",

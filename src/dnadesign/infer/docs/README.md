@@ -1,7 +1,7 @@
 ## infer docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-27
+**Last verified:** 2026-10-28
 
 ### Read order
 
@@ -26,15 +26,15 @@
 - [Feature schema and selector contract](reference/feature-schema.md): output ids, metadata out ids, digests, and OPAL export ordering.
 - [evo2_feature_bundle_smoke workspace](../workspaces/evo2_feature_bundle_smoke/README.md): packaged feature-bundle smoke path with generic anchor and templated records.
 
-#### Pressure-test agnostic model writes into USR
+#### Pressure-test agnostic model writes into SeqLedger
 - [Agnostic-model pressure-test runbook](operations/pressure-test-agnostic-models.md): standalone CLI and ops-runbook paths.
 - [End-to-end pressure-test demo](tutorials/demo_pressure_test_usr_ops_notify.md): reproducible infer -> usr -> ops -> notify walkthrough.
 - [Workspaces guide](../workspaces/README.md): initialize workspace roots with `infer workspace init`.
 
 #### Continue after infer-derived `X` exists
-- If infer writes a bundle of `infer__...` columns, choose the one feature column or exported matrix you want to carry forward from a file or USR dataset before moving to Cluster or OPAL.
+- If infer writes a bundle of `infer__...` columns, choose the one feature column or exported matrix you want to carry forward from a file or SeqLedger dataset before moving to Cluster or OPAL.
 - [cluster exploratory clustering workflow](../../cluster/docs/workflows/exploratory-clustering.md): Leiden, UMAP, and exploratory analysis once the chosen feature column or exported matrix exists.
-- [USR dataset with infer-derived X -> OPAL active learning](../../opal/docs/workflows/usr-infer-x-active-learning.md): start the label/train/select loop only after infer has written the chosen `infer__...` column into a USR dataset and OPAL `campaign.yaml` uses `data.location.kind: usr`.
+- [SeqLedger dataset with infer-derived X -> OPAL active learning](../../opal/docs/workflows/seqledger-infer-x-active-learning.md): start the label/train/select loop only after infer has written the chosen `infer__...` column into a SeqLedger dataset and OPAL `campaign.yaml` uses `data.location.kind: usr`.
 
 #### Run scheduler-oriented infer flows
 - [Operations index](operations/README.md): run no-submit preflight, then submit.
@@ -48,9 +48,9 @@
 
 ### Shared dataset handoffs into infer
 
-- [Multi-source shared dataset assembly](../../usr/docs/operations/assembly/multi-source-shared-dataset.md): shared multi-source consolidation route before construct and infer share one downstream dataset.
-- [Construct -> USR -> Infer shared dataset runbook](../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md): shared construct-led consolidation route once construct owns the current handoff.
-- [Promoter characterization feature matrix](../../usr/docs/operations/promoter/characterization-feature-matrix.md): study-specific feature-dataset assembly before downstream cluster or OPAL use.
+- [Multi-source shared dataset assembly](../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md): shared multi-source consolidation route before construct and infer share one downstream dataset.
+- [Construct -> SeqLedger -> Infer shared dataset runbook](../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md): shared construct-led consolidation route once construct owns the current handoff.
+- [Promoter characterization feature matrix](../../seqledger/docs/operations/promoter/characterization-feature-matrix.md): study-specific feature-dataset assembly before downstream cluster or OPAL use.
 
 ### Documentation by type
 

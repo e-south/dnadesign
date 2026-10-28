@@ -36,21 +36,21 @@ def wizard_next_steps(
     source_config_shell = shlex.quote(source_config) if source_config else ""
     watch_with_tool_config = bool(source_tool and source_config)
     dry_run_watch = (
-        f"uv run notify usr-events watch --tool {source_tool} --config {source_config_shell} --dry-run"
+        f"uv run notify seqledger-events watch --tool {source_tool} --config {source_config_shell} --dry-run"
         if watch_with_tool_config
-        else f"uv run notify usr-events watch --profile {profile_arg_shell} --dry-run"
+        else f"uv run notify seqledger-events watch --profile {profile_arg_shell} --dry-run"
     )
     follow_watch = (
-        f"uv run notify usr-events watch --tool {source_tool} --config {source_config_shell} --follow"
+        f"uv run notify seqledger-events watch --tool {source_tool} --config {source_config_shell} --follow"
         if watch_with_tool_config
-        else f"uv run notify usr-events watch --profile {profile_arg_shell} --follow"
+        else f"uv run notify seqledger-events watch --profile {profile_arg_shell} --follow"
     )
     follow_wait_watch = (
-        f"uv run notify usr-events watch --tool {source_tool} --config {source_config_shell} --follow "
+        f"uv run notify seqledger-events watch --tool {source_tool} --config {source_config_shell} --follow "
         "--wait-for-events --stop-on-terminal-status --idle-timeout 900"
         if watch_with_tool_config
         else (
-            f"uv run notify usr-events watch --profile {profile_arg_shell} --follow "
+            f"uv run notify seqledger-events watch --profile {profile_arg_shell} --follow "
             "--wait-for-events --stop-on-terminal-status --idle-timeout 900"
         )
     )

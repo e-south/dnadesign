@@ -1,7 +1,7 @@
 ## OPAL Architecture and Data Flow
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-26
+**Last verified:** 2026-10-28
 
 OPAL executes each round through the stages below.
 
@@ -29,7 +29,7 @@ OPAL executes each round through the stages below.
 
 - Source records: `records.parquet`
 - Label source: `labels.source.kind`, either `campaign_history` or
-  `usr_sidecar`; a USR sidecar may be mutable or pinned to a study-issued
+  `usr_sidecar`; a SeqLedger sidecar may be mutable or pinned to a study-issued
   `opal.observed_label_promotion.v1` manifest
 - Round artifacts: `outputs/rounds/round_<k>/...`
 - Ledger sinks:

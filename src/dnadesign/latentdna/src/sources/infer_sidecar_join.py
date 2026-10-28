@@ -28,7 +28,7 @@ from dnadesign.contracts.feature_payloads import (
     payload_signature,
     read_payload_table,
 )
-from dnadesign.usr import sequence_views_path, view_semantics_path
+from dnadesign.seqledger import sequence_views_path, view_semantics_path
 
 from ..contracts.errors import SourceResolutionError
 from ..io.parquet_io import read_schema

@@ -57,7 +57,7 @@ def run_extract_write_back(
 
     if source == "usr":
         if ids is None or ds is None:
-            raise WriteBackError("USR write-back requires ids and dataset handle")
+            raise WriteBackError("SeqLedger write-back requires ids and dataset handle")
         return
 
     raise WriteBackError("write_back not supported for this ingest source")

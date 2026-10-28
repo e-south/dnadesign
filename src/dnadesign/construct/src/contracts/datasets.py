@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/construct/src/contracts/datasets.py
 
-USR dataset locator and input selection contracts for construct configs.
+SeqLedger dataset locator and input selection contracts for construct configs.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -28,7 +28,7 @@ class USRDatasetLocatorConfig(StrictConfigModel):
     def _dataset_not_blank(cls, value: str) -> str:
         text = str(value or "").strip()
         if not text:
-            raise ValueError("USR dataset locator dataset cannot be empty.")
+            raise ValueError("SeqLedger dataset locator dataset cannot be empty.")
         return text
 
 

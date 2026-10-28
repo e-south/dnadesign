@@ -82,34 +82,37 @@ def test_infer_docs_readme_keeps_workflow_then_type_progressive_disclosure() -> 
     assert "reference/feature-schema.md" in docs_readme
     assert "../workspaces/evo2_feature_bundle_smoke/README.md" in docs_readme
     assert "tutorials/demo_pressure_test_usr_ops_notify.md" in docs_readme
-    assert "../../usr/docs/operations/assembly/multi-source-shared-dataset.md" in docs_readme
-    assert "../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in docs_readme
-    assert "../../usr/docs/operations/promoter/characterization-feature-matrix.md" in docs_readme
-    assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" in docs_readme
+    assert "../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md" in docs_readme
+    assert "../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in docs_readme
+    assert "../../seqledger/docs/operations/promoter/characterization-feature-matrix.md" in docs_readme
+    assert "../../opal/docs/workflows/seqledger-infer-x-active-learning.md" in docs_readme
     assert "../../cluster/docs/workflows/exploratory-clustering.md" in docs_readme
-    assert "file or USR dataset" in docs_readme
+    assert "file or SeqLedger dataset" in docs_readme
     assert "data.location.kind: usr" in docs_readme
     assert "[Multi-source shared dataset assembly]" in docs_readme
-    assert "[Construct -> USR -> Infer shared dataset runbook]" in docs_readme
+    assert "[Construct -> SeqLedger -> Infer shared dataset runbook]" in docs_readme
     assert "[cluster exploratory clustering workflow]" in docs_readme
     assert "reference/README.md" in docs_readme
     assert "architecture/README.md" in docs_readme
     assert "dev/README.md" in docs_readme
     assert "dev/journal.md" not in docs_readme
-    pressure_test_section = docs_readme.split("#### Pressure-test agnostic model writes into USR", maxsplit=1)[1]
+    pressure_test_section = docs_readme.split("#### Pressure-test agnostic model writes into SeqLedger", maxsplit=1)[1]
     pressure_test_section = pressure_test_section.split("#### Continue after infer-derived `X` exists", maxsplit=1)[0]
-    assert "../../usr/docs/operations/assembly/multi-source-shared-dataset.md" not in pressure_test_section
-    assert "../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" not in pressure_test_section
-    assert "../../usr/docs/operations/promoter/characterization-feature-matrix.md" not in pressure_test_section
+    assert "../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md" not in pressure_test_section
+    assert (
+        "../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md"
+        not in pressure_test_section
+    )
+    assert "../../seqledger/docs/operations/promoter/characterization-feature-matrix.md" not in pressure_test_section
     shared_handoff_section = docs_readme.split("### Shared dataset handoffs into infer", maxsplit=1)[1]
     shared_handoff_section = shared_handoff_section.split("### Documentation by type", maxsplit=1)[0]
     assert "../../cluster/docs/workflows/exploratory-clustering.md" not in shared_handoff_section
-    assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" not in shared_handoff_section
+    assert "../../opal/docs/workflows/seqledger-infer-x-active-learning.md" not in shared_handoff_section
     by_type = docs_readme.split("### Documentation by type", maxsplit=1)[1]
-    assert "../../usr/docs/operations/assembly/multi-source-shared-dataset.md" not in by_type
-    assert "../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" not in by_type
-    assert "../../usr/docs/operations/promoter/characterization-feature-matrix.md" not in by_type
-    assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" not in by_type
+    assert "../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md" not in by_type
+    assert "../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" not in by_type
+    assert "../../seqledger/docs/operations/promoter/characterization-feature-matrix.md" not in by_type
+    assert "../../opal/docs/workflows/seqledger-infer-x-active-learning.md" not in by_type
     assert "../../cluster/docs/workflows/exploratory-clustering.md" not in by_type
     assert "[Section index](index.md)" in docs_readme
 
@@ -124,12 +127,12 @@ def test_infer_docs_index_exists_and_points_back_to_docs_readme() -> None:
     assert "### Operations" in docs_index
     assert "### Reference" in docs_index
     assert "### Developer notes" in docs_index
-    assert "../../usr/docs/operations/assembly/multi-source-shared-dataset.md" in docs_index
-    assert "../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in docs_index
-    assert "../../usr/docs/operations/promoter/characterization-feature-matrix.md" in docs_index
+    assert "../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md" in docs_index
+    assert "../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in docs_index
+    assert "../../seqledger/docs/operations/promoter/characterization-feature-matrix.md" in docs_index
     assert "../../cluster/docs/workflows/exploratory-clustering.md" in docs_index
     assert "cluster exploratory workflow" in docs_index
-    assert "../../opal/docs/workflows/usr-infer-x-active-learning.md" in docs_index
+    assert "../../opal/docs/workflows/seqledger-infer-x-active-learning.md" in docs_index
     assert "operations/evo2-sequence-features.md" in docs_index
     assert "reference/evo2-provider.md" in docs_index
     assert "reference/feature-schema.md" in docs_index
@@ -141,7 +144,7 @@ def test_infer_operations_index_links_pressure_test_demo_and_runbook() -> None:
     assert "pressure-test-agnostic-models.md" in ops_index
     assert "../tutorials/demo_pressure_test_usr_ops_notify.md" in ops_index
     assert "scc-evo2-gpu-uv-runbook.md" in ops_index
-    assert "../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in ops_index
+    assert "../../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in ops_index
 
 
 def test_infer_pressure_test_tutorial_covers_local_and_ops_paths() -> None:
@@ -150,14 +153,14 @@ def test_infer_pressure_test_tutorial_covers_local_and_ops_paths() -> None:
     assert "uv run infer workspace init --id demo_usr_pressure --profile usr-pressure" in tutorial
     assert 'export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets"' in tutorial
     assert "uv run infer run --config" in tutorial
-    assert 'uv run infer prune --usr "$DATASET_ID" --usr-root "$USR_ROOT"' in tutorial
+    assert 'uv run infer prune --seqledger "$DATASET_ID" --seqledger-root "$USR_ROOT"' in tutorial
     assert "layer` values `mid` and `final`" in tutorial
     assert "uv run ops runbook init" in tutorial
     assert "uv run ops runbook execute" in tutorial
     assert 'export OPS_RUNBOOK="$WORKSPACE_ROOT/outputs/logs/ops/runbooks/infer-pressure.runbook.yaml"' in tutorial
     assert "--no-submit" in tutorial
     assert "--submit" in tutorial
-    assert "uv run usr --root" in tutorial
+    assert "uv run seqledger --root" in tutorial
 
 
 def test_infer_workspaces_readme_mentions_workspace_inventory_command() -> None:

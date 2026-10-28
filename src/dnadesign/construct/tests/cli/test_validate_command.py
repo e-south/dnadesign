@@ -127,7 +127,7 @@ job:
     result = _RUNNER.invoke(app, ["validate", "config", "--config", config_path.as_posix()])
 
     assert result.exit_code == 1
-    assert "job.input.source.root is required for construct jobs that read USR datasets" in (result.stdout or "")
+    assert "job.input.source.root is required for construct jobs that read SeqLedger datasets" in (result.stdout or "")
 
 
 def test_validate_config_rejects_missing_input_driven_part(tmp_path: Path) -> None:

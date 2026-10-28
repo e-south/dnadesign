@@ -277,7 +277,7 @@ jobs:
       collect_intermediate_embedding: true
       sequence_view_inputs:
         - dataset: demo_sequence_views
-          root: ../../usr/datasets
+          root: ../../seqledger/datasets
           view_selector:
             product_kind: source_record
           pooling:
@@ -1086,7 +1086,7 @@ def test_infer_sequence_view_plan_uses_sidecar_guard_not_overlay_guard(tmp_path:
     submit_block = _render_block(plan.submit_commands)
 
     assert "infer validate sequence-view-completion" in preflight_block
-    assert "dnadesign.ops.orchestrator.gates usr-overlay-guard" not in preflight_block
+    assert "dnadesign.ops.orchestrator.gates seqledger-overlay-guard" not in preflight_block
     assert "INFER_RUN_ARGS" not in preflight_block
     assert "INFER_RUN_ARGS" not in submit_block
 
@@ -2100,7 +2100,7 @@ def test_batch_plan_uses_single_notify_profile_smoke_command(tmp_path: Path) -> 
 
     assert "notify profile doctor" not in preflight_block
     assert "notify setup slack" not in smoke_block
-    assert "notify usr-events watch" not in smoke_block
+    assert "notify seqledger-events watch" not in smoke_block
     assert "notify profile smoke --profile" in smoke_block
     assert "--dry-run" in smoke_block
     assert "--no-advance-cursor-on-dry-run" in smoke_block
@@ -2270,7 +2270,7 @@ def test_densegen_notify_preflight_requires_usr_events_path_contract(tmp_path: P
     plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
     preflight_block = _render_block(plan.preflight_commands)
 
-    assert "uv run dense inspect run --usr-events-path -c" in preflight_block
+    assert "uv run dense inspect run --seqledger-events-path -c" in preflight_block
 
 
 def test_densegen_batch_only_preflight_skips_usr_events_path_contract(tmp_path: Path) -> None:
@@ -2280,7 +2280,7 @@ def test_densegen_batch_only_preflight_skips_usr_events_path_contract(tmp_path: 
     plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
     preflight_block = _render_block(plan.preflight_commands)
 
-    assert "uv run dense inspect run --usr-events-path -c" not in preflight_block
+    assert "uv run dense inspect run --seqledger-events-path -c" not in preflight_block
 
 
 def test_densegen_preflight_solver_probe_includes_gurobi_runtime_env(tmp_path: Path) -> None:
@@ -2308,7 +2308,7 @@ def test_densegen_preflight_includes_overlay_sprawl_guard_command(tmp_path: Path
     plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
     preflight_block = _render_block(plan.preflight_commands)
 
-    assert "dnadesign.ops.orchestrator.gates usr-overlay-guard" in preflight_block
+    assert "dnadesign.ops.orchestrator.gates seqledger-overlay-guard" in preflight_block
     assert "--tool densegen" in preflight_block
     assert f"--config {shlex.quote(str(runbook.densegen.config))}" in preflight_block
     assert f"--workspace-root {shlex.quote(str(runbook.workspace_root))}" in preflight_block
@@ -2324,7 +2324,7 @@ def test_densegen_preflight_includes_records_part_guard_command(tmp_path: Path) 
     plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
     preflight_block = _render_block(plan.preflight_commands)
 
-    assert "dnadesign.ops.orchestrator.gates usr-records-part-guard" in preflight_block
+    assert "dnadesign.ops.orchestrator.gates seqledger-records-part-guard" in preflight_block
     assert "--tool densegen" in preflight_block
     assert f"--config {shlex.quote(str(runbook.densegen.config))}" in preflight_block
     assert f"--workspace-root {shlex.quote(str(runbook.workspace_root))}" in preflight_block
@@ -2341,7 +2341,7 @@ def test_densegen_preflight_includes_archived_overlay_guard_command(tmp_path: Pa
     plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
     preflight_block = _render_block(plan.preflight_commands)
 
-    assert "dnadesign.ops.orchestrator.gates usr-archived-overlay-guard" in preflight_block
+    assert "dnadesign.ops.orchestrator.gates seqledger-archived-overlay-guard" in preflight_block
     assert "--tool densegen" in preflight_block
     assert f"--config {shlex.quote(str(runbook.densegen.config))}" in preflight_block
     assert f"--workspace-root {shlex.quote(str(runbook.workspace_root))}" in preflight_block
@@ -2415,13 +2415,13 @@ def test_infer_qsub_template_exports_usr_actor_tags() -> None:
     repo_root = Path(__file__).resolve().parents[4]
     template_text = (repo_root / "docs" / "bu-scc" / "jobs" / "evo2-gpu-infer.qsub").read_text(encoding="utf-8")
 
-    assert 'export USR_ACTOR_TOOL="${USR_ACTOR_TOOL:-infer}"' in template_text
+    assert 'export SEQLEDGER_ACTOR_TOOL="${SEQLEDGER_ACTOR_TOOL:-infer}"' in template_text
     assert 'DEFAULT_RUN_ID="${OPS_JOB_NAME_SLUG:-$JOB_ID_VALUE}"' in template_text
     assert (
         'if [[ -n "$TASK_ID_VALUE" && "$TASK_ID_VALUE" != "undefined" && "$TASK_ID_VALUE" != "NONE" ]]; then'
         in template_text
     )
-    assert 'export USR_ACTOR_RUN_ID="${USR_ACTOR_RUN_ID:-$DEFAULT_RUN_ID}"' in template_text
+    assert 'export SEQLEDGER_ACTOR_RUN_ID="${SEQLEDGER_ACTOR_RUN_ID:-$DEFAULT_RUN_ID}"' in template_text
 
 
 def test_infer_qsub_template_preserves_infer_exit_codes() -> None:
@@ -2504,7 +2504,7 @@ jobs: []
     submit_block = _render_block(plan.submit_commands)
     smoke_block = _render_block(plan.notify_smoke_commands)
 
-    assert "dnadesign.ops.orchestrator.gates usr-overlay-guard" in preflight_block
+    assert "dnadesign.ops.orchestrator.gates seqledger-overlay-guard" in preflight_block
     assert "--tool infer " in preflight_block
     assert "--tool infer_evo2" not in preflight_block
     assert "evo2-gpu-infer.qsub" in submit_block
@@ -2555,7 +2555,7 @@ jobs:
       collect_intermediate_embedding: true
       sequence_view_inputs:
         - dataset: construct_prom_eth_cip_context
-          root: ../../../usr/datasets
+          root: ../../../seqledger/datasets
           view_selector:
             product_kind: realized_context
             orientation: reverse_complement

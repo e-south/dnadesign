@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/src/runtime/resume_planner.py
 
-Plans resumable USR extract work by reading records and infer overlays.
+Plans resumable SeqLedger extract work by reading records and infer overlays.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-from dnadesign.usr import overlay_metadata, overlay_parts
+from dnadesign.seqledger import overlay_metadata, overlay_parts
 
 from ..contracts import infer_usr_column_name
 from ..errors import WriteBackError
@@ -141,7 +141,7 @@ def _merge_named_column_values(
 
 def plan_resume_for_usr(
     *,
-    ds,  # dnadesign.usr.Dataset
+    ds,  # dnadesign.seqledger.Dataset
     ids: List[str],
     model_id: str,
     job_id: str,
@@ -195,7 +195,7 @@ def plan_resume_for_usr(
                 only_non_null=True,
             )
     except Exception as exc:
-        raise WriteBackError(f"USR resume scan failed for records table {ds.records_path}: {exc}") from exc
+        raise WriteBackError(f"SeqLedger resume scan failed for records table {ds.records_path}: {exc}") from exc
 
     todo_idx: List[int] = []
     for row_index in range(total_rows):
@@ -255,7 +255,7 @@ def read_usr_columns(
                 only_non_null=True,
             )
     except Exception as exc:
-        raise WriteBackError(f"USR column scan failed for records table {ds.records_path}: {exc}") from exc
+        raise WriteBackError(f"SeqLedger column scan failed for records table {ds.records_path}: {exc}") from exc
 
     return values
 

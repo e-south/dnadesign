@@ -1,11 +1,11 @@
 # Source Contract
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-11
+**Last verified:** 2026-10-28
 
 `latentdna` currently accepts three source kinds:
 
-- `usr`
+- `seqledger`
 - `parquet`
 - `matrix_bundle`
 

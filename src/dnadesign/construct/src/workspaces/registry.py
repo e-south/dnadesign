@@ -388,7 +388,7 @@ def _rewrite_workspace_registry_identity(*, workspace_dir: Path, workspace_id: s
     workspace_payload["profile"] = profile
     if "roots" not in workspace_payload:
         workspace_payload["roots"] = {
-            "shared_usr_root": "src/dnadesign/usr/datasets",
+            "shared_usr_root": "src/dnadesign/seqledger/datasets",
             "workspace_usr_root": "outputs/usr_datasets",
         }
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")

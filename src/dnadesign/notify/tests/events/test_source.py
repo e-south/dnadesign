@@ -233,7 +233,7 @@ def test_resolve_tool_events_path_infer_requires_explicit_root_even_with_env(tmp
         + "\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("DNADESIGN_USR_ROOT", str(usr_root))
+    monkeypatch.setenv("DNADESIGN_SEQLEDGER_ROOT", str(usr_root))
 
     with pytest.raises(NotifyConfigError, match="requires ingest.root for source='usr' write-back jobs"):
         resolve_tool_events_path(tool="infer", config=config)
@@ -264,7 +264,7 @@ def test_resolve_tool_events_path_infer_requires_explicit_root_without_env(tmp_p
         + "\n",
         encoding="utf-8",
     )
-    monkeypatch.delenv("DNADESIGN_USR_ROOT", raising=False)
+    monkeypatch.delenv("DNADESIGN_SEQLEDGER_ROOT", raising=False)
 
     with pytest.raises(NotifyConfigError, match="requires ingest.root for source='usr' write-back jobs"):
         resolve_tool_events_path(tool="infer", config=config)
@@ -307,7 +307,7 @@ def test_resolve_tool_events_path_infer_rejects_ambiguous_destinations(tmp_path:
         encoding="utf-8",
     )
 
-    with pytest.raises(NotifyConfigError, match="multiple USR destinations"):
+    with pytest.raises(NotifyConfigError, match="multiple SeqLedger destinations"):
         resolve_tool_events_path(tool="infer", config=config)
 
 

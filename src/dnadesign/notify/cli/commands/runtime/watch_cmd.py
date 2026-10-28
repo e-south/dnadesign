@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/notify/cli/commands/runtime/watch_cmd.py
 
-USR events watch command registration for Notify CLI.
+SeqLedger events watch command registration for Notify CLI.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -33,7 +33,7 @@ def register_usr_events_watch_command(
             help="Secret reference: keychain://service/account, secretservice://service/account, or file:///path.",
         ),
         tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
-        events: Path | None = typer.Option(None, "--events", help="USR events JSONL path."),
+        events: Path | None = typer.Option(None, "--events", help="SeqLedger events JSONL path."),
         profile: Path | None = typer.Option(None, "--profile", help="Path to profile JSON file."),
         config: Path | None = typer.Option(
             None,

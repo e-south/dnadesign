@@ -122,7 +122,7 @@ densegen:
       deduplicate: true
       chunk_size: 128
     usr:
-      root: ../../../usr/datasets
+      root: ../../../seqledger/datasets
       dataset: densegen_study_constitutive_sigma_panel
       chunk_size: 128
       health_event_interval_seconds: 60

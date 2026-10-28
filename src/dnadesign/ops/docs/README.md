@@ -1,7 +1,7 @@
 ## Ops docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-09
+**Last verified:** 2026-10-28
 
 Ops package docs cover packaged presets and command reference. The repo-wide
 command list lives in `docs/runbooks/README.md`.
@@ -24,7 +24,7 @@ If you are entering from the shell rather than browsing docs first, start with `
 
 - [SGE/HPC operator skill](../../../../.agents/skills/sge-hpc-ops/SKILL.md): use when the task is scheduler-shaped (`qsub`, `qrsh`, queue state, BU SCC execution posture, or batch/Notify chains).
 - [Notify operator skill](../../../../.agents/skills/notify-ops/SKILL.md): use when the task is Slack watcher setup, validation, live watch, or recovery.
-- [BU SCC USR sync skill](../../../../.agents/skills/bu-scc-usr-sync/SKILL.md): use when the task is dataset sync between local dnadesign and BU SCC.
+- [BU SCC SeqLedger sync skill](../../../../.agents/skills/bu-scc-seqledger-sync/SKILL.md): use when the task is dataset sync between local dnadesign and BU SCC.
 
 ### Package-local surfaces
 
@@ -37,4 +37,4 @@ If you are entering from the shell rather than browsing docs first, start with `
 - Ops owns control-plane orchestration, audit trails, and scheduler command ordering.
 - `ops progress show` and `ops progress campaign` are read-only; `ops progress scaffold` prints YAML to stdout unless you pass `--out`.
 - Tool-specific runtime semantics stay in the boundary-owning tool docs.
-- Durable USR-backed data-plane workflows stay in shared USR operations docs.
+- Durable SeqLedger-backed data-plane workflows stay in shared SeqLedger operations docs.

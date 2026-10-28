@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Protocol
 
 from dnadesign.ops.status.path_ref import resolve_path_ref
-from dnadesign.usr import Dataset, SequenceViewContractExpectation, validate_sequence_view_contract
+from dnadesign.seqledger import Dataset, SequenceViewContractExpectation, validate_sequence_view_contract
 
 from .check_protocols import CommandCheckTarget, RunbookPlanCheckTarget, SchedulerQueueCheckTarget
 from .checks import (

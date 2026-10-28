@@ -180,7 +180,7 @@ class JobConfig(StrictConfigModel):
             if not self.params:
                 raise ConfigError("generate job requires 'params'")
         if self.io.write_back and self.ingest.source == "usr" and not str(self.ingest.root or "").strip():
-            raise ConfigError("USR write-back jobs must set ingest.root explicitly.")
+            raise ConfigError("SeqLedger write-back jobs must set ingest.root explicitly.")
         return self
 
 

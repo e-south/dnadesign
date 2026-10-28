@@ -289,7 +289,7 @@ class CombineAA(Protocol):
             modifications = [header, *aa_tokens, *nt_tokens_txt]
 
             out = {
-                # USR core fields are set by the caller; we emit the sequence and protocol specifics only.
+                # SeqLedger core fields are set by the caller; we emit the sequence and protocol specifics only.
                 "sequence": new_seq,
                 "modifications": modifications,
                 # round '2' (combination generation)

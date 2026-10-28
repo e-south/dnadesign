@@ -1,7 +1,7 @@
 ## Notify command contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-28
 
 This page is the tool-local source for Notify command invocation contracts and fail-fast behavior.
 
@@ -21,14 +21,14 @@ This page is the tool-local source for Notify command invocation contracts and f
 
 ### notify setup resolve-events
 
-- Purpose: resolve expected USR `.events.log` path and default policy without writing profile artifacts.
+- Purpose: resolve expected SeqLedger `.events.log` path and default policy without writing profile artifacts.
 - Requires resolver mode with `--tool` and exactly one of `--config` or `--workspace`.
 - Built-in resolver policies:
   - `densegen` -> `densegen`
   - `infer` -> `infer`
   - `construct` -> `construct`
 - Workspace shorthand is repo-rooted for all resolver-mode tools. Outside the repo checkout, set `DNADESIGN_REPO_ROOT=<repo-root>` or pass `--config` explicitly.
-- `infer` resolver accepts exactly one USR write-back destination or exactly one sequence-view
+- `infer` resolver accepts exactly one SeqLedger write-back destination or exactly one sequence-view
   input dataset. Write-back jobs require explicit `ingest.root` for every
   `ingest.source='usr'` + `io.write_back=true` job.
 - Multi-destination infer configs must use explicit `--events <path>` or be split into
@@ -57,7 +57,7 @@ This page is the tool-local source for Notify command invocation contracts and f
 - `--dry-run` still enforces webhook source and provider URL validation contracts.
 - HTTPS webhook delivery requires trust roots via `--tls-ca-bundle` or `SSL_CERT_FILE`.
 
-### notify usr-events watch
+### notify seqledger-events watch
 
 - Invocation contract: pass exactly one mode family.
   - `--profile <profile.json>`
@@ -95,7 +95,7 @@ This page is the tool-local source for Notify command invocation contracts and f
 
 ### observer boundary
 
-- Notify reads USR `"<dataset>/.events.log"` JSONL streams.
+- Notify reads SeqLedger `"<dataset>/.events.log"` JSONL streams.
 - Notify does not consume DenseGen runtime telemetry (`outputs/meta/events.jsonl`).
 - Notify resolves observation paths and delivery wiring; it does not launch upstream tool runs.
 

@@ -1,7 +1,7 @@
 ## Linear ssDNA Composition
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-21
+**Last verified:** 2026-10-28
 **Surface role:** tool-local reference; generic authority for
 `linear_ssdna_composition_v1` and producer-owned Folding/BaseRender handoffs
 
@@ -23,7 +23,7 @@ Use this route for explicit segment composition:
   same producer-owned bundle.
 
 Use regular Construct workspaces when the task is template/context realization
-from USR-backed anchors, templates, and downstream `construct__*` lineage.
+from SeqLedger-backed anchors, templates, and downstream `construct__*` lineage.
 
 ### Commands
 
@@ -59,7 +59,7 @@ Segment sources use neutral provenance shapes:
 
 - `literal` for sequence supplied in the config;
 - `derived` for a sequence transformed from another declared segment;
-- `usr` for a USR dataset record;
+- `seqledger` for a SeqLedger dataset record;
 - `record` for an external record named by `authority` and `record_id`; and
 - `artifact` for a typed artifact named by contract, URI, selector, and
   resolution evidence.

@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/notify/cli/resolve.py
 
-Shared CLI resolution helpers for notify option values and USR events paths.
+Shared CLI resolution helpers for notify option values and SeqLedger events paths.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -102,8 +102,8 @@ def resolve_existing_file_path(*, field: str, path_value: Path) -> Path:
 
 def events_path_hint() -> str:
     return (
-        "Find the USR .events.log path with `uv run dense inspect run --usr-events-path` from the DenseGen "
-        "workspace, or use `uv run dense inspect run --usr-events-path -c <config.yaml>`."
+        "Find the SeqLedger .events.log path with `uv run dense inspect run --seqledger-events-path` from the DenseGen "
+        "workspace, or use `uv run dense inspect run --seqledger-events-path -c <config.yaml>`."
     )
 
 
@@ -121,14 +121,14 @@ def validate_usr_events_probe(
                 event = json.loads(raw)
             except json.JSONDecodeError as exc:
                 raise NotifyConfigError(
-                    "events must be a USR .events.log JSONL file; first non-empty line is not JSON "
+                    "events must be a SeqLedger .events.log JSONL file; first non-empty line is not JSON "
                     f"(line {line_no}) in {events_path}. {events_path_hint()}"
                 ) from exc
             try:
                 validate_usr_event(event, allow_unknown_version=True)
             except NotifyConfigError as exc:
                 raise NotifyConfigError(
-                    f"events file does not look like USR .events.log (line {line_no}) in {events_path}: "
+                    f"events file does not look like SeqLedger .events.log (line {line_no}) in {events_path}: "
                     f"{exc}. {events_path_hint()}"
                 ) from exc
             return
@@ -143,7 +143,7 @@ def resolve_usr_events_path(
     resolved = events_path.expanduser().resolve()
     if resolved.suffix.lower() in {".yaml", ".yml"}:
         raise NotifyConfigError(
-            f"events must point to a USR .events.log JSONL file, not a config file: {resolved}. {events_path_hint()}"
+            f"events must point to .events.log JSONL, not configuration: {resolved}. {events_path_hint()}"
         )
     if not require_exists and not resolved.exists():
         return resolved

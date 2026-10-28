@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.usr import normalize_sequence
+from dnadesign.seqledger import normalize_sequence
 
 from ..contracts.errors import ValidationError
 

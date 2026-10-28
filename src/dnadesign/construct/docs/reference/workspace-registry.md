@@ -1,7 +1,7 @@
 ## Construct workspace registry reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-24
+**Last verified:** 2026-10-28
 
 ### Purpose
 
@@ -15,7 +15,7 @@ workspace:
   profile: anchor-template-demo
   description: Construct workspace registry for explicit project inventory.
   roots:
-    shared_usr_root: src/dnadesign/usr/datasets
+    shared_usr_root: src/dnadesign/seqledger/datasets
     workspace_usr_root: outputs/usr_datasets
   projects:
     - id: slot_a_window
@@ -42,7 +42,7 @@ workspace:
 - every project must track `project.artifacts.config.job_id`; registry/config job-id drift is rejected
 - every project must declare a `contract:` block; flat legacy fields are rejected
 - when `project.contract.template` is present, it must include `id`, `dataset`, and `record_id` together
-- dataset ids stay semantic and biological at the USR layer
+- dataset ids stay semantic and biological at the SeqLedger layer
 - `project.contract` is an assertion surface, not the runtime source of truth; the config remains authoritative for runtime semantics
 
 ### Root precedence

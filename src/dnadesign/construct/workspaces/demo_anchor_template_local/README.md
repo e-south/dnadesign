@@ -2,7 +2,7 @@
 
 Use this packaged workspace when you want the smallest Construct demo:
 one anchor part placed into one larger template, with the resulting sequence
-and `construct__*` provenance written into workspace-local USR datasets.
+and `construct__*` provenance written into workspace-local SeqLedger datasets.
 
 Copy it into a new workspace id with:
 
@@ -19,7 +19,7 @@ stays self-contained. The configs illustrate two independent choices:
 - which slot in the template should receive the anchor (`slot_a` or `slot_b`)
 - whether the realized output should be a 1 kb window or the full template context
 
-If you want a shared USR root instead, edit the config `root:` fields
+If you want a shared SeqLedger root instead, edit the config `root:` fields
 deliberately and re-run `construct workspace show` to verify the project
 inventory.
 

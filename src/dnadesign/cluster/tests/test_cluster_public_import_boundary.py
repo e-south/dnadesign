@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/cluster/tests/test_cluster_public_import_boundary.py
 
-Cluster runtime import-boundary tests for USR public APIs.
+Cluster runtime import-boundary tests for SeqLedger public APIs.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -29,7 +29,7 @@ def _runtime_root() -> Path:
 
 
 def test_cluster_runtime_does_not_import_usr_internal_paths() -> None:
-    disallowed = "dnadesign.usr.src."
+    disallowed = "dnadesign.seqledger.src."
     violations: list[str] = []
     for path in sorted(_runtime_root().rglob("*.py")):
         if "tests" in path.parts:
@@ -37,7 +37,7 @@ def test_cluster_runtime_does_not_import_usr_internal_paths() -> None:
         text = path.read_text(encoding="utf-8")
         if disallowed in text:
             violations.append(str(path))
-    assert not violations, f"Found disallowed USR internal imports in cluster runtime: {violations}"
+    assert not violations, f"Found disallowed SeqLedger internal imports in cluster runtime: {violations}"
 
 
 def test_cluster_public_surface_exposes_workspace_execution_api() -> None:

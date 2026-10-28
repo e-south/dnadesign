@@ -19,7 +19,7 @@ from typing import Sequence
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from dnadesign.usr import Dataset, overlay_digest_ledger_path, overlay_parts
+from dnadesign.seqledger import Dataset, overlay_digest_ledger_path, overlay_parts
 
 
 @dataclass(frozen=True)

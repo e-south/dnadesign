@@ -151,7 +151,7 @@ def test_workspace_runbooks_include_workspace_local_runbook_script() -> None:
                 '--notebook "$NOTEBOOK"',
                 '--mode "$MODE"',
                 f'--runner "{expected_runner[workspace_id]}"',
-                f'--ensure-usr-registry "{expected_usr_registry[workspace_id]}"',
+                f'--ensure-seqledger-registry "{expected_usr_registry[workspace_id]}"',
                 f'--require-fimo "{expected_require_fimo[workspace_id]}"',
                 '"$@"',
             ],
@@ -162,10 +162,10 @@ def test_workspace_runbooks_include_workspace_local_runbook_script() -> None:
 def test_usr_workspace_runbooks_document_usr_registry_auto_seed() -> None:
     for workspace_id in USR_WORKSPACE_IDS:
         script = _read_runbook_script(workspace_id)
-        assert '--ensure-usr-registry "true"' in script
+        assert '--ensure-seqledger-registry "true"' in script
 
         runbook_text = _read_runbook(workspace_id)
-        assert "auto-seeds the configured shared USR root registry when missing." in runbook_text
+        assert "auto-seeds the configured shared SeqLedger root registry when missing." in runbook_text
 
 
 def test_shared_runbook_lib_keeps_canonical_dense_command_sequence() -> None:
@@ -196,7 +196,7 @@ def test_shared_runbook_lib_enforces_config_and_notebook_artifact_guards() -> No
             'echo "DenseGen config not found at: $config" >&2',
             'if [[ "$ensure_usr_registry" == "true" ]]; then',
             'if [[ ! -f "$root_registry" ]]; then',
-            'echo "USR registry source not found at: $root_registry" >&2',
+            'echo "SeqLedger registry source not found at: $root_registry" >&2',
             '"${dense_cmd[@]}" notebook generate -c "$config"',
             'if [[ ! -f "$notebook" ]]; then',
             'echo "DenseGen notebook was not generated at: $notebook" >&2',

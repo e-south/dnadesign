@@ -1,13 +1,13 @@
 ## Cluster semantic surface
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-28
 
 Use this page when you need the package nouns and boundaries before changing code or contracts.
 
 ### Core nouns
 
-- `InputSource`: a USR dataset or a CSV/Parquet file that provides row-aligned records.
+- `InputSource`: a SeqLedger dataset or a CSV/Parquet file that provides row-aligned records.
 - `FeatureSpec`: the explicit feature definition used to build the clustering matrix, either one vector column or one numeric column set.
 - `AnalysisRequest`: the resolved downstream analysis execution request after CLI/workspace/preset precedence has been applied.
 - `WorkspaceConfig`: the canonical reusable machine config surface for `fit`, `umap`, and `analyze`.

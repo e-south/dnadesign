@@ -51,7 +51,7 @@ _PRIVATE_STUDY_TOKEN_SIGNATURES = {
 }
 _PRIVATE_DOCUMENT_DIGESTS = frozenset({"31a5001333e23e2f81709a76c222ec8bd51ff1195ccc54afb69342641c2d3fd1"})
 _IDENTIFIER_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{9,}")
-_ACTIVE_REMOTES_CONFIG = Path("src/dnadesign/usr/remotes.yaml")
+_ACTIVE_REMOTES_CONFIG = Path("src/dnadesign/seqledger/remotes.yaml")
 _HOME_PATH_PATTERNS = (
     re.compile("/Users" + r"/([^/\s\"']+)"),
     re.compile("/home" + r"/([^/\s\"']+)"),

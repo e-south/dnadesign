@@ -261,7 +261,7 @@ def test_verify_observed_label_promotion_rejects_dataset_escape(tmp_path: Path) 
         y_space="response_window_vector_v1",
     )
 
-    with pytest.raises(OpalError, match="manifest_path must remain within the USR dataset root"):
+    with pytest.raises(OpalError, match="manifest_path must remain within the SeqLedger dataset root"):
         verify_observed_label_promotion(binding)
 
 

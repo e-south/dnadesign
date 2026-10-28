@@ -169,7 +169,7 @@ def _build_steps(cfg_path: Path, cfg: RootConfig, labels_as_of: int) -> list[Gui
     records_path = str(_records_path_from_cfg(cfg))
     label_source = _label_source_summary(cfg)
     if label_source["kind"] == "usr_sidecar":
-        ingest_why = "Append observed round labels to the shared USR observed-label sidecar."
+        ingest_why = "Append observed round labels to the shared SeqLedger observed-label sidecar."
         ingest_writes = [str(label_source["path"]), "outputs/ledger/labels.parquet"]
     else:
         ingest_why = "Append observed round labels to campaign-local label history."
@@ -432,7 +432,7 @@ def build_missing_records_guidance(
             f"opal guide -c {cfg_path}",
             f"opal validate -c {cfg_path}",
         ],
-        learn_more=["docs/reference/data-contracts.md", "docs/workflows/usr-infer-x-active-learning.md"],
+        learn_more=["docs/reference/data-contracts.md", "docs/workflows/seqledger-infer-x-active-learning.md"],
         records_path=str(records_path),
         records_exists=False,
         label_source=_label_source_summary(cfg),

@@ -3,7 +3,7 @@
 **Type:** workflow
 **Plane:** downstream-tool
 **Owner-boundary:** cluster
-**Entry artifact:** one chosen feature column or exported matrix in a USR dataset or file input
+**Entry artifact:** one chosen feature column or exported matrix in a SeqLedger dataset or file input
 **Exit artifact:** cluster run records, embeddings, plots, and downstream exploratory summaries
 **Registry-id:** cluster.downstream.exploratory-clustering
 **Summary:** Explore one chosen feature column or exported matrix through clustering, UMAP, and downstream summaries.
@@ -11,21 +11,21 @@
 **Status-kind:** cluster-run-index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-17
+**Last verified:** 2026-10-28
 
 Use this workflow when one feature column or exported matrix already exists and the next task is exploratory clustering, UMAP visualization, or unsupervised summaries.
 
 ### Preconditions
 
 - One chosen feature column or exported matrix is already present.
-- The input is a USR dataset (`--dataset`) or a file (`--file`) with that chosen feature column or matrix.
-- If that feature column or matrix does not exist yet, return to [promoter characterization feature matrix](../../../usr/docs/operations/promoter/characterization-feature-matrix.md) for the shared infer-backed workflow.
+- The input is a SeqLedger dataset (`--dataset`) or a file (`--file`) with that chosen feature column or matrix.
+- If that feature column or matrix does not exist yet, return to [promoter characterization feature matrix](../../../seqledger/docs/operations/promoter/characterization-feature-matrix.md) for the shared infer-backed workflow.
 
 ### First fit, UMAP, and analysis pass
 
-The examples below use the packaged workspace `promoter_clusters_v1`, which targets the USR dataset `60bp_dual_promoter_cpxR_LexA`.
+The examples below use the packaged workspace `promoter_clusters_v1`, which targets the SeqLedger dataset `60bp_dual_promoter_cpxR_LexA`.
 When you run a packaged workspace id directly, cluster reads the built-in config as a template and writes runtime artifacts under `./workspaces/<id>/outputs/cluster/`, not under the installed package tree.
-Outside a source checkout, resolve the dataset via `--usr-root` or `DNADESIGN_USR_ROOT`.
+Outside a source checkout, resolve the dataset via `--seqledger-root` or `DNADESIGN_SEQLEDGER_ROOT`.
 
 #### 1. Fit
 
@@ -138,7 +138,7 @@ uv run cluster sweep \
   --method leiden
 ```
 
-If another Python tool needs to run the same flow in-process, use the public helpers in [`../../api.py`](../../api.py) instead of importing `dnadesign.cluster.src.*`. Use workspace helpers for reusable checked-in workspaces and ad hoc helpers for one-off file or USR executions.
+If another Python tool needs to run the same flow in-process, use the public helpers in [`../../api.py`](../../api.py) instead of importing `dnadesign.cluster.src.*`. Use workspace helpers for reusable checked-in workspaces and ad hoc helpers for one-off file or SeqLedger executions.
 
 ### Verify next
 
@@ -147,11 +147,11 @@ If another Python tool needs to run the same flow in-process, use the public hel
 - Confirm `analysis/<run-slug>/analysis.json` captures the resolved analysis request, including any OPAL join campaign or round selectors.
 - Confirm the chosen `cluster__<name>` columns and optional coordinate columns exist when `--write` or `--attach-coords` was used.
 - If you are editing package code or docs rather than only running the workflow, use the [cluster verification contract](../reference/verification.md) before widening to broader repo checks.
-- If exploratory work has answered the structural question and you now need supervised label/train/select, continue with [USR dataset with infer-derived X -> OPAL active learning](../../../opal/docs/workflows/usr-infer-x-active-learning.md).
+- If exploratory work has answered the structural question and you now need supervised label/train/select, continue with [SeqLedger dataset with infer-derived X -> OPAL active learning](../../../opal/docs/workflows/seqledger-infer-x-active-learning.md).
 
 ### Related docs
 
 - [cluster docs index by workflow](../README.md)
 - [cluster CLI contracts](../reference/cli-contracts.md)
 - [cluster ownership boundary](../concepts/ownership-boundary.md)
-- [promoter characterization feature matrix](../../../usr/docs/operations/promoter/characterization-feature-matrix.md)
+- [promoter characterization feature matrix](../../../seqledger/docs/operations/promoter/characterization-feature-matrix.md)

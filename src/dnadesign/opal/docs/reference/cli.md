@@ -3,7 +3,7 @@ id: opal-reference-cli
 title: OPAL Command Line Interface
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-10-06
+last_verified: 2026-10-28
 audience:
   - operator
   - maintainer
@@ -24,7 +24,7 @@ For operator-managed datasets, use one explicit coordinate for the complete
 command lifecycle:
 
 ```bash
-opal --usr-root <absolute-path> <command> --config <yaml>
+opal --seqledger-root <absolute-path> <command> --config <yaml>
 ```
 
 The root must name an absolute, existing directory that is not a symbolic link.
@@ -234,7 +234,7 @@ opal ingest-y --config <yaml> --round <r> --csv <path> \
   campaign label-history columns. Fixed-universe sidecar ingest loads only the
   records identity frame (`id`, `sequence`) and does not materialize the
   configured X column.
-* For a USR sidecar with `manifest_path`, `ingest-y --apply` fails before any
+* For a SeqLedger sidecar with `manifest_path`, `ingest-y --apply` fails before any
   label or ledger write. The source is a study-published immutable snapshot;
   its owning workflow publishes a new Parquet artifact and promotion manifest.
 * The text preview includes a `[Runtime] ingest-y` block. JSON output includes
@@ -727,7 +727,7 @@ opal validate --config <yaml> [--json]
 **Notes**
 
 * Config parsing is strict: malformed YAML or duplicate keys fail as bad-args config errors.
-* Verifies **USR essentials** exist in `records.parquet`.
+* Verifies **SeqLedger essentials** exist in `records.parquet`.
 * Verifies the configured **X** column exists.
 * If Y is present, validates vector length & numeric/finite cells.
 * JSON errors use the shared `opal.cli_error.v1` payload, so scripts can rely

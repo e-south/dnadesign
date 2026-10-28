@@ -20,7 +20,7 @@ from dnadesign.construct.src.contracts.errors import ValidationError
 from dnadesign.construct.src.interfaces.api import run_from_config
 from dnadesign.construct.src.persistence.usr_registry import _ensure_construct_registry
 from dnadesign.construct.tests.runtime.run_construct_helpers import write_registry as _write_registry
-from dnadesign.usr import Dataset
+from dnadesign.seqledger import Dataset
 
 
 def test_run_construct_can_append_new_rows_to_existing_output_dataset(tmp_path: Path) -> None:

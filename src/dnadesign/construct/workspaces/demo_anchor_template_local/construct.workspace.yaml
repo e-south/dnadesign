@@ -6,7 +6,7 @@ workspace:
     Each project entry maps one audited config to its intended
     input/template/output contract.
   roots:
-    shared_usr_root: src/dnadesign/usr/datasets
+    shared_usr_root: src/dnadesign/seqledger/datasets
     workspace_usr_root: outputs/usr_datasets
   projects:
     - id: slot_a_window

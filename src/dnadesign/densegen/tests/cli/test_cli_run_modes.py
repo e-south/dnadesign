@@ -655,8 +655,8 @@ def test_run_handles_missing_usr_registry_runtime_errors_with_actionable_next_st
 
     def _fake_run_pipeline(*_args, **_kwargs):
         raise RuntimeError(
-            "USR registry not found at /tmp/demo/usr_root/registry.yaml. "
-            "Create registry.yaml before writing USR outputs."
+            "SeqLedger registry not found at /tmp/demo/usr_root/registry.yaml. "
+            "Create registry.yaml before writing SeqLedger outputs."
         )
 
     monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
@@ -665,7 +665,7 @@ def test_run_handles_missing_usr_registry_runtime_errors_with_actionable_next_st
 
     assert result.exit_code != 0, result.output
     normalized = result.output.replace("\n", " ")
-    assert "USR registry not found" in normalized
+    assert "SeqLedger registry not found" in normalized
     assert "workspace init --output-mode usr|both" in normalized
     assert "registry.yaml" in normalized
     assert "Traceback" not in result.output
@@ -769,7 +769,7 @@ def test_run_refuses_fresh_when_shared_usr_dataset_already_has_state(tmp_path: P
 
     assert result.exit_code == 1, result.output
     assert captured["called"] is False
-    assert "--fresh only clears workspace outputs" in result.output
+    assert "--fresh clears workspace outputs" in result.output
     assert "inspect the attached dataset" in result.output
     assert str(usr_root) in result.output
 
@@ -800,7 +800,7 @@ def test_run_refuses_new_run_when_shared_usr_dataset_exists_without_workspace_ou
 
     assert result.exit_code == 1, result.output
     assert captured["called"] is False
-    assert "Shared USR dataset state already exists" in result.output
+    assert "Shared SeqLedger dataset state already exists" in result.output
     assert "restore workspace outputs and resume" in result.output
 
 
@@ -919,10 +919,10 @@ def test_campaign_reset_purge_usr_registry_removes_registry(tmp_path: Path) -> N
     stale_table.write_text("seed")
 
     runner = CliRunner()
-    result = runner.invoke(app, ["campaign-reset", "--yes", "--purge-usr-registry", "-c", str(cfg_path)])
+    result = runner.invoke(app, ["campaign-reset", "--yes", "--purge-seqledger-registry", "-c", str(cfg_path)])
 
     assert result.exit_code == 1, result.output
-    assert "--purge-usr-registry only applies to workspace-local USR roots" in result.output
+    assert "--purge-seqledger-registry requires a workspace-local root" in result.output
     assert registry_path.exists()
     assert stale_table.exists()
 
@@ -948,7 +948,7 @@ def test_run_auto_seeds_missing_usr_registry_when_enabled(tmp_path: Path, monkey
     assert result.exit_code == 0, result.output
     assert captured["called"] is True
     assert registry_path.exists()
-    assert "Seeded USR registry" in result.output
+    assert "Seeded SeqLedger registry" in result.output
 
 
 def test_run_fails_fast_when_usr_registry_missing_and_auto_seed_disabled(tmp_path: Path, monkeypatch) -> None:
@@ -967,11 +967,11 @@ def test_run_fails_fast_when_usr_registry_missing_and_auto_seed_disabled(tmp_pat
 
     runner = CliRunner()
     monkeypatch.setattr(run_command, "run_pipeline", _fake_run_pipeline)
-    result = runner.invoke(app, ["run", "--fresh", "--no-plot", "--no-ensure-usr-registry", "-c", str(cfg_path)])
+    result = runner.invoke(app, ["run", "--fresh", "--no-plot", "--no-ensure-seqledger-registry", "-c", str(cfg_path)])
 
     assert result.exit_code == 1, result.output
     assert captured["called"] is False
-    assert "USR registry not found" in result.output
+    assert "SeqLedger registry not found" in result.output
     assert "workspace init --output-mode usr|both" in result.output
 
 

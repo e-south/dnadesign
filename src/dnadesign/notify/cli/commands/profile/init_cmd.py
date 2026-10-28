@@ -27,7 +27,7 @@ def register_profile_init_command(
         profile: Path = typer.Option(..., "--profile", help="Path to profile JSON file."),
         provider: str = typer.Option(..., help="Provider: generic|slack|discord."),
         url_env: str = typer.Option(..., "--url-env", help="Environment variable holding webhook URL."),
-        events: Path = typer.Option(..., "--events", help="USR events JSONL path."),
+        events: Path = typer.Option(..., "--events", help="SeqLedger events JSONL path."),
         cursor: Path | None = typer.Option(None, "--cursor", help="Cursor file storing byte offset."),
         only_actions: str | None = typer.Option(None, "--only-actions", help="Comma-separated action filter."),
         only_tools: str | None = typer.Option(None, "--only-tools", help="Comma-separated actor tool filter."),
@@ -45,7 +45,7 @@ def register_profile_init_command(
         include_raw_event: bool = typer.Option(
             False,
             "--include-raw-event/--no-include-raw-event",
-            help="Whether to include the full USR event blob in payload meta.",
+            help="Whether to include the full SeqLedger event blob in payload meta.",
         ),
         progress_step_pct: int | None = typer.Option(
             None,

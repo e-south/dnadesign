@@ -147,7 +147,7 @@ def _densegen_preflight_commands(
     commands: list[ToolCommandSpec] = []
     overlay_guard = runbook.densegen.overlay_guard
     overlay_guard_parts: list[str] = [
-        "usr-overlay-guard",
+        "seqledger-overlay-guard",
         "--tool",
         "densegen",
         "--config",
@@ -172,7 +172,7 @@ def _densegen_preflight_commands(
 
     records_part_guard = runbook.densegen.records_part_guard
     records_part_guard_parts: list[str] = [
-        "usr-records-part-guard",
+        "seqledger-records-part-guard",
         "--tool",
         "densegen",
         "--config",
@@ -198,7 +198,7 @@ def _densegen_preflight_commands(
     archived_overlay_guard = runbook.densegen.archived_overlay_guard
     commands.append(
         _tool_ops_gate(
-            "usr-archived-overlay-guard",
+            "seqledger-archived-overlay-guard",
             "--tool",
             "densegen",
             "--config",
@@ -221,7 +221,7 @@ def _densegen_preflight_commands(
                 "dense",
                 "inspect",
                 "run",
-                "--usr-events-path",
+                "--seqledger-events-path",
                 "-c",
                 config,
             )
@@ -333,7 +333,7 @@ def _infer_preflight_commands(
     else:
         infer_overlay_guard = runbook.infer.overlay_guard
         infer_overlay_guard_parts: list[str] = [
-            "usr-overlay-guard",
+            "seqledger-overlay-guard",
             "--tool",
             "infer",
             "--config",

@@ -1,0 +1,123 @@
+# SeqLedger sync quickstart
+
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-10-28
+
+
+Use this page for the minimum reliable loop: preflight diff, transfer, verify.
+
+## Quick path
+
+1. One-time setup: [setup.md](setup.md).
+2. Every run: `diff` -> `pull`/`push`.
+3. Set `DNADESIGN_SEQLEDGER_ROOT` to the existing local dataset root, or pass `--root` on each command. The default is `./usr_datasets`. See [dataset location and migration](../../../README.md#dataset-location) for older checkout-local datasets.
+
+## Minimum command loop
+
+```bash
+# Preview local-vs-remote diff.
+uv run seqledger diff my_dataset bu-scc
+# Pull remote state into local dataset path.
+uv run seqledger pull my_dataset bu-scc -y
+```
+
+Default sync contract:
+
+- Dataset sync defaults to `--verify hash` plus strict sidecar and `_derived`/`_auxiliary` content-hash fidelity checks.
+- Dataset sync preserves dataset contents and sidecars, not cross-host owner/group/permission bits.
+- Use `--no-verify-sidecars` only when you intentionally trade fidelity for speed.
+- Use `--no-verify-derived-hashes` only when you intentionally keep sidecar inventory checks but skip content-hash parity.
+- Use `--verify auto|size|parquet` only when hash verification is intentionally unavailable.
+
+## Daily sync workflow
+
+Rule: run command on the machine where files should end up.
+
+```bash
+# Preview local-vs-remote differences.
+uv run seqledger diff my_dataset bu-scc
+
+# Pull remote -> local.
+uv run seqledger pull my_dataset bu-scc -y
+
+# Push local -> remote.
+uv run seqledger push my_dataset bu-scc -y
+```
+
+Useful flags:
+
+- `-y/--yes`: non-interactive overwrite confirmation
+- `--primary-only`: transfer only `records.parquet`
+- `--skip-snapshots`: exclude `_snapshots/`
+- `--dry-run`: preview only
+- `--verify {hash,auto,size,parquet}`: primary verification mode (default `hash`)
+- `--verify-sidecars` and `--no-verify-sidecars`
+- `--verify-derived-hashes` and `--no-verify-derived-hashes`
+- `--audit-json-out <path>`: machine-readable sync audit JSON
+- `--strict-bootstrap-id`: require an explicit canonical dataset id for bootstrap pulls and disable local name guessing
+
+## Iterative batch loop (HPC clone -> local clone)
+
+Use when datasets are produced on HPC and too large for git transfer.
+
+```bash
+# Local dataset may not exist yet; explicit flat or namespace-qualified ids both work.
+uv run seqledger diff my_dataset bu-scc
+# Materialize remote dataset locally.
+uv run seqledger pull my_dataset bu-scc -y
+```
+
+```bash
+# Pull latest remote state before local analysis/notebook work.
+uv run seqledger diff my_dataset bu-scc
+# Apply remote updates to local workspace copy.
+uv run seqledger pull my_dataset bu-scc -y
+```
+
+```bash
+# Preview whether local overlays diverged from remote.
+uv run seqledger diff my_dataset bu-scc
+# Push local changes back to the HPC dataset root.
+uv run seqledger push my_dataset bu-scc -y
+```
+
+Safety guardrails:
+
+- `seqledger diff` / `seqledger pull` / `seqledger push` fail fast on SSH auth or transport errors instead of treating the remote dataset as silently missing.
+- `seqledger pull` fails fast when remote `records.parquet` is missing.
+- `seqledger push` fails fast when local `records.parquet` is missing.
+- Dataset transfers acquire the remote dataset's exclusive `.usr.lock` to avoid cross-host write races.
+- A live dataset lease hands transfer ownership to rsync through `.usr.transfer.lock`; ephemeral dataset-local `.usr.lease.*` marker files bind that handoff to the exact lock-holder process. These runtime paths are never synchronized or inventoried as data.
+- Event writers use the dataset's runtime-only `.events.lock`; sync excludes it so a transfer cannot replace the shared advisory lock.
+- Diff and full-transfer planning compare the complete event-log content revision, not only its line count.
+- A full push validates the local log as complete UTF-8 JSONL, proves that the remote event log is a complete-line prefix, and holds both event locks through transfer and verification.
+- Pull, push, and single-file transport are operational actions outside the replicated dataset history. They never append local-only transport entries to `.events.log`; successful full transfers leave both copies byte-identical.
+- `--dry-run` does not create remote directories or lock files. It makes a read-only event-prefix observation; the real push repeats that proof under transaction locks.
+- Use one sync coordinator for a dataset during each transfer. Later work on either copy is supported: push accepts a remote history that is an exact prefix, and pull accepts a remote history that extends the local prefix. Concurrent reciprocal transfers wait only to the bounded lock timeout, while overlapping or branched histories fail closed instead of silently choosing one copy.
+- The remote lock handshake tolerates benign shell noise before the lock marker, so SCC environment chatter does not break normal `seqledger pull` / `seqledger push`.
+- `seqledger pull` and `seqledger push` skip transfer when no changes are detected.
+- Pull transfers stage into a temporary directory and only promote after verification.
+- Staged pull payloads reject symlink and unsupported entry types before promotion.
+- Rsync intentionally avoids replaying remote owner/group/permission metadata on the destination so SCC pulls stay portable across local filesystems.
+- Strict sidecar and `_derived`/`_auxiliary` content-hash fidelity checks are enabled by default.
+- `--verify-sidecars` requires full dataset transfer and is incompatible with `--primary-only` / `--skip-snapshots`.
+- Re-run `seqledger pull`/`seqledger push` after transient failure; post-transfer verification is always enforced.
+- Every pull/push prints a post-action sync audit summary.
+
+Optional strict bootstrap mode:
+
+```bash
+# Require an explicit canonical dataset id and disable local name guessing.
+uv run seqledger pull usr_promoter_references bu-scc -y --strict-bootstrap-id
+```
+
+```bash
+# Enable strict bootstrap id mode for current shell session.
+export SEQLEDGER_SYNC_STRICT_BOOTSTRAP_ID=1
+```
+
+## Next
+
+- Setup and SSH/key management: [setup.md](setup.md)
+- Dataset vs file mode details: [modes.md](modes.md)
+- Failure diagnostics: [troubleshooting.md](troubleshooting.md)

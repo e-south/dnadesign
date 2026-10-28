@@ -213,7 +213,7 @@ def cmd_prune_source(
 
             # Drop requested columns and write atomically
             df2 = df.drop(columns=[c for c in to_delete if c in df.columns], errors="ignore")
-            # Assertive safety: USR essentials + X must remain
+            # Assertive safety: SeqLedger essentials + X must remain
             missing_post = [c for c in (ESSENTIAL_COLS + [store.x_col]) if c not in df2.columns]
             if missing_post:
                 raise OpalError(

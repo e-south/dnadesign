@@ -53,18 +53,18 @@ def _validate_run_mode_contract(
         if job:
             raise ConfigError("--job is only valid with --config.")
         if usr is None or not str(usr).strip():
-            raise ConfigError("--usr is required when using --preset.")
+            raise ConfigError("--seqledger is required when using --preset.")
         return
 
     invalid_flags: list[str] = []
     if usr is not None:
-        invalid_flags.append("--usr")
+        invalid_flags.append("--seqledger")
     if field != "sequence":
         invalid_flags.append("--field")
     if ids is not None:
         invalid_flags.append("--ids")
     if usr_root is not None:
-        invalid_flags.append("--usr-root")
+        invalid_flags.append("--seqledger-root")
     if write_back:
         invalid_flags.append("--write-back")
     if invalid_flags:
@@ -84,14 +84,14 @@ def register(app: typer.Typer) -> None:
         overwrite: Optional[bool] = typer.Option(None, "--overwrite/--no-overwrite", help="Override job.io.overwrite."),
         progress: bool = typer.Option(True, "--progress/--no-progress", help="Use progress bars."),
         dry_run: bool = typer.Option(False, "--dry-run", help="Validate and print summary, then exit."),
-        usr: Optional[str] = typer.Option(None, "--usr", help="USR dataset (preset mode)."),
-        field: str = typer.Option("sequence", "--field", help="USR field/column."),
-        ids: Optional[str] = typer.Option(None, "--ids", help="CSV or file of ids (USR)."),
-        usr_root: Optional[Path] = typer.Option(None, "--usr-root", help="USR datasets root."),
+        usr: Optional[str] = typer.Option(None, "--seqledger", help="SeqLedger dataset (preset mode)."),
+        field: str = typer.Option("sequence", "--field", help="SeqLedger field/column."),
+        ids: Optional[str] = typer.Option(None, "--ids", help="CSV or file of ids (SeqLedger)."),
+        usr_root: Optional[Path] = typer.Option(None, "--seqledger-root", help="SeqLedger datasets root."),
         write_back: bool = typer.Option(
             False,
             "--write-back/--no-write-back",
-            help="Preset mode: attach outputs to USR.",
+            help="Preset mode: attach outputs to SeqLedger.",
         ),
         i_know_this_is_pickle: bool = typer.Option(False, "--i-know-this-is-pickle", help="Needed only for pt_file."),
     ):

@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/permuter/src/api/materialize.py
 
-Materialization helpers for durable Permuter workspace and USR records.
+Materialization helpers for durable Permuter workspace and SeqLedger records.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -30,7 +30,7 @@ from dnadesign.permuter.src.core.usr import make_usr_row
 
 def materialize_result(result: PermuterResult, output_dir: str | Path, *, overwrite: bool = False) -> DatasetRef:
     """
-    Write a public API result as a USR-shaped Permuter dataset directory.
+    Write a public API result as a SeqLedger-shaped Permuter dataset directory.
 
     The materialized dataset intentionally uses the same canonical observed
     metric columns as the CLI so downstream tools can consume either path.

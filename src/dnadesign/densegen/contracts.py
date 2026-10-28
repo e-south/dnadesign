@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/densegen/contracts.py
 
-Public DenseGen contracts for USR destination and producer-shape resolution.
+Public DenseGen contracts for SeqLedger destination and producer-shape resolution.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -135,7 +135,7 @@ def _usr_output_from_mapping(config_path: Path, root: dict[str, object]) -> Dens
         usr_root=usr_root,
         usr_dataset=_normalize_relative_dataset_path(
             usr_cfg.get("dataset"),
-            label="densegen.output.usr.dataset",
+            label="densegen.output.seqledger.dataset",
         ),
     )
 

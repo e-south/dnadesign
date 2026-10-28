@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/notify/runtime/watch_runner.py
 
-Runtime orchestration for notify usr-events watch execution.
+Runtime orchestration for notify seqledger-events watch execution.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

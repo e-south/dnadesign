@@ -363,7 +363,9 @@ def _dataset_relative_path(value: str, *, field: str) -> str:
     posix_path = PurePosixPath(raw)
     windows_path = PureWindowsPath(raw)
     if not raw or "\\" in raw or posix_path.is_absolute() or windows_path.is_absolute() or ".." in posix_path.parts:
-        raise ConfigError(f"Invalid campaign.yaml: labels.source.{field} must be relative to the USR dataset root.")
+        raise ConfigError(
+            f"Invalid campaign.yaml: labels.source.{field} must be relative to the SeqLedger dataset root."
+        )
     return posix_path.as_posix()
 
 
@@ -422,12 +424,12 @@ def _validate_registered_plugin_names(pyd: PRoot) -> None:
 
 
 def _resolve_explicit_usr_root(value: Path | str) -> Path:
-    from dnadesign.usr import require_explicit_usr_root
+    from dnadesign.seqledger import require_explicit_seqledger_root
 
     try:
-        return require_explicit_usr_root(value)
+        return require_explicit_seqledger_root(value)
     except ValueError as exc:
-        raise ConfigError(f"Invalid explicit USR root: {exc}.") from exc
+        raise ConfigError(f"Invalid explicit SeqLedger root: {exc}.") from exc
 
 
 def load_config(path: Path | str, *, usr_root: Path | str | None = None) -> RootConfig:
@@ -554,7 +556,7 @@ def load_config(path: Path | str, *, usr_root: Path | str | None = None) -> Root
         return str(resolve_path_like(cfg_path, v, base_dir=base_dir))
 
     if usr_root is not None and not isinstance(pyd.data.location, PLocationUSR):
-        raise ConfigError("An explicit USR root is only valid when data.location.kind=usr.")
+        raise ConfigError("An explicit SeqLedger root is only valid when data.location.kind=usr.")
 
     if isinstance(pyd.data.location, PLocationUSR):
         resolved_usr_root = (

@@ -1,7 +1,7 @@
 ## SCC Evo2 GPU Environment Runbook (UV + infer)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-26
+**Last verified:** 2026-10-28
 
 Use this page when you need a deterministic SCC GPU environment build for infer.
 
@@ -312,20 +312,20 @@ Treat live study collection as four explicit gates:
 1. the checked-in study snapshot is current
 2. the study preflight is green on the current host
 3. Evo2 actually imports and loads on the live GPU host
-4. the canonical USR `infer` namespace is registered before first write-back
+4. the canonical SeqLedger `infer` namespace is registered before first write-back
 
-For study-owned USR write-back lanes, run:
+For study-owned SeqLedger write-back lanes, run:
 
 ```bash
 uv run ops catalog list --simple # Discover routes supplied by the installed study package.
 uv run ops progress show <study-status-registry-id> --json # Confirm the checked-in study snapshot is current.
 NOTIFY_WEBHOOK_FILE=<...> SSL_CERT_FILE=<...> uv run ops progress show <study-preflight-registry-id> --scope next --json # Confirm the current host is execution-ready.
-uv run infer validate usr-registry --config <lane-config> # Derive the canonical infer namespace registration contract.
-uv run usr --root src/dnadesign/usr/datasets namespace show infer # Confirm the shared USR root already knows the infer namespace.
+uv run infer validate seqledger-registry --config <lane-config> # Derive the canonical infer namespace registration contract.
+uv run seqledger --root src/dnadesign/seqledger/datasets namespace show infer # Confirm the shared SeqLedger root already knows the infer namespace.
 ```
 
 If `namespace show infer` fails, use the register command emitted by
-`infer validate usr-registry` before the first real write-back.
+`infer validate seqledger-registry` before the first real write-back.
 
 ### First live signals on a GPU node
 
@@ -341,7 +341,7 @@ Before declaring the run hung, check:
 - the watcher spool remains empty
 
 For study-owned interactive watchers on an existing event stream, seed the
-cursor to the current `.events.log` size before `notify usr-events watch
+cursor to the current `.events.log` size before `notify seqledger-events watch
 --follow` unless replay is intentional.
 
 ### API pressure checks (forward, embeddings, generation)
@@ -480,5 +480,5 @@ export OMP_NUM_THREADS=1 # Limit OpenMP thread usage.
 ### Follow-on path
 
 - For scheduler-managed pressure tests, continue with:
-  - [Agnostic model + USR pressure test](pressure-test-agnostic-models.md)
+  - [Agnostic model + SeqLedger pressure test](pressure-test-agnostic-models.md)
   - [BU SCC Batch + Notify runbook](../../../../../docs/bu-scc/runbooks/batch-notify.md)

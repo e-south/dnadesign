@@ -2,7 +2,7 @@
 doc_id: bu-scc-job-templates
 surface: ops-runbook
 owner: dnadesign-maintainers
-last_verified: 2026-08-09
+last_verified: 2026-10-28
 ---
 
 ## BU SCC job templates
@@ -13,7 +13,7 @@ These scripts are submit-ready templates for BU SCC SGE jobs:
 - `densegen-analysis.qsub`: post-run DenseGen analysis (plots)
 - `evo2-gpu-infer.qsub`: Evo2 GPU infer batch run
 - `permuter-evaluate.qsub`: Permuter workspace evaluate batch run, optionally preceded by `permuter run`
-- `notify-watch.qsub`: Notify watcher for USR `.events.log`
+- `notify-watch.qsub`: Notify watcher for SeqLedger `.events.log`
 
 ### Quick start
 
@@ -65,7 +65,7 @@ qsub -P <project> \
 `densegen-cpu.qsub` command defaults:
 - validation: `uv run dense validate-config --probe-solver -c "$DENSEGEN_CONFIG"`
 - run: `DENSEGEN_RUN_ARGS` must include exactly one of `--fresh` or `--resume`
-- actor tags: `USR_ACTOR_TOOL=densegen`, `USR_ACTOR_RUN_ID=$JOB_ID.$SGE_TASK_ID`
+- actor tags: `SEQLEDGER_ACTOR_TOOL=densegen`, `SEQLEDGER_ACTOR_RUN_ID=$JOB_ID.$SGE_TASK_ID`
 - thread alignment: `OMP_NUM_THREADS=${NSLOTS:-1}`
 - runtime trace: `<DENSEGEN_CONFIG directory>/outputs/logs/ops/runtime/dnadesign_densegen_cpu.$JOB_ID.trace.log`
 - GUROBI bootstrap defaults:
@@ -133,7 +133,7 @@ When using GUROBI, keep config aligned with scheduler slots:
 For large campaigns with `runtime.round_robin: true`, avoid tiny turn caps:
 - raise `densegen.runtime.max_accepted_per_library` so each round-robin turn emits a meaningful batch
 - raise `output.usr.chunk_size` to reduce overlay-part fan-out
-- use ops runbooks so preflight `usr-overlay-guard` blocks unsafe projected overlay-part growth and compacts existing overlay parts when configured
+- use ops runbooks so preflight `seqledger-overlay-guard` blocks unsafe projected overlay-part growth and compacts existing overlay parts when configured
 
 ### Evo2 GPU submissions
 
@@ -150,7 +150,7 @@ Use that direct submit as the default `evo2_7b` lane. For `evo2_20b`, keep the s
 - fail-fast gate: `INFER_CONFIG` is required
 - preflight: `uv run infer validate config --config "$INFER_CONFIG"`
 - run: `uv run infer run --config "$INFER_CONFIG" ${INFER_RUN_ARGS:-}`
-- actor tags: `USR_ACTOR_TOOL=infer`, `USR_ACTOR_RUN_ID=${OPS_JOB_NAME_SLUG:-$JOB_ID}` with `.SGE_TASK_ID` appended only for real array tasks
+- actor tags: `SEQLEDGER_ACTOR_TOOL=infer`, `SEQLEDGER_ACTOR_RUN_ID=${OPS_JOB_NAME_SLUG:-$JOB_ID}` with `.SGE_TASK_ID` appended only for real array tasks
 - sequence-view sidecar jobs should be submitted through Ops runbooks or `ops runbook fill-infer`; those plans add `infer validate sequence-view-completion` before submit and do not pass `INFER_RUN_ARGS=--overwrite`
 - optional legacy reset contract: set `INFER_RUN_ARGS=--overwrite` only when a direct row-writeback Infer run intentionally needs to recompute requested write-back outputs in place
 
@@ -177,11 +177,11 @@ qsub -P <project> \
 - preflight: `uv run permuter workspace validate --workspace "$PERMUTER_WORKSPACE"`
 - optional generation: set `PERMUTER_RUN_FIRST=1` to run `permuter run --json` before evaluation
 - evaluation: `uv run permuter evaluate --json`; pass explicit metrics with `PERMUTER_EVALUATE_ARGS` or define `evaluate.metrics[]` in the workspace config
-- actor tags: `USR_ACTOR_TOOL=permuter`, `USR_ACTOR_RUN_ID=${JOB_ID}` with `.SGE_TASK_ID` appended only for real array tasks
+- actor tags: `SEQLEDGER_ACTOR_TOOL=permuter`, `SEQLEDGER_ACTOR_RUN_ID=${JOB_ID}` with `.SGE_TASK_ID` appended only for real array tasks
 - runtime trace: `<PERMUTER_WORKSPACE directory>/outputs/logs/ops/runtime/dnadesign_permuter_evaluate.$JOB_ID.trace.log` when `PERMUTER_WORKSPACE` is a path; pass `PERMUTER_TRACE_ROOT` for registered scope ids
 - output override: pass `PERMUTER_OUT=<output root>` to mirror local `permuter run/evaluate --out`
 
-This wrapper is intentionally a Permuter surface, not an Infer workaround. Evo2 evaluators still call through Permuter's evaluator registry; feature-bundle or USR-sidecar Infer jobs should use the Infer runbook/template directly until the Permuter sidecar-native bridge lands.
+This wrapper is intentionally a Permuter surface, not an Infer workaround. Evo2 evaluators still call through Permuter's evaluator registry; feature-bundle or SeqLedger-sidecar Infer jobs should use the Infer runbook/template directly until the Permuter sidecar-native bridge lands.
 
 ### Notify watcher submissions
 
@@ -229,7 +229,7 @@ qsub -P <project> \
 ```
 
 `notify-watch.qsub` mode selection:
-- if `NOTIFY_PROFILE` is set, it runs `notify usr-events watch --profile ... --follow`
+- if `NOTIFY_PROFILE` is set, it runs `notify seqledger-events watch --profile ... --follow`
 - otherwise it requires `EVENTS_PATH` or auto-resolves from `NOTIFY_TOOL` + `NOTIFY_CONFIG`
 - it accepts future `.events.log` paths and uses `--wait-for-events` for run-before-events startup
 - profile mode requires a readable `WEBHOOK_FILE` (watcher loads secret from file each run)
@@ -261,7 +261,7 @@ docs/bu-scc/jobs/notify-watch-local-smoke.sh \
 ```
 
 What it does:
-- writes a terminal USR event into a local test events file
+- writes a terminal SeqLedger event into a local test events file
 - starts a local HTTP capture endpoint (no external Slack posting)
 - runs `docs/bu-scc/jobs/notify-watch.qsub` with real `uv run notify ...` commands
 - verifies at least one success payload was delivered

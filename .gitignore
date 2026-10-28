@@ -98,7 +98,7 @@ temp.md
 tmp/
 
 # Local operator configuration (copy the tracked example before use)
-src/dnadesign/usr/remotes.yaml
+src/dnadesign/seqledger/remotes.yaml
 
 # -----------------------------------------------------------------------------
 # Archives
@@ -176,8 +176,8 @@ src/dnadesign/cruncher/projects/**/projects/
 # Internal archives/prototypes
 src/dnadesign/archived/
 src/dnadesign/prototypes/
-src/dnadesign/usr/archived/
-src/dnadesign/usr/datasets/usr_regulondb_native_promoters/
+src/dnadesign/seqledger/archived/
+src/dnadesign/seqledger/datasets/usr_regulondb_native_promoters/
 
 # OPAL campaigns: keep configs tracked, ignore artifacts/data.
 src/dnadesign/opal/campaigns/**
@@ -305,15 +305,15 @@ src/dnadesign/densegen/runs/**
 **/.opal/
 /$OPAL_TMPDIR/
 
-# USR datasets (large, not for git)
-src/dnadesign/usr/datasets/**
-!src/dnadesign/usr/datasets/
-!src/dnadesign/usr/datasets/README.md
-!src/dnadesign/usr/datasets/registry.yaml
-!src/dnadesign/usr/datasets/archived/
-!src/dnadesign/usr/datasets/archived/README.md
-!src/dnadesign/usr/datasets/archived/promoter_misc_pytorch/
-!src/dnadesign/usr/datasets/archived/promoter_misc_pytorch/README.md
+# SeqLedger datasets (large, not for git)
+src/dnadesign/seqledger/datasets/**
+!src/dnadesign/seqledger/datasets/
+!src/dnadesign/seqledger/datasets/README.md
+!src/dnadesign/seqledger/datasets/registry.yaml
+!src/dnadesign/seqledger/datasets/archived/
+!src/dnadesign/seqledger/datasets/archived/README.md
+!src/dnadesign/seqledger/datasets/archived/promoter_misc_pytorch/
+!src/dnadesign/seqledger/datasets/archived/promoter_misc_pytorch/README.md
 
 # Common local project dirs
 /.var/
@@ -355,9 +355,12 @@ AGENTS.md
 !src/dnadesign/opal/AGENTS.md
 !src/dnadesign/opal/notebooks/AGENTS.md
 !src/dnadesign/permuter/AGENTS.md
-!src/dnadesign/usr/notebooks/AGENTS.md
+!src/dnadesign/seqledger/notebooks/AGENTS.md
 src/dnadesign/notify/.secrets/
 
 # Marimo
 **/__marimo__/cache/
 **/__marimo__/
+
+# Existing operator data remains outside source and distribution artifacts.
+src/dnadesign/usr/

@@ -1,11 +1,11 @@
 ## Construct seed/import manifest reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-28
 
 ### Purpose
 
-Use `construct seed import-manifest` to materialize canonical anchor or template records into one or more USR datasets before you write construct configs.
+Use `construct seed import-manifest` to materialize canonical anchor or template records into one or more SeqLedger datasets before you write construct configs.
 
 ### Shape
 
@@ -36,7 +36,7 @@ datasets:
 
 - `manifest_id`: required stable id for the import batch
 - `datasets`: required non-empty list
-- `datasets[].id`: semantic USR dataset id, preferably flat and biological
+- `datasets[].id`: semantic SeqLedger dataset id, preferably flat and biological
 - `datasets[].records`: required non-empty list
 - `records[].label`: preferred human-readable record name
 - `records[].intended_role`: optional hint such as `anchor` or `template`; runtime construct configs still decide how a record is used
@@ -47,7 +47,7 @@ datasets:
 
 ### What gets written
 
-- base USR records in the requested dataset ids
+- base SeqLedger records in the requested dataset ids
 - `usr_label__primary` / `usr_label__aliases` for human-readable names
 - `construct_seed__label`
 - `construct_seed__manifest_id`

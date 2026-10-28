@@ -1,7 +1,7 @@
 ## Constitutive sigma70 panel tutorial
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-27
+**Last verified:** 2026-10-28
 
 
 Use this tutorial to build a constitutive σ70 promoter panel. The workflow pairs fixed RNAP -35 and -10 hexamer motifs, then embeds each pair in filtered background sequence.
@@ -73,8 +73,8 @@ inputs:                                      # Input definitions used by Stage-A
 
 ### Step-by-step commands
 
-Start by pinning the config path used across run commands. This workspace writes local tables to `outputs/tables/` and its shared USR sink to `src/dnadesign/usr/datasets/`.
-`dense run` auto-seeds the configured shared USR root registry when it is missing, so no manual registry copy step is required.
+Start by pinning the config path used across run commands. This workspace writes local tables to `outputs/tables/` and its shared SeqLedger sink to `src/dnadesign/seqledger/datasets/`.
+`dense run` auto-seeds the configured shared SeqLedger root registry when it is missing, so no manual registry copy step is required.
 
 ```bash
 # Enter the workspace directory so relative paths resolve correctly.

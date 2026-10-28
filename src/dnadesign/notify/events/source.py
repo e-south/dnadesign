@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/notify/events/source.py
 
-Tool config resolvers for expected USR events log destinations.
+Tool config resolvers for expected SeqLedger events log destinations.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

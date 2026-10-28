@@ -85,7 +85,7 @@ RUNBOOK_MARKDOWN_FILES = (
     "docs/bu-scc/setup/quickstart.md",
     "docs/bu-scc/setup/install.md",
     "docs/bu-scc/runbooks/batch-notify.md",
-    "docs/notify/usr-events.md",
+    "docs/notify/seqledger-events.md",
 )
 TYPE_PATTERN = re.compile(r"^\*\*Type:\*\*\s*(.+?)\s*$", re.MULTILINE)
 PLANE_PATTERN = re.compile(r"^\*\*Plane:\*\*\s*(.+?)\s*$", re.MULTILINE)
@@ -163,7 +163,7 @@ DENSEGEN_DOC_LANGUAGE_PATHS = (
 )
 DENSEGEN_DISALLOWED_TERM_PATTERN = re.compile(r"\bcanonical\b", flags=re.IGNORECASE)
 CONSTRUCT_OPERATOR_DOC_PATHS = (
-    "src/dnadesign/usr/docs/operations",
+    "src/dnadesign/seqledger/docs/operations",
     "src/dnadesign/notify/docs/reference/command-contracts.md",
 )
 CONSTRUCT_LEGACY_OPERATOR_PATTERNS = (
@@ -182,13 +182,13 @@ LEGACY_CONTRACT_SURFACE_DOC_PATTERNS = (
     re.compile(r"\bdnadesign\._contracts\b"),
     re.compile(r"\bdnadesign\.usr_roots\b"),
     re.compile(r"src/dnadesign/_contracts\b"),
-    re.compile(r"src/dnadesign/usr_roots\.py\b"),
-    re.compile(r"src/dnadesign/usr/src/roots\.py\b"),
+    re.compile(r"src/dnadesign/seqledger_roots\.py\b"),
+    re.compile(r"src/dnadesign/seqledger/src/roots\.py\b"),
     re.compile(r"src/dnadesign/ops/orchestrator/contracts\.py\b"),
 )
-SHARED_USR_DATASETS_ROOT = "src/dnadesign/usr/datasets"
+SHARED_USR_DATASETS_ROOT = "src/dnadesign/seqledger/datasets"
 SHARED_USR_DATASET_LAYOUT_NUDGE = (
-    "Shared repo USR dataset roots must be flat under src/dnadesign/usr/datasets; "
+    "Shared repo SeqLedger dataset roots must be flat under src/dnadesign/seqledger/datasets; "
     "move nested roots to owner-first ids like 'densegen_demo_sampling_baseline'. "
     "archived/ is the only special top-level bucket."
 )
@@ -209,57 +209,57 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "plane": "control-plane",
         "owner_boundary": "ops",
     },
-    "src/dnadesign/usr/docs/operations/README.md": {
+    "src/dnadesign/seqledger/docs/operations/README.md": {
         "type": "route",
         "plane": "data-plane",
-        "owner_boundary": "usr",
+        "owner_boundary": "seqledger",
     },
-    "src/dnadesign/usr/docs/operations/routes/workflow-map.md": {
+    "src/dnadesign/seqledger/docs/operations/routes/workflow-map.md": {
         "type": "route",
         "plane": "data-plane",
-        "owner_boundary": "usr",
+        "owner_boundary": "seqledger",
     },
-    "src/dnadesign/usr/docs/operations/sync/README.md": {
+    "src/dnadesign/seqledger/docs/operations/sync/README.md": {
         "type": "route",
         "plane": "data-plane",
-        "owner_boundary": "usr",
+        "owner_boundary": "seqledger",
     },
-    "src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.md": {
+    "src/dnadesign/seqledger/docs/operations/sync/hpc-agent-flow.md": {
         "type": "runbook",
         "plane": "data-plane",
-        "owner_boundary": "usr",
+        "owner_boundary": "seqledger",
     },
-    "src/dnadesign/usr/docs/operations/assembly/multi-source-shared-dataset.md": {
+    "src/dnadesign/seqledger/docs/operations/assembly/multi-source-shared-dataset.md": {
         "type": "runbook",
         "plane": "data-plane",
-        "owner_boundary": "usr",
+        "owner_boundary": "seqledger",
     },
-    "src/dnadesign/usr/docs/operations/sync/chained-densegen-infer-runbook.md": {
+    "src/dnadesign/seqledger/docs/operations/sync/chained-densegen-infer-runbook.md": {
         "type": "runbook",
         "plane": "data-plane",
-        "owner_boundary": "usr",
+        "owner_boundary": "seqledger",
     },
-    "src/dnadesign/usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md": {
+    "src/dnadesign/seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md": {
         "type": "runbook",
         "plane": "data-plane",
-        "owner_boundary": "usr",
+        "owner_boundary": "seqledger",
     },
-    "src/dnadesign/usr/docs/operations/assembly/permuter-construct-infer-shared-dataset.md": {
+    "src/dnadesign/seqledger/docs/operations/assembly/permuter-construct-infer-shared-dataset.md": {
         "type": "runbook",
         "plane": "data-plane",
-        "owner_boundary": "usr",
+        "owner_boundary": "seqledger",
     },
-    "src/dnadesign/usr/docs/operations/promoter/characterization-feature-matrix.md": {
+    "src/dnadesign/seqledger/docs/operations/promoter/characterization-feature-matrix.md": {
         "type": "runbook",
         "plane": "data-plane",
-        "owner_boundary": "usr",
+        "owner_boundary": "seqledger",
     },
     "src/dnadesign/cluster/docs/workflows/exploratory-clustering.md": {
         "type": "workflow",
         "plane": "downstream-tool",
         "owner_boundary": "cluster",
     },
-    "src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md": {
+    "src/dnadesign/opal/docs/workflows/seqledger-infer-x-active-learning.md": {
         "type": "workflow",
         "plane": "downstream-tool",
         "owner_boundary": "opal",

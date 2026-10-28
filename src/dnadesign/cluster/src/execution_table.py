@@ -104,7 +104,7 @@ def run_delete_columns(
         _log(
             console,
             "print",
-            f"[green]Removed[/green] {len(to_delete)} column(s) from USR dataset '{ictx['dataset']}'.",
+            f"[green]Removed[/green] {len(to_delete)} column(s) from SeqLedger dataset '{ictx['dataset']}'.",
         )
         return
 
@@ -186,7 +186,7 @@ def run_intra_similarity(
             if "Columns already exist" in str(exc) and not allow_overwrite:
                 raise RuntimeError("Columns already exist. Re-run with `-y/--allow-overwrite`.") from exc
             raise
-        _log(console, "print", "[green]Attached[/green] intra-sim to USR dataset.")
+        _log(console, "print", "[green]Attached[/green] intra-sim to SeqLedger dataset.")
     else:
         merged = attach_columns_schema_preserving(df, cols, "id", allow_overwrite=allow_overwrite)
         write_generic(ictx["file"], merged, inplace=inplace, out=(Path(out) if out else None), backup_suffix=".bak")

@@ -27,12 +27,12 @@ def run(
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        help="Validate inputs and build outputs without writing USR data.",
+        help="Validate inputs and build outputs without writing SeqLedger data.",
     ),
     usr_root: Path | None = typer.Option(
         None,
-        "--usr-root",
-        help="Absolute operator-managed USR root used for inputs and outputs.",
+        "--seqledger-root",
+        help="Absolute operator-managed SeqLedger root used for inputs and outputs.",
     ),
     output_format: str = typer.Option("text", "--format", help="Output format: text or json."),
 ) -> None:

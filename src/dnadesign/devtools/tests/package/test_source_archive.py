@@ -16,6 +16,7 @@ import runpy
 import shutil
 import struct
 import subprocess
+import sys
 import tarfile
 import zipfile
 from pathlib import Path
@@ -47,7 +48,7 @@ def test_source_archive_has_reproducible_metadata_and_preserves_contents(tmp_pat
         os.utime(module, (1600000000 + index, 1600000000 + index))
         output = tmp_path / str(index)
         subprocess.run(
-            ["uv", "build", "--sdist", "--out-dir", str(output)],
+            ["uv", "build", "--python", sys.executable, "--sdist", "--out-dir", str(output)],
             cwd=source,
             env=env,
             check=True,
@@ -87,7 +88,7 @@ def test_wheel_rebuild_drops_stale_python_and_data_files(tmp_path: Path) -> None
     (staging / "private-record.txt").write_text("stale fixture data\n")
     output = tmp_path / "dist"
     subprocess.run(
-        ["uv", "build", "--wheel", "--out-dir", str(output)],
+        ["uv", "build", "--python", sys.executable, "--wheel", "--out-dir", str(output)],
         cwd=source,
         check=True,
         capture_output=True,

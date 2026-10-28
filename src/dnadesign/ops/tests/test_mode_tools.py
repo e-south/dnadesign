@@ -76,7 +76,7 @@ def test_infer_overlay_probe_avoids_workspace_fallback_when_usr_destination_reso
     _write_infer_config(infer_config, usr_root=external_usr_root)
 
     def _unexpected_workspace_probe(_workspace_root: Path) -> tuple[Path, ...]:
-        raise AssertionError("workspace fallback should not be used when infer USR destination resolves")
+        raise AssertionError("workspace fallback should not be used when infer SeqLedger destination resolves")
 
     monkeypatch.setattr(mode_tools, "_infer_workspace_overlay_candidates", _unexpected_workspace_probe)
     artifacts = mode_tools._infer_overlay_artifacts(workspace_root, infer_config=infer_config)
@@ -98,7 +98,7 @@ def test_infer_overlay_probe_returns_no_artifacts_when_no_usr_destination(
 
     def _unexpected_workspace_probe(_workspace_root: Path) -> tuple[Path, ...]:
         raise AssertionError(
-            "workspace fallback should stay disabled for infer configs without a scoped USR destination"
+            "workspace fallback should stay disabled for infer configs without a scoped SeqLedger destination"
         )
 
     monkeypatch.setattr(mode_tools, "_infer_workspace_overlay_candidates", _unexpected_workspace_probe)
@@ -164,7 +164,7 @@ jobs:
         raise AssertionError("workspace fallback should stay disabled for ambiguous infer configs")
 
     monkeypatch.setattr(mode_tools, "_infer_workspace_overlay_candidates", _unexpected_workspace_probe)
-    with pytest.raises(mode_tools.InferModeProbeError, match="multiple USR destinations"):
+    with pytest.raises(mode_tools.InferModeProbeError, match="multiple SeqLedger destinations"):
         mode_tools._infer_overlay_artifacts(workspace_root, infer_config=infer_config)
 
 

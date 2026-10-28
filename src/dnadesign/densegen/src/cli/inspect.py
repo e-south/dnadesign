@@ -344,13 +344,15 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
             help="Show full motif IDs instead of TF display names in summaries.",
         ),
         events: bool = typer.Option(False, "--events", help="Show events summary (stalls/resamples)."),
-        usr_events_path: bool = typer.Option(False, "--usr-events-path", help="Print USR .events.log path and exit."),
+        usr_events_path: bool = typer.Option(
+            False, "--seqledger-events-path", help="Print SeqLedger .events.log path and exit."
+        ),
     ):
         if root is not None and run is not None:
             context.console.print("[bold red]Choose either --root or --run, not both.[/]")
             raise typer.Exit(code=1)
         if root is not None and usr_events_path:
-            context.console.print("[bold red]Choose either --root or --usr-events-path, not both.[/]")
+            context.console.print("[bold red]Choose either --root or --seqledger-events-path, not both.[/]")
             raise typer.Exit(code=1)
         if root is not None:
             workspaces_root = root.resolve()
@@ -377,7 +379,7 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
             run_root = run
             if library or usr_events_path:
                 cfg_path = config if config is not None else (run_root / "config.yaml")
-                command_flag = "--library" if library else "--usr-events-path"
+                command_flag = "--library" if library else "--seqledger-events-path"
                 if not cfg_path.exists():
                     context.console.print(
                         f"[bold red]Config not found for {command_flag}:[/] "
@@ -388,12 +390,12 @@ def register_inspect_commands(inspect_app: typer.Typer, *, context: CliContext) 
                 loaded = context.load_config_or_exit(cfg_path, absolute=absolute, display_root=run_root)
         if usr_events_path:
             if loaded is None:
-                context.console.print("[bold red]Config is required for --usr-events-path.[/]")
+                context.console.print("[bold red]Config is required for --seqledger-events-path.[/]")
                 raise typer.Exit(code=1)
             try:
                 events_log_path = _resolve_usr_events_log_path(loaded, context=context)
             except Exception as exc:
-                context.console.print(f"[bold red]Failed to resolve USR events path:[/] {exc}")
+                context.console.print(f"[bold red]Failed to resolve SeqLedger events path:[/] {exc}")
                 raise typer.Exit(code=1)
             typer.echo(str(events_log_path))
             return

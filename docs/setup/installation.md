@@ -9,7 +9,7 @@ Add `--group dev` when running tests or lint checks.
 | Use | Checkout command |
 | --- | --- |
 | NumPy-only scoring API | `uv sync --locked --no-default-groups` |
-| Sequence datasets and overlays | `uv sync --locked --no-default-groups --extra usr` |
+| Sequence datasets and overlays | `uv sync --locked --no-default-groups --extra seqledger` |
 | Variant generation and plots | `uv sync --locked --no-default-groups --extra permuter` |
 | Inference configuration and dry runs | `uv sync --locked --no-default-groups --extra infer` |
 | OPAL campaigns and plots | `uv sync --locked --no-default-groups --extra opal` |
@@ -70,12 +70,12 @@ uv sync --locked
 
 # Baseline verification.
 uv run python -c "import dnadesign, pandas, pyarrow; print('ok')"
-uv run usr --help
+uv run seqledger --help
 ```
 
 You are done with checkout installation when:
 - the import check prints `ok`
-- `uv run usr --help` exits successfully
+- `uv run seqledger --help` exits successfully
 
 ### UV dependency model
 

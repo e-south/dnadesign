@@ -1,4 +1,13 @@
-"""Immutable payload commits and explicit migration/compaction for Infer."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/infer/src/features/payload_store.py
+
+Immutable payload commits and explicit migration/compaction for Infer.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 from __future__ import annotations
 

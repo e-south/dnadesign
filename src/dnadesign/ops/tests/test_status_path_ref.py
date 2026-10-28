@@ -60,11 +60,11 @@ def test_campaign_manifest_v2_path_base_repo(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     manifest_dir = repo_root / "docs" / "studies" / "promoter" / "demo"
     manifest_dir.mkdir(parents=True)
-    target = repo_root / "src" / "dnadesign" / "usr" / "datasets"
+    target = repo_root / "src" / "dnadesign" / "seqledger" / "datasets"
     target.mkdir(parents=True)
 
     resolved = resolve_path_ref(
-        "src/dnadesign/usr/datasets",
+        "src/dnadesign/seqledger/datasets",
         repo_root=repo_root,
         manifest_dir=manifest_dir,
         default_base="repo",

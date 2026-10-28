@@ -1,7 +1,7 @@
 ## Notify maintainer architecture map
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-28
 
 This page maps package boundaries for maintainers extending command registration, event resolution, and delivery/runtime flows.
 
@@ -26,7 +26,7 @@ This page maps package boundaries for maintainers extending command registration
 
 ### Tool-event transforms and policy logic
 
-- `src/dnadesign/notify/events/transforms.py`: USR event to Notify status/message/meta transforms.
+- `src/dnadesign/notify/events/transforms.py`: SeqLedger event to Notify status/message/meta transforms.
 - `src/dnadesign/notify/tool_events/core.py`: tool-event evaluator registry.
 - `src/dnadesign/notify/tool_events/packs_builtin.py`: built-in tool-event pack installers.
 - `src/dnadesign/notify/tool_events/densegen*.py`: DenseGen-specific metric extraction, message rendering, and emission state.

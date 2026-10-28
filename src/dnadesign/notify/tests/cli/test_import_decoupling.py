@@ -21,7 +21,7 @@ import importlib
 import sys
 
 importlib.import_module("dnadesign.notify.cli")
-raise SystemExit(1 if "dnadesign.usr.src.dataset" in sys.modules else 0)
+raise SystemExit(1 if "dnadesign.seqledger.src.dataset" in sys.modules else 0)
 """
     result = subprocess.run(
         [sys.executable, "-c", script],

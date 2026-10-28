@@ -26,7 +26,7 @@ from dnadesign.construct.src.persistence.records import (
     validate_duplicate_output_aliases,
 )
 from dnadesign.construct.src.persistence.write_session import sequence_views_to_append
-from dnadesign.usr import SequenceViewRecord
+from dnadesign.seqledger import SequenceViewRecord
 
 _CREATED_AT = "2026-01-01T00:00:00+00:00"
 

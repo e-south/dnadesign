@@ -38,7 +38,7 @@ def test_resolve_path_value_resolves_relative_to_profile() -> None:
 
 
 def test_resolve_usr_events_path_rejects_yaml_path() -> None:
-    with pytest.raises(NotifyConfigError, match="events must point to a USR .events.log JSONL file"):
+    with pytest.raises(NotifyConfigError, match="events must point to .events.log JSONL, not configuration"):
         resolve_usr_events_path(
             Path("/tmp/config.yaml"),
             validate_usr_event=lambda *_args, **_kwargs: None,

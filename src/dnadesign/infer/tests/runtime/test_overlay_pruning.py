@@ -20,7 +20,7 @@ import pyarrow.parquet as pq
 from dnadesign.devtools.tests.support.usr import register_test_namespace
 from dnadesign.infer.src.contracts import infer_usr_column_name
 from dnadesign.infer.src.features.overlay_pruning import prune_stale_infer_overlay_columns
-from dnadesign.usr import Dataset, ensure_sequence_contract_namespaces
+from dnadesign.seqledger import Dataset, ensure_sequence_contract_namespaces
 
 
 def _dataset_with_sequence(tmp_path: Path) -> tuple[Dataset, str]:

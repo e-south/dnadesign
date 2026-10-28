@@ -141,7 +141,7 @@ jobs:
 
 
 def test_run_config_usr_ingest_requires_explicit_root_or_env(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.delenv("DNADESIGN_USR_ROOT", raising=False)
+    monkeypatch.delenv("DNADESIGN_SEQLEDGER_ROOT", raising=False)
     config_path = tmp_path / "config.yaml"
     config_path.write_text(
         """
@@ -169,7 +169,9 @@ jobs:
     result = _RUNNER.invoke(app, ["run", "--config", config_path.as_posix(), "--dry-run"])
 
     assert result.exit_code != 0
-    assert "USR ingest requires ingest.root or DNADESIGN_USR_ROOT." in (result.stdout or "")
+    assert "SeqLedger ingest requires ingest.root or DNADESIGN_SEQLEDGER_ROOT." in " ".join(
+        (result.stdout or "").split()
+    )
 
 
 def test_run_config_dry_run_fails_when_usr_dataset_is_missing(tmp_path: Path) -> None:
@@ -203,7 +205,7 @@ jobs:
     result = _RUNNER.invoke(app, ["run", "--config", config_path.as_posix(), "--dry-run"])
 
     assert result.exit_code != 0
-    assert "USR dataset not initialized or missing" in (result.stdout or "")
+    assert "SeqLedger dataset not initialized or missing" in (result.stdout or "")
 
 
 def test_run_config_dry_run_validates_non_usr_job_inputs(tmp_path: Path) -> None:
@@ -264,7 +266,7 @@ def test_run_preset_requires_usr_dataset_flag() -> None:
     )
 
     assert result.exit_code == 2
-    assert "--usr is required when using --preset" in (result.stdout or "")
+    assert "--seqledger is required when using --preset" in (result.stdout or "")
 
 
 def test_run_preset_dry_run_preflights_usr_dataset_and_field(tmp_path: Path) -> None:
@@ -277,16 +279,16 @@ def test_run_preset_dry_run_preflights_usr_dataset_and_field(tmp_path: Path) -> 
             "run",
             "--preset",
             "evo2/extract_logits_ll",
-            "--usr",
+            "--seqledger",
             "demo",
-            "--usr-root",
+            "--seqledger-root",
             usr_root.as_posix(),
             "--dry-run",
         ],
     )
 
     assert result.exit_code != 0
-    assert "USR dataset missing required column(s): sequence" in (result.stdout or "")
+    assert "SeqLedger dataset missing required column(s): sequence" in (result.stdout or "")
 
 
 def test_run_rejects_preset_only_flags_when_config_mode_is_selected(tmp_path: Path) -> None:
@@ -296,12 +298,12 @@ def test_run_rejects_preset_only_flags_when_config_mode_is_selected(tmp_path: Pa
 
     result = _RUNNER.invoke(
         app,
-        ["run", "--config", config_path.as_posix(), "--usr", "demo"],
+        ["run", "--config", config_path.as_posix(), "--seqledger", "demo"],
     )
 
     assert result.exit_code == 2
     assert "Preset-mode options are not allowed with --config" in (result.stdout or "")
-    assert "--usr" in (result.stdout or "")
+    assert "--seqledger" in (result.stdout or "")
 
 
 def test_run_dry_run_fails_capacity_for_20b_on_single_hopper_with_insufficient_memory(

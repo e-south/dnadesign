@@ -166,14 +166,14 @@ def _iter_record_batches_from_config(
             scope=usr_cfg.root_scope,
         )
         try:
-            from dnadesign.usr import Dataset
+            from dnadesign.seqledger import Dataset
         except Exception as e:
-            raise RuntimeError(f"USR support is not available: {e}") from e
+            raise RuntimeError(f"SeqLedger support is not available: {e}") from e
 
         ds = Dataset(root, usr_cfg.dataset)
         rp = ds.records_path
         if not rp.exists():
-            raise FileNotFoundError(f"USR records not found at: {rp}")
+            raise FileNotFoundError(f"SeqLedger records not found at: {rp}")
         return (
             ds.scan(
                 columns=requested,
@@ -278,14 +278,14 @@ def scan_records_from_config(
             scope=usr_cfg.root_scope,
         )
         try:
-            from dnadesign.usr import Dataset
+            from dnadesign.seqledger import Dataset
         except Exception as e:
-            raise RuntimeError(f"USR support is not available: {e}") from e
+            raise RuntimeError(f"SeqLedger support is not available: {e}") from e
 
         ds = Dataset(root, usr_cfg.dataset)
         rp = ds.records_path
         if not rp.exists():
-            raise FileNotFoundError(f"USR records not found at: {rp}")
+            raise FileNotFoundError(f"SeqLedger records not found at: {rp}")
         rows = _iter_record_dicts_from_batches(
             ds.scan(
                 columns=requested,
@@ -296,7 +296,7 @@ def scan_records_from_config(
             parse_json_in_namespaced_columns=True,
         )
         rows = _limit_rows(rows, max_rows=max_rows)
-        rows = _require_non_empty_rows(rows, empty_error=f"USR output has no rows: {rp}")
+        rows = _require_non_empty_rows(rows, empty_error=f"SeqLedger output has no rows: {rp}")
         return rows, f"usr:{usr_cfg.dataset}"
 
     if source == "parquet":

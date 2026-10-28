@@ -7,7 +7,7 @@ Use this file as a short map. Keep detailed operating and architecture material 
 - [Docs index by workflow](docs/README.md)
 - [Docs index by type](docs/index.md)
 - [Workspaces guide](workspaces/README.md)
-- [DenseGen to USR to Notify tutorial](docs/tutorials/demo_usr_notify.md)
+- [DenseGen to SeqLedger to Notify tutorial](docs/tutorials/demo_usr_notify.md)
 
 ### Pick a path
 - Run a packaged workspace: open the workspace directory and execute `./runbook.sh --mode fresh`.
@@ -25,7 +25,7 @@ Use this file as a short map. Keep detailed operating and architecture material 
 - Live study workspaces stay external and call DenseGen through its public
   configuration and CLI contracts.
 - Generated outputs stay under each workspace `outputs/` directory.
-- For USR sinks, stage workspaces with `dense workspace init --output-mode usr|both`.
+- For SeqLedger sinks, stage workspaces with `dense workspace init --output-mode usr|both`.
 
 ### Core commands
 ```bash

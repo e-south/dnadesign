@@ -1,6 +1,6 @@
 # Ownership Boundary
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-08
+**Last verified:** 2026-10-28
 
-`latentdna` owns downstream latent-analysis artifacts, not infer execution, USR mutation, or OPAL campaign logic.
+`latentdna` owns downstream latent-analysis artifacts, not infer execution, SeqLedger mutation, or OPAL campaign logic.

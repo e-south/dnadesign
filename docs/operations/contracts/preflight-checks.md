@@ -1,7 +1,7 @@
 ## OPS preflight checks
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-29
+**Last verified:** 2026-10-28
 
 Study contracts declare generic readiness checks in `operations/ops.study.yaml`.
 
@@ -15,7 +15,7 @@ Study contracts declare generic readiness checks in `operations/ops.study.yaml`.
 | `path_exists` | one declared artifact path exists | required file or directory is missing | artifact id, path resolution contract | cheap | require config, lane output, or notify profile path |
 | `runbook_plan` | `ops runbook plan` compiles one declared runbook cleanly | planner contract failed for that runbook | runbook path, repo root | medium | prove a batch route can be planned before execution |
 | `scheduler_queue` | scheduler counts stay under declared queue thresholds | queue probe unavailable or queue already too busy | backend, running/queued thresholds | medium | stop new submits when queue pressure is too high |
-| `sequence_view_contract` | a USR dataset's `_views/sequence_views.parquet` sidecar satisfies declared product-kind, orientation, pooling, length, and bounds expectations | sidecar missing, stale semantic names, invalid bounds, or wrong counts | dataset artifact id plus expected sidecar counts | cheap-to-medium | prove construct-ready anchors and forward/reverse-complement contexts are present before Infer |
+| `sequence_view_contract` | a SeqLedger dataset's `_views/sequence_views.parquet` sidecar satisfies declared product-kind, orientation, pooling, length, and bounds expectations | sidecar missing, stale semantic names, invalid bounds, or wrong counts | dataset artifact id plus expected sidecar counts | cheap-to-medium | prove construct-ready anchors and forward/reverse-complement contexts are present before Infer |
 | `workspace_layout` | a declared workspace root exists and is a directory | workspace missing or malformed | execution surface id, workspace index | cheap | require a real workspace before tool-local checks |
 
 ### State interpretation

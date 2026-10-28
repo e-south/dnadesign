@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/permuter/src/core/usr.py
 
-Core runtime primitives for USR Permuter core.
+Core runtime primitives for SeqLedger Permuter core.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

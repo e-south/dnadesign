@@ -11,10 +11,10 @@
 **Status-kind:** ops-audit-json
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-09-01
+**Last verified:** 2026-10-28
 
 This contract defines machine-readable runbooks for cross-tool BU SCC control-plane orchestration.
-It does not own durable USR-backed data-plane workflows; return to the root docs router or USR operations docs when the next procedure is about shared datasets rather than scheduler sequencing.
+It does not own durable SeqLedger-backed data-plane workflows; return to the root docs router or SeqLedger operations docs when the next procedure is about shared datasets rather than scheduler sequencing.
 
 ### Why this exists
 
@@ -275,7 +275,7 @@ For repeated attempts on one study workspace, keep paths stable to avoid fan-out
 3. Keep one stable `audit-json` path and overwrite it each run (for example: `<workspace-root>/outputs/logs/ops/audit/latest.json`).
 4. Use `--mode auto` for normal loops so ops resolves `fresh` vs `resume` deterministically.
 5. Keep `logging.retention.keep_last` and `logging.retention.max_age_days` explicit in the runbook so stale logs are pruned before each submit attempt.
-6. Use `uv run dense campaign-reset -c <workspace-root>/config.yaml --yes` before an intentional full fresh campaign reset; this clears run artifacts while preserving notify/log scaffolding and preserves USR registry unless `--purge-usr-registry` is set.
+6. Use `uv run dense campaign-reset -c <workspace-root>/config.yaml --yes` before an intentional full fresh campaign reset; this clears run artifacts while preserving notify/log scaffolding and preserves SeqLedger registry unless `--purge-seqledger-registry` is set.
 7. After reset, run `ops ... --mode fresh --allow-fresh-reset` once, then return to `--mode auto`.
 
 ### Planner and executor commands
@@ -392,25 +392,25 @@ uv run ops runbook execute \
 19. Notify workflows require `runbook.notify`, with policy matching workflow family (`densegen|generic` for DenseGen, `infer|generic` for Infer).
 20. Notify setup is non-interactive and file-only by contract: planner resolves webhook file with explicit precedence (`<notify.webhook_env>_FILE` first, otherwise `notify.profile` webhook `secret_ref` when it is a `file://` path) and uses `--secret-source file --secret-ref file://<resolved-path> --no-store-webhook`; missing/unreadable webhook file fails fast before submit.
 21. Notify setup writes an explicit TLS CA bundle in profile wiring (`--tls-ca-bundle`, defaulting to `SSL_CERT_FILE` or `/etc/pki/tls/certs/ca-bundle.crt`).
-22. Notify smoke bootstraps the resolved USR events file path before dry-watch so fresh workspaces do not fail on missing `.events.log`.
+22. Notify smoke bootstraps the resolved SeqLedger events file path before dry-watch so fresh workspaces do not fail on missing `.events.log`.
 23. Batch-only workflows reject `runbook.notify` to keep notify decoupled.
 24. Preflight creates and verifies `runbook.logging.stdout_dir` (`mkdir -p` + writable check) before any verify or submit command.
 25. Verify and submit commands always pass explicit `-o <runbook.logging.stdout_dir>/$JOB_NAME.$JOB_ID.out` to avoid cwd-dependent stdout placement.
 26. Preflight runs `prune-ops-logs`-backed log-retention guards before scheduler verify/submit for both `runbook.logging.stdout_dir` and `<workspace-root>/outputs/logs/ops/runtime`, with `--stdout-dir`, `--runbook-id`, `--keep-last`, and `--max-age-days` from runbook logging retention settings.
 27. `runbook.logging.stdout_dir` must be exactly `<workspace-root>/outputs/logs/ops/sge/<runbook.id>`; mismatched id variants are rejected at runbook load time to prevent path fan-out.
-28. DenseGen notify workflows run `dense inspect run --usr-events-path` in preflight so local-only output configs fail before submit.
+28. DenseGen notify workflows run `dense inspect run --seqledger-events-path` in preflight so local-only output configs fail before submit.
 29. Notify watcher submit injects `NOTIFY_PROFILE`, `WEBHOOK_ENV`, and `WEBHOOK_FILE` in `qsub -v`; webhook values are not embedded in scheduler metadata.
 30. When `notify.orchestration_events=true`, execute emits direct notify lifecycle events for submit orchestration (`started`, then `success` or `failure`) in addition to watcher event notifications, using file-backed `--secret-ref`.
 31. Notify DenseGen progress semantics use workspace-session counters (`rows_written_session`, `run_quota`, and `fingerprint.rows`) and default heartbeat cadence is 1800 seconds (`progress_heartbeat_seconds`) unless explicitly overridden.
 32. Notify workflows resolve a TLS CA bundle from `SSL_CERT_FILE` or known system CA paths and pass it explicitly to notify setup/orchestration commands; when no readable CA bundle is resolvable, planning fails fast before submit.
-33. DenseGen preflight runs `usr-overlay-guard` with explicit thresholds from its overlay-guard block; when projected overlay parts exceed `max_projected_overlay_parts`, planning fails fast with required tuning guidance.
-34. Sequence-view Infer preflight does not render `usr-overlay-guard`: those jobs write sidecar features under `_derived/infer/`, not row-overlay parts. It renders `infer validate sequence-view-completion` instead, blocks missing source products, and requires shard-level durability metadata before SGE submit.
-35. `densegen.overlay_guard.overlay_namespace` must match `^[a-z][a-z0-9_]*$` so runbook contracts remain compatible with USR overlay namespace rules.
-36. Legacy row-writeback Infer runbooks remain explicit direct-runbook surfaces. The study-level `fill-infer` primitive skips non-sequence-view Infer runbooks before SGE plan rendering, so old USR/write-back shapes do not enter the intelligent fill queue.
-37. `usr-overlay-guard` and `usr-records-part-guard` are explicit about degraded mode: tools that do not emit overlay parts or records-part files return `guard_status=skipped` with a reason (no silent fallback).
-38. DenseGen preflight runs `usr-records-part-guard` with explicit thresholds from `densegen.records_part_guard`; when projected records parts exceed `max_projected_records_parts`, planning fails fast with tuning guidance (`runtime.max_accepted_per_library`, `output.parquet.chunk_size`).
+33. DenseGen preflight runs `seqledger-overlay-guard` with explicit thresholds from its overlay-guard block; when projected overlay parts exceed `max_projected_overlay_parts`, planning fails fast with required tuning guidance.
+34. Sequence-view Infer preflight does not render `seqledger-overlay-guard`: those jobs write sidecar features under `_derived/infer/`, not row-overlay parts. It renders `infer validate sequence-view-completion` instead, blocks missing source products, and requires shard-level durability metadata before SGE submit.
+35. `densegen.overlay_guard.overlay_namespace` must match `^[a-z][a-z0-9_]*$` so runbook contracts remain compatible with SeqLedger overlay namespace rules.
+36. Legacy row-writeback Infer runbooks remain explicit direct-runbook surfaces. The study-level `fill-infer` primitive skips non-sequence-view Infer runbooks before SGE plan rendering, so old SeqLedger/write-back shapes do not enter the intelligent fill queue.
+37. `seqledger-overlay-guard` and `seqledger-records-part-guard` are explicit about degraded mode: tools that do not emit overlay parts or records-part files return `guard_status=skipped` with a reason (no silent fallback).
+38. DenseGen preflight runs `seqledger-records-part-guard` with explicit thresholds from `densegen.records_part_guard`; when projected records parts exceed `max_projected_records_parts`, planning fails fast with tuning guidance (`runtime.max_accepted_per_library`, `output.parquet.chunk_size`).
 39. When existing records parts exceed `densegen.records_part_guard.max_existing_records_parts` or oldest part age exceeds `max_existing_records_part_age_days`, preflight compacts `records__part-*.parquet` into `records.parquet` when `auto_compact_existing_records_parts=true`; otherwise planning fails fast with explicit maintenance guidance.
-40. DenseGen preflight runs `usr-archived-overlay-guard` with explicit thresholds from `densegen.archived_overlay_guard`; when `_derived/_archived` file count or byte total exceeds thresholds, planning fails fast with explicit retention guidance.
+40. DenseGen preflight runs `seqledger-archived-overlay-guard` with explicit thresholds from `densegen.archived_overlay_guard`; when `_derived/_archived` file count or byte total exceeds thresholds, planning fails fast with explicit retention guidance.
 41. `ops runbook execute --audit-json` must be exactly `<workspace-root>/outputs/logs/ops/audit/<file>.json`; non-workspace audit paths fail fast.
 42. transient operational working directories at repo root (for example `.codex_tmp/`, `.tmp_ops/`, `tmp_ops/`) are not allowed; place disposable operational working state under `/scratch` and keep durable orchestration artifacts under `<workspace-root>/outputs/logs/ops/`.
 43. DenseGen run args remain `--no-plot` by default for generation throughput; submit phase adds a dependent `densegen-analysis.qsub` job (`-hold_jid <densegen_cpu_job_name>`) that runs `dense plot --only "$DENSEGEN_ANALYSIS_PLOTS"` with a static default set (`stage_a_summary,placement_map,run_health,tfbs_usage`).

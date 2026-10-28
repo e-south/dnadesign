@@ -103,12 +103,12 @@ def _replay_usr_overlay_backlog_for_resume(
     records_path = dataset_dir / "records.parquet"
     if not records_path.exists():
         raise RuntimeError(
-            f"USR overlay backlog exists but records.parquet is missing at {records_path}. "
+            f"SeqLedger overlay backlog exists but records.parquet is missing at {records_path}. "
             "Restore the dataset or reset the workspace before resuming."
         )
 
     log.warning(
-        "Found %d pending USR overlay backlog part(s); replaying before resume-state scan.",
+        "Found %d pending SeqLedger overlay backlog part(s); replaying before resume-state scan.",
         len(pending_before),
     )
     writer = USRWriter(
@@ -122,7 +122,7 @@ def _replay_usr_overlay_backlog_for_resume(
     pending_after = _pending_usr_overlay_backlog_parts(dataset_dir)
     if pending_after:
         raise RuntimeError(
-            "USR overlay backlog replay failed; "
+            "SeqLedger overlay backlog replay failed; "
             f"{len(pending_after)} part(s) still pending under {dataset_dir / '_artifacts' / 'pending_overlay'}."
         )
     return len(pending_before)

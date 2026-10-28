@@ -1,7 +1,7 @@
 ## DenseGen CLI reference
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-06-02
+**Last verified:** 2026-10-28
 Use this page when you need exact command behavior and flag names.
 For end-to-end guided runs, use:
 - [binding-sites baseline demo](../tutorials/demo_tfbs_baseline.md)
@@ -108,12 +108,12 @@ Key options:
 - `--show-tfbs`
 - `--show-motif-ids`
 - `--events`
-- `--usr-events-path` (prints USR `.events.log` path and exits)
+- `--seqledger-events-path` (prints SeqLedger `.events.log` path and exits)
 - `-c, --config PATH`
 
 Notes:
-- `--root` and `--usr-events-path` are mutually exclusive.
-- `--usr-events-path` requires a config that writes to USR outputs.
+- `--root` and `--seqledger-events-path` are mutually exclusive.
+- `--seqledger-events-path` requires a config that writes to SeqLedger outputs.
 
 ### `dense stage-a build-pool`
 
@@ -169,18 +169,18 @@ Key options:
 - `--from-config PATH`
 - `--copy-inputs / --no-copy-inputs`
 - `--output-mode local|usr|both`
-- `--usr-root PATH`
+- `--seqledger-root PATH`
 
 Notes:
-- `--output-mode usr|both` points `output.usr.root` at a shared USR root
+- `--output-mode usr|both` points `output.usr.root` at a shared SeqLedger root
   relative to the new workspace.
-- Inside a source checkout, `dense workspace init` uses the repo shared USR
+- Inside a source checkout, `dense workspace init` uses the repo shared SeqLedger
   root by default.
-- Outside a source checkout, pass `--usr-root` or set `DNADESIGN_USR_ROOT`;
+- Outside a source checkout, pass `--seqledger-root` or set `DNADESIGN_SEQLEDGER_ROOT`;
   the command does not guess a writable shared root from an installed package
   path.
-- `--output-mode usr|both` leaves the shared USR root unchanged during workspace initialization; create the shared `registry.yaml` manually or let `dense run` seed it when a write path is intended.
-- `--output-mode usr|both` sets `output.usr.dataset` to a flat owner-first DenseGen id (`densegen_<workspace-id>`) so each initialized workspace writes directly under the configured USR datasets root.
+- `--output-mode usr|both` leaves the shared SeqLedger root unchanged during workspace initialization; create the shared `registry.yaml` manually or let `dense run` seed it when a write path is intended.
+- `--output-mode usr|both` sets `output.usr.dataset` to a flat owner-first DenseGen id (`densegen_<workspace-id>`) so each initialized workspace writes directly under the configured SeqLedger datasets root.
 
 ### `dense workspace where`
 
@@ -201,20 +201,20 @@ Key options:
 - `--log-file PATH`
 - `--show-tfbs`
 - `--show-solutions`
-- `--ensure-usr-registry / --no-ensure-usr-registry`
+- `--ensure-seqledger-registry / --no-ensure-seqledger-registry`
 - `-c, --config PATH`
 
 Notes:
 - If prior run outputs exist, default behavior is resume-like unless `--fresh` is set.
 - `--fresh` refuses to reset a workspace when `output.usr.root` points at a
-  shared USR dataset that already has state.
-- If a shared USR dataset already exists but this workspace has no run outputs,
+  shared SeqLedger dataset that already has state.
+- If a shared SeqLedger dataset already exists but this workspace has no run outputs,
   `dense run` fails fast instead of guessing whether it should resume or append
   as a new run.
 - Missing/stale Stage-A pools for plan-active `include_inputs` are rebuilt automatically.
 - Stale pools for configured-but-unused inputs are ignored with an explicit warning.
 - For FIMO-backed inputs, ensure `fimo` is available (for example via `pixi run ...`).
-- When `output.targets` includes `usr`, DenseGen auto-seeds `output.usr.root/registry.yaml` from the repo default seed when missing (unless `--no-ensure-usr-registry` is set).
+- When `output.targets` includes `seqledger`, DenseGen auto-seeds `output.usr.root/registry.yaml` from the repo default seed when missing (unless `--no-ensure-seqledger-registry` is set).
 
 ### `dense campaign-reset`
 
@@ -222,18 +222,18 @@ Clears run artifacts under `outputs/` while preserving workspace config and inpu
 
 Key options:
 - `--yes` (skip confirmation prompt)
-- `--purge-usr-registry` (remove `output.usr.root/registry.yaml` instead of preserving it)
+- `--purge-seqledger-registry` (remove `output.usr.root/registry.yaml` instead of preserving it)
 - `-c, --config PATH`
 
 Notes:
 - Runs in danger-zone mode by default and prompts before deleting outputs.
-- `campaign-reset` refuses to clear workspace outputs when a shared USR dataset
+- `campaign-reset` refuses to clear workspace outputs when a shared SeqLedger dataset
   already has state, because that would orphan the live dataset from its run
   history.
-- Preserves the configured USR registry by default so post-reset `dense run`
-  remains ergonomic when the USR root is still part of the same workspace
+- Preserves the configured SeqLedger registry by default so post-reset `dense run`
+  remains ergonomic when the SeqLedger root is still part of the same workspace
   state.
-- `--purge-usr-registry` only applies to workspace-local USR roots under
+- `--purge-seqledger-registry` only applies to workspace-local SeqLedger roots under
   `outputs/`.
 - Preserves `outputs/notify` and `outputs/logs` scaffolding so watcher/profile wiring and ops log roots remain stable across fresh resets.
 
@@ -270,11 +270,11 @@ Key options:
 
 Notes:
 - Uses one records source parquet file, selected by output wiring:
-  - if `output.targets` has one sink, use that sink (`parquet` or `usr`)
+  - if `output.targets` has one sink, use that sink (`parquet` or `seqledger`)
   - if `output.targets` has both sinks, use `plots.source`
 - Source path resolution:
   - `parquet` source -> `output.parquet.path`
-  - `usr` source -> `<output.usr.root>/<output.usr.dataset>/records.parquet`
+  - `seqledger` source -> `<output.usr.root>/<output.usr.dataset>/records.parquet`
 - First notebook markdown cell renders two deterministic sections from config + `outputs/meta/run_manifest.json`:
   - `Run contract (what this run will try to do)` from validated config schema.
   - `Run outcome (what happened)` from finalized manifest counters.

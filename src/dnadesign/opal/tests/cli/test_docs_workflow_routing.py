@@ -36,30 +36,30 @@ def test_opal_docs_index_routes_to_usr_infer_x_workflow() -> None:
     docs_index = _read("src/dnadesign/opal/docs/index.md")
     top_readme = _read("src/dnadesign/opal/README.md")
 
-    assert "./workflows/usr-infer-x-active-learning.md" in docs_index
+    assert "./workflows/seqledger-infer-x-active-learning.md" in docs_index
     assert "docs/index.md" in top_readme
-    assert "docs/workflows/usr-infer-x-active-learning.md" in top_readme
+    assert "docs/workflows/seqledger-infer-x-active-learning.md" in top_readme
     assert "../../../cluster/docs/workflows/exploratory-clustering.md" in _read(
-        "src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md"
+        "src/dnadesign/opal/docs/workflows/seqledger-infer-x-active-learning.md"
     )
 
 
 def test_opal_usr_infer_x_workflow_keeps_upstream_preconditions_explicit() -> None:
-    workflow = _read("src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md")
+    workflow = _read("src/dnadesign/opal/docs/workflows/seqledger-infer-x-active-learning.md")
 
     assert "**Type:** workflow" in workflow
     assert "**Plane:** downstream-tool" in workflow
     assert "**Owner-boundary:** opal" in workflow
-    assert "**Registry-id:** opal.downstream.usr-infer-x-active-learning" in workflow
+    assert "**Registry-id:** opal.downstream.seqledger-infer-x-active-learning" in workflow
     assert "**Execution-kind:** round-loop" in workflow
     assert "**Status-kind:** opal-campaign-state" in workflow
     assert "data.location.kind: usr" in workflow
     assert "x_column_name" in workflow
-    assert "../../../usr/docs/operations/promoter/characterization-feature-matrix.md" in workflow
+    assert "../../../seqledger/docs/operations/promoter/characterization-feature-matrix.md" in workflow
 
 
 def test_usr_workflow_yaml_loads_and_maps_its_measurement_column(tmp_path: Path) -> None:
-    workflow = _read("src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md")
+    workflow = _read("src/dnadesign/opal/docs/workflows/seqledger-infer-x-active-learning.md")
     blocks = re.findall(r"```yaml\n(.*?)```", workflow, flags=re.DOTALL)
     config_path = tmp_path / "campaign.yaml"
     config_path.write_text("\n".join(blocks), encoding="utf-8")
@@ -72,7 +72,7 @@ def test_usr_workflow_yaml_loads_and_maps_its_measurement_column(tmp_path: Path)
 def test_opal_cli_reference_documents_the_explicit_usr_coordinate() -> None:
     cli = _read("src/dnadesign/opal/docs/reference/cli.md")
 
-    assert "opal --usr-root <absolute-path> <command>" in cli
+    assert "opal --seqledger-root <absolute-path> <command>" in cli
 
 
 def test_opal_cli_reference_documents_one_history_import_contract() -> None:

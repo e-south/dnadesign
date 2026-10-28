@@ -1,4 +1,13 @@
-"""Explicit maintenance commands for persisted feature payloads."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/infer/src/cli/commands/features.py
+
+Explicit maintenance commands for persisted feature payloads.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 import json
 from pathlib import Path

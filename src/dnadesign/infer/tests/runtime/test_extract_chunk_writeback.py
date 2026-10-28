@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/tests/runtime/test_extract_chunk_writeback.py
 
-Contract tests for extract USR chunk write-back callback construction.
+Contract tests for extract SeqLedger chunk write-back callback construction.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------

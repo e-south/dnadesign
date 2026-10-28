@@ -241,7 +241,7 @@ def test_workspace_init_output_mode_usr_sets_usr_target(tmp_path: Path) -> None:
             "demo_tfbs_baseline",
             "--output-mode",
             "usr",
-            "--usr-root",
+            "--seqledger-root",
             str(shared_usr_root),
         ],
     )
@@ -252,7 +252,7 @@ def test_workspace_init_output_mode_usr_sets_usr_target(tmp_path: Path) -> None:
     assert output["usr"]["root"] == expected_root
     assert output["usr"]["dataset"] == "densegen_demo_run"
     assert not (shared_usr_root / "registry.yaml").exists()
-    assert "Shared USR registry is not present yet" in result.output
+    assert "Shared SeqLedger registry is not present yet" in result.output
 
 
 def test_workspace_init_output_mode_usr_rewrites_template_usr_dataset_to_owner_first_id(tmp_path: Path) -> None:
@@ -271,7 +271,7 @@ def test_workspace_init_output_mode_usr_rewrites_template_usr_dataset_to_owner_f
             "demo_sampling_baseline",
             "--output-mode",
             "usr",
-            "--usr-root",
+            "--seqledger-root",
             str(shared_usr_root),
         ],
     )
@@ -298,7 +298,7 @@ def test_workspace_init_output_mode_both_sets_both_targets(tmp_path: Path) -> No
             "demo_tfbs_baseline",
             "--output-mode",
             "both",
-            "--usr-root",
+            "--seqledger-root",
             str(shared_usr_root),
         ],
     )
@@ -312,7 +312,7 @@ def test_workspace_init_output_mode_both_sets_both_targets(tmp_path: Path) -> No
         usr_root=shared_usr_root,
     )
     assert not (shared_usr_root / "registry.yaml").exists()
-    assert "Shared USR registry is not present yet" in result.output
+    assert "Shared SeqLedger registry is not present yet" in result.output
 
 
 def test_workspace_init_output_mode_both_rewrites_template_usr_dataset_to_owner_first_id(tmp_path: Path) -> None:
@@ -331,7 +331,7 @@ def test_workspace_init_output_mode_both_rewrites_template_usr_dataset_to_owner_
             "demo_sampling_baseline",
             "--output-mode",
             "both",
-            "--usr-root",
+            "--seqledger-root",
             str(shared_usr_root),
         ],
     )
@@ -346,7 +346,7 @@ def test_workspace_init_output_mode_usr_requires_explicit_or_env_shared_root_out
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    monkeypatch.delenv("DNADESIGN_USR_ROOT", raising=False)
+    monkeypatch.delenv("DNADESIGN_SEQLEDGER_ROOT", raising=False)
     monkeypatch.setattr(workspace_commands, "_repo_root_from", lambda _start: None)
     runner = CliRunner()
 
@@ -367,9 +367,9 @@ def test_workspace_init_output_mode_usr_requires_explicit_or_env_shared_root_out
     )
 
     assert result.exit_code == 1
-    assert "Shared USR root is ambiguous outside a dnadesign checkout" in result.output
-    assert "--usr-root" in result.output
-    assert "DNADESIGN_USR_ROOT" in result.output
+    assert "Set --seqledger-root or DNADESIGN_SEQLEDGER_ROOT" in result.output
+    assert "--seqledger-root" in result.output
+    assert "DNADESIGN_SEQLEDGER_ROOT" in result.output
 
 
 def test_workspace_init_output_mode_usr_uses_env_shared_root_when_explicit_not_passed(
@@ -377,7 +377,7 @@ def test_workspace_init_output_mode_usr_uses_env_shared_root_when_explicit_not_p
     monkeypatch,
 ) -> None:
     shared_usr_root = tmp_path / "usr_root"
-    monkeypatch.setenv("DNADESIGN_USR_ROOT", str(shared_usr_root))
+    monkeypatch.setenv("DNADESIGN_SEQLEDGER_ROOT", str(shared_usr_root))
     runner = CliRunner()
 
     result = runner.invoke(

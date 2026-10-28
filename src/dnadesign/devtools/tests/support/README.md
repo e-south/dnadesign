@@ -10,7 +10,7 @@ maintainer references.
 
 Current owned surfaces:
 
-- `usr.py`: shared USR registry fixture helpers used by USR, Infer, LatentDNA, and Ops tests.
+- `usr.py`: shared SeqLedger registry fixture helpers used by SeqLedger, Infer, LatentDNA, and Ops tests.
 - `dependencies.py`: resolves composed installation profiles for package and security checks.
 
 Boundary notes:

@@ -13,8 +13,8 @@ requires-python = ">=3.12,<3.13"
 dependencies = ["numpy"]
 
 [project.scripts]
-usr        = "dnadesign._entrypoints:usr"
-usr-sync-audit-drill = "dnadesign._entrypoints:usr_sync_audit_drill"
+seqledger = "dnadesign._entrypoints:seqledger"
+seqledger-sync-audit-drill = "dnadesign._entrypoints:seqledger_sync_audit_drill"
 opal       = "dnadesign._entrypoints:opal"
 dense      = "dnadesign._entrypoints:dense"
 notify     = "dnadesign._entrypoints:notify"
@@ -31,24 +31,24 @@ ops        = "dnadesign._entrypoints:ops"
 dnadesign-storage = "dnadesign.contracts.storage_objects.cli:main"
 
 [project.optional-dependencies]
-usr = [
+seqledger = [
   "biopython>=1.87", "duckdb>=1.5.5,<2", "pandas", "pyarrow>=23.0.1",
   "pydantic>=2.12.5,<3", "pyyaml", "rich", "typer", "psutil>=7.2.1",
 ]
-infer = ["dnadesign-tools[usr]", "tqdm"]
+infer = ["dnadesign-tools[seqledger]", "tqdm"]
 ops = ["pydantic>=2.12.5,<3", "pyyaml", "typer", "pyarrow>=23.0.1", "click>=8.3.3"]
 notify = ["typer", "click>=8.3.3", "keyring>=25.6.0", "certifi>=2026.10.19"]
 folding = ["pydantic>=2.12.5,<3", "pyyaml", "typer", "psutil>=7.2.1", "viennarna>=2.7.2"]
-construct = ["dnadesign-tools[usr,folding]", "vl-convert-python>=1.9.0"]
+construct = ["dnadesign-tools[seqledger,folding]", "vl-convert-python>=1.9.0"]
 baserender = ["pydantic>=2.12.5,<3", "pyyaml", "typer", "pyarrow>=23.0.1", "matplotlib", "pillow>=13.0.0", "psutil>=7.2.1"]
 junction = ["pydantic>=2.12.5,<3", "pyyaml", "typer", "matplotlib", "psutil>=7.2.1"]
 cluster = [
-  "dnadesign-tools[usr]", "scanpy==1.10.3", "igraph", "leidenalg",
+  "dnadesign-tools[seqledger]", "scanpy==1.10.3", "igraph", "leidenalg",
   "scikit-learn>=1.8,<2", "scipy>=1.17.0", "seaborn", "matplotlib",
   "umap-learn>=0.5.11", "python-levenshtein", "click>=8.3.3",
 ]
 latentdna = [
-  "dnadesign-tools[usr]", "anndata", "igraph", "leidenalg", "pynndescent",
+  "dnadesign-tools[seqledger]", "anndata", "igraph", "leidenalg", "pynndescent",
   "scipy>=1.17.0", "scikit-learn>=1.8,<2", "matplotlib", "umap-learn>=0.5.11",
 ]
 latentdna-notebook = ["dnadesign-tools[latentdna]", "marimo>=0.23.16"]
@@ -89,7 +89,7 @@ opal-notebook = [
 
 # Complete runtime composes the tool profiles and adds shared optional backends.
 full = [
-  "dnadesign-tools[usr,infer,permuter,opal-notebook,ops,notify,folding,construct,baserender,junction,cluster,latentdna-notebook,cruncher-notebook]",
+  "dnadesign-tools[seqledger,infer,permuter,opal-notebook,ops,notify,folding,construct,baserender,junction,cluster,latentdna-notebook,cruncher-notebook]",
   "anyio>=4.14.2",
   "markdown-it-py>=4.0.0,<5",
   "ortools>=9.9,<9.10",
@@ -148,6 +148,8 @@ include-package-data = false
 [tool.setuptools.packages.find]
 where = ["src"]
 exclude = [
+  "dnadesign.usr",
+  "dnadesign.usr.*",
   "dnadesign.devtools",
   "dnadesign.devtools.*",
   "dnadesign.*.devtools",
@@ -164,10 +166,10 @@ exclude = [
   "dnadesign.prototypes.*",
   "dnadesign.studies",
   "dnadesign.studies.*",
-  "dnadesign.usr.archived",
-  "dnadesign.usr.archived.*",
-  "dnadesign.usr.datasets.usr_regulondb_native_promoters",
-  "dnadesign.usr.datasets.usr_regulondb_native_promoters.*",
+  "dnadesign.seqledger.archived",
+  "dnadesign.seqledger.archived.*",
+  "dnadesign.seqledger.datasets.usr_regulondb_native_promoters",
+  "dnadesign.seqledger.datasets.usr_regulondb_native_promoters.*",
   "dnadesign.opal.campaigns.*.notebooks",
   "dnadesign.opal.campaigns.*.notebooks.*",
   "dnadesign.densegen.workspaces.*.outputs.notebooks",
@@ -329,7 +331,7 @@ exclude = [
   "runbooks/templates/evo2-gpu-infer.qsub",
   "runbooks/templates/notify-watch.qsub",
 ]
-"dnadesign.usr" = [
+"dnadesign.seqledger" = [
   "assets/demo_material/demo_attachment_one.csv",
   "assets/demo_material/demo_attachment_two.csv",
   "assets/demo_material/demo_sequences.csv",

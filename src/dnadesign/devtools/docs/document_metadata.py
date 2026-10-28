@@ -642,7 +642,7 @@ def _find_shared_usr_dataset_layout_issues(repo_root: Path) -> list[str]:
             continue
         if len(parts) > 1:
             issues.append(
-                f"{dataset_dir}: nested shared USR dataset root {relative_dataset!r} is not allowed. "
+                f"{dataset_dir}: nested shared SeqLedger dataset root {relative_dataset!r} is not allowed. "
                 f"{SHARED_USR_DATASET_LAYOUT_NUDGE}"
             )
 

@@ -11,7 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dnadesign.usr import SequenceViewRecord
+from dnadesign.seqledger import SequenceViewRecord
 
 from ..persistence.records import BuiltRecord
 

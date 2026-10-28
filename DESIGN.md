@@ -2,14 +2,14 @@
 doc_id: design
 surface: system-of-record
 owner: dnadesign-maintainers
-last_verified: 2026-08-27
+last_verified: 2026-10-28
 ---
 
 # DESIGN
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-27
+**Last verified:** 2026-10-28
 
 ## At a glance
 This document defines repo-wide engineering principles, invariants, and boundary rules.
@@ -45,18 +45,18 @@ Use it when adding or changing behavior so tools remain decoupled, assertive, an
 - Tool run-mode behavior must stay explicit and fail-fast; resume/fresh transitions may not be inferred from ambiguous state.
 - Cross-tool output ownership is orthogonal:
   - control-plane state belongs to orchestration tooling
-  - durable dataset state belongs to USR
+  - durable dataset state belongs to SeqLedger
   - notifier delivery state belongs to notifier tooling
   - workload-domain artifacts belong to the producing tool
-- Active shared USR dataset ids are flat owner-first names. Nested paths may not
+- Active shared SeqLedger dataset ids are flat owner-first names. Nested paths may not
   encode producer routing for live shared handoffs; use `root_kind`,
   `owner_tool`, overlays, and study metadata for provenance.
-- Curated study-facing workspace and runbook examples should default USR sinks
-  to an explicit shared USR root rather than an implicit workspace-local
+- Curated study-facing workspace and runbook examples should default SeqLedger sinks
+  to an explicit shared SeqLedger root rather than an implicit workspace-local
   dataset mirror.
-- Workspace-local export roots and external USR roots remain allowed only when
+- Workspace-local export roots and external SeqLedger roots remain allowed only when
   the workflow makes that storage boundary explicit.
-- Shared data-plane behaviors such as overlay compaction and part-management are expressed with USR semantics (`usr-overlay-*`) instead of tool-specific command names.
+- Shared data-plane behaviors such as overlay compaction and part-management are expressed with SeqLedger semantics (`usr-overlay-*`) instead of tool-specific command names.
 - Cross-dataset overlay carry must stay explicit and narrow: no implicit merge-side overlay copying, no non-`id` carry keys, and no reserved-namespace transfer hidden behind convenience defaults.
 - No hidden path fallback is allowed for orchestration accumulation; when required paths are missing or invalid, commands fail with actionable errors.
 - A non-demo private workspace must not resolve inside a Git checkout. External
@@ -96,8 +96,8 @@ Use it when adding or changing behavior so tools remain decoupled, assertive, an
   - `Owner-boundary`
   - `Entry artifact`
   - `Exit artifact`
-- `registry` must always be domain-qualified in docs and code-facing prose (for example `USR namespace registry`, `construct workspace registry`, `OPAL plugin registry`).
-- `docs/operations/` is the control-plane orchestration surface; durable USR-backed data-plane procedures belong under `src/dnadesign/usr/docs/operations/`.
+- `registry` must always be domain-qualified in docs and code-facing prose (for example `SeqLedger namespace registry`, `construct workspace registry`, `OPAL plugin registry`).
+- `docs/operations/` is the control-plane orchestration surface; durable SeqLedger-backed data-plane procedures belong under `src/dnadesign/seqledger/docs/operations/`.
 
 ## References
 - Architecture map: `ARCHITECTURE.md`

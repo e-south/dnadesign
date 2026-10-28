@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Protocol
 
-from dnadesign.usr import compute_id, normalize_sequence
+from dnadesign.seqledger import compute_id, normalize_sequence
 
 from ..contracts.config import JobConfig, OutputVariantConfig
 from ..contracts.errors import ValidationError

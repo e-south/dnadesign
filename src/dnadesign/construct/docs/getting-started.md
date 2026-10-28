@@ -3,7 +3,7 @@ doc_id: construct-getting-started
 title: Construct getting started
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-10-28
 ---
 
 # Construct getting started
@@ -30,7 +30,7 @@ uv run construct workspace doctor --workspace .
 ./runbook.sh --mode dry-run-all
 ```
 
-Use this path when both packaged window projects should accumulate into one semantic USR dataset before infer or Notify pick it up. The profile keeps the shared-dataset contract explicit in `construct.workspace.yaml` by tracking both config artifacts and routing assertions instead of relying on manual config repointing.
+Use this path when both packaged window projects should accumulate into one semantic SeqLedger dataset before infer or Notify pick it up. The profile keeps the shared-dataset contract explicit in `construct.workspace.yaml` by tracking both config artifacts and routing assertions instead of relying on manual config repointing.
 
 ### Path 3: blank custom workspace
 
@@ -63,6 +63,6 @@ misrouted workspace fails before materialization.
 
 - [Construct docs](README.md)
 - [Workspaces guide](../workspaces/README.md)
-- [Construct -> USR -> Infer shared dataset runbook](../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
+- [Construct -> SeqLedger -> Infer shared dataset runbook](../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
 - [Config reference](reference/config.md)
 - [Workspace registry reference](reference/workspace-registry.md)

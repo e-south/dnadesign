@@ -17,7 +17,7 @@ from typer.testing import CliRunner
 
 from dnadesign.infer.cli import app
 from dnadesign.infer.src.runtime.capacity_planner import GpuDeviceInfo, GpuInventory
-from dnadesign.usr import Dataset, SequenceViewRecord, ensure_sequence_contract_namespaces, write_sequence_views
+from dnadesign.seqledger import Dataset, SequenceViewRecord, ensure_sequence_contract_namespaces, write_sequence_views
 
 _RUNNER = CliRunner()
 
@@ -157,7 +157,7 @@ jobs:
     result = _RUNNER.invoke(app, ["validate", "config", "--config", bad.as_posix()])
 
     assert result.exit_code == 2
-    assert "USR write-back jobs must set ingest.root explicitly." in (result.stdout or "")
+    assert "SeqLedger write-back jobs must set ingest.root explicitly." in (result.stdout or "")
 
 
 def test_validate_sequence_view_completion_renders_json_plan(tmp_path: Path) -> None:
@@ -598,7 +598,7 @@ jobs:
         + "\n",
     )
 
-    result = _RUNNER.invoke(app, ["validate", "usr-registry", "--config", cfg.as_posix()])
+    result = _RUNNER.invoke(app, ["validate", "seqledger-registry", "--config", cfg.as_posix()])
 
     assert result.exit_code == 0, result.stdout
     output = result.stdout or ""
@@ -607,7 +607,7 @@ jobs:
     assert f"root: {resolved_root}" in output
     assert ("columns: infer__evo2_7b__j1__ll_mean:float64,infer__evo2_7b__j1__logits_mean:list<float64>") in output
     assert (
-        f"uv run usr --root {resolved_root} namespace register infer --columns "
+        f"uv run seqledger --root {resolved_root} namespace register infer --columns "
         "'infer__evo2_7b__j1__ll_mean:float64,"
         "infer__evo2_7b__j1__logits_mean:list<float64>'"
     ) in output
@@ -638,7 +638,7 @@ jobs:
         + "\n",
     )
 
-    result = _RUNNER.invoke(app, ["validate", "usr-registry", "--config", cfg.as_posix()])
+    result = _RUNNER.invoke(app, ["validate", "seqledger-registry", "--config", cfg.as_posix()])
 
     assert result.exit_code == 0, result.stdout
     output = result.stdout or ""
@@ -677,7 +677,7 @@ jobs:
         + "\n",
     )
 
-    result = _RUNNER.invoke(app, ["validate", "usr-registry", "--config", cfg.as_posix()])
+    result = _RUNNER.invoke(app, ["validate", "seqledger-registry", "--config", cfg.as_posix()])
 
     assert result.exit_code == 0, result.stdout
     assert f"root: {(tmp_path / 'outputs' / 'usr_datasets').resolve()}" in (result.stdout or "")
@@ -721,7 +721,7 @@ jobs:
         + "\n",
     )
 
-    result = _RUNNER.invoke(app, ["validate", "usr-registry", "--config", cfg.as_posix(), "--job", "j2"])
+    result = _RUNNER.invoke(app, ["validate", "seqledger-registry", "--config", cfg.as_posix(), "--job", "j2"])
 
     assert result.exit_code == 0, result.stdout
     output = result.stdout or ""
@@ -767,10 +767,12 @@ jobs:
         + "\n",
     )
 
-    result = _RUNNER.invoke(app, ["validate", "usr-registry", "--config", cfg.as_posix()])
+    result = _RUNNER.invoke(app, ["validate", "seqledger-registry", "--config", cfg.as_posix()])
 
     assert result.exit_code == 2
-    assert "All selected USR write-back jobs must use the same ingest.root." in (result.stdout or "")
+    assert "All selected SeqLedger write-back jobs must use the same ingest.root." in " ".join(
+        (result.stdout or "").split()
+    )
 
 
 def test_validate_usr_registry_fails_fast_on_unsupported_output_format(tmp_path: Path) -> None:
@@ -801,7 +803,9 @@ jobs:
         + "\n",
     )
 
-    result = _RUNNER.invoke(app, ["validate", "usr-registry", "--config", cfg.as_posix()])
+    result = _RUNNER.invoke(app, ["validate", "seqledger-registry", "--config", cfg.as_posix()])
 
     assert result.exit_code == 2
-    assert "USR registry spec only supports infer output formats: float, list" in (result.stdout or "")
+    assert "SeqLedger registry spec only supports infer output formats: float, list" in " ".join(
+        (result.stdout or "").split()
+    )

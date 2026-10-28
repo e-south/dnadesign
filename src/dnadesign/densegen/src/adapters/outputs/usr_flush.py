@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/densegen/src/adapters/outputs/usr_flush.py
 
-Transactional flush helpers for DenseGen USR writes.
+Transactional flush helpers for DenseGen SeqLedger writes.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -18,7 +18,7 @@ from typing import Mapping, Sequence
 
 import pyarrow as pa
 
-from dnadesign.usr import Dataset
+from dnadesign.seqledger import Dataset
 
 
 @dataclass(frozen=True)

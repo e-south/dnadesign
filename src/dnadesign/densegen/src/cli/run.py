@@ -356,7 +356,7 @@ def _print_shared_usr_boundary_next_steps(*, usr_root: Path, dataset: str, conso
     console.print("[bold]Next steps[/]:")
     console.print("  - restore workspace outputs and resume if this dataset belongs to the current run")
     console.print("  - or change output.usr.dataset/output.usr.root before starting a clean run")
-    console.print(f'  - inspect the attached dataset with `uv run usr --root "{usr_root}" info "{dataset}"`')
+    console.print(f'  - inspect the attached dataset with `uv run seqledger --root "{usr_root}" info "{dataset}"`')
 
 
 def _reset_outputs(
@@ -388,9 +388,9 @@ def _reset_outputs(
         try:
             _restore_usr_registry_snapshots(snapshots=registry_snapshots)
         except OSError as exc:
-            raise RuntimeError(f"Failed to restore preserved USR registry: {_render_os_error(exc)}") from exc
+            raise RuntimeError(f"Failed to restore preserved SeqLedger registry: {_render_os_error(exc)}") from exc
         except Exception as exc:
-            raise RuntimeError(f"Failed to restore preserved USR registry: {exc}") from exc
+            raise RuntimeError(f"Failed to restore preserved SeqLedger registry: {exc}") from exc
 
     if remove_empty_root:
         try:
@@ -405,7 +405,7 @@ def _reset_outputs(
 def _print_usr_registry_next_steps(*, console) -> None:
     console.print("[bold]Next steps[/]:")
     console.print(
-        "  - stage your run via `dense workspace init --output-mode usr|both` to seed the configured USR root"
+        "  - stage your run via `dense workspace init --output-mode usr|both` to seed the configured SeqLedger root"
     )
     console.print("  - or create `<output.usr.root>/registry.yaml` before running `dense run`")
 
@@ -432,7 +432,7 @@ def _ensure_usr_registry_ready(
     if registry_path.exists() and registry_path.is_file():
         return
     if registry_path.exists() and not registry_path.is_file():
-        console.print(f"[bold red]USR registry path exists but is not a file:[/] {registry_path}")
+        console.print(f"[bold red]SeqLedger registry path exists but is not a file:[/] {registry_path}")
         raise typer.Exit(code=1)
 
     if ensure_usr_registry:
@@ -447,7 +447,8 @@ def _ensure_usr_registry_ready(
         return
 
     console.print(
-        f"[bold red]USR registry not found at {registry_path}. Create registry.yaml before writing USR outputs.[/]"
+        f"[bold red]SeqLedger registry not found at {registry_path}. "
+        "Create registry.yaml before writing SeqLedger outputs.[/]"
     )
     _print_usr_registry_next_steps(console=console)
     raise typer.Exit(code=1)
@@ -474,7 +475,7 @@ def _resolve_resume_mode(
         if shared_usr_state is not None:
             usr_root, dataset, dataset_dir = shared_usr_state
             console.print(
-                "[bold red]--fresh only clears workspace outputs, but shared USR dataset state already exists at[/] "
+                "[bold red]--fresh clears workspace outputs; shared SeqLedger data already exists at[/] "
                 f"{context.display_path(dataset_dir, run_root, absolute=False)}"
             )
             _print_shared_usr_boundary_next_steps(usr_root=usr_root, dataset=dataset, console=console)
@@ -514,7 +515,7 @@ def _resolve_resume_mode(
     if shared_usr_state is not None and not existing_outputs:
         usr_root, dataset, dataset_dir = shared_usr_state
         console.print(
-            "[bold red]Shared USR dataset state already exists, but this workspace has no "
+            "[bold red]Shared SeqLedger dataset state already exists, but this workspace has no "
             "run outputs to resume from:[/] "
             f"{context.display_path(dataset_dir, run_root, absolute=False)}"
         )
@@ -730,7 +731,7 @@ def _handle_run_runtime_error(
             "no need to run `uv run dense stage-b build-libraries`"
         )
         raise typer.Exit(code=1)
-    if "USR registry not found at " in message:
+    if "SeqLedger registry not found at " in message:
         console.print(f"[bold red]{message}[/]")
         _print_usr_registry_next_steps(console=console)
         raise typer.Exit(code=1)
@@ -804,7 +805,7 @@ def register_run_commands(
         show_solutions: bool = typer.Option(False, "--show-solutions", help="Show full solution sequences in output."),
         ensure_usr_registry: bool = typer.Option(
             True,
-            "--ensure-usr-registry/--no-ensure-usr-registry",
+            "--ensure-seqledger-registry/--no-ensure-seqledger-registry",
             help="Auto-seed output.usr.root/registry.yaml from repository defaults when missing.",
         ),
         config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
@@ -996,7 +997,7 @@ def register_run_commands(
         yes: bool = typer.Option(False, "--yes", help="Skip the danger-zone confirmation prompt."),
         purge_usr_registry: bool = typer.Option(
             False,
-            "--purge-usr-registry",
+            "--purge-seqledger-registry",
             help="Also remove output.usr.root/registry.yaml instead of preserving it.",
         ),
         config: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to config YAML."),
@@ -1033,15 +1034,15 @@ def register_run_commands(
         if purge_usr_registry and shared_usr_root is not None:
             usr_root, dataset, _dataset_dir = shared_usr_root
             console.print(
-                "[bold red]--purge-usr-registry only applies to workspace-local USR roots under outputs/.[/] "
-                f"The configured USR root is shared: {context.display_path(usr_root, run_root, absolute=False)}"
+                "[bold red]--purge-seqledger-registry requires a workspace-local root under outputs/.[/] "
+                f"The configured SeqLedger root is shared: {context.display_path(usr_root, run_root, absolute=False)}"
             )
             _print_shared_usr_boundary_next_steps(usr_root=usr_root, dataset=dataset, console=console)
             raise typer.Exit(code=1)
         if shared_usr_state is not None:
             usr_root, dataset, dataset_dir = shared_usr_state
             console.print(
-                "[bold red]campaign-reset only clears workspace outputs, but shared USR dataset "
+                "[bold red]campaign-reset only clears workspace outputs, but shared SeqLedger dataset "
                 "state already exists at[/] "
                 f"{context.display_path(dataset_dir, run_root, absolute=False)}"
             )
@@ -1092,11 +1093,11 @@ def register_run_commands(
         )
         if purged_registry_path is not None:
             console.print(
-                ":bookmark_tabs: [bold green]Removed USR registry[/]: "
+                ":bookmark_tabs: [bold green]Removed SeqLedger registry[/]: "
                 f"{context.display_path(purged_registry_path, run_root, absolute=False)}"
             )
         if preserved_registry_paths:
             preserved = ", ".join(
                 context.display_path(path, run_root, absolute=False) for path in preserved_registry_paths
             )
-            console.print(f":bookmark_tabs: [bold green]Preserved USR registry[/]: {preserved}")
+            console.print(f":bookmark_tabs: [bold green]Preserved SeqLedger registry[/]: {preserved}")

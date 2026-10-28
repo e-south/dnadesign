@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/notify/tests/cli/test_usr_events.py
 
-CLI adapter tests for notify usr-events watch + spool workflows.
+CLI adapter tests for notify seqledger-events watch + spool workflows.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -22,10 +22,10 @@ from typer.testing import CliRunner
 from dnadesign.notify.cli import app
 from dnadesign.notify.core.errors import NotifyConfigError, NotifyDeliveryError
 from dnadesign.notify.runtime.cursor import iter_file_lines as _iter_file_lines
-from dnadesign.usr import USR_EVENT_VERSION
+from dnadesign.seqledger import SEQLEDGER_EVENT_VERSION
 
 
-def _event(*, action: str = "write_overlay_part", event_version: int = USR_EVENT_VERSION) -> dict:
+def _event(*, action: str = "write_overlay_part", event_version: int = SEQLEDGER_EVENT_VERSION) -> dict:
     return {
         "event_version": event_version,
         "timestamp_utc": "2026-02-06T00:00:00+00:00",
@@ -53,7 +53,7 @@ def test_usr_events_watch_rejects_unknown_event_version(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -76,7 +76,7 @@ def test_usr_events_watch_rejects_non_positive_poll_interval(tmp_path: Path) -> 
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -101,7 +101,7 @@ def test_usr_events_watch_rejects_non_object_actor(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -126,7 +126,7 @@ def test_usr_events_watch_rejects_non_object_dataset(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -149,7 +149,7 @@ def test_usr_events_watch_dry_run_does_not_require_webhook_url(tmp_path: Path) -
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -176,7 +176,7 @@ def test_usr_events_watch_rejects_https_webhook_without_ca_bundle(tmp_path: Path
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -210,7 +210,7 @@ def test_usr_events_watch_accepts_tls_ca_bundle_override(tmp_path: Path, monkeyp
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -237,7 +237,7 @@ def test_usr_events_watch_rejects_non_slack_webhook_host_for_slack_provider(tmp_
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "slack",
@@ -264,7 +264,7 @@ def test_usr_events_watch_can_skip_invalid_events_when_configured(tmp_path: Path
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -288,7 +288,7 @@ def test_usr_events_watch_rejects_completed_malformed_json_record(tmp_path: Path
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -311,7 +311,7 @@ def test_usr_events_watch_can_skip_completed_malformed_json_record_when_configur
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -341,7 +341,7 @@ def test_usr_events_watch_cursor_prevents_duplicate_sends(tmp_path: Path, monkey
 
     runner = CliRunner()
     args = [
-        "usr-events",
+        "seqledger-events",
         "watch",
         "--provider",
         "generic",
@@ -370,7 +370,7 @@ def test_usr_events_watch_requires_actor_tool_or_override(tmp_path: Path) -> Non
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -395,7 +395,7 @@ def test_usr_events_watch_requires_actor_run_id_or_override(tmp_path: Path) -> N
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -420,7 +420,7 @@ def test_usr_events_watch_fails_on_truncated_cursor_by_default(tmp_path: Path) -
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -447,7 +447,7 @@ def test_usr_events_watch_can_restart_on_truncated_cursor_when_configured(tmp_pa
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -791,7 +791,7 @@ def test_usr_events_watch_spools_after_delivery_failures(tmp_path: Path, monkeyp
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -907,7 +907,7 @@ def test_usr_events_watch_can_include_args_when_opted_in(tmp_path: Path) -> None
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -929,7 +929,7 @@ def test_usr_events_watch_can_include_raw_event_when_opted_in(tmp_path: Path) ->
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -951,7 +951,7 @@ def test_usr_events_watch_can_include_context_when_opted_in(tmp_path: Path) -> N
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -1000,7 +1000,7 @@ def test_usr_events_watch_formats_densegen_health_message(tmp_path: Path) -> Non
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -1033,7 +1033,7 @@ def test_usr_events_watch_includes_error_in_failed_densegen_health_message(tmp_p
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -1063,7 +1063,7 @@ def test_usr_events_watch_includes_error_in_densegen_flush_failed_message(tmp_pa
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -1100,7 +1100,7 @@ def test_usr_events_watch_maps_densegen_health_completed_to_success_status(tmp_p
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -1151,7 +1151,7 @@ def test_usr_events_watch_suppresses_densegen_running_health_without_progress_st
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -1203,7 +1203,7 @@ def test_usr_events_watch_respects_custom_progress_heartbeat_seconds(tmp_path: P
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -1257,7 +1257,7 @@ def test_usr_events_watch_emits_densegen_running_health_on_quota_step_boundary(t
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -1312,7 +1312,7 @@ def test_usr_events_watch_formats_densegen_completion_summary_with_runtime(tmp_p
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -1355,7 +1355,7 @@ def test_usr_events_watch_can_stop_on_terminal_status(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -1381,7 +1381,7 @@ def test_usr_events_watch_dry_run_can_skip_cursor_advance_when_requested(tmp_pat
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -1408,7 +1408,7 @@ def test_usr_events_watch_rejects_when_cursor_lock_is_held(tmp_path: Path) -> No
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -1434,7 +1434,7 @@ def test_usr_events_watch_recovers_stale_cursor_lock(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--provider",
             "generic",
@@ -1478,7 +1478,7 @@ def test_usr_events_watch_profile_can_reresolve_events_from_tool_config(tmp_path
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--profile",
             str(profile),
@@ -1520,7 +1520,7 @@ def test_usr_events_watch_can_autoload_profile_from_tool_config(tmp_path: Path, 
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--tool",
             "densegen",
@@ -1584,7 +1584,7 @@ def test_usr_events_watch_can_autoload_profile_from_infer_tool_config(tmp_path: 
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--tool",
             "infer",
@@ -1642,7 +1642,7 @@ def test_usr_events_watch_autoload_rejects_profile_events_source_mismatch(tmp_pa
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--tool",
             "densegen",
@@ -1694,7 +1694,7 @@ def test_usr_events_watch_autoload_uses_cli_events_when_profile_events_field_is_
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--tool",
             "densegen",
@@ -1723,7 +1723,7 @@ def test_usr_events_watch_autoload_prompts_setup_when_profile_missing(tmp_path: 
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--tool",
             "densegen",
@@ -1772,7 +1772,7 @@ def test_usr_events_watch_autoload_supports_workspace_shorthand(tmp_path: Path, 
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--tool",
             "densegen",
@@ -1893,7 +1893,7 @@ def test_usr_events_watch_construct_workspace_selector_uses_selector_profile_and
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--tool",
             "construct",
@@ -2013,7 +2013,7 @@ def test_usr_events_watch_profile_infers_construct_run_id_from_events_source(tmp
     result = runner.invoke(
         app,
         [
-            "usr-events",
+            "seqledger-events",
             "watch",
             "--profile",
             str(profile),

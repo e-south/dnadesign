@@ -2,13 +2,13 @@
 doc_id: documentation-index
 surface: docs-router
 owner: dnadesign-maintainers
-last_verified: 2026-10-26
+last_verified: 2026-10-28
 ---
 
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-26
+**Last verified:** 2026-10-28
 
 Find the next task, command, or reference doc from the routes below.
 
@@ -40,7 +40,7 @@ contracts.
 | `construct` | packaged workspaces and their current output state | `uv run construct workspace list` | [Construct workspaces](../src/dnadesign/construct/workspaces/README.md) |
 | `infer` | packaged workspaces and their current output state | `uv run infer workspace list` | [infer workspaces](../src/dnadesign/infer/workspaces/README.md) |
 | `cluster` | packaged workspaces and their current output state | `uv run cluster workspace list` | [Cluster workspaces](../src/dnadesign/cluster/workspaces/README.md) |
-| `usr` | dataset roots and datasets, not workspaces | `uv run usr --help` to see the default root, then `uv run usr ls --root <usr-root>` | [USR CLI quickstart](../src/dnadesign/usr/docs/getting-started/cli-quickstart.md) |
+| `seqledger` | dataset roots and datasets, not workspaces | `uv run seqledger --help` to see the default root, then `uv run seqledger ls --root <seqledger-root>` | [SeqLedger CLI quickstart](../src/dnadesign/seqledger/docs/getting-started/cli-quickstart.md) |
 
 ### Choose a workflow
 
@@ -51,28 +51,28 @@ Use these when one tool owns the next step.
 | Need | Primary workflow | Verify next |
 | --- | --- | --- |
 | Inspect a DenseGen workspace | [DenseGen docs overview](../src/dnadesign/densegen/docs/README.md) | Inspect records with [DenseGen outputs reference](../src/dnadesign/densegen/docs/reference/outputs.md). |
-| Build DNA constructs from templates or multiple parts into derived datasets | [Construct docs overview](../src/dnadesign/construct/docs/README.md) | Verify resulting lineage and sequence identity in [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
+| Build DNA constructs from templates or multiple parts into derived datasets | [Construct docs overview](../src/dnadesign/construct/docs/README.md) | Verify resulting lineage and sequence identity in [SeqLedger schema contract](../src/dnadesign/seqledger/docs/reference/schema-contract.md). |
 | Compose declared linear ssDNA parts into a local artifact bundle | [Construct linear ssDNA composition](../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md) | Verify the bundle manifest, optional Folding plot artifacts, and optional BaseRender review handoff. |
 | Select candidates from measured labels and sequence features | [OPAL demo and campaign workflow](../src/dnadesign/opal/docs/index.md) | Inspect and export the selected batch with [OPAL selection commands](../src/dnadesign/opal/docs/reference/cli.md#selection-batch). |
-| Run model inference and write outputs back to datasets | [Infer docs index](../src/dnadesign/infer/docs/README.md) | Verify write-back columns and types with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md). |
+| Run model inference and write outputs back to datasets | [Infer docs index](../src/dnadesign/infer/docs/README.md) | Verify write-back columns and types with [SeqLedger schema contract](../src/dnadesign/seqledger/docs/reference/schema-contract.md). |
 | Set up the SCC Evo2 infer GPU environment | [BU SCC install bootstrap](bu-scc/setup/install.md#gpu-setup-and-verification-runbook) | Verify infer model capabilities with [infer SCC Evo2 GPU runbook](../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md). |
 | Run Notify for local event watching and webhook setup | [Notify docs index](notify/README.md) | Verify mode and delivery contracts in [Notify command contracts](../src/dnadesign/notify/docs/reference/command-contracts.md). |
 | Inspect or extend Notify package internals | [Notify package docs index](../src/dnadesign/notify/docs/README.md) | Verify module boundaries in [Notify maintainer architecture map](../src/dnadesign/notify/docs/dev/architecture.md). |
 
 #### Cross-tool dataset workflows
 
-Use these when data moves through more than one tool and the shared record lives in USR.
+Use these when data moves through more than one tool and the shared record lives in SeqLedger.
 
 | Need | Primary workflow | Verify next |
 | --- | --- | --- |
-| Assemble multiple producer datasets before construct and infer share one downstream dataset | [Multi-source shared dataset assembly](../src/dnadesign/usr/docs/operations/assembly/multi-source-shared-dataset.md) | Verify carried overlays, construct lineage, and infer write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
-| Hand one construct-backed dataset to infer and downstream watchers | [Construct -> USR -> Infer shared dataset runbook](../src/dnadesign/usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md) | Verify lineage plus downstream write-back contracts with [USR schema contract](../src/dnadesign/usr/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
+| Assemble multiple producer datasets before construct and infer share one downstream dataset | [Multi-source shared dataset assembly](../src/dnadesign/seqledger/docs/operations/assembly/multi-source-shared-dataset.md) | Verify carried overlays, construct lineage, and infer write-back contracts with [SeqLedger schema contract](../src/dnadesign/seqledger/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
+| Hand one construct-backed dataset to infer and downstream watchers | [Construct -> SeqLedger -> Infer shared dataset runbook](../src/dnadesign/seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md) | Verify lineage plus downstream write-back contracts with [SeqLedger schema contract](../src/dnadesign/seqledger/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
 | Connect a private study workspace to dnadesign | [External study workspace contract](integrations/study-workspaces.md) | Pin dnadesign, pass explicit paths, and register only study-owned status or evidence adapters. |
 | Validate private runtime state outside Git | [External storage-object contract](integrations/storage-objects.md) | Inventory one exact workspace, store, or cache and verify its ownership, retention, file closure, and digests before execution. |
-| Build a promoter feature dataset from anchors, wildtype/manual promoters, optional construct contexts, and infer outputs | [Promoter characterization feature matrix](../src/dnadesign/usr/docs/operations/promoter/characterization-feature-matrix.md) | Verify one explicit `infer__...` column is chosen as `X` or export a flattened matrix before continuing to the exploratory [cluster workflow](../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) or the downstream [USR dataset with infer-derived X -> OPAL active learning](../src/dnadesign/opal/docs/workflows/usr-infer-x-active-learning.md) workflow. |
-| Sync iterative HPC outputs to local analysis safely | [USR workflow map](../src/dnadesign/usr/docs/operations/routes/workflow-map.md) -> [USR HPC sync flow](../src/dnadesign/usr/docs/operations/sync/hpc-agent-flow.md) | Verify transfer parity with [USR sync audit loop](../src/dnadesign/usr/docs/operations/sync/audit-loop.md). |
-| Run cross-machine sync with stricter failure checks | [USR sync command contract](../src/dnadesign/usr/docs/operations/sync/README.md) | Verify sidecar and overlay fidelity with [USR sync fidelity drills](../src/dnadesign/usr/docs/operations/sync/fidelity-drills.md). |
-| Chain DenseGen -> USR -> Infer -> USR updates | [Chained DenseGen and Infer sync runbook](../src/dnadesign/usr/docs/operations/sync/chained-densegen-infer-runbook.md) | Verify downstream dataset state with [Infer docs](../src/dnadesign/infer/docs/README.md). |
+| Build a promoter feature dataset from anchors, wildtype/manual promoters, optional construct contexts, and infer outputs | [Promoter characterization feature matrix](../src/dnadesign/seqledger/docs/operations/promoter/characterization-feature-matrix.md) | Verify one explicit `infer__...` column is chosen as `X` or export a flattened matrix before continuing to the exploratory [cluster workflow](../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) or the downstream [SeqLedger dataset with infer-derived X -> OPAL active learning](../src/dnadesign/opal/docs/workflows/seqledger-infer-x-active-learning.md) workflow. |
+| Sync iterative HPC outputs to local analysis safely | [SeqLedger workflow map](../src/dnadesign/seqledger/docs/operations/routes/workflow-map.md) -> [SeqLedger HPC sync flow](../src/dnadesign/seqledger/docs/operations/sync/hpc-agent-flow.md) | Verify transfer parity with [SeqLedger sync audit loop](../src/dnadesign/seqledger/docs/operations/sync/audit-loop.md). |
+| Run cross-machine sync with stricter failure checks | [SeqLedger sync command contract](../src/dnadesign/seqledger/docs/operations/sync/README.md) | Verify sidecar and overlay fidelity with [SeqLedger sync fidelity drills](../src/dnadesign/seqledger/docs/operations/sync/fidelity-drills.md). |
+| Chain DenseGen -> SeqLedger -> Infer -> SeqLedger updates | [Chained DenseGen and Infer sync runbook](../src/dnadesign/seqledger/docs/operations/sync/chained-densegen-infer-runbook.md) | Verify downstream dataset state with [Infer docs](../src/dnadesign/infer/docs/README.md). |
 
 #### Scheduler and environment workflows
 
@@ -80,7 +80,7 @@ Use these when the next step is orchestration, environment setup, or audit outpu
 
 | Need | Primary workflow | Verify next |
 | --- | --- | --- |
-| Run BU SCC batch jobs with notifications | [BU SCC batch + notify runbook](bu-scc/runbooks/batch-notify.md) | Verify event delivery contract in [Notify USR events contract](notify/usr-events.md). |
+| Run BU SCC batch jobs with notifications | [BU SCC batch + notify runbook](bu-scc/runbooks/batch-notify.md) | Verify event delivery contract in [Notify SeqLedger events contract](notify/seqledger-events.md). |
 | Plan and execute deterministic DenseGen/Infer HPC orchestration runbooks | [Ops orchestration index](operations/README.md) | Verify command ordering and outcomes in [orchestration audit contract](operations/orchestration/runbooks.md#contract-rules). |
 
 ### Tool docs
@@ -102,7 +102,7 @@ files produced by other tools; their guides describe the required inputs.
 | `latentdna` | `uv run latentdna --help` | [latentdna README](../src/dnadesign/latentdna/README.md) |
 | `opal` | `uv run opal --help` | [opal README](../src/dnadesign/opal/README.md) |
 | `permuter` | `uv run permuter --help` | [permuter docs](../src/dnadesign/permuter/docs/README.md) |
-| `usr` | `uv run usr --help` | [usr README](../src/dnadesign/usr/README.md) |
+| `seqledger` | `uv run seqledger --help` | [usr README](../src/dnadesign/seqledger/README.md) |
 
 #### Artifact services
 
@@ -145,7 +145,7 @@ files produced by other tools; their guides describe the required inputs.
 - [OPS failure contract](operations/contracts/failure.md): CLI exit-code and stderr contract for automation and maintainers.
 - [BU SCC docs index](bu-scc/README.md): cluster setup, submission, and operator runbooks.
 - [Notify docs index](notify/README.md): notifier setup, runtime behavior, and recovery routes.
-- [USR operations index](../src/dnadesign/usr/docs/operations/README.md): sync, transfer, dataset assembly, and downstream handoff runbooks.
+- [SeqLedger operations index](../src/dnadesign/seqledger/docs/operations/README.md): sync, transfer, dataset assembly, and downstream handoff runbooks.
 
 ### Maintainer references
 

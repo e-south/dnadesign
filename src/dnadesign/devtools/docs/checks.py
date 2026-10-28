@@ -338,7 +338,7 @@ def main(argv: list[str] | None = None) -> int:
 
     shared_usr_dataset_layout_issues = _find_shared_usr_dataset_layout_issues(repo_root)
     if shared_usr_dataset_layout_issues:
-        print("Shared USR dataset layout check failed:")
+        print("Shared SeqLedger dataset layout check failed:")
         for issue in shared_usr_dataset_layout_issues:
             print(f" - {issue}")
         return 1

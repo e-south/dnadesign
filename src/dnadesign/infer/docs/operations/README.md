@@ -1,7 +1,7 @@
 ## infer operations
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-28
 
 ### Start path
 
@@ -10,15 +10,15 @@
    - `uv run infer validate config --config <path>`
    - `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
 2. Run pressure-test path from this index.
-3. Verify dataset state with `uv run usr ...` before enabling scheduler submit.
+3. Verify dataset state with `uv run seqledger ...` before enabling scheduler submit.
 
 ### Runbooks
 
 - [Evo2 feature-bundle runbook](evo2-sequence-features.md): repo-aligned sequence feature-bundle path with anchor-only and templated contexts.
-- [Agnostic model + USR pressure test](pressure-test-agnostic-models.md): standalone and ops-runbook paths.
+- [Agnostic model + SeqLedger pressure test](pressure-test-agnostic-models.md): standalone and ops-runbook paths.
 - [SCC Evo2 GPU environment runbook (UV + infer)](scc-evo2-gpu-uv-runbook.md): deterministic environment build + infer capability checks.
 - [End-to-end pressure-test demo](../tutorials/demo_pressure_test_usr_ops_notify.md): infer + usr + ops + notify full walkthrough.
-- [Construct -> USR -> Infer shared dataset runbook](../../../usr/docs/operations/assembly/construct-infer-shared-dataset-runbook.md): construct-led data-plane handoff into infer.
+- [Construct -> SeqLedger -> Infer shared dataset runbook](../../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md): construct-led data-plane handoff into infer.
 
 ### Integration boundary
 

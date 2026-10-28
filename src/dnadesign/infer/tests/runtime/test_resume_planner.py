@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/tests/runtime/test_resume_planner.py
 
-Contract tests for USR resume planning module boundaries.
+Contract tests for SeqLedger resume planning module boundaries.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -27,7 +27,7 @@ from dnadesign.infer.src.features.contracts import (
 )
 from dnadesign.infer.src.features.execution import build_feature_bundle_outputs
 from dnadesign.infer.src.runtime.resume_planner import plan_resume_for_usr, read_usr_column_values, read_usr_columns
-from dnadesign.usr import Dataset
+from dnadesign.seqledger import Dataset
 
 
 def test_plan_resume_for_usr_overwrite_short_circuits_scan() -> None:

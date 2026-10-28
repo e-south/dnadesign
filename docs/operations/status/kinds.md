@@ -1,20 +1,20 @@
 ## OPS status kinds
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-09
+**Last verified:** 2026-10-28
 
 Registered public OPS routes and their status-kind providers:
 
 | Registry id | Status kind | Observed plane | Surface type | Summary scope | Cost | Required inputs | Owner |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `ops.control-plane.orchestration` | `ops-audit-json` | `control` | `orchestration_audit` | `workspace` | `cheap` | `--audit-json` | `ops` |
-| `usr.data-plane.hpc-sync` | `usr-sync-audit` | `data` | `sync_audit` | `workspace` | `cheap` | `--sync-audit-json` | `usr` |
-| `usr.data-plane.chained-densegen-infer-sync` | `usr-sync-audit` | `data` | `sync_audit` | `workspace` | `cheap` | `--sync-audit-json` | `usr` |
-| `usr.data-plane.multi-source-source-of-truth` | `usr-dataset-state` | `data` | `dataset_snapshot` | `workspace` | `cheap` | `--usr-root`, `--dataset` | `usr` |
-| `usr.data-plane.construct-infer-source-of-truth` | `usr-dataset-state` | `data` | `dataset_snapshot` | `workspace` | `cheap` | `--usr-root`, `--dataset` | `usr` |
-| `usr.data-plane.promoter-feature-matrix` | `usr-dataset-state` | `data` | `dataset_snapshot` | `workspace` | `cheap` | `--usr-root`, `--dataset` | `usr` |
+| `seqledger.data-plane.hpc-sync` | `seqledger-sync-audit` | `data` | `sync_audit` | `workspace` | `cheap` | `--sync-audit-json` | `seqledger` |
+| `seqledger.data-plane.chained-densegen-infer-sync` | `seqledger-sync-audit` | `data` | `sync_audit` | `workspace` | `cheap` | `--sync-audit-json` | `seqledger` |
+| `seqledger.data-plane.multi-source-source-of-truth` | `seqledger-dataset-state` | `data` | `dataset_snapshot` | `workspace` | `cheap` | `--seqledger-root`, `--dataset` | `seqledger` |
+| `seqledger.data-plane.construct-infer-source-of-truth` | `seqledger-dataset-state` | `data` | `dataset_snapshot` | `workspace` | `cheap` | `--seqledger-root`, `--dataset` | `seqledger` |
+| `seqledger.data-plane.promoter-feature-matrix` | `seqledger-dataset-state` | `data` | `dataset_snapshot` | `workspace` | `cheap` | `--seqledger-root`, `--dataset` | `seqledger` |
 | `cluster.downstream.exploratory-clustering` | `cluster-run-index` | `data` | `run_index` | `workspace` | `cheap` | `--cluster-results-root` | `cluster` |
-| `opal.downstream.usr-infer-x-active-learning` | `opal-campaign-state` | `control` | `campaign_snapshot` | `workspace` | `cheap` | `--opal-config` | `opal` |
+| `opal.downstream.seqledger-infer-x-active-learning` | `opal-campaign-state` | `control` | `campaign_snapshot` | `workspace` | `cheap` | `--opal-config` | `opal` |
 
 ### Direct status-kind inventory
 

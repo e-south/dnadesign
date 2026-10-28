@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/infer/src/writers/usr.py
 
-Writer helpers for USR infer writers.
+Writer helpers for SeqLedger infer writers.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -23,13 +23,13 @@ import pyarrow as pa
 import pyarrow.dataset as pa_dataset
 import pyarrow.parquet as pq
 
-from dnadesign.usr import (
+from dnadesign.seqledger import (
     MUTATION_RESERVED_NAMESPACES,
     SchemaError,
     overlay_parts,
     overlay_schema,
 )
-from dnadesign.usr import (
+from dnadesign.seqledger import (
     attach_frame_dataset as _attach_frame_dataset,
 )
 
@@ -42,7 +42,7 @@ _OVERLAY_GUARD_FILTER_CHUNK_SIZE = 10_000
 
 
 def _infer_actor(job_id: str) -> dict[str, object]:
-    run_id = str(os.getenv("USR_ACTOR_RUN_ID") or "").strip() or f"infer-{job_id}"
+    run_id = str(os.getenv("SEQLEDGER_ACTOR_RUN_ID") or "").strip() or f"infer-{job_id}"
     return {
         "tool": "infer",
         "run_id": run_id,
@@ -264,7 +264,7 @@ def _guard_usr_overwrite(ds, *, ids: List[str], out_cols: List[str], overwrite: 
 
 
 def write_back_usr(
-    ds,  # dnadesign.usr.Dataset
+    ds,  # dnadesign.seqledger.Dataset
     *,
     ids: List[str],
     model_id: str,
@@ -331,7 +331,7 @@ def write_back_usr(
         pq.write_table(tbl, p)
         actor = _infer_actor(job_id)
         _LOG.info(
-            "Attaching to USR: rows=%d cols=%s overwrite=%s",
+            "Attaching to SeqLedger: rows=%d cols=%s overwrite=%s",
             len(ids),
             list(out_cols.keys()),
             overwrite,
