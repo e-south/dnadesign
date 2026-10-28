@@ -1,4 +1,13 @@
-"""Feature consumers verify committed content and support explicit snapshots."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/contracts/tests/test_feature_payload_reads.py
+
+Feature consumers verify committed content and support explicit snapshots.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 import hashlib
 import json

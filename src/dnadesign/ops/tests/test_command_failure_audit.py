@@ -1,4 +1,13 @@
-"""Process failures retain a readable execution audit."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/ops/tests/test_command_failure_audit.py
+
+Process failures retain a readable execution audit.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 import json
 import subprocess
