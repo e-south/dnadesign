@@ -83,6 +83,28 @@ def test_builtin_ops_status_registry_lives_under_provider_package() -> None:
     assert (ops_root / "providers" / "builtin" / "status_provider.py").is_file()
 
 
+def test_builtin_lookup_does_not_load_optional_registry_plugins(monkeypatch: pytest.MonkeyPatch) -> None:
+    def discover(**kwargs: object) -> object:
+        pytest.fail("built-in status lookup must not discover external registries")
+
+    monkeypatch.setattr(registry_loader, "entry_points", discover)
+    registry_loader.list_status_kind_specs.cache_clear()
+    spec = registry_loader.load_status_kind_spec("usr-dataset-state")
+    assert spec.owner_boundary == "usr"
+
+
+def test_full_registry_inventory_identifies_a_broken_plugin(monkeypatch: pytest.MonkeyPatch) -> None:
+    def broken_loader() -> object:
+        raise ModuleNotFoundError("optional dependency absent", name="optional_dependency")
+
+    plugin = SimpleNamespace(name="broken-study", value="study_plugin:registries", load=broken_loader)
+    monkeypatch.setattr(registry_loader, "entry_points", lambda **kwargs: [plugin])
+    registry_loader.list_status_kind_specs.cache_clear()
+    with pytest.raises(ValueError, match="broken-study") as error:
+        registry_loader.list_status_kind_specs()
+    assert isinstance(error.value.__cause__, ModuleNotFoundError)
+
+
 def test_status_registry_loader_reads_metadata_without_provider_import() -> None:
     imported_modules = _run_python(
         """

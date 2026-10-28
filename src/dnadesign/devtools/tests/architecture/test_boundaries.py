@@ -69,6 +69,37 @@ def test_from_and_dynamic_imports_cannot_access_private_subpackage(tmp_path: Pat
     assert violations[0].import_target == "dnadesign.usr.src"
 
 
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "latentdna/src/workspaces/probe.py",
+        "latentdna/src/notebooks/probe.py",
+        "baserender/src/config/jobs/probe.py",
+        "contracts/sequence/probe.py",
+        "artifacts/probe.py",
+    ],
+)
+def test_runtime_directories_and_shared_contracts_enforce_tool_boundaries(tmp_path: Path, relative: str) -> None:
+    _write(tmp_path / "src/dnadesign" / relative, "from dnadesign.usr.src import dataset\n")
+    _write(tmp_path / "src/dnadesign/usr/src/__init__.py", "")
+    violations = find_undeclared_cross_tool_imports(repo_root=tmp_path)
+    assert len(violations) == 1
+    assert violations[0].import_target == "dnadesign.usr.src"
+
+
+def test_shared_contracts_cannot_depend_on_a_public_tool_facade(tmp_path: Path) -> None:
+    _write(tmp_path / "src/dnadesign/contracts/sequence/probe.py", "from dnadesign.usr import Dataset\n")
+    _write(tmp_path / "src/dnadesign/usr/__init__.py", "")
+    assert len(find_undeclared_cross_tool_imports(repo_root=tmp_path)) == 1
+
+
+def test_generated_workspace_and_test_files_are_outside_runtime_boundary_checks(tmp_path: Path) -> None:
+    for relative in ("latentdna/workspaces/local/outputs/probe.py", "latentdna/tests/probe.py"):
+        _write(tmp_path / "src/dnadesign" / relative, "from dnadesign.usr.src import dataset\n")
+    _write(tmp_path / "src/dnadesign/usr/src/__init__.py", "")
+    assert find_undeclared_cross_tool_imports(repo_root=tmp_path) == []
+
+
 def test_dynamic_public_facade_and_public_attribute_remain_allowed(tmp_path: Path) -> None:
     _write(
         tmp_path / "src/dnadesign/opal/api.py",

@@ -24,11 +24,11 @@ TOP_LEVEL_ROOT_MODULES = {"__init__.py", "_entrypoints.py"}
 TOP_LEVEL_SHARED_INFRA_PACKAGES = {"artifacts", "contracts", "devtools"}
 _IGNORED_TOP_LEVEL_DIRECTORIES = {"__pycache__"}
 _NON_TOOL_DIRS = TOP_LEVEL_SHARED_INFRA_PACKAGES | _IGNORED_TOP_LEVEL_DIRECTORIES
-_SKIPPED_PATH_SEGMENTS = {
+_RESOURCE_ROOT_DIRECTORIES = {
     "tests",
-    "notebooks",
     "docs",
     "workspaces",
+    "campaigns",
     "jobs",
     "images",
     "assets",
@@ -179,15 +179,21 @@ def _discover_tools(repo_root: Path) -> set[str]:
 
 def _boundary_checked_owners(*, repo_root: Path, tool_names: set[str]) -> set[str]:
     checked = set(tool_names)
-    if (repo_root / "src" / "dnadesign" / "devtools").is_dir():
-        checked.add("devtools")
+    checked.update(
+        owner for owner in TOP_LEVEL_SHARED_INFRA_PACKAGES if (repo_root / "src" / "dnadesign" / owner).is_dir()
+    )
     return checked
 
 
 def _skip_checked_python_file(relative_path: Path) -> bool:
-    if relative_path.parts and relative_path.parts[0] == "devtools":
-        return "tests" in relative_path.parts or "__pycache__" in relative_path.parts
-    return any(segment in _SKIPPED_PATH_SEGMENTS for segment in relative_path.parts)
+    parts = relative_path.parts
+    if "__pycache__" in parts:
+        return True
+    if parts and parts[0] in TOP_LEVEL_SHARED_INFRA_PACKAGES:
+        return len(parts) > 1 and parts[1] == "tests"
+    # Resource shelves live at the tool root. The same names under src/ are
+    # runtime packages and must receive the same checks as any other module.
+    return len(parts) > 1 and parts[1] in _RESOURCE_ROOT_DIRECTORIES
 
 
 def _iter_checked_python_files(repo_root: Path, tool_names: set[str]) -> list[Path]:

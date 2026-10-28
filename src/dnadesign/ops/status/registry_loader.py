@@ -70,10 +70,11 @@ _REGISTRY_INPUT_KEYS = frozenset(
 )
 
 
-@lru_cache(maxsize=1)
-def list_status_kind_specs() -> tuple[StatusKindSpec, ...]:
+@lru_cache(maxsize=2)
+def list_status_kind_specs(*, include_external: bool = True) -> tuple[StatusKindSpec, ...]:
+    """List validated metadata, optionally without loading installed plugins."""
     dnadesign_root = Path(__file__).resolve().parents[2]
-    external_fragments = _load_external_status_registry_fragments()
+    external_fragments = _load_external_status_registry_fragments() if include_external else ()
     return _load_status_kind_specs(
         fragment_paths=(
             *_iter_status_registry_fragment_paths(),
@@ -245,6 +246,11 @@ def load_status_kind_spec(status_kind: str) -> StatusKindSpec:
     normalized_kind = str(status_kind or "").strip()
     if not normalized_kind:
         raise ValueError("status kind must be non-empty")
+    # Built-in operations do not depend on optional entry-point packages. The
+    # full inventory still validates plugins and rejects conflicting names.
+    for spec in list_status_kind_specs(include_external=False):
+        if spec.status_kind == normalized_kind:
+            return spec
     for spec in list_status_kind_specs():
         if spec.status_kind == normalized_kind:
             return spec
@@ -264,11 +270,17 @@ def _load_external_status_registry_fragments() -> tuple[tuple[Path, str], ...]:
     seen_paths: set[Path] = set()
     discovered = entry_points(group=_STATUS_REGISTRY_ENTRY_POINT_GROUP)
     for entry_point in sorted(discovered, key=lambda item: (item.name, item.value)):
-        loader = entry_point.load()
+        try:
+            loader = entry_point.load()
+        except Exception as exc:
+            raise ValueError(f"unable to load status registry plugin {entry_point.name!r}: {exc}") from exc
         if not callable(loader):
             raise ValueError(f"status registry entry point must resolve to a callable: {entry_point.name}")
         package_roots = _entry_point_package_roots(entry_point=entry_point)
-        raw_paths = loader()
+        try:
+            raw_paths = loader()
+        except Exception as exc:
+            raise ValueError(f"status registry plugin {entry_point.name!r} failed: {exc}") from exc
         if isinstance(raw_paths, (str, Path)):
             raw_paths = (raw_paths,)
         if not isinstance(raw_paths, (list, tuple)):

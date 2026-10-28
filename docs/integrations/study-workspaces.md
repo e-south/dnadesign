@@ -2,7 +2,7 @@
 doc_id: study-workspace-integration
 surface: integration-contract
 owner: dnadesign-maintainers
-last_verified: 2026-10-26
+last_verified: 2026-10-28
 ---
 
 ## External study workspaces
@@ -53,6 +53,8 @@ research-studies = "research_studies.integrations.dnadesign_ops:status_registry_
 The registered function must return one or more existing
 `status.registry.yaml` paths inside the provider package. Duplicate paths,
 missing files, and provider references outside that package fail at load time.
+Built-in status lookups do not load external registries. Full inventory commands
+validate every registry and identify plugins that fail to load.
 
 ### Boundary rules
 
