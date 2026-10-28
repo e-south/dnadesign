@@ -1,7 +1,7 @@
 ## How to use Ops
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-26
+**Last verified:** 2026-10-28
 
 When Ops is already the right surface, start with the next command below. Use
 `uv run ops catalog list --simple` if the route is still unknown.
@@ -23,6 +23,10 @@ specific checkout. External catalog providers are available in either mode.
 - `uv run ops catalog list --section tool-sources`: show tool docs rather than the full procedure inventory.
 - `uv run ops catalog list --related-to usr.data-plane.promoter-feature-matrix`: inspect related procedures around one registered route once you know the anchor id.
 - `uv run ops catalog list --section tool-sources --related-to usr.data-plane.promoter-feature-matrix`: inspect related tool docs around one registered route once you know the anchor id.
+
+Tool-source listings and lookups of built-in procedures do not import optional
+catalog providers. Full procedure inventories and external procedure lookups
+load those providers and report the responsible entry point if one fails.
 
 ### Inspect one route
 

@@ -51,6 +51,37 @@ def _fake_distribution(name: str, *owned_paths: Path) -> SimpleNamespace:
     )
 
 
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["list", "--section", "tool-sources", "--tool", "usr"],
+        ["list", "--section", "tool-sources", "--related-to", "ops.control-plane.orchestration"],
+        ["show", "ops.control-plane.orchestration"],
+    ],
+)
+def test_builtin_catalog_requests_do_not_import_optional_plugins(monkeypatch, arguments) -> None:
+    def fail_load():
+        raise AssertionError("unrelated plugin was imported")
+
+    entry = SimpleNamespace(name="broken-optional", value="optional_provider.registry:paths", load=fail_load)
+    monkeypatch.setattr(provider_sources, "entry_points", lambda **kwargs: (entry,))
+    result = CliRunner().invoke(app, ["catalog", *arguments, "--repo-root", str(_repo_root()), "--json"])
+    assert result.exit_code == 0, result.output or repr(result.exception)
+    assert json.loads(result.output)
+
+
+def test_full_catalog_identifies_a_failing_optional_plugin(monkeypatch) -> None:
+    def fail_load():
+        raise ModuleNotFoundError("optional dependency unavailable")
+
+    entry = SimpleNamespace(name="broken-optional", value="optional_provider.registry:paths", load=fail_load)
+    monkeypatch.setattr(provider_sources, "entry_points", lambda **kwargs: (entry,))
+    result = CliRunner().invoke(app, ["catalog", "list", "--repo-root", str(_repo_root()), "--json"])
+    assert result.exit_code != 0
+    assert "broken-optional" in result.output
+    assert "optional dependency unavailable" in result.output
+
+
 def test_load_runbook_catalog_reads_shared_registry() -> None:
     catalog = load_runbook_catalog(repo_root=_repo_root())
 

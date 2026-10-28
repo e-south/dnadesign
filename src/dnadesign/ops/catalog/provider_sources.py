@@ -40,13 +40,19 @@ def discover_external_catalog_registry_sources() -> tuple[CatalogRegistrySource,
     seen_paths: set[Path] = set()
     discovered = entry_points(group=_CATALOG_REGISTRY_ENTRY_POINT_GROUP)
     for entry_point in sorted(discovered, key=lambda item: (item.name, item.value)):
-        loader = entry_point.load()
-        if not callable(loader):
-            raise ValueError(f"catalog registry entry point must resolve to a callable: {entry_point.name}")
-        provider_id = _entry_point_provider_id(entry_point=entry_point)
-        package_root = _entry_point_package_root(entry_point=entry_point)
-        owned_files, owned_roots = _entry_point_owned_paths(entry_point=entry_point)
-        raw_paths = loader()
+        try:
+            loader = entry_point.load()
+            if not callable(loader):
+                raise ValueError("catalog registry entry point must resolve to a callable")
+            provider_id = _entry_point_provider_id(entry_point=entry_point)
+            package_root = _entry_point_package_root(entry_point=entry_point)
+            owned_files, owned_roots = _entry_point_owned_paths(entry_point=entry_point)
+            raw_paths = loader()
+        except Exception as exc:
+            raise ValueError(
+                f"catalog registry provider '{entry_point.name}' ({entry_point.value}) failed: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
         if isinstance(raw_paths, (str, Path)):
             raw_paths = (raw_paths,)
         if not isinstance(raw_paths, (list, tuple)):
@@ -70,7 +76,7 @@ def discover_external_catalog_registry_sources() -> tuple[CatalogRegistrySource,
                         f"{entry_point.name}: {owned_path}"
                     )
             if path in seen_paths:
-                raise ValueError(f"catalog registry path registered more than once: {path}")
+                raise ValueError(f"catalog registry path registered more than once: {entry_point.name}: {path}")
             seen_paths.add(path)
             sources.append(CatalogRegistrySource(provider_id=provider_id, path=path, package_root=package_root))
     return tuple(sources)

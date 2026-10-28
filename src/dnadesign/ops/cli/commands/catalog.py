@@ -800,12 +800,18 @@ def catalog_list(
         typer.Option("--json/--no-json", help="Emit machine-readable JSON instead of plain text."),
     ] = False,
 ) -> None:
+    normalized_related_to = normalize_optional_filter(related_to)
     try:
-        catalog = load_runbook_catalog(repo_root=repo_root)
+        catalog = load_runbook_catalog(repo_root=repo_root, include_external=section != "tool-sources")
+        if (
+            section == "tool-sources"
+            and normalized_related_to
+            and catalog.find_procedure(normalized_related_to) is None
+        ):
+            catalog = load_runbook_catalog(repo_root=repo_root)
     except ValueError as exc:
         raise_contract_error(f"Catalog contract error: {exc}")
 
-    normalized_related_to = normalize_optional_filter(related_to)
     if normalized_related_to is not None and catalog.find_procedure(normalized_related_to) is None:
         message = f"Catalog contract error: unknown --related-to registry id: {normalized_related_to}"
         message = append_registry_suggestions(message=message, catalog=catalog, registry_id=normalized_related_to)
@@ -869,7 +875,9 @@ def catalog_show(
     ] = False,
 ) -> None:
     try:
-        catalog = load_runbook_catalog(repo_root=repo_root)
+        catalog = load_runbook_catalog(repo_root=repo_root, include_external=False)
+        if catalog.find_procedure(registry_id) is None:
+            catalog = load_runbook_catalog(repo_root=repo_root)
     except ValueError as exc:
         raise_contract_error(f"Catalog contract error: {exc}")
 
