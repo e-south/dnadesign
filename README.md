@@ -1,4 +1,4 @@
-![dnadesign sequence toolkit](https://raw.githubusercontent.com/e-south/dnadesign/022cfe9ddcfdb531c9500936e7fc81f64ce2bbb7/assets/dnadesign-banner.png)
+![dnadesign sequence toolkit](assets/dnadesign-banner.png)
 
 [![CI](https://github.com/e-south/dnadesign/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/e-south/dnadesign/actions/workflows/ci.yaml)
 [![Codecov](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg)](https://codecov.io/gh/e-south/dnadesign)

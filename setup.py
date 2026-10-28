@@ -22,6 +22,8 @@ def package_link(match):
     if target.startswith(("https://", "http://", "#", "mailto:")):
         return match.group(0)
     path = target.split("#", 1)[0]
+    if Path(path).suffix.lower() in {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}:
+        return f"](https://raw.githubusercontent.com/e-south/dnadesign/v{PROJECT['version']}/{target})"
     kind = "tree" if (ROOT / path).is_dir() else "blob"
     return f"](https://github.com/e-south/dnadesign/{kind}/v{PROJECT['version']}/{target})"
 

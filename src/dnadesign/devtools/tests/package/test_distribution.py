@@ -382,6 +382,9 @@ def test_built_wheel_retains_runtime_resources_without_internal_shelves(tmp_path
 
     assert metadata["Name"] == "dnadesign-tools"
     assert metadata["Description-Content-Type"] == "text/markdown"
+    assert re.findall(r"!\[[^\]]*\]\(([^)]+)\)", metadata.get_payload())[0] == (
+        f"https://raw.githubusercontent.com/e-south/dnadesign/v{metadata['Version']}/assets/dnadesign-banner.png"
+    )
     assert all(target.startswith(("https://", "#")) for target in re.findall(r"\]\(([^)]+)\)", metadata.get_payload()))
     requirements = [Requirement(value) for value in metadata.get_all("Requires-Dist", [])]
     assert {r.name for r in requirements if r.marker is None or r.marker.evaluate({"extra": ""})} == {"numpy"}
@@ -793,7 +796,7 @@ def test_tool_software_versions_follow_the_installed_distribution() -> None:
         assert import_module(module).__version__ == expected
 
 
-def test_source_readme_uses_local_routes_and_durable_package_image() -> None:
+def test_source_readme_uses_local_routes_and_private_repository_image() -> None:
     root = _repo_root()
     project = tomllib.loads((root / "pyproject.toml").read_text())["project"]
     assert "readme" in project["dynamic"]
@@ -804,10 +807,6 @@ def test_source_readme_uses_local_routes_and_durable_package_image() -> None:
     assert all((root / target.split("#", 1)[0]).exists() for target in local_targets)
     images = re.findall(r"!\[[^\]]*\]\(([^)]+)\)", text)
     banner = images[0]
-    prefix = "https://raw.githubusercontent.com/e-south/dnadesign/"
-    assert banner.startswith(prefix)
-    revision, relative = banner.removeprefix(prefix).split("/", 1)
-    assert revision == "v" + project["version"] or re.fullmatch(r"[0-9a-f]{40}", revision)
-    assert relative.endswith(".png")
-    data = (root / relative).read_bytes()
+    assert banner == "assets/dnadesign-banner.png"
+    data = (root / banner).read_bytes()
     assert data.startswith(b"\x89PNG\r\n\x1a\n") and len(data) < 10_000_000
