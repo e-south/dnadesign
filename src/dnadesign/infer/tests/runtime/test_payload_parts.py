@@ -162,6 +162,26 @@ def test_cli_migration_and_compaction_preserve_payload_keys(tmp_path):
     assert aliases.load_feature_vector_rows(dataset_root=ds.root, dataset_id=ds.name, keys=["one"]) == {"one": [1.0]}
 
 
+@pytest.mark.parametrize("command", ["compact", "migrate"])
+@pytest.mark.parametrize("target", ["../neighbor", "absolute", "missing"])
+def test_maintenance_rejects_invalid_destinations_before_any_writes(tmp_path, command, target):
+    from typer.testing import CliRunner
+
+    from dnadesign.infer.src.cli import app
+
+    ds = _dataset(tmp_path / "neighbor")
+    aliases.persist_feature_vector_rows([_row(ds, "one", [1.0])])
+    selected_root = tmp_path / "selected"
+    selected_root.mkdir()
+    dataset_id = str(ds.dir) if target == "absolute" else "../neighbor/demo" if target == "../neighbor" else target
+    before = {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    directories = {p.relative_to(tmp_path) for p in tmp_path.rglob("*") if p.is_dir()}
+    result = CliRunner().invoke(app, ["features", command, "--root", str(selected_root), "--dataset", dataset_id])
+    assert result.exit_code != 0
+    assert {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
+    assert {p.relative_to(tmp_path) for p in tmp_path.rglob("*") if p.is_dir()} == directories
+
+
 def test_scalar_nan_round_trips_without_changing_its_value(tmp_path):
     ds = _dataset(tmp_path)
     aliases.persist_feature_scalar_rows(

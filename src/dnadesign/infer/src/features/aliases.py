@@ -697,6 +697,10 @@ def compact_feature_sidecars(
     dataset_id: str,
     prune_unreferenced: bool = False,
 ) -> dict[str, int]:
+    dataset = Dataset(Path(dataset_root), dataset_id)
+    if not dataset.records_path.is_file():
+        raise ValueError(f"Dataset records do not exist: {dataset.records_path}")
+    dataset_root, dataset_id = dataset.root, dataset.name
     with sidecar_dataset_lock(dataset_root=dataset_root, dataset_id=dataset_id):
         vector_alias_rows = load_feature_alias_rows(dataset_root=dataset_root, dataset_id=dataset_id)
         scalar_alias_rows = load_feature_scalar_alias_rows(dataset_root=dataset_root, dataset_id=dataset_id)
@@ -745,7 +749,7 @@ def compact_feature_sidecars(
     removed_scalars = scalar_result["rows_before"] - scalar_result["rows_after"]
     if vector_result["rows_before"] or scalar_result["rows_before"]:
         dataset_dir = Path(dataset_root) / dataset_id
-        Dataset(Path(dataset_root), dataset_id).log_event(
+        dataset.log_event(
             "infer_feature_sidecars_compact",
             args={
                 "removed_vector_rows": removed_vectors,
