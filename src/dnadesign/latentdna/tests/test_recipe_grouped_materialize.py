@@ -205,7 +205,9 @@ def test_recipe_groups_compatible_infer_sidecar_materializations_after_one_share
         def iter_batches(self, *args, **kwargs):
             nonlocal payload_scans
             columns = list(kwargs.get("columns") or [])
-            if self.path.name == "feature_vectors.parquet" and "value" in columns:
+            if (
+                self.path.name == "feature_vectors.parquet" or self.path.parent.name == "feature_vectors.parts"
+            ) and "value" in columns:
                 payload_scans += 1
             return self.inner.iter_batches(*args, **kwargs)
 

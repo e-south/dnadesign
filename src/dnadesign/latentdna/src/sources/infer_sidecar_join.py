@@ -21,6 +21,13 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
+from dnadesign.contracts.feature_payloads import (
+    iter_payload_batches,
+    payload_exists,
+    payload_files,
+    payload_signature,
+    read_payload_table,
+)
 from dnadesign.usr import sequence_views_path, view_semantics_path
 
 from ..contracts.errors import SourceResolutionError
@@ -87,9 +94,9 @@ def read_alias_table(
 def _payload_key_set_for_path(path_text: str, key_column: str, mtime_ns: int, size: int) -> set[str]:
     del mtime_ns, size
     path = Path(path_text)
-    if not path.is_file():
+    if not payload_exists(path):
         return set()
-    table = pq.read_table(path, columns=[key_column])
+    table = read_payload_table(path, columns=[key_column])
     return {str(value) for value in table.column(key_column).to_pylist() if value is not None}
 
 
@@ -101,10 +108,9 @@ def _payload_key_set(
     workspace_dir: Path,
 ) -> set[str]:
     path = payload_path(contract, root, dataset, workspace_dir=workspace_dir)
-    if not path.is_file():
+    if not payload_exists(path):
         return set()
-    stat = path.stat()
-    return _payload_key_set_for_path(path.as_posix(), contract.payload_key_column, stat.st_mtime_ns, stat.st_size)
+    return _payload_key_set_for_path(path.as_posix(), contract.payload_key_column, *payload_signature(path))
 
 
 def _first_true_index(mask: pa.Array | pa.ChunkedArray) -> int:
@@ -447,9 +453,9 @@ def iter_batches(
         payload_columns.append(contract.payload_value_column)
     if contract.payload_created_at_column in selected:
         payload_columns.append("created_at")
-    if not payload_table_path.is_file():
+    if not payload_exists(payload_table_path):
         return
-    for batch in pq.ParquetFile(payload_table_path).iter_batches(columns=payload_columns, batch_size=batch_size):
+    for batch in iter_payload_batches(payload_table_path, columns=payload_columns, batch_size=batch_size):
         matched_metadata_rows, payload_indices = _match_payload_batch_rows(contract, batch, metadata=metadata)
         if not matched_metadata_rows:
             continue
@@ -556,7 +562,7 @@ def iter_grouped_batches(
         return
 
     payload_table_path = payload_path(contract, root, dataset, workspace_dir=workspace_dir)
-    if not payload_table_path.is_file():
+    if not payload_exists(payload_table_path):
         return
     grouped_selected = [state["selected"] for state in request_state.values()]
     needs_value_column = any(
@@ -570,7 +576,7 @@ def iter_grouped_batches(
         payload_columns.append(contract.payload_value_column)
     if needs_created_at_column:
         payload_columns.append("created_at")
-    for batch in pq.ParquetFile(payload_table_path).iter_batches(columns=payload_columns, batch_size=batch_size):
+    for batch in iter_payload_batches(payload_table_path, columns=payload_columns, batch_size=batch_size):
         grouped_metadata_rows: dict[str, list[dict[str, object]]] = {request_id: [] for request_id in request_state}
         grouped_payload_indices: dict[str, list[int]] = {request_id: [] for request_id in request_state}
         for row_index, key_value in enumerate(_record_batch_column(batch, contract.payload_key_column).to_pylist()):
@@ -653,10 +659,14 @@ def source_provenance(
     ds = infer_sidecar_common.load_dataset(root, dataset, workspace_dir=workspace_dir)
     for path, role in [
         (alias_path(contract, root, dataset, workspace_dir=workspace_dir), contract.alias_role),
-        (payload_path(contract, root, dataset, workspace_dir=workspace_dir), contract.payload_role),
         (sequence_views_path(ds), "sequence_views"),
         (view_semantics_path(ds), "view_semantics"),
     ]:
         if path.is_file():
             entries.append({"kind": "file", "id": role, "path": path.as_posix(), "role": role})
+    for part in payload_files(
+        payload_path(contract, root, dataset, workspace_dir=workspace_dir), include_manifest=True
+    ):
+        source_id = f"{contract.payload_role}:{part.stem}" if part.name.startswith("part-") else contract.payload_role
+        entries.append({"kind": "file", "id": source_id, "path": part.as_posix(), "role": contract.payload_role})
     return entries

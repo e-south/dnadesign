@@ -15,6 +15,7 @@ import typer
 
 from .adapters import register as register_adapters_commands
 from .extract import register as register_extract_command
+from .features import register as register_features_commands
 from .generate import register as register_generate_command
 from .migrate import register as register_migrate_commands
 from .presets import register as register_presets_commands
@@ -27,6 +28,7 @@ from .workspace import register as register_workspace_commands
 def register_all(app: typer.Typer) -> None:
     register_run_command(app)
     register_extract_command(app)
+    register_features_commands(app)
     register_generate_command(app)
     register_prune_command(app)
     register_migrate_commands(app)

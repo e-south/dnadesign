@@ -8,9 +8,10 @@ feature sidecars, and USR writeback work.
 - Treat Infer as a generic model-runtime and feature-extraction tool. Promoter
   studies, anchors, core windows, and context products are request inputs, not
   internal package semantics.
-- Keep sequence-view feature outputs in canonical sidecars under
-  `_derived/infer/`: `feature_aliases.parquet`, `feature_vectors.parquet`,
-  `feature_scalar_aliases.parquet`, and `feature_scalars.parquet`.
+- Keep sequence-view aliases under `_derived/infer/` as `feature_aliases.parquet`
+  and `feature_scalar_aliases.parquet`. Payloads use committed manifests and
+  immutable parts; use `dnadesign.contracts.feature_payloads` to read them.
+  Single-file payloads remain readable but require explicit migration before appends.
 - Partial completion is expected for long GPU jobs. Resume logic must reuse
   complete vector and scalar sidecar rows, identify missing aliases, and fail
   fast on corrupt alias-to-payload references.

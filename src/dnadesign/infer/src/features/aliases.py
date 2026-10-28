@@ -18,14 +18,21 @@ from pathlib import Path
 from typing import Iterable
 
 import pyarrow as pa
-import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
+from dnadesign.contracts.feature_payloads import (
+    SCALAR_SCHEMA,
+    VECTOR_SCHEMA,
+    iter_payload_batches,
+    manifest_path,
+    payload_exists,
+    read_payload_table,
+)
 from dnadesign.usr import Dataset
 
 from .cache_keys import DNA_SEQUENCE_CASE_POLICY, stable_sha256
+from .payload_store import append_payload, compact_payload, migrate_payload, same_numeric_payload
 from .sidecar_io import (
-    atomic_parquet_temp_path,
     read_table_with_schema,
     sidecar_dataset_lock,
     write_table_atomic,
@@ -81,13 +88,7 @@ _FEATURE_ALIAS_SCHEMA = pa.schema(
     ]
 )
 
-_FEATURE_VECTOR_SCHEMA = pa.schema(
-    [
-        pa.field("feature_vector_key", pa.string()),
-        pa.field("value", pa.list_(pa.float64())),
-        pa.field("created_at", pa.string()),
-    ]
-)
+_FEATURE_VECTOR_SCHEMA = VECTOR_SCHEMA
 
 _FEATURE_SCALAR_ALIAS_SCHEMA = pa.schema(
     [
@@ -110,13 +111,8 @@ _FEATURE_SCALAR_ALIAS_SCHEMA = pa.schema(
     ]
 )
 
-_FEATURE_SCALAR_SCHEMA = pa.schema(
-    [
-        pa.field("feature_scalar_key", pa.string()),
-        pa.field("value", pa.float64()),
-        pa.field("created_at", pa.string()),
-    ]
-)
+_FEATURE_SCALAR_SCHEMA = SCALAR_SCHEMA
+
 _VECTOR_BATCH_SIZE = 256
 _SCALAR_BATCH_SIZE = 4096
 _COMPACT_BATCH_SIZE = 4096
@@ -124,6 +120,12 @@ _FEATURE_BUNDLE_PROGRESS_ACTION = "infer_feature_bundle_progress"
 _FEATURE_BUNDLE_COMPLETE_ACTION = "infer_feature_bundle_complete"
 _FEATURE_BUNDLE_SHARD_COMMIT_ACTION = "infer_feature_bundle_shard_commit"
 _RUNTIME_CONTRACT_FIELDS = ("runtime_fingerprint_key", "sequence_case_policy")
+
+
+def _payload_artifact_reference(dataset_dir: Path, relative_path: str) -> str:
+    path = dataset_dir / relative_path
+    current = manifest_path(path) if manifest_path(path).exists() else path
+    return current.relative_to(dataset_dir).as_posix()
 
 
 def _infer_sidecar_actor(*, default_run_id: str) -> dict[str, object]:
@@ -421,6 +423,7 @@ def load_feature_vector_keys(
     dataset_root: str | Path,
     dataset_id: str,
     keys: Iterable[str],
+    lock: bool = True,
 ) -> set[str]:
     """Return persisted feature-vector keys without reading embedding payloads.
 
@@ -433,9 +436,9 @@ def load_feature_vector_keys(
     if not wanted:
         return set()
     path = feature_vector_path(dataset_root=dataset_root, dataset_id=dataset_id)
-    if not path.exists():
+    if not payload_exists(path):
         return set()
-    table = pq.read_table(path, columns=["feature_vector_key"])
+    table = read_payload_table(path, columns=["feature_vector_key"], lock=lock)
     return {str(key) for key in table.column("feature_vector_key").to_pylist() if str(key) in wanted}
 
 
@@ -444,14 +447,15 @@ def load_feature_scalar_keys(
     dataset_root: str | Path,
     dataset_id: str,
     keys: Iterable[str],
+    lock: bool = True,
 ) -> set[str]:
     wanted = {str(key) for key in keys if str(key).strip()}
     if not wanted:
         return set()
     path = feature_scalar_path(dataset_root=dataset_root, dataset_id=dataset_id)
-    if not path.exists():
+    if not payload_exists(path):
         return set()
-    table = pq.read_table(path, columns=["feature_scalar_key"])
+    table = read_payload_table(path, columns=["feature_scalar_key"], lock=lock)
     return {str(key) for key in table.column("feature_scalar_key").to_pylist() if str(key) in wanted}
 
 
@@ -475,15 +479,18 @@ def load_feature_vector_rows(
     dataset_root: str | Path,
     dataset_id: str,
     keys: Iterable[str],
+    lock: bool = True,
 ) -> dict[str, list[float]]:
     wanted = {str(key) for key in keys if str(key).strip()}
     if not wanted:
         return {}
     path = feature_vector_path(dataset_root=dataset_root, dataset_id=dataset_id)
-    if not path.exists():
+    if not payload_exists(path):
         return {}
     out: dict[str, list[float]] = {}
-    for batch in pq.ParquetFile(path).iter_batches(
+    for batch in iter_payload_batches(
+        path,
+        lock=lock,
         columns=["feature_vector_key", "value"],
         batch_size=_VECTOR_BATCH_SIZE,
     ):
@@ -501,15 +508,18 @@ def load_feature_scalar_rows(
     dataset_root: str | Path,
     dataset_id: str,
     keys: Iterable[str],
+    lock: bool = True,
 ) -> dict[str, float]:
     wanted = {str(key) for key in keys if str(key).strip()}
     if not wanted:
         return {}
     path = feature_scalar_path(dataset_root=dataset_root, dataset_id=dataset_id)
-    if not path.exists():
+    if not payload_exists(path):
         return {}
     out: dict[str, float] = {}
-    for batch in pq.ParquetFile(path).iter_batches(
+    for batch in iter_payload_batches(
+        path,
+        lock=lock,
         columns=["feature_scalar_key", "value"],
         batch_size=_SCALAR_BATCH_SIZE,
     ):
@@ -681,10 +691,11 @@ def _prune_alias_table_for_expected_slots(
     return removed
 
 
-def compact_feature_sidecars_to_current_aliases(
+def compact_feature_sidecars(
     *,
     dataset_root: str | Path,
     dataset_id: str,
+    prune_unreferenced: bool = False,
 ) -> dict[str, int]:
     with sidecar_dataset_lock(dataset_root=dataset_root, dataset_id=dataset_id):
         vector_alias_rows = load_feature_alias_rows(dataset_root=dataset_root, dataset_id=dataset_id)
@@ -699,23 +710,40 @@ def compact_feature_sidecars_to_current_aliases(
             for row in scalar_alias_rows
             if _has_current_alias_contract(row) and str(row.get("feature_scalar_key") or "").strip()
         }
-        vector_result = _compact_payload_table_to_keys(
+        if not prune_unreferenced:
+            vector_keys = set(
+                read_payload_table(
+                    feature_vector_path(dataset_root=dataset_root, dataset_id=dataset_id),
+                    columns=["feature_vector_key"],
+                    lock=False,
+                )
+                .column(0)
+                .to_pylist()
+            )
+            scalar_keys = set(
+                read_payload_table(
+                    feature_scalar_path(dataset_root=dataset_root, dataset_id=dataset_id),
+                    columns=["feature_scalar_key"],
+                    lock=False,
+                )
+                .column(0)
+                .to_pylist()
+            )
+        vector_result = compact_payload(
             feature_vector_path(dataset_root=dataset_root, dataset_id=dataset_id),
             schema=_FEATURE_VECTOR_SCHEMA,
-            key_column="feature_vector_key",
             keep_keys=vector_keys,
             batch_size=_COMPACT_BATCH_SIZE,
         )
-        scalar_result = _compact_payload_table_to_keys(
+        scalar_result = compact_payload(
             feature_scalar_path(dataset_root=dataset_root, dataset_id=dataset_id),
             schema=_FEATURE_SCALAR_SCHEMA,
-            key_column="feature_scalar_key",
             keep_keys=scalar_keys,
             batch_size=_COMPACT_BATCH_SIZE,
         )
     removed_vectors = vector_result["rows_before"] - vector_result["rows_after"]
     removed_scalars = scalar_result["rows_before"] - scalar_result["rows_after"]
-    if removed_vectors or removed_scalars:
+    if vector_result["rows_before"] or scalar_result["rows_before"]:
         dataset_dir = Path(dataset_root) / dataset_id
         Dataset(Path(dataset_root), dataset_id).log_event(
             "infer_feature_sidecars_compact",
@@ -734,9 +762,9 @@ def compact_feature_sidecars_to_current_aliases(
             },
             artifacts={
                 "feature_aliases": FEATURE_ALIAS_RELATIVE_PATH,
-                "feature_vectors": FEATURE_VECTOR_RELATIVE_PATH,
+                "feature_vectors": _payload_artifact_reference(dataset_dir, FEATURE_VECTOR_RELATIVE_PATH),
                 "feature_scalar_aliases": FEATURE_SCALAR_ALIAS_RELATIVE_PATH,
-                "feature_scalars": FEATURE_SCALAR_RELATIVE_PATH,
+                "feature_scalars": _payload_artifact_reference(dataset_dir, FEATURE_SCALAR_RELATIVE_PATH),
             },
             target_path=dataset_dir / "records.parquet",
             actor=_infer_sidecar_actor(default_run_id="feature-sidecar-compaction"),
@@ -749,51 +777,28 @@ def compact_feature_sidecars_to_current_aliases(
     }
 
 
-def _compact_payload_table_to_keys(
-    path: Path,
-    *,
-    schema: pa.Schema,
-    key_column: str,
-    keep_keys: set[str],
-    batch_size: int,
-) -> dict[str, int]:
-    if not path.exists():
-        return {"rows_before": 0, "rows_after": 0}
-    parquet_file = pq.ParquetFile(path)
-    rows_before = int(parquet_file.metadata.num_rows) if parquet_file.metadata is not None else 0
-    payload_keys = {
-        str(value)
-        for value in pq.read_table(path, columns=[key_column]).column(key_column).to_pylist()
-        if str(value).strip()
-    }
-    if payload_keys.issubset(keep_keys):
-        return {"rows_before": rows_before, "rows_after": rows_before}
-    keep_values = pa.array(sorted(keep_keys), type=pa.string())
-    temp_path = atomic_parquet_temp_path(path)
-    writer: pq.ParquetWriter | None = None
-    rows_after = 0
-    try:
-        for batch in parquet_file.iter_batches(batch_size=batch_size):
-            table = pa.Table.from_batches([batch]).cast(schema)
-            mask = pc.is_in(table.column(key_column), value_set=keep_values)
-            filtered = table.filter(mask)
-            if filtered.num_rows == 0:
-                continue
-            if writer is None:
-                writer = pq.ParquetWriter(temp_path, schema)
-            writer.write_table(filtered)
-            rows_after += filtered.num_rows
-        if writer is not None:
-            writer.close()
-            writer = None
-        else:
-            pq.write_table(_empty_table(schema), temp_path)
-        os.replace(temp_path, path)
-    finally:
-        if writer is not None:
-            writer.close()
-        temp_path.unlink(missing_ok=True)
-    return {"rows_before": rows_before, "rows_after": rows_after}
+def migrate_feature_payloads(*, dataset_root: str | Path, dataset_id: str) -> dict[str, dict[str, int]]:
+    dataset = Dataset(Path(dataset_root), dataset_id)
+    if not dataset.records_path.is_file():
+        raise ValueError(f"Dataset records do not exist: {dataset.records_path}")
+    results = {}
+    with sidecar_dataset_lock(dataset_root=dataset_root, dataset_id=dataset_id):
+        for kind, path_for, schema in (
+            ("vectors", feature_vector_path, _FEATURE_VECTOR_SCHEMA),
+            ("scalars", feature_scalar_path, _FEATURE_SCALAR_SCHEMA),
+        ):
+            path = path_for(dataset_root=dataset_root, dataset_id=dataset_id)
+            result = migrate_payload(path, schema=schema)
+            results[kind] = result
+            if result["migrated_files"]:
+                dataset.log_event(
+                    "infer_feature_payload_migrate",
+                    args={"kind": kind, **result},
+                    artifacts={"manifest": manifest_path(path).relative_to(dataset.dir).as_posix()},
+                    target_path=dataset.records_path,
+                    actor=_infer_sidecar_actor(default_run_id="feature-payload-migration"),
+                )
+    return results
 
 
 def _empty_table(schema: pa.Schema) -> pa.Table:
@@ -824,7 +829,7 @@ def persist_feature_vector_rows(rows: Iterable[dict[str, object]]) -> int:
                 }
                 current = incoming_by_key.get(key)
                 if current is not None:
-                    if current["value"] != value:
+                    if not same_numeric_payload(current["value"], value):
                         raise ValueError(f"Feature vector collision within incoming payload for '{key}'.")
                     continue
                 incoming_by_key[key] = payload
@@ -832,12 +837,14 @@ def persist_feature_vector_rows(rows: Iterable[dict[str, object]]) -> int:
                 dataset_root=dataset_root,
                 dataset_id=dataset_id,
                 keys=incoming_by_key,
+                lock=False,
             )
             existing_matches = (
                 load_feature_vector_rows(
                     dataset_root=dataset_root,
                     dataset_id=dataset_id,
                     keys=existing_keys,
+                    lock=False,
                 )
                 if existing_keys
                 else {}
@@ -847,21 +854,21 @@ def persist_feature_vector_rows(rows: Iterable[dict[str, object]]) -> int:
                 sample = ", ".join(missing[:3])
                 raise ValueError(f"Feature vector payload missing for existing key(s): {sample}")
             for key, existing_value in existing_matches.items():
-                if existing_value != incoming_by_key[key]["value"]:
+                if not same_numeric_payload(existing_value, incoming_by_key[key]["value"]):
                     raise ValueError(f"Feature vector collision with different payload for '{key}'.")
             append_rows = [row for key, row in incoming_by_key.items() if key not in existing_keys]
             group_written = len(append_rows)
             if group_written:
-                _append_feature_vector_rows(path, append_rows)
+                part_path = _append_feature_vector_rows(path, append_rows)
                 total_written += group_written
-        if group_written:
-            Dataset(Path(dataset_root), dataset_id).log_event(
-                "infer_feature_vectors_write",
-                args={"rows_written": group_written},
-                artifacts={"path": path.relative_to(Path(dataset_root) / dataset_id).as_posix()},
-                target_path=path,
-                actor=_infer_sidecar_actor(default_run_id="feature-vector-persistence"),
-            )
+            if group_written:
+                Dataset(Path(dataset_root), dataset_id).log_event(
+                    "infer_feature_vectors_write",
+                    args={"rows_written": group_written},
+                    artifacts={"path": manifest_path(path).relative_to(Path(dataset_root) / dataset_id).as_posix()},
+                    target_path=part_path,
+                    actor=_infer_sidecar_actor(default_run_id="feature-vector-persistence"),
+                )
     return total_written
 
 
@@ -888,7 +895,7 @@ def persist_feature_scalar_rows(rows: Iterable[dict[str, object]]) -> int:
                 }
                 current = incoming_by_key.get(key)
                 if current is not None:
-                    if float(current["value"]) != payload["value"]:
+                    if not same_numeric_payload(float(current["value"]), payload["value"]):
                         raise ValueError(f"Feature scalar collision within incoming payload for '{key}'.")
                     continue
                 incoming_by_key[key] = payload
@@ -896,12 +903,14 @@ def persist_feature_scalar_rows(rows: Iterable[dict[str, object]]) -> int:
                 dataset_root=dataset_root,
                 dataset_id=dataset_id,
                 keys=incoming_by_key,
+                lock=False,
             )
             existing_matches = (
                 load_feature_scalar_rows(
                     dataset_root=dataset_root,
                     dataset_id=dataset_id,
                     keys=existing_keys,
+                    lock=False,
                 )
                 if existing_keys
                 else {}
@@ -911,21 +920,21 @@ def persist_feature_scalar_rows(rows: Iterable[dict[str, object]]) -> int:
                 sample = ", ".join(missing[:3])
                 raise ValueError(f"Feature scalar payload missing for existing key(s): {sample}")
             for key, existing_value in existing_matches.items():
-                if existing_value != float(incoming_by_key[key]["value"]):
+                if not same_numeric_payload(existing_value, float(incoming_by_key[key]["value"])):
                     raise ValueError(f"Feature scalar collision with different value for '{key}'.")
             append_rows = [row for key, row in incoming_by_key.items() if key not in existing_keys]
             group_written = len(append_rows)
             if group_written:
-                _append_feature_scalar_rows(path, append_rows)
+                part_path = _append_feature_scalar_rows(path, append_rows)
                 total_written += group_written
-        if group_written:
-            Dataset(Path(dataset_root), dataset_id).log_event(
-                "infer_feature_scalars_write",
-                args={"rows_written": group_written},
-                artifacts={"path": path.relative_to(Path(dataset_root) / dataset_id).as_posix()},
-                target_path=path,
-                actor=_infer_sidecar_actor(default_run_id="feature-scalar-persistence"),
-            )
+            if group_written:
+                Dataset(Path(dataset_root), dataset_id).log_event(
+                    "infer_feature_scalars_write",
+                    args={"rows_written": group_written},
+                    artifacts={"path": manifest_path(path).relative_to(Path(dataset_root) / dataset_id).as_posix()},
+                    target_path=part_path,
+                    actor=_infer_sidecar_actor(default_run_id="feature-scalar-persistence"),
+                )
     return total_written
 
 
@@ -967,9 +976,9 @@ def record_feature_bundle_complete(
         metrics=metrics,
         artifacts={
             "feature_aliases": FEATURE_ALIAS_RELATIVE_PATH,
-            "feature_vectors": FEATURE_VECTOR_RELATIVE_PATH,
+            "feature_vectors": _payload_artifact_reference(dataset_dir, FEATURE_VECTOR_RELATIVE_PATH),
             "feature_scalar_aliases": FEATURE_SCALAR_ALIAS_RELATIVE_PATH,
-            "feature_scalars": FEATURE_SCALAR_RELATIVE_PATH,
+            "feature_scalars": _payload_artifact_reference(dataset_dir, FEATURE_SCALAR_RELATIVE_PATH),
         },
         target_path=dataset_dir / "records.parquet",
         actor=_infer_sidecar_actor(default_run_id=f"infer-{job_id}"),
@@ -1025,9 +1034,9 @@ def record_feature_bundle_progress(
         metrics=metrics,
         artifacts={
             "feature_aliases": FEATURE_ALIAS_RELATIVE_PATH,
-            "feature_vectors": FEATURE_VECTOR_RELATIVE_PATH,
+            "feature_vectors": _payload_artifact_reference(dataset_dir, FEATURE_VECTOR_RELATIVE_PATH),
             "feature_scalar_aliases": FEATURE_SCALAR_ALIAS_RELATIVE_PATH,
-            "feature_scalars": FEATURE_SCALAR_RELATIVE_PATH,
+            "feature_scalars": _payload_artifact_reference(dataset_dir, FEATURE_SCALAR_RELATIVE_PATH),
         },
         target_path=dataset_dir / "records.parquet",
         actor=_infer_sidecar_actor(default_run_id=f"infer-{job_id}"),
@@ -1080,9 +1089,9 @@ def record_feature_bundle_shard_commit(
         metrics=metrics,
         artifacts={
             "feature_aliases": FEATURE_ALIAS_RELATIVE_PATH,
-            "feature_vectors": FEATURE_VECTOR_RELATIVE_PATH,
+            "feature_vectors": _payload_artifact_reference(dataset_dir, FEATURE_VECTOR_RELATIVE_PATH),
             "feature_scalar_aliases": FEATURE_SCALAR_ALIAS_RELATIVE_PATH,
-            "feature_scalars": FEATURE_SCALAR_RELATIVE_PATH,
+            "feature_scalars": _payload_artifact_reference(dataset_dir, FEATURE_SCALAR_RELATIVE_PATH),
             "ledger": str(ledger_relative_path),
         },
         target_path=dataset_dir / "records.parquet",
@@ -1097,45 +1106,9 @@ def _table_from_rows(rows: list[dict[str, object]], *, schema: pa.Schema) -> pa.
     )
 
 
-def _replace_with_appended_rows(
-    path: Path,
-    *,
-    schema: pa.Schema,
-    append_rows: list[dict[str, object]],
-    batch_size: int,
-) -> None:
-    if not path.exists():
-        write_table_atomic(_table_from_rows(append_rows, schema=schema), path)
-        return
-
-    tmp_path = atomic_parquet_temp_path(path)
-    try:
-        if tmp_path.exists():
-            tmp_path.unlink()
-        with pq.ParquetWriter(tmp_path, schema=schema) as writer:
-            parquet_file = pq.ParquetFile(path)
-            for batch in parquet_file.iter_batches(batch_size=batch_size):
-                writer.write_table(pa.Table.from_batches([batch], schema=schema))
-            writer.write_table(_table_from_rows(append_rows, schema=schema))
-        os.replace(tmp_path, path)
-    finally:
-        if tmp_path.exists():
-            tmp_path.unlink()
+def _append_feature_vector_rows(path: Path, rows: list[dict[str, object]]) -> Path:
+    return append_payload(path, _table_from_rows(rows, schema=_FEATURE_VECTOR_SCHEMA))
 
 
-def _append_feature_vector_rows(path: Path, rows: list[dict[str, object]]) -> None:
-    _replace_with_appended_rows(
-        path,
-        schema=_FEATURE_VECTOR_SCHEMA,
-        append_rows=rows,
-        batch_size=_VECTOR_BATCH_SIZE,
-    )
-
-
-def _append_feature_scalar_rows(path: Path, rows: list[dict[str, object]]) -> None:
-    _replace_with_appended_rows(
-        path,
-        schema=_FEATURE_SCALAR_SCHEMA,
-        append_rows=rows,
-        batch_size=_SCALAR_BATCH_SIZE,
-    )
+def _append_feature_scalar_rows(path: Path, rows: list[dict[str, object]]) -> Path:
+    return append_payload(path, _table_from_rows(rows, schema=_FEATURE_SCALAR_SCHEMA))

@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import fcntl
 import os
 from contextlib import contextmanager
 from pathlib import Path
@@ -20,19 +19,16 @@ from typing import Iterator
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from dnadesign.contracts.feature_payloads import payload_lock
+
 SIDECAR_LOCK_RELATIVE_PATH = "_derived/infer/.sidecar.lock"
 
 
 @contextmanager
 def sidecar_dataset_lock(*, dataset_root: str | Path, dataset_id: str) -> Iterator[None]:
     lock_path = Path(dataset_root) / dataset_id / SIDECAR_LOCK_RELATIVE_PATH
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with lock_path.open("a+", encoding="utf-8") as lock_file:
-        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+    with payload_lock(lock_path, exclusive=True):
+        yield
 
 
 def atomic_parquet_temp_path(path: Path) -> Path:

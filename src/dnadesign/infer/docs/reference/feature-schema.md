@@ -1,7 +1,7 @@
 ## Evo2 Sequence-View Feature Schema
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-28
+**Last verified:** 2026-10-28
 
 Use this page when you need the stable bundle contract for Evo2 feature extraction from explicit sequence views.
 The repository supports two sibling surfaces:
@@ -103,11 +103,12 @@ Sequence-view rules:
   `forward_pass_key`, but it still receives a distinct feature-vector key when
   its pooling semantics differ.
 - view-aware bundles persist feature aliases under `_derived/infer/feature_aliases.parquet`
-- view-aware bundles persist reusable feature vectors under `_derived/infer/feature_vectors.parquet`
+- vector payloads are immutable Parquet parts in `_derived/infer/feature_vectors.parts/`,
+  selected by `feature_vectors.manifest.json` in the same directory as the aliases
 - view-aware bundles persist log-likelihood scalar aliases under
   `_derived/infer/feature_scalar_aliases.parquet`
-- view-aware bundles persist reusable log-likelihood scalar values under
-  `_derived/infer/feature_scalars.parquet`
+- scalar payloads use `_derived/infer/feature_scalars.parts/` and
+  `_derived/infer/feature_scalars.manifest.json`
 - `infer` consumes sequence views; it does not manufacture missing
   `analysis_window` or `realized_context` rows
 - missing required product kinds are a Construct/USR completion problem; the
@@ -128,6 +129,33 @@ Sequence-view rules:
   are absent or existing vector/scalar sidecars are stale. Do not set
   `--max-missing-vectors 0` or `--max-missing-scalars 0` for a lane whose
   purpose is to generate missing features.
+### Payload storage and maintenance
+
+Each shard publishes its new payload parts through an atomic manifest update.
+Readers use only listed parts; files left by an interrupted commit are invisible.
+The shared `dnadesign.contracts.feature_payloads` reader supports both committed
+parts and single-file Parquet payloads. It coordinates with writers through the
+local `.sidecar.lock`; this lock is not data and can be recreated after transfer.
+Keys, values and alias schemas are unchanged by the storage layout.
+
+Before appending to single-file payloads, explicitly migrate them:
+
+```bash
+uv run infer features migrate --root /path/to/datasets --dataset demo
+```
+
+Migration verifies the copied bytes and schema before publishing a manifest and
+removing the single-file copy. Routine commits do not rewrite prior payloads.
+To combine parts and remove uncommitted orphan parts, run:
+
+```bash
+uv run infer features compact --root /path/to/datasets --dataset demo
+```
+
+Compaction retains all committed keys by default. Add `--prune-unreferenced` only
+to remove payloads without current aliases. Neither operation runs automatically
+at job completion. Both require the dataset to be writable.
+
 ### Default output ids
 
 - `log_likelihood__total`

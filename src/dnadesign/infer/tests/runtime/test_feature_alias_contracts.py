@@ -17,9 +17,10 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+from dnadesign.contracts.feature_payloads import read_payload_table
 from dnadesign.infer.src.features import aliases as alias_module
 from dnadesign.infer.src.features.aliases import (
-    compact_feature_sidecars_to_current_aliases,
+    compact_feature_sidecars,
     feature_alias_path,
     feature_vector_path,
     persist_feature_alias_rows,
@@ -165,9 +166,9 @@ def test_sidecar_compaction_prunes_unreferenced_payload_rows(tmp_path: Path) -> 
         ]
     )
 
-    result = compact_feature_sidecars_to_current_aliases(dataset_root=root, dataset_id=ds.name)
+    result = compact_feature_sidecars(dataset_root=root, dataset_id=ds.name, prune_unreferenced=True)
 
-    rows = pq.read_table(feature_vector_path(dataset_root=root, dataset_id=ds.name)).to_pylist()
+    rows = read_payload_table(feature_vector_path(dataset_root=root, dataset_id=ds.name)).to_pylist()
     assert result["removed_vector_rows"] == 1
     assert [row["feature_vector_key"] for row in rows] == ["fv_current"]
 
@@ -209,10 +210,10 @@ def test_alias_prune_removes_same_slot_superseded_runtime_before_payload_compact
         current_vector_alias_rows=[current],
         current_scalar_alias_rows=[],
     )
-    compact_result = compact_feature_sidecars_to_current_aliases(dataset_root=root, dataset_id=ds.name)
+    compact_result = compact_feature_sidecars(dataset_root=root, dataset_id=ds.name, prune_unreferenced=True)
 
     alias_rows = pq.read_table(feature_alias_path(dataset_root=root, dataset_id=ds.name)).to_pylist()
-    vector_rows = pq.read_table(feature_vector_path(dataset_root=root, dataset_id=ds.name)).to_pylist()
+    vector_rows = read_payload_table(feature_vector_path(dataset_root=root, dataset_id=ds.name)).to_pylist()
     assert prune_result["removed_vector_alias_rows"] == 1
     assert compact_result["removed_vector_rows"] == 1
     assert [row["alias_id"] for row in alias_rows] == ["alias_current"]

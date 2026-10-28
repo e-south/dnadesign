@@ -26,10 +26,11 @@ from ..contracts import infer_usr_column_name
 from ..errors import CapabilityError, RuntimeOOMError
 from ..runtime.resume_planner import read_usr_columns
 from .aliases import (
-    compact_feature_sidecars_to_current_aliases,
     compute_feature_alias_id,
     compute_feature_scalar_alias_id,
     compute_feature_scalar_key,
+    feature_scalar_path,
+    feature_vector_path,
     load_feature_scalar_keys,
     load_feature_scalar_rows,
     load_feature_vector_keys,
@@ -52,6 +53,7 @@ from .cache_keys import (
 )
 from .context import resolve_sequence_contexts
 from .contracts import SequenceContextRecord, SequenceFeatureBundleConfig
+from .payload_store import require_parts_for_write
 from .selectors import canonical_selector_for_block, resolve_intermediate_selector
 from .sequence_views import bundle_uses_sequence_views, resolve_sequence_view_contexts
 from .shard_ledger import (
@@ -1427,14 +1429,6 @@ def _persist_sequence_view_feature_sidecars(
         scalar_specs=selected_scalar_specs,
     )
     if record_complete:
-        for dataset_root, dataset_id in sorted(
-            {
-                (str(context.source_dataset_root), str(context.source_dataset_id))
-                for context in contexts
-                if context.source_dataset_root is not None and context.source_dataset_id is not None
-            }
-        ):
-            compact_feature_sidecars_to_current_aliases(dataset_root=dataset_root, dataset_id=dataset_id)
         _record_sequence_view_feature_bundle_complete(
             contexts=contexts,
             metadata_rows=metadata_rows,
@@ -1796,6 +1790,16 @@ def _execute_sequence_view_feature_bundle(
             run_elapsed_seconds=time.monotonic() - run_started_monotonic,
         )
         return {**all_vals, **metadata_columnar}, metadata_rows
+
+    pending_paths = set()
+    for specs, path_for in ((vector_specs, feature_vector_path), (scalar_specs, feature_scalar_path)):
+        if specs is vector_specs and not bundle.deduplicate.by_feature_vector_key:
+            continue
+        for spec in specs:
+            if all_vals[str(spec["out_id"])][int(spec["row_index"])] is None:
+                pending_paths.add(path_for(dataset_root=str(spec["dataset_root"]), dataset_id=str(spec["dataset_id"])))
+    for path in sorted(pending_paths):
+        require_parts_for_write(path)
 
     adapter = _resolve_feature_bundle_adapter(adapter, adapter_factory)
     stable_eval_batch_size = None

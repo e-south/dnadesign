@@ -1,7 +1,7 @@
 # Contract Exports
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-27
+**Last verified:** 2026-10-28
 
 `contracts` publishes shared cross-tool artifact schemas for `dnadesign`.
 
@@ -38,6 +38,11 @@ Generic sequence and folding contracts:
   sequence bytes or provider-internal candidate ids
 
 External storage contract:
+
+- `dnadesign.contracts.feature_payloads`: the `dnadesign.infer-feature-parts/v1`
+  inventory and reader shared by Infer and LatentDNA. Manifests select immutable
+  Parquet parts; readers also support single-file payloads. Infer owns writes,
+  migration and compaction.
 
 - `dnadesign.contracts.storage_objects`: strict
   `dnadesign.storage-object/v1` parsing, deterministic inventory, and exact

@@ -20,6 +20,8 @@ from typing import Literal
 import numpy as np
 import pyarrow as pa
 
+from dnadesign.contracts.feature_payloads import payload_signature
+
 from ..contracts.errors import ContractViolationError, MemoryPreflightError, MissingArtifactError
 from ..contracts.workspace import (
     InferFeatureSidecarSourceConfig,
@@ -591,7 +593,6 @@ def _source_vector_dims(resolved, *, vector_column: str) -> int:
             resolved.source.dataset,
             workspace_dir=resolved.workspace_dir,
         )
-        stat = payload_path.stat() if payload_path.is_file() else None
         where = resolved.source.where or {}
         dimension_where = tuple(
             sorted(
@@ -606,8 +607,7 @@ def _source_vector_dims(resolved, *, vector_column: str) -> int:
             resolved.source.dataset,
             vector_column,
             dimension_where,
-            0 if stat is None else stat.st_mtime_ns,
-            0 if stat is None else stat.st_size,
+            *payload_signature(payload_path),
         )
     for batch in iter_records_batches(resolved, columns=[vector_column], batch_size=1):
         column = batch.column(vector_column)

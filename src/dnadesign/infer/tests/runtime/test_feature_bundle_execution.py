@@ -19,6 +19,7 @@ import torch
 from Bio.Seq import Seq
 from pyarrow import parquet as pq
 
+from dnadesign.contracts.feature_payloads import payload_exists, read_payload_table
 from dnadesign.infer import export_evo2_sequence_opal_matrix
 from dnadesign.infer.src.config import JobConfig, ModelConfig
 from dnadesign.infer.src.contracts import infer_usr_column_name
@@ -1156,9 +1157,11 @@ def test_run_extract_job_feature_bundle_sequence_views_emit_sparse_progress_even
     assert complete_events[-1]["args"]["contexts_completed"] == 2
 
 
+@pytest.mark.parametrize("interrupt_commit", [False, True])
 def test_run_extract_job_feature_bundle_sequence_views_commits_checkpoint_shards_during_execution(
     monkeypatch,
     tmp_path,
+    interrupt_commit,
 ) -> None:
     usr_root = tmp_path / "usr_root"
     ensure_sequence_contract_namespaces(usr_root)
@@ -1208,7 +1211,38 @@ def test_run_extract_job_feature_bundle_sequence_views_commits_checkpoint_shards
         io={"checkpoint": {"enabled": True, "every_n": 1}},
     )
 
+    if interrupt_commit:
+        from dnadesign.infer.src.features import payload_store
+
+        original = payload_store._write_manifest
+        commits = 0
+
+        def fail_second_vector_commit(path, document):
+            nonlocal commits
+            if path.stem == "feature_vectors":
+                commits += 1
+                if commits == 2:
+                    raise OSError("injected interrupted feature commit")
+            return original(path, document)
+
+        monkeypatch.setattr(payload_store, "_write_manifest", fail_second_vector_commit)
+        with pytest.raises(OSError, match="injected interrupted"):
+            run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+        monkeypatch.setattr(payload_store, "_write_manifest", original)
+
     run_extract_job(inputs=None, model=model, job=job, progress_factory=None)
+
+    from dnadesign.latentdna.src.sources import infer_feature_sidecar_source
+
+    table = infer_feature_sidecar_source.read_table(
+        str(usr_root),
+        dataset.name,
+        workspace_dir=tmp_path,
+        where={"representation_kind": "intermediate_embedding"},
+        columns=["sequence_id", "value"],
+    )
+    assert set(table.column("sequence_id").to_pylist()) == set(add_result.ids)
+    assert table.column("value").to_pylist() == [[88.5, 89.5, 90.5]] * 3
 
     events = [json.loads(line) for line in dataset.events_path.read_text(encoding="utf-8").splitlines()]
     actions = [event["action"] for event in events]
@@ -1222,15 +1256,16 @@ def test_run_extract_job_feature_bundle_sequence_views_commits_checkpoint_shards
     assert {event["args"]["committed_scalar_keys"] for event in shard_commit_events} == {2}
 
     ledger = load_shard_ledger(dataset.dir / "_derived/infer/checkpoints/reference_view_bundle/ledger.json")
-    assert ledger.shard_count == 3
+    expected_shards = 2 if interrupt_commit else 3
+    assert ledger.shard_count == expected_shards
     assert {entry.status for entry in ledger.shards} == {SHARD_STATUS_COMMITTED}
-    assert [entry.committed_views for entry in ledger.shards] == [1, 1, 1]
-    assert [entry.expected_vector_keys for entry in ledger.shards] == [2, 2, 2]
-    assert [entry.expected_scalar_keys for entry in ledger.shards] == [2, 2, 2]
-    assert [entry.committed_vector_keys for entry in ledger.shards] == [2, 2, 2]
-    assert [entry.committed_scalar_keys for entry in ledger.shards] == [2, 2, 2]
-    assert (dataset.dir / FEATURE_VECTOR_RELATIVE_PATH).exists()
-    assert (dataset.dir / FEATURE_SCALAR_RELATIVE_PATH).exists()
+    assert [entry.committed_views for entry in ledger.shards] == [1] * expected_shards
+    assert [entry.expected_vector_keys for entry in ledger.shards] == [2] * expected_shards
+    assert [entry.expected_scalar_keys for entry in ledger.shards] == [2] * expected_shards
+    assert [entry.committed_vector_keys for entry in ledger.shards] == [2] * expected_shards
+    assert [entry.committed_scalar_keys for entry in ledger.shards] == [2] * expected_shards
+    assert payload_exists(dataset.dir / FEATURE_VECTOR_RELATIVE_PATH)
+    assert payload_exists(dataset.dir / FEATURE_SCALAR_RELATIVE_PATH)
 
 
 def test_run_extract_job_feature_bundle_sequence_view_resume_skips_completed_vector_families(
@@ -1307,7 +1342,7 @@ def test_run_extract_job_feature_bundle_sequence_view_resume_skips_completed_vec
     assert resume_adapter.logits_call_count == 0
     assert resume_adapter.embedding_call_count == 0
     assert (dataset.dir / FEATURE_SCALAR_ALIAS_RELATIVE_PATH).exists()
-    assert (dataset.dir / FEATURE_SCALAR_RELATIVE_PATH).exists()
+    assert payload_exists(dataset.dir / FEATURE_SCALAR_RELATIVE_PATH)
 
 
 def test_run_extract_job_feature_bundle_sequence_view_deduplicate_flags_control_execution_grouping(
@@ -1504,7 +1539,7 @@ def test_run_extract_job_sequence_view_anchor_mean_uses_full_context_and_emitted
     _assert_list_close(out["intermediate_embedding__block26_mlp_out__anchor_mean"][1], [16.5, 17.5, 18.5])
 
     scalar_alias_table = pq.read_table(dataset.dir / FEATURE_SCALAR_ALIAS_RELATIVE_PATH).to_pylist()
-    scalar_table = pq.read_table(dataset.dir / FEATURE_SCALAR_RELATIVE_PATH).to_pylist()
+    scalar_table = read_payload_table(dataset.dir / FEATURE_SCALAR_RELATIVE_PATH).to_pylist()
     assert len(scalar_alias_table) == 4
     assert len(scalar_table) == 4
     assert {row["scalar_kind"] for row in scalar_alias_table} == {

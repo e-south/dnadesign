@@ -1,10 +1,10 @@
 # Workspace Schema
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-27
+**Last verified:** 2026-10-28
 
-`latentdna.workspace.v1` is the workspace contract for the current tracer-bullet implementation.
-Flattened artifact namespaces now live directly under `outputs/`, including
+`latentdna.workspace.v1` defines LatentDNA workspaces.
+Artifacts are stored under `outputs/`, including
 `outputs/plots`, `outputs/notebooks`, `outputs/exports`, and `outputs/runs`.
 LatentDNA core contracts are sequence-family agnostic: promoter labels,
 RegulonDB annotations, stress-study design axes, or any future biological
@@ -243,7 +243,7 @@ Current runtime limits:
   declared explicitly.
 - `infer_feature_sidecar` sources expose canonical Infer outputs from
   `<usr-dataset>/_derived/infer/feature_aliases.parquet` joined to
-  `feature_vectors.parquet`, `_views/sequence_views.parquet`, mutable
+  the parts listed in `feature_vectors.manifest.json`, `_views/sequence_views.parquet`, mutable
   `_views/view_semantics.parquet`, and the owning USR dataset rows. These
   sources make `value` the vector column and keep sequence-view fields such as
   `view_id`, `product_kind`, `orientation`, `recommended_pooling`,
@@ -254,9 +254,11 @@ Current runtime limits:
   When multiple alias rows point at the same `feature_vector_key`, LatentDNA
   preserves one row per alias/view and reuses the shared vector payload so row
   metadata such as parent sequence ids cannot be collapsed by feature key.
+  Single-file `feature_vectors.parquet` payloads are also readable. Committed
+  manifests select the active parts; unlisted files are excluded from reads.
 - `infer_feature_scalar_sidecar` sources expose canonical Infer scalar outputs
   from `<usr-dataset>/_derived/infer/feature_scalar_aliases.parquet` joined to
-  `feature_scalars.parquet`, `_views/sequence_views.parquet`, mutable
+  the parts listed in `feature_scalars.manifest.json`, `_views/sequence_views.parquet`, mutable
   `_views/view_semantics.parquet`, and the owning USR dataset rows. These
   sources make `value` the scalar column for diagnostics such as
   `log_likelihood__total` and `log_likelihood__mean_per_token`. Missing scalar
