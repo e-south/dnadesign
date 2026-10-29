@@ -1,7 +1,11 @@
-# RegulonDB Functional Annotation Sidecars
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
+
+[SeqLedger guide](../README.md)
+
+# RegulonDB Functional Annotation Sidecars
 
 This contract projects BioCyc SmartTable regulator GO terms onto the existing
 `usr_regulondb_native_promoters` regulatory-interaction sidecar. It is an

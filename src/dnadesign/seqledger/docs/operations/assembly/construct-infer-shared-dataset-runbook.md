@@ -1,5 +1,4 @@
-## Construct -> SeqLedger -> Infer Shared Dataset Runbook
-
+<!--
 **Type:** runbook
 **Plane:** data-plane
 **Owner-boundary:** seqledger
@@ -9,9 +8,13 @@
 **Summary:** Realize construct outputs into one shared SeqLedger dataset and use that dataset as the durable Infer handoff.
 **Execution-kind:** staged
 **Status-kind:** seqledger-dataset-state
-
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
+
+[SeqLedger guide](../../README.md)
+
+## Construct -> SeqLedger -> Infer Shared Dataset Runbook
 
 Use this runbook when construct should write one shared SeqLedger dataset and infer plus Notify should read that same dataset next.
 
@@ -52,7 +55,7 @@ uses the resulting dataset as a cross-tool source of truth.
 ### 1) Bootstrap a construct workspace and seed demo inputs
 
 ```bash
-# Create a disposable root for this tracer-bullet workflow.
+# Create a disposable root for this local example.
 export WORK_ROOT="$(mktemp -d /tmp/construct-usr-infer-XXXXXX)"
 # Pin the repo checkout so later file copies do not depend on the current shell directory.
 export DNADESIGN_REPO_ROOT="$(git rev-parse --show-toplevel)"
@@ -60,7 +63,7 @@ export DNADESIGN_REPO_ROOT="$(git rev-parse --show-toplevel)"
 uv run construct workspace init --id shared_dataset_demo --root "$WORK_ROOT" --profile anchor-template-shared-dataset-demo
 # Reuse one workspace path across the remaining commands.
 export WORKSPACE_ROOT="$WORK_ROOT/shared_dataset_demo"
-# Seed packaged anchor and template records into the local tracer-bullet SeqLedger root.
+# Seed packaged anchor and template records into the local example SeqLedger root.
 uv run construct seed anchor-template-demo \
   --root "$WORKSPACE_ROOT/outputs/usr_datasets" \
   --manifest "$WORKSPACE_ROOT/inputs/seed_manifest.yaml"
@@ -87,7 +90,7 @@ uv run construct workspace run-project --workspace "$WORKSPACE_ROOT" --project s
 ### 3) Verify the construct-backed shared dataset
 
 ```bash
-# Reuse the local tracer-bullet SeqLedger root and one semantic dataset id.
+# Reuse the local example SeqLedger root and one semantic dataset id.
 export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets"
 # Reuse the packaged construct output dataset id across verification and downstream tools.
 export DATASET_ID="anchor_template_shared_dataset_demo"

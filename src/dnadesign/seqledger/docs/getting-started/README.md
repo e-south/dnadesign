@@ -1,17 +1,12 @@
-# SeqLedger getting started
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
+[SeqLedger guide](../README.md)
 
-Use this section when you need a first runnable path before moving to full operations runbooks.
+# Getting started
 
-## Entry points
+[Create your first dataset](cli-quickstart.md) walks through a local import, annotation and export. It introduces the registry and overlay concepts using three short sequences.
 
-- [CLI quickstart](cli-quickstart.md): initialize, import, attach, materialize, inspect, export.
-- [Interactive notebook](notebook.md): local exploration with marimo.
-
-## Next steps
-
-- For iterative HPC and remote sync loops: [../operations/README.md](../operations/README.md)
-- For schema, overlay, registry, and API details: [../reference/README.md](../reference/README.md)
+For scripts, use the [Python API example](../reference/python-api.md). For interactive inspection, open the [dataset notebook](notebook.md).

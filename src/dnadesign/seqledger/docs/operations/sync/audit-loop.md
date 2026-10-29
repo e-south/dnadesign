@@ -1,16 +1,19 @@
-# SeqLedger Sync Audit Loop
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
+[SeqLedger guide](../../README.md)
 
-Use this runbook when you need machine-readable transfer decisions during iterative sync between HPC and local clones.
+# Read sync audit output
+
+Use `--audit-json-out` to capture comparison and transfer results for scripts or run records. Configure the local root and remote profile using the [sync setup](setup.md) first. These examples assume an activated SeqLedger environment; `jq` is used only to inspect JSON.
 
 ## Goal
 
 - Keep pull/push decisions low friction while preserving strict dataset fidelity.
 - Emit JSON artifacts that can be consumed by scripts, notebooks, and chained tool flows.
-- Use the same command loop for either endpoint (run on the machine where you want files to land).
+- Choose `pull` for remote-to-local transfer or `push` for local-to-remote transfer.
 
 ## Contract
 
@@ -24,25 +27,23 @@ Use this runbook when you need machine-readable transfer decisions during iterat
 # Set dataset id used by pull/push calls.
 DATASET_ID="my_dataset"
 # Set configured remote profile name.
-REMOTE="bu-scc"
+REMOTE="cluster"
 # Set local directory for audit JSON artifacts.
 AUDIT_DIR="${PWD}/.seqledger-sync-audit"
 # Create directory for audit JSON outputs.
 mkdir -p "$AUDIT_DIR"
 
 # 1) Preview before transfer and persist machine-readable diff state.
-uv run seqledger diff "$DATASET_ID" "$REMOTE" \
+seqledger diff "$DATASET_ID" "$REMOTE" \
   --audit-json-out "$AUDIT_DIR/diff-before-transfer.json"
 
 # 2) Pull remote -> local and capture machine-readable audit.
-uv run seqledger pull "$DATASET_ID" "$REMOTE" -y \
+seqledger pull "$DATASET_ID" "$REMOTE" \
   --audit-json-out "$AUDIT_DIR/pull.json"
 
-# 3) Optional local updates (notebook, infer write-back, overlay attach, etc.).
-# 4) Push local -> remote and capture machine-readable audit.
-uv run seqledger push "$DATASET_ID" "$REMOTE" -y \
-  --audit-json-out "$AUDIT_DIR/push.json"
 ```
+
+For local-to-remote transfer, substitute `push` and save its audit under a corresponding filename. Do not run both directions automatically.
 
 ## Decision checks from JSON
 
@@ -61,8 +62,8 @@ jq -r '.data | {derived_local_only: ._derived.local_only, derived_remote_only: .
 ```
 
 Interpretation:
-- `transfer_state=NO-OP` with no changed sections means repeated sync calls are safe.
-- `_derived.changed=true` or `_auxiliary.changed=true` means non-primary data moved and should be reviewed.
+- `transfer_state=NO-OP` with no changed sections means this invocation found nothing to transfer.
+- `_derived.changed=true` or `_auxiliary.changed=true` indicates a difference in non-primary data. Read it together with the action and transfer state to determine whether data were transferred.
 - `_derived.local_only` / `_derived.remote_only` and `_auxiliary.local_only` / `_auxiliary.remote_only` list the exact file deltas to review.
 - `verify.content_hashes=on` confirms strict `_derived` and `_auxiliary` hash parity checks were active.
 
@@ -70,14 +71,13 @@ Interpretation:
 
 Use these artifacts to gate chained execution:
 
-1. Run `pull` with `--audit-json-out`.
-2. Parse `.data.transfer_state` and changed sections.
-3. Run downstream steps only when expected changes are present.
-4. Run `push` with `--audit-json-out`.
-5. Archive audit JSON files with run metadata for reproducible operator traces.
+1. Check the transfer command's exit status before consuming its audit.
+2. Parse `.data.transfer_state` and the changed sections.
+3. Run downstream steps when the expected data are available.
+4. Keep the audit with the run outputs. Push later only if local work should be transferred back.
 
 ## Failure handling
 
-- If transfer fails, rerun the same command; pull uses staged promotion and push verifies post-transfer.
+- If a transfer fails, inspect the error and compare the copies before retrying. Pull stages before promotion; push verifies after transfer.
 - If fidelity errors occur, inspect sync audit fields (`Primary`, `.events.log`, `_snapshots`, `_derived`, `_auxiliary`) before retrying.
-- If remote prerequisites fail, run `uv run seqledger remotes doctor --remote <name>` and resolve toolchain/lock issues first.
+- If remote prerequisites fail, run `seqledger remotes doctor --remote <name>` and resolve toolchain/lock issues first.

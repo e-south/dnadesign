@@ -1,5 +1,4 @@
-# Chained DenseGen and Infer Sync Runbook
-
+<!--
 **Type:** runbook
 **Plane:** data-plane
 **Owner-boundary:** seqledger
@@ -9,10 +8,13 @@
 **Summary:** Coordinate DenseGen-on-HPC and Infer-local writes against one SeqLedger dataset with explicit sync checkpoints.
 **Execution-kind:** iterative
 **Status-kind:** seqledger-sync-audit
-
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
+[SeqLedger guide](../../README.md)
+
+# Chained DenseGen and Infer Sync Runbook
 
 Use this runbook for the full asynchronous loop where DenseGen writes on HPC and Infer writes back overlays locally, with SeqLedger sync as the transfer contract.
 

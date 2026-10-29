@@ -1,96 +1,45 @@
-# SeqLedger Sync Fidelity Drills (Adversarial)
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
+[SeqLedger guide](../../README.md) / [Operations](../README.md) / [Sync](README.md)
 
-Use this runbook to pressure test strict sync fidelity for iterative batch workflows (`densegen`, `infer`, and sibling tools) across local and HPC clones.
+# Sync verification drills
 
-## Scope
+Use these contributor checks after changing transfer, overlay or registry behavior. They exercise isolated fixtures; normal dataset users can follow the [transfer quickstart](quickstart.md).
 
-- Validate overlay fidelity when transfers are interrupted or partial.
-- Validate schema contract enforcement for overlay write paths.
-- Keep transfer decisions low-friction using `diff` and sync audit output.
-- Exercise the default dataset sync contract (`hash` primary verification plus strict sidecar and `_derived`/`_auxiliary` content-hash checks).
-- Use `--verify-derived-hashes` when you want scripts to state content-hash enforcement explicitly (same behavior as default).
-- If required for emergency throughput, explicitly opt out of content hashes with `--no-verify-derived-hashes`.
-- Include `_auxiliary` inventory checks so non-core files remain in lockstep.
+## Local sync audit drill
 
-## Preconditions
+From the repository root, run the drill against temporary local and simulated remote datasets. It tests `diff`, `pull` and `push` across `_derived`, `_auxiliary` and `_registry` changes without an SSH account.
 
 ```bash
-# Remote profile health must be clean before drills.
-uv run seqledger remotes doctor --remote bu-scc
-# Local root example (canonical repo-local datasets root).
-export LOCAL_USR_ROOT="src/dnadesign/seqledger/datasets"
-# Use the canonical dataset id.
-export DATASET_ID="my_dataset"
+# Save the audit in the ignored build directory.
+mkdir -p build/seqledger-checks
+# Choose one location for the reports.
+ARTIFACT_ROOT="$PWD/build/seqledger-checks"
+# Run the isolated transfer checks.
+uv run seqledger-sync-audit-drill   --report-json "$ARTIFACT_ROOT/sync-audit.json"
 ```
 
-## Drill 1: Pull must fail when `_derived` payload is missing
+Add `--work-dir "$ARTIFACT_ROOT/sync-drill"` to retain the fixture roots for inspection. The report records each comparison and transfer check; a nonzero exit requires investigation before accepting the change.
 
-Goal: ensure strict pull rejects partial payloads that omit overlays.
+## Dataset and schema checks
 
 ```bash
-# Baseline preview.
-uv run seqledger --root "$LOCAL_USR_ROOT" diff "$DATASET_ID" bu-scc --verify parquet
-# Strict pull must validate sidecars plus overlay inventory.
-uv run seqledger --root "$LOCAL_USR_ROOT" pull "$DATASET_ID" bu-scc -y --verify parquet --verify-sidecars
+# Exercise iterative batches, invalid schemas and drill behavior.
+uv run pytest -q   src/dnadesign/seqledger/tests/sync/test_sync_iterative_batch_flow.py   src/dnadesign/seqledger/tests/sync/test_sync_schema_adversarial.py   src/dnadesign/seqledger/tests/test_usr_sync_audit_drill_script.py
 ```
 
-Expected contract:
-- If remote and staged payload disagree on `_derived` inventory, pull fails with `post-pull-sidecars`.
-- Local `records.parquet` is not promoted from staged payload on failure.
+These checks cover overlay continuity, malformed writes and sync audit outcomes. Default dataset transfer verification includes primary hashes, sidecar inventory and `_derived`/`_auxiliary` content hashes. A test should not disable those checks merely to make a failed transfer pass.
 
-Operator decision:
-- Re-run after fixing remote payload integrity; do not disable `--verify-sidecars`.
-- If you must trade fidelity for emergency transfer speed, use `--no-verify-sidecars` or `--no-verify-derived-hashes` explicitly and record that decision.
+## Combined harness cycle
 
-## Drill 2: Push must fail when remote misses local overlays
-
-Goal: ensure strict push rejects remote post-transfer state that drops overlays.
+The harness combines mock data, schema tests and optional sync auditing:
 
 ```bash
-# Local write-back from sibling tool (example: infer).
-uv run infer run --preset evo2/extract_logits_ll --seqledger "$DATASET_ID" --seqledger-root "$LOCAL_USR_ROOT" --field sequence --device cpu --write-back
-# Preview drift before transfer.
-uv run seqledger --root "$LOCAL_USR_ROOT" diff "$DATASET_ID" bu-scc --verify parquet
-# Strict push requires post-transfer sidecar and overlay parity.
-uv run seqledger --root "$LOCAL_USR_ROOT" push "$DATASET_ID" bu-scc -y --verify parquet --verify-sidecars
+# Run the cycle with reports and the local sync drill enabled.
+SEQLEDGER_HARNESS_RUN_SYNC_AUDIT_DRILL=1 SEQLEDGER_HARNESS_REPORT_PATH="$ARTIFACT_ROOT/harness-report.json" SEQLEDGER_HARNESS_SYNC_AUDIT_REPORT_PATH="$ARTIFACT_ROOT/sync-drill-report.json"   bash src/dnadesign/seqledger/scripts/run_seqledger_harness_cycle.sh
 ```
 
-Expected contract:
-- Push fails with `post-push-sidecars` when remote `_derived` inventory does not match local.
-- Primary verification still runs; sidecar/overlay mismatch remains fatal.
-
-Operator decision:
-- Treat this as transfer integrity failure, not a benign warning.
-
-## Drill 3: Overlay schema attack surface
-
-Goal: confirm schema enforcement blocks invalid overlay writes before sync.
-
-```bash
-# Example failure path: namespace not registered or invalid column shape.
-uv run seqledger --root "$LOCAL_USR_ROOT" attach "$DATASET_ID" \
-  --path /tmp/bad_overlay.csv \
-  --namespace infer --key sequence --key-col sequence --columns bad_field
-```
-
-Expected contract:
-- Attach fails fast with actionable schema/registry errors.
-- Invalid overlays are not written into `_derived`.
-
-## Chained command loop
-
-Use this loop in automation or operator sessions:
-
-1. `uv run seqledger remotes doctor --remote bu-scc`
-2. `uv run seqledger --root "$LOCAL_USR_ROOT" diff "$DATASET_ID" bu-scc --verify parquet`
-3. `uv run seqledger --root "$LOCAL_USR_ROOT" pull "$DATASET_ID" bu-scc -y --verify parquet --verify-sidecars`
-4. Run local notebook or sibling tool write-back.
-5. `uv run seqledger --root "$LOCAL_USR_ROOT" diff "$DATASET_ID" bu-scc --verify parquet`
-6. `uv run seqledger --root "$LOCAL_USR_ROOT" push "$DATASET_ID" bu-scc -y --verify parquet --verify-sidecars`
-7. Re-run `diff` and require `up-to-date`.
-
-Use sync audit lines (`Primary`, `.events.log`, `_snapshots`, `_derived`, `_auxiliary`) as the final transfer decision summary.
+For command routing and ownership, see the [architecture guide](../../architecture-introspection.md). For live connection failures, use [sync troubleshooting](troubleshooting.md); do not run destructive fault-injection drills against working datasets.

@@ -1,5 +1,4 @@
-# SeqLedger HPC Sync Flow
-
+<!--
 **Type:** runbook
 **Plane:** data-plane
 **Owner-boundary:** seqledger
@@ -9,10 +8,13 @@
 **Summary:** Keep one SeqLedger dataset synchronized between HPC and local analysis with explicit diff, pull, and push verification.
 **Execution-kind:** iterative
 **Status-kind:** seqledger-sync-audit
-
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
+[SeqLedger guide](../../README.md)
+
+# SeqLedger HPC Sync Flow
 
 Use this runbook when a dataset is produced incrementally on BU SCC (or similar HPC) and local analysis must stay in sync without moving data through git.
 
@@ -45,8 +47,10 @@ uv run seqledger remotes status --remote bu-scc
 2. Confirm dataset roots are correct on both hosts.
 
 ```bash
-# Local root example (repo-local shared datasets root)
-LOCAL_USR_ROOT="src/dnadesign/seqledger/datasets"
+# Select an existing local data root outside the installed package.
+export DNADESIGN_SEQLEDGER_ROOT="/absolute/path/to/seqledger_datasets"
+# Use the same root in commands that pass it explicitly.
+LOCAL_USR_ROOT="$DNADESIGN_SEQLEDGER_ROOT"
 # Print the chosen local datasets root before using it in sync commands.
 echo "$LOCAL_USR_ROOT"
 # Remote base_dir is shown by:
@@ -61,7 +65,7 @@ If the producer writes to a workspace-local export root such as
 - mirror the approved dataset into the shared SeqLedger root before using it as the
   checked-in study record
 
-`seqledger --root src/dnadesign/seqledger ...` is also accepted and normalized automatically, but this runbook uses the shared datasets root to keep path ownership explicit.
+All following commands use this root, either explicitly or through `DNADESIGN_SEQLEDGER_ROOT`.
 
 If BU SCC auth works in your shell only when SSH BatchMode is disabled, set `batch_mode: false` in the configured remote profile before running `diff` / `pull` / `push`.
 
@@ -182,7 +186,7 @@ Then verify on HPC by pulling or diffing from that side.
 
 - If transfer fails mid-run: rerun the same `pull`/`push` command. Pull stages and verifies before promotion.
 - If lock acquisition fails: resolve remote lock holder contention, then retry.
-- If the remote shell emits benign startup noise before the lock marker, SeqLedger now ignores that noise and continues waiting for the real lock marker.
+- If the remote shell emits benign startup noise before the lock marker, SeqLedger ignores that noise and continues waiting for the real lock marker.
 - If strict sidecar verification fails: inspect `meta.md`, `.events.log`, and `_snapshots` drift before retrying.
 - If doctor reports missing `flock`: install `flock` (util-linux) on remote host.
 - If a local filesystem rejects remote permission metadata, use the standard `seqledger pull` / `seqledger push` path; rsync metadata replay is already disabled in that path.

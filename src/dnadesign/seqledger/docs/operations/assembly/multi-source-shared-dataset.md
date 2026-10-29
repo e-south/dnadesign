@@ -1,5 +1,4 @@
-## Multi-Source Shared Dataset Assembly
-
+<!--
 **Type:** runbook
 **Plane:** data-plane
 **Owner-boundary:** seqledger
@@ -9,9 +8,13 @@
 **Summary:** Merge multiple SeqLedger-backed sources, preserve explicit carry, and hand one construct-backed shared dataset to Infer and Notify.
 **Execution-kind:** staged
 **Status-kind:** seqledger-dataset-state
-
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
+
+[SeqLedger guide](../../README.md)
+
+## Multi-Source Shared Dataset Assembly
 
 Use this runbook when inputs already span multiple SeqLedger-backed datasets, but downstream consumers should still see one consolidated construct-backed dataset plus one event stream.
 
@@ -54,11 +57,11 @@ result as a cross-tool source of truth.
 ### 1) Choose the shared roots and dataset ids
 
 ```bash
-# Create one disposable workspace root for the tracer-bullet flow.
+# Create one disposable workspace root for the local example.
 export WORK_ROOT="$(mktemp -d /tmp/dnadesign-multisource-XXXXXX)" # Allocate a disposable root for the shared workspace and SeqLedger datasets.
 uv run construct workspace init --id shared_dataset_demo --root "$WORK_ROOT" --profile anchor-template-shared-dataset-demo # Scaffold the packaged construct workspace that will read merged SeqLedger inputs.
 export WORKSPACE_ROOT="$WORK_ROOT/shared_dataset_demo" # Reuse one workspace path across construct, infer, and notify commands.
-export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets" # Keep this tracer-bullet flow inside the packaged workspace-local datasets root.
+export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets" # Keep this local example inside the packaged workspace-local datasets root.
 
 # Seed packaged control/template inputs used by the tracer bullet.
 uv run construct seed anchor-template-demo \

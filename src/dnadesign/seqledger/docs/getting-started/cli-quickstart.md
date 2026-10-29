@@ -1,76 +1,114 @@
-# SeqLedger CLI quickstart
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
+[SeqLedger guide](../README.md)
 
-Run commands from repo root with `uv run seqledger ...`.
+# Create your first dataset
 
-## Command availability
+Import three DNA sequences, attach example scores and export the annotated table. Everything stays in a new local directory; no remote service or model is needed.
 
-```bash
-# Show full CLI command surface.
-uv run seqledger --help
-```
+## 1. Install and activate SeqLedger
 
-## Minimal end-to-end sequence
-
-```bash
-# Use a scratch datasets root so this walkthrough does not touch tracked demo data.
-ROOT="/tmp/usr_quickstart_$(date -u +%Y%m%d_%H%M%S)"
-DATASET="quickstart_demo"
-OUT_DIR="/tmp/usr_exports"
-mkdir -p "$ROOT" "$OUT_DIR"
-
-# 1) Register namespace contract for derived columns.
-uv run seqledger --root "$ROOT" namespace register quickstart \
-  --columns 'quickstart__X_value:list<float64>,quickstart__intensity_log2_offset_delta:float64'
-
-# 2) Create dataset and import canonical sequence rows.
-uv run seqledger --root "$ROOT" init "$DATASET" --source "docs quickstart"
-uv run seqledger --root "$ROOT" import "$DATASET" --from csv \
-  --path src/dnadesign/seqledger/assets/demo_material/demo_sequences.csv \
-  --bio-type dna --alphabet dna_4
-
-# 3) Attach derived overlays.
-uv run seqledger --root "$ROOT" attach "$DATASET" \
-  --path src/dnadesign/seqledger/assets/demo_material/demo_attachment_one.csv \
-  --namespace quickstart --key sequence --key-col sequence --columns X_value
-uv run seqledger --root "$ROOT" attach "$DATASET" \
-  --path src/dnadesign/seqledger/assets/demo_material/demo_y_sfxi.csv \
-  --namespace quickstart --key sequence --key-col sequence \
-  --columns intensity_log2_offset_delta --allow-missing
-
-# 4) Materialize overlays into records.parquet and keep a rollback snapshot.
-uv run seqledger --root "$ROOT" materialize "$DATASET" --yes --snapshot-before
-
-# 5) Inspect and export portable handoff files.
-uv run seqledger --root "$ROOT" info "$DATASET"
-uv run seqledger --root "$ROOT" export "$DATASET" --fmt parquet --out "$OUT_DIR"
-uv run seqledger --root "$ROOT" export "$DATASET" --fmt csv --out "$OUT_DIR"
-```
-
-`materialize` mutates canonical `records.parquet`. `export` is the handoff step for files copied elsewhere.
-
-## Check the imported data
-
-Continue with the same scratch dataset created above:
+From a DNADesign checkout:
 
 ```bash
-uv run seqledger --root "$ROOT" ls
-uv run seqledger --root "$ROOT" info "$DATASET"
-uv run seqledger --root "$ROOT" head "$DATASET" -n 5
-uv run seqledger --root "$ROOT" schema "$DATASET" --tree
-uv run seqledger --root "$ROOT" events tail "$DATASET" --format json --n 5
-uv run seqledger --root "$ROOT" validate "$DATASET" --strict
+uv sync --locked --no-default-groups --extra seqledger
+source .venv/bin/activate
 ```
 
-## Notes
+If SeqLedger is already installed, activate that environment instead. The remaining commands use its `seqledger` executable and can run outside the checkout. See [installation](../../../../../docs/setup/installation.md) for other profiles.
 
-- Developer-only mock generators are hidden from the default CLI surface. If you need them for local fixture work, make that explicit: `SEQLEDGER_SHOW_DEV_COMMANDS=1 uv run seqledger dev make-mock --help`.
-- macOS: set `SEQLEDGER_SHOW_PYARROW_SYSCTL=1` to show PyArrow sysctl warnings.
+## 2. Prepare a small input
 
-## Next steps
+Run this where you want to keep the example:
 
-- Remote and iterative batch workflows: [SeqLedger workflow map](../operations/routes/workflow-map.md)
-- Schema and overlay contracts: [../reference/README.md](../reference/README.md)
+```bash
+mkdir seqledger-demo
+cd seqledger-demo
+mkdir seqledger_datasets
+DATA_ROOT="$PWD/seqledger_datasets"
+DATASET="example_sequences"
+
+cat > sequences.csv <<'CSV'
+sequence
+ACGTACGT
+ACGTTCGT
+TGCATGCA
+CSV
+```
+
+A dataset root can contain several datasets and one shared `registry.yaml`. Each command below names the root explicitly with `--root`.
+
+## 3. Register an annotation and import records
+
+A namespace declares which annotation columns you will write. Register `demo__score` as a floating-point value; this also creates the root's registry.
+
+```bash
+seqledger --root "$DATA_ROOT" namespace register demo \
+  --columns 'demo__score:float64'
+seqledger --root "$DATA_ROOT" init "$DATASET" --source "quickstart"
+seqledger --root "$DATA_ROOT" import "$DATASET" --from csv \
+  --path sequences.csv --bio-type dna --alphabet dna_4
+seqledger --root "$DATA_ROOT" head "$DATASET" -n 3
+```
+
+The dataset now contains three records. SeqLedger computes their IDs and adds biological type, alphabet, length, source and creation time. Sequence case contributes to identity; the [schema reference](../reference/schema-contract.md) explains normalization and duplicate handling.
+
+## 4. Attach scores
+
+Create a second file that pairs the same sequences with illustrative scores:
+
+```bash
+cat > scores.csv <<'CSV'
+sequence,score
+ACGTACGT,0.2
+ACGTTCGT,0.8
+TGCATGCA,0.5
+CSV
+
+# Match by sequence and store the score in the demo namespace.
+seqledger --root "$DATA_ROOT" attach "$DATASET" \
+  --path scores.csv --namespace demo \
+  --key sequence --key-col sequence --columns score
+seqledger --root "$DATA_ROOT" head "$DATASET" -n 3
+```
+
+The combined view includes `demo__score`. These values live in an overlay under `_derived/`; the base `records.parquet` is not rewritten. For other join keys or updates to existing annotations, see [overlays and the registry](../reference/overlay-and-registry.md).
+
+## 5. Validate and export
+
+```bash
+# Check the dataset and its registered annotation types.
+seqledger --root "$DATA_ROOT" validate "$DATASET" --strict
+
+# Export the combined view to an explicit file path.
+seqledger --root "$DATA_ROOT" export "$DATASET" --fmt csv \
+  --columns sequence,demo__score --out annotated_sequences.csv
+cat annotated_sequences.csv
+```
+
+The CSV pairs each sequence with its score:
+
+```csv
+sequence,demo__score
+ACGTACGT,0.2
+ACGTTCGT,0.8
+TGCATGCA,0.5
+```
+
+Export includes overlays without materialization. It produces a table for another program, not a full copy of dataset history or sidecars. Use [dataset sync](../operations/sync/README.md) when transferring the complete dataset.
+
+## Inspect or continue
+
+```bash
+# List datasets, inspect the schema and read recent mutation events.
+seqledger --root "$DATA_ROOT" ls
+seqledger --root "$DATA_ROOT" schema "$DATASET" --tree
+seqledger --root "$DATA_ROOT" events tail "$DATASET" --format json --n 5
+```
+
+- [Python API](../reference/python-api.md): perform the same work in a script.
+- [Notebook](notebook.md): browse distributions and columns interactively.
+- [Maintenance](../reference/maintenance.md): snapshots, compaction and deliberate base-table rewrites.

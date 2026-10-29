@@ -1,127 +1,77 @@
-# SeqLedger schema contract
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
+[SeqLedger guide](../README.md) / [Reference](README.md)
 
-Configuration kind `usr`, Parquet metadata keys `usr:*`, and the `usr_label__*`
-and `usr_state__*` columns are stable format identifiers. SeqLedger reads and
-writes these formats without converting existing records or event logs.
+# Sequence identity and schema
+
+Every record has a stable sequence ID and seven required columns. Annotations add namespaced columns without changing that identity.
 
 ## Core schema
 
-| column | type | notes |
+All columns below are non-null.
+
+| Column | Type | Meaning |
 | --- | --- | --- |
-| `id` | string | `sha1(UTF-8 bio_type\|sequence_norm)` |
-| `bio_type` | string | `dna` \| `rna` \| `protein` |
-| `sequence` | string | case-preserving, normalized by trim for hashing |
-| `alphabet` | string | `dna_4`, `dna_5`, `rna_4`, `rna_5`, `protein_20`, `protein_21` |
-| `length` | int32 | `len(sequence_norm)` |
-| `source` | string | ingest provenance |
-| `created_at` | timestamp(us, coordinated universal time) | ingest time |
+| `id` | string | SHA-1 of UTF-8 `bio_type\|sequence_norm` |
+| `bio_type` | string | `dna`, `rna` or `protein` |
+| `sequence` | string | Sequence text, with case preserved |
+| `alphabet` | string | `dna_4`, `dna_5`, `rna_4`, `rna_5`, `protein_20` or `protein_21` |
+| `length` | int32 | Length of `sequence_norm` |
+| `source` | string | Import source label |
+| `created_at` | timestamp(us, UTC) | Import time |
 
-`sequence_norm` is `sequence.strip()` and is the value used for id hashing. `bio_type` must not contain `|`.
+For hashing, `sequence_norm` is `sequence.strip()`. Leading and trailing whitespace is removed; case is preserved. Thus `ACGT` and `acgt` have different IDs, as do identical strings with different biological types. `bio_type` cannot contain `|`. Import duplicate handling and maintenance deduplication are separate from this identity rule.
 
-## Required columns (non-null)
+## Annotation columns
 
-| column | type | description |
+Annotations use `<namespace>__<field>`, such as `demo__score`. A namespace must match `^[a-z][a-z0-9_]*$`, and its columns must be declared in the root registry. Annotation columns cannot replace core columns. `usr` and `usr_state` are reserved for system operations; use the dedicated deletion and state commands for those values.
+
+CLI attachment rejects conflicting values unless `--allow-overwrite` is explicit. Python writers have their own overwrite arguments; choose the policy explicitly when updating annotations. See [overlays and the registry](overlay-and-registry.md).
+
+Shared annotation conventions:
+
+| Namespace | Purpose | Example columns |
 | --- | --- | --- |
-| `id` | `string` | `sha1(UTF-8 bio_type\|sequence_norm)` |
-| `bio_type` | `string` | one of `dna`, `rna`, `protein` |
-| `sequence` | `string` | raw sequence (case preserved) |
-| `alphabet` | `string` | `dna_4`, `dna_5`, `rna_4`, `rna_5`, `protein_20`, `protein_21` |
-| `length` | `int32` | `len(sequence_norm)` |
-| `source` | `string` | source label or file |
-| `created_at` | `timestamp[us, coordinated universal time]` | ingest time |
+| `usr_label` | Record names and aliases | `usr_label__primary`, `usr_label__aliases` |
+| `seq_annot` | Imported source annotations | `seq_annot__source_sha256`, `seq_annot__record_id`, `seq_annot__features` |
+| `derived` | Parent-child lineage and retained annotations | `derived__parent_id`, `derived__product_kind`, `derived__source_interval_*`, `derived__features_*` |
 
-## Derived columns
+`seq_annot__features` preserves source feature order, raw location text and repeated qualifiers. Where possible, it also records zero-based, half-open intervals, with confidence information for fuzzy or unsupported locations. The `derived__features_retained`, `derived__features_clipped` and `derived__features_lost` columns describe how those annotations carry into a derived sequence.
 
-- Must be namespaced `<namespace>__<field>`.
-- Must not overlap essential columns.
-- Namespace regex: `^[a-z][a-z0-9_]*$`
-- Reserved namespaces: `seqledger`
-- Collision policy: hard error unless `--allow-overwrite` is explicit.
+## Dataset names
 
-Conventional cross-tool label namespace:
+Choose a dataset ID that identifies the collection, such as `reference_sequences`. Flat IDs and namespace-qualified IDs are supported. Keep record labels in `usr_label` and producing-tool provenance in annotation columns rather than relying on the dataset name to encode them.
 
-- Use `usr_label__primary` for the preferred human-readable record name.
-- Use `usr_label__aliases` for stable alternate names or legacy labels.
-- Use tool-specific namespaces for tool provenance, not for the canonical human label itself.
+## Parquet metadata
 
-Additive shared namespaces used by the current sequence-product contract:
+Configuration kind `usr`, metadata keys beginning with `usr:`, and columns beginning with `usr_label__` or `usr_state__` are stable format identifiers used by SeqLedger.
 
-| namespace | purpose | notable columns |
-| --- | --- | --- |
-| `usr_label` | canonical human-readable names and aliases | `usr_label__primary`, `usr_label__aliases` |
-| `seq_annot` | source-faithful imported annotation overlays | `seq_annot__source_sha256`, `seq_annot__record_id`, `seq_annot__features` |
-| `derived` | parent/child lineage and derived-product semantics | `derived__parent_id`, `derived__product_kind`, `derived__source_interval_*`, `derived__features_*` |
-
-`seq_annot__features` preserves imported feature order, raw location text, normalized 0-based half-open intervals where available, qualifier multiplicity, and confidence for fuzzy or unsupported source locations.
-
-`derived__features_retained`, `derived__features_clipped`, and `derived__features_lost` summarize how parent annotations survive derived sequence products such as `analysis_window` windows or template-expanded contexts.
-
-Dataset id naming convention:
-
-- Prefer the least-coupled semantic id that still makes the dataset obvious to operators.
-- Flat ids are first-class: examples include `usr_promoter_references`, `usr_pdual10_plasmid_template`, and `anchor_template_slot_a_window_1kb_demo`.
-- Namespace-qualified ids remain valid when they genuinely improve disambiguation.
-- Avoid encoding the producing tool name in the dataset id when the dataset is intended to be consumed across sibling packages.
-
-## Base table metadata
-
-Parquet key/value metadata:
-
-- `usr:schema_version`
-- `usr:dataset_created_at`
-- `usr:id_hash`
-- `usr:registry_hash`
-
-## Overlay metadata
-
-Parquet key/value metadata for derived overlays:
-
-- `usr:overlay_namespace`
-- `usr:overlay_key`
-- `usr:overlay_created_at`
-- `usr:registry_hash`
-- `usr:namespace_contract_hash`
+Base tables carry `usr:schema_version`, `usr:dataset_created_at`, `usr:id_hash` and `usr:registry_hash`. Overlays carry `usr:overlay_namespace`, `usr:overlay_key`, `usr:overlay_created_at`, `usr:registry_hash` and `usr:namespace_contract_hash`. These identify the format and registry contracts used to write each file.
 
 ## Sidecars and semantic aliases
 
-SeqLedger keeps the base `records.parquet` schema stable and stores richer semantic view identity in additive sidecars.
+A sequence can have several roles while retaining the same literal DNA, RNA or protein string. Sequence views record those roles separately from the base table:
 
-- Dataset-local sequence views live at `_views/sequence_views.parquet`.
-- Optional mutable view semantics live at `_views/view_semantics.parquet`.
-- `view_id` identifies a semantic sequence product/view, not a base sequence row.
-- Multiple `view_id` values may point to the same `id` in `records.parquet`.
-- Sequence views carry product kind, orientation, parent lineage, optional source intervals, optional emitted anchor bounds, and recommended pooling metadata.
-- Human labels and aliases are mutable metadata on the view row; they are not part of the stable semantic hash.
-- The view-semantics addendum is keyed by `view_id` and can carry `source_family`,
-  `selection_basis`, `view_collections`, and `role_tags` without changing stable
-  view identity. It is the right place for study cohort membership; do not
-  encode cohort membership by inventing misleading `product_kind` values.
+- `_views/sequence_views.parquet` stores view identity, orientation, parent lineage, source intervals, anchor bounds and recommended pooling metadata.
+- `view_id` identifies a sequence view. Several views may refer to one base record's `id`.
+- `_views/view_semantics.parquet` optionally stores mutable metadata keyed by `view_id`, including `source_family`, `selection_basis`, `view_collections` and `role_tags`.
+- Human labels, aliases and collection membership do not determine stable view identity.
 
-This separation allows provenance-faithful native records, analysis-only cores, and forward or reverse-complement construct contexts to alias the same base sequence when the literal sequence string collides.
+| Product kind | Meaning |
+| --- | --- |
+| `source_record` | Imported source record |
+| `selected_region` | Region selected from a source record |
+| `construct_insert` | Sequence used as an insert in a construct |
+| `analysis_window` | Sequence window derived for analysis |
+| `realized_context` | Sequence emitted after constructing a context around an insert |
 
-Current product-kind vocabulary:
+Product kind describes lineage and use, not a fixed length, orientation or experimental group. An `analysis_window` is not necessarily 60 bp, and a `realized_context` is not necessarily 1 kb. Record those dimensions and relationships in their dedicated fields. Use the [public readers](python-api.md#read-sequence-views) instead of reading sidecars directly.
 
-- `source_record`: source-faithful imported record.
-- `selected_region`: explicitly selected biological insert from a source record.
-- `construct_insert`: construct-ready promoter/anchor row in a merged handoff dataset.
-- `analysis_window`: Construct-derived 60 bp analysis-only comparability view.
-- `realized_context`: Construct-realized emitted context; `orientation` and
-  length distinguish forward 1 kb pDual contexts from reverse-complement
-  contexts.
+## Continue
 
-Product kind describes the sequence product's lineage and semantics, not every
-downstream analysis cohort. A natively 60 bp promoter insert remains a
-`construct_insert`; it must not be duplicated or relabeled as `analysis_window`
-solely because it is 60 bp. `analysis_window` is reserved for rows Construct
-derived by trimming/windowing or template-expanding around an explicit focal
-rule. Exact 60 bp `seq_mean` and `core60_mean` equivalence belongs to Infer's
-feature-alias layer, not to SeqLedger base rows.
-
-## Next steps
-
-- Overlay merge and registry behavior: [overlay-and-registry.md](overlay-and-registry.md)
-- Event contract: [event-log.md](event-log.md)
+- [Overlays and the registry](overlay-and-registry.md) explain annotation writes and merge order.
+- [Event log](event-log.md) documents mutation records.
+- [Dataset layout](dataset-layout-and-code-map.md) shows where each artifact is stored.

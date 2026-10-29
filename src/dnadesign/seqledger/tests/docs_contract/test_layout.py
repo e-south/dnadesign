@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 import subprocess
 
 from ..source_layout_inventory import TOP_LEVEL_SOURCE_PACKAGES
@@ -39,7 +40,7 @@ def test_usr_layout_docs_cover_sanctioned_source_packages_and_new_support_surfac
         assert token in code_map or token in introspection or token in usr_agents
 
     assert "Public import surface: `dnadesign.seqledger`" in api_doc
-    assert "uv run seqledger-sync-audit-drill" in api_doc
+    assert "architecture-introspection.md" in api_doc
 
 
 def test_usr_agents_describe_ops_scripts_assets_and_testsupport_boundaries() -> None:
@@ -57,15 +58,20 @@ def test_usr_agents_describe_ops_scripts_assets_and_testsupport_boundaries() -> 
     )
 
 
-def test_usr_demo_docs_use_canonical_paths() -> None:
+def test_seqledger_quickstart_is_local_and_uses_the_installed_cli() -> None:
     quickstart = read_text("src/dnadesign/seqledger/docs/getting-started/cli-quickstart.md")
+    shell_blocks = re.findall(r"```bash\n(.*?)```", quickstart, re.DOTALL)
+    commands = "\n".join(shell_blocks[1:])
 
-    assert "src/dnadesign/seqledger/assets/demo_material/demo_sequences.csv" in quickstart
-    assert 'uv run seqledger --root "$ROOT" init "$DATASET"' in quickstart
-    assert 'uv run seqledger --root "$ROOT" validate "$DATASET" --strict' in quickstart
-    assert "usr_demo_cli_examples" not in quickstart
-    assert "SEQLEDGER_SHOW_DEV_COMMANDS=1 uv run seqledger dev make-mock --help" in quickstart
-    assert "src/dnadesign/seqledger/demo_material/demo_sequences.csv" not in quickstart
+    assert "source .venv/bin/activate" in shell_blocks[0]
+    assert "cat > sequences.csv" in commands
+    for operation in ("namespace register", "init", "import", "attach", "validate", "export"):
+        assert re.search(rf'seqledger --root "\$DATA_ROOT" {operation}\b', commands)
+    assert "--strict" in commands
+    assert "--out annotated_sequences.csv" in commands
+    assert "materialize" not in commands
+    assert "SEQLEDGER_SHOW_DEV_COMMANDS" not in commands
+    assert "assets/demo_material" not in commands
     assert not (repo_root() / "src" / "dnadesign" / "usr" / "demo_material").exists()
     assert not (repo_root() / "src" / "dnadesign" / "usr" / "archived").exists()
 

@@ -1,41 +1,44 @@
-# SeqLedger interactive notebook
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
+[SeqLedger guide](../README.md) / [Getting started](README.md)
 
-Use the marimo notebook for interactive exploration (filters, summaries, and quick dataset inspection).
+# Explore a dataset in the notebook
+
+The marimo explorer provides filters, summaries and plots for a selected Parquet table. It reads `records.parquet` directly, so it does not apply SeqLedger overlays or deletion filtering. To inspect the effective annotated view, first [export it](cli-quickstart.md#5-validate-and-export), then choose that file in **Custom parquet path**.
+
+## Open the explorer
+
+Run from a DNADesign checkout. The full profile includes marimo and the plotting dependencies used by this notebook.
 
 ```bash
-# Install project dependencies.
+# Install the notebook dependencies.
 uv sync --locked
 
-# Open notebook.
-uv run marimo edit --sandbox --watch src/dnadesign/seqledger/notebooks/usr_explorer.py
+# Point the dataset picker at an existing root directory.
+export DNADESIGN_SEQLEDGER_ROOT="/absolute/path/to/seqledger_datasets"
+
+# Open the interactive notebook.
+uv run marimo edit --watch src/dnadesign/seqledger/notebooks/usr_explorer.py
 ```
 
-## Path-first CLI helpers
+Replace the root path before running. The picker lists immediate child directories containing `records.parquet`; use **Custom parquet path** for nested datasets or an exported table. The sample slider limits the displayed rows, with a seed control for repeatable sampling.
 
-These commands accept a dataset id or a file/directory path.
+## Inspect from the terminal
+
+With SeqLedger installed, these commands provide a quicker view of a dataset:
 
 ```bash
-# Preview current directory parquet (interactive picker when needed).
-uv run seqledger head .
+# Include overlays by selecting a dataset through SeqLedger.
+seqledger --root /absolute/path/to/seqledger_datasets head example_sequences
+seqledger --root /absolute/path/to/seqledger_datasets schema example_sequences --tree
 
-# List columns for selected file.
-uv run seqledger cols
-
-# Print one cell.
-uv run seqledger cell --row 0 --col sequence
-
-# Explicit path examples.
-uv run seqledger head permuter/run42/records.parquet
-uv run seqledger cols ./some/dir --glob 'events*.parquet'
+# Inspect a standalone exported table instead.
+seqledger head ./annotated_sequences.parquet
+seqledger cols ./annotated_sequences.parquet
+seqledger cell ./annotated_sequences.parquet --row 0 --col sequence
 ```
 
-When running inside `src/dnadesign/seqledger/datasets/<dataset-id>`, commands default to that dataset.
-
-## Next steps
-
-- Sync workflows: [SeqLedger sync operations](../operations/sync/README.md)
-- Contracts and schema details: [../reference/README.md](../reference/README.md)
+Use the [Python API](../reference/python-api.md) for scripted analysis or the [schema reference](../reference/schema-contract.md) to interpret record and annotation fields.

@@ -1,10 +1,13 @@
-# SeqLedger event log contract
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
+[SeqLedger guide](../README.md)
 
-`.events.log` is newline-delimited JSON and is the operator integration boundary.
+# SeqLedger event log contract
+
+`.events.log` records dataset mutations as newline-delimited JSON. Event consumers can use it to follow changes without inspecting every data file.
 Each encoded record, including its terminal newline, is limited to 1 MiB. Store
 large data in an artifact and reference it from the event instead of embedding it
 in the ledger.
@@ -30,10 +33,7 @@ Notify expects at minimum `event_version` and `action`.
 
 ## Integration boundary
 
-- Notify consumes dataset `.events.log`.
-- DenseGen runtime telemetry (`outputs/meta/events.jsonl`) is not Notify input.
-
-See: [../../../../../docs/notify/seqledger-events.md](../../../../../docs/notify/seqledger-events.md)
+[Notify](../../../../../docs/notify/seqledger-events.md) consumes dataset `.events.log`. A producing tool's separate runtime log is not interchangeable with this mutation stream.
 
 ## Next steps
 

@@ -40,19 +40,21 @@ def test_sync_router_and_ops_indexes_have_resolving_links_and_route_metadata() -
     assert "# SeqLedger operations runbooks" in heading_lines("src/dnadesign/seqledger/docs/operations/README.md")
 
 
-def test_workflow_map_and_harness_document_stable_sync_drill_entrypoint() -> None:
+def test_navigation_routes_to_the_stable_sync_drill() -> None:
     workflow_map = read_text("src/dnadesign/seqledger/docs/operations/routes/workflow-map.md")
     ops_index = read_text("src/dnadesign/seqledger/docs/operations/README.md")
+    drills = read_text("src/dnadesign/seqledger/docs/operations/sync/fidelity-drills.md")
     harness = read_text("src/dnadesign/seqledger/scripts/run_seqledger_harness_cycle.sh")
 
-    assert "uv run seqledger-sync-audit-drill" in workflow_map
-    assert "run_usr_sync_audit_drill.py" not in workflow_map
-    assert "uv run seqledger-sync-audit-drill" in ops_index
-    assert "run_usr_sync_audit_drill.py" not in ops_index
-    assert "uv run seqledger-sync-audit-drill" in harness
-    assert "run_usr_sync_audit_drill.py" not in harness
-    assert "SEQLEDGER_HARNESS_RUN_SYNC_AUDIT_DRILL" in workflow_map
-    assert "SEQLEDGER_HARNESS_SYNC_AUDIT_REPORT_PATH" in workflow_map
+    assert "../sync/fidelity-drills.md" in workflow_map
+    assert "sync/fidelity-drills.md" in ops_index
+    assert_markdown_links_resolve("src/dnadesign/seqledger/docs/operations/routes/workflow-map.md")
+    assert_markdown_links_resolve("src/dnadesign/seqledger/docs/operations/sync/fidelity-drills.md")
+    for text in (drills, harness):
+        assert "uv run seqledger-sync-audit-drill" in text
+        assert "run_usr_sync_audit_drill.py" not in text
+        assert "SEQLEDGER_HARNESS_RUN_SYNC_AUDIT_DRILL" in text
+        assert "SEQLEDGER_HARNESS_SYNC_AUDIT_REPORT_PATH" in text
 
 
 def test_sync_runbooks_keep_hash_and_auxiliary_contract_terms() -> None:

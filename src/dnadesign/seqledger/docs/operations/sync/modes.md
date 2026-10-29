@@ -1,81 +1,74 @@
-# SeqLedger sync target modes
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
+[SeqLedger guide](../../README.md) / [Sync](README.md)
 
-Use this page when dataset-id sync is not enough and you need explicit path mapping.
+# Target modes and verification
+
+Dataset-ID mode is the usual choice: `seqledger pull example_sequences cluster` resolves the dataset beneath the local root and the remote profile's `base_dir`. Use an explicit directory or single-file target when that mapping does not fit.
 
 ## Dataset directory mode
 
-Use this when you have an explicit dataset directory path outside `--root`.
+An absolute dataset directory can be outside the selected local root:
 
 ```bash
-# Diff dataset directory path outside --root.
-uv run seqledger diff /path/to/dnadesign/src/dnadesign/seqledger/datasets/densegen_demo_hpc bu-scc
-
-# Pull dataset directory by explicit path.
-uv run seqledger pull /path/to/dnadesign/src/dnadesign/seqledger/datasets/densegen_demo_hpc bu-scc -y
-
-# Push dataset directory by explicit path.
-uv run seqledger push /path/to/dnadesign/src/dnadesign/seqledger/datasets/densegen_demo_hpc bu-scc -y
+# Compare an explicit dataset directory, then pull after reviewing the diff.
+seqledger diff /data/seqledger_datasets/example_sequences cluster
+# Copy remote dataset state after reviewing the comparison.
+seqledger pull /data/seqledger_datasets/example_sequences cluster
 ```
+
+Use `push` for the reverse direction. The [quickstart](quickstart.md) explains the common preview and verification steps.
 
 ## File mode
 
-Use this when syncing a single file.
+File mode transfers one file rather than the complete dataset. It cannot establish parity for omitted overlays, views or event history.
 
-Remote config example with repo mapping:
+A remote profile can map repository-relative files using `repo_root` and `local_repo_root`:
 
 ```yaml
+# Optional repository mappings supplement the dataset root.
 remotes:
-  bu-scc:
-    type: ssh                                                                                          # Sets `type` for this example configuration.
-    host: scc1.bu.edu                                                                                  # Sets `host` for this example configuration.
-    user: <user>                                                                                       # Sets `user` for this example configuration.
-    base_dir: /project/<user>/dnadesign/src/dnadesign/seqledger/datasets                                     # Sets `base_dir` for this example configuration.
-    repo_root: /path/to/remote/dnadesign                                                               # Sets `repo_root` for this example configuration.
-    local_repo_root: /path/to/local/dnadesign                                                          # Sets `local_repo_root` for this example configuration.
+  cluster:
+    type: ssh
+    host: compute.example.org
+    user: your-user
+    base_dir: /project/your-group/seqledger_datasets
+    repo_root: /project/your-group/analysis
+    local_repo_root: /absolute/path/to/analysis
 ```
-
-Dataset-id mode against the shared SeqLedger root remains the preferred path. Explicit path mode is for exceptional cases where dataset-id resolution is not enough.
-
-Examples:
 
 ```bash
-# Diff one file by repo-relative path.
-uv run seqledger diff permuter/run42/records.parquet bu-scc
+# Compare and retrieve one file relative to the configured repository roots.
+seqledger diff outputs/annotated_sequences.parquet cluster
+# Retrieve the selected file.
+seqledger pull outputs/annotated_sequences.parquet cluster
 
-# Pull one file by repo-relative path.
-uv run seqledger pull permuter/run42/records.parquet bu-scc -y
+# Supply a local mapping explicitly when local_repo_root is not configured.
+seqledger pull outputs/annotated_sequences.parquet cluster   --repo-root /absolute/path/to/analysis
 
-# If local repo root is not configured.
-uv run seqledger pull permuter/run42/records.parquet bu-scc \
-  --repo-root /path/to/local/dnadesign -y
-
-# If remote path mapping cannot be inferred.
-uv run seqledger pull permuter/run42/records.parquet bu-scc \
-  --remote-path /path/to/remote/dnadesign/src/dnadesign/permuter/run42/records.parquet -y
+# Specify the remote file directly when its path cannot be inferred.
+seqledger pull outputs/annotated_sequences.parquet cluster   --remote-path /project/your-group/results/annotated_sequences.parquet
 ```
 
-Verification in `--verify auto` uses this order:
+`DNADESIGN_REPO_ROOT` can supply the local mapping when `--repo-root` is absent. Dataset sidecar checks do not apply to file mode.
 
-1. SHA-256 (if available on both hosts)
-2. File size
-3. For Parquet files, row/column checks (`pyarrow` required on remote)
+## Verification choices
 
-If auto mode falls back, SeqLedger prints a warning.
+The primary verification mode defaults to `--verify hash`. `--verify auto` tries SHA-256, then file size, then Parquet row/column checks; fallback emits a warning. Size and table-shape checks do not establish identical file contents.
 
-Environment variable for file mode:
+Full dataset transfers additionally verify sidecar inventories and content hashes for `_derived` and `_auxiliary` files. `--no-verify-derived-hashes` skips those content hashes while retaining inventory checks. `--no-verify-sidecars` disables strict sidecar parity and is required for partial transfers using `--primary-only` or `--skip-snapshots`.
 
-- `DNADESIGN_REPO_ROOT` can provide local repo root when not passed with `--repo-root`.
+## Transfer consistency
 
-BU transfer-heavy option:
+- Transfers require an existing source `records.parquet` and fail on SSH authentication or transport errors.
+- Full transfers lock dataset and event state. Runtime lock and lease files are excluded from transfer inventories.
+- Push requires remote event history to be an exact prefix of local history; pull requires remote history to extend the local prefix. Independent branches are rejected rather than silently merged.
+- Transfer actions do not append host-local events to the replicated `.events.log`. Successful full transfers leave the copies byte-identical.
+- `--dry-run` does not create remote directories or locks. A real push repeats the history check under transaction locks.
+- Pull stages its payload, rejects symlinks and unsupported entry types, and verifies before promotion. A failed staged verification does not replace the local primary.
+- Transfers skip unchanged datasets and do not preserve remote owner, group or permission bits.
 
-- Use host `scc-globus.bu.edu` for transfer-focused workflows.
-- BU also supports download-node jobs via `qsub -l download`.
-
-## Next
-
-- Baseline operator loop: [quickstart.md](quickstart.md)
-- Failure diagnostics: [troubleshooting.md](troubleshooting.md)
+Use one transfer coordinator per dataset. Reciprocal transfers wait only until the lock timeout. After a transient failure, inspect the audit and compare again before retrying. See [troubleshooting](troubleshooting.md) and [audit output](audit-loop.md).

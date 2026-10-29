@@ -1,9 +1,10 @@
-## SeqLedger Operation Routes
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-Use this folder for concise task-routing maps. Put long procedures in
-`../sync/`, `../assembly/`, or `../promoter/`.
+[SeqLedger guide](../../README.md) / [Operations](../README.md)
 
-- [Workflow map](workflow-map.md): choose a command chain by operator intent.
+# Choose a workflow
+
+The [workflow map](workflow-map.md) connects common dataset tasks to their commands and detailed procedures. Start there when you already have data and need to choose the next operation.

@@ -1,10 +1,24 @@
-# SeqLedger maintenance patterns
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
+[SeqLedger guide](../README.md)
 
-This page captures common maintenance commands that mutate or package dataset state.
+# SeqLedger maintenance patterns
+
+Use maintenance commands when you intend to change dataset storage or consolidate records. Routine reads and exports already include overlays; they do not require materialization. Run the examples from a DNADesign checkout with the intended root selected through `--root` or `DNADESIGN_SEQLEDGER_ROOT`. Dataset and namespace names below are examples.
+
+## Materialize annotations into the base table
+
+Materialization rewrites `records.parquet` with effective overlay values. Use it when a consumer needs those columns in the base file itself; use export when the consumer only needs a separate annotated table.
+
+```bash
+# Snapshot the base table before merging annotations into it.
+uv run seqledger materialize example_sequences --snapshot-before
+```
+
+The command prompts before rewriting. Overlay removal and archival are separate options; inspect `seqledger materialize --help` before choosing them.
 
 ## GenBank-backed import and sequence-view upkeep
 
@@ -24,32 +38,32 @@ Operational rules:
 
 ```bash
 # Freeze active registry into dataset artifact.
-uv run seqledger maintenance registry-freeze densegen_demo
+uv run seqledger maintenance registry-freeze example_sequences
 
 # Compact overlay parts for one namespace.
-uv run seqledger maintenance overlay-compact densegen_demo --namespace densegen
+uv run seqledger maintenance overlay-compact example_sequences --namespace demo
 
 # Refresh a compact overlay's registry metadata after registry-only drift.
-uv run seqledger maintenance overlay-refresh-metadata densegen_demo --namespace densegen
+uv run seqledger maintenance overlay-refresh-metadata example_sequences --namespace demo
 
 # Project one namespace from a source dataset onto a downstream dataset by join key.
 uv run seqledger maintenance overlay-project \
-  --src densegen_demo \
-  --dest promoter/demo_anchor_set \
-  --namespace densegen \
+  --src example_sequences \
+  --dest derived_sequences \
+  --namespace demo \
   --src-join id \
   --dest-join id \
   --allow-missing
 
 # Remove or archive one derived namespace.
-uv run seqledger maintenance overlay-remove densegen_demo --namespace densegen --mode archive
+uv run seqledger maintenance overlay-remove example_sequences --namespace demo --mode archive
 ```
 
 Compaction retention contract:
 
 - Compaction rewrites active parts into one compact overlay file.
 - Compaction fails fast before registry freeze or file rewrites when the namespace has no overlay parts or is already compact.
-- Previous part snapshots are dropped by default (no lingering compact archives).
+- Previous part snapshots are dropped by default.
 - Overlay archive retention is bounded: `overlay-remove --mode archive` keeps only the latest archived snapshot.
 - Reserved system namespaces such as `usr_state` are only mutated through dedicated command groups such as `uv run seqledger state ...`.
 - `overlay-project` is the safe repair path when downstream handoff datasets must inherit authoritative overlay metadata after merge, construct, or infer without rewriting `records.parquet` or disturbing unrelated namespaces such as `infer`.
@@ -83,7 +97,7 @@ uv run seqledger maintenance event-log-garden <dataset> \
   --retain-last 1000 \
   --write \
   --acknowledge-notify-cursor-reset \
-  --reason "post-migration event-log gardening"
+  --reason "retaining the latest 1000 events for active use"
 ```
 
 Event-log gardening contract:
@@ -96,14 +110,13 @@ Event-log gardening contract:
 ## De-duplication
 
 ```bash
-# Case-insensitive dedupe (dna_4 only).
-uv run seqledger maintenance dedupe <dataset> --key sequence_ci --keep keep-first
+# Preview the selected deduplication rule before applying it.
+uv run seqledger maintenance dedupe example_sequences \
+  --key sequence_ci --keep keep-first --dry-run
 
-# Case-preserving dedupe.
-uv run seqledger maintenance dedupe <dataset> --key sequence --keep keep-last
-
-# Preview dedupe impact.
-uv run seqledger maintenance dedupe <dataset> --dry-run
+# Apply the same rule (dna_4 only).
+uv run seqledger maintenance dedupe example_sequences \
+  --key sequence_ci --keep keep-first
 ```
 
 `sequence_ci` is valid only for `dna_4` datasets.
@@ -138,14 +151,14 @@ Merge controls:
 
 ```bash
 # Write timestamped snapshot under _snapshots/.
-uv run seqledger snapshot densegen_demo
+uv run seqledger snapshot example_sequences
 
-# Export canonical data.
-uv run seqledger export densegen_demo --fmt parquet --out /tmp/usr_exports
-uv run seqledger export densegen_demo --fmt csv --out /tmp/usr_exports
+# Export the combined base-plus-overlay view to explicit files.
+uv run seqledger export example_sequences --fmt parquet --out annotated_sequences.parquet
+uv run seqledger export example_sequences --fmt csv --out annotated_sequences.csv
 ```
 
 ## Next steps
 
 - End-to-end command chains: [SeqLedger workflow map](../operations/routes/workflow-map.md)
-- Quickstart path: [../getting-started/cli-quickstart.md](../getting-started/cli-quickstart.md)
+- Quickstart path: [Create your first dataset](../getting-started/cli-quickstart.md)

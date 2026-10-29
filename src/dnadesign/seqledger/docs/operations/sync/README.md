@@ -1,44 +1,29 @@
-## SeqLedger Sync over SSH
-
+<!--
 **Type:** route
 **Plane:** data-plane
 **Owner-boundary:** seqledger
 **Entry artifact:** sync intent that still needs a task-specific transfer route
 **Exit artifact:** chosen sync runbook for setup, execution, or troubleshooting
-
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
+[SeqLedger guide](../../README.md) / [Operations](../README.md)
 
-Use this page to choose setup, daily sync, or troubleshooting for SeqLedger dataset and file transfers over SSH.
+# Transfer datasets over SSH
 
-### Read this first
+Use sync to keep a complete dataset on another machine, including its overlays, sequence views and mutation history. `pull` copies remote state to the local root; `push` copies local state to the remote root. Choose the direction for each transfer rather than running both in sequence.
 
-- [quickstart.md](quickstart.md): minimum reliable loop (`diff` -> `pull`/`push`) and iterative HPC batch pattern.
-- [setup.md](setup.md): SSH keys, remote profile setup, and key rotation hygiene.
-- [modes.md](modes.md): dataset directory mode and file mode path mapping.
-- [troubleshooting.md](troubleshooting.md): failure signatures and deterministic diagnosis sequence.
+Start with [SSH and remote setup](setup.md), then follow the [transfer quickstart](quickstart.md).
 
-### Default sync contract
+| Task | Guide |
+| --- | --- |
+| Map a dataset directory or a single file | [Target modes and verification](modes.md) |
+| Read transfer decisions in JSON | [Sync audit output](audit-loop.md) |
+| Work between a local machine and HPC | [HPC transfer workflow](hpc-agent-flow.md) |
+| Diagnose a failed connection or transfer | [Troubleshooting](troubleshooting.md) |
+| Test sync changes locally | [Verification drills](fidelity-drills.md) |
 
-- Dataset sync defaults to `--verify hash` plus strict sidecar and `_derived`/`_auxiliary` content-hash fidelity checks.
-- Use `--no-verify-sidecars` only when you intentionally trade fidelity for speed.
-- Use `--no-verify-derived-hashes` only when you intentionally keep sidecar inventory checks but skip content-hash parity.
+Full dataset transfers default to primary-file hash verification, sidecar checks and content hashes for `_derived` and `_auxiliary` files. They do not preserve cross-host file ownership or permission bits. The [verification reference](modes.md#transfer-consistency) explains history checks, locking and partial-transfer options.
 
-### Quick command loop
-
-```bash
-# Preview local-vs-remote diff.
-uv run seqledger diff my_dataset bu-scc
-# Pull remote state into local dataset path.
-uv run seqledger pull my_dataset bu-scc -y
-# Push local state back to remote when needed.
-uv run seqledger push my_dataset bu-scc -y
-```
-
-### Related runbooks
-
-- [audit-loop.md](audit-loop.md)
-- [hpc-agent-flow.md](hpc-agent-flow.md)
-- [chained-densegen-infer-runbook.md](chained-densegen-infer-runbook.md)
-- [fidelity-drills.md](fidelity-drills.md)
+For a producer-specific example, see the [generation and inference transfer workflow](chained-densegen-infer-runbook.md).

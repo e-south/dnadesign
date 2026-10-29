@@ -1,248 +1,63 @@
-# SeqLedger Architecture Introspection
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
+[SeqLedger guide](README.md)
 
-## Decision summary
+# SeqLedger architecture
 
-- Scope: `src/dnadesign/seqledger/src/` package behavior, with emphasis on sync reliability, overlay materialization, and operator-facing contracts.
-- Assumptions: repository-local package layout is authoritative; CLI path is `uv run seqledger`.
-- Depth: deep package-level introspection with lifecycle, config-to-behavior mapping, and operational interaction boundaries.
+SeqLedger owns sequence identity, annotation storage and dataset transfer. Other tools produce sequences or annotations through its public API; analysis consumers read the combined records and overlays. [Notify](../../notify/) can consume mutation events independently of those producers.
 
-## Intent and use-case map
+## From input to annotated records
 
-- Problem intent:
-  - Maintain a canonical sequence store that supports iterative updates without losing reproducibility.
-  - Preserve strict mutation/event boundaries for sibling tools and operators.
-- Primary use cases:
-  - Initialize/import canonical records for flat or namespace-qualified datasets.
-  - Attach tool-derived overlays incrementally and materialize deterministically.
-  - Run iterative pull/push cycles between local and HPC roots with strict verification.
-  - Emit `.events.log` as operator integration boundary.
-- Secondary use cases:
-  - Snapshot, restore, and state transitions (`delete`, `restore`, `state set/clear/get`).
-  - Namespace registry governance and schema freeze checks.
-- Non-goals:
-  - Not a sequence generation runtime.
-  - Not a webhook transport runtime.
+1. The registry declares annotation namespaces and types.
+2. Import normalizes sequence identity and adds base records to `records.parquet`.
+3. Annotation writers join values by a declared key and write overlays under `_derived/`.
+4. Dataset reads apply overlays in deterministic order. Export produces this combined view without rewriting the base table.
+5. Maintenance operations can compact parts, materialize annotations or rewrite records when explicitly requested.
 
-## Core functionality and behavior contract
+Sequence views are separate sidecars for lineage and semantic identity. Their storage does not change a base record's sequence ID. The [schema reference](reference/schema-contract.md) defines both identities.
 
-- Canonical primary:
-  - Exactly one `records.parquet` per dataset root.
-- Overlay contract:
-  - Derived columns must be namespaced (`<namespace>__<field>`), with registry-governed schema.
-  - Overlay parts are append-only; read/materialize semantics are deterministic last-writer-wins.
-- Sync contract:
-  - Dataset sync defaults to primary hash verification plus strict sidecar parity.
-  - `_derived` and `_auxiliary` file-content hashes are verified by default;
-    `--verify-derived-hashes` states that default explicitly, while
-    `--no-verify-derived-hashes` is the deliberate opt-out.
-- Failure behavior:
-  - Hard errors on invalid schema, missing required files, unsupported paths, and verification mismatches.
-  - Pull promotes staged payload only after verification; partial transfer does not mutate canonical local primary.
+## Ownership and entry points
 
-## Lifecycle model
+Cross-tool code imports `dnadesign.seqledger`; `dnadesign.seqledger.src` is internal. The CLI parses arguments and delegates to dataset, maintenance or sync operations. The [code map](reference/dataset-layout-and-code-map.md#maintainer-code-map) identifies the owning packages.
 
-1. Bootstrap:
-  - Register namespace contract, init dataset, import canonical records.
-2. Enrichment:
-  - Attach overlays by key (`id`, `sequence`, `sequence_norm`, `sequence_ci`) under namespace constraints.
-3. Consolidation:
-  - Materialize overlays into base records with maintenance-gated mutation.
-4. Distribution:
-  - Diff/pull/push between roots with verification and sync audit summaries.
-5. Governance:
-  - Event emission, snapshots, tombstones/state overlays, and registry freeze checkpoints.
+- `dataset/` coordinates helpers under `datasets/` for reads and mutations.
+- `registry/`, `contracts/` and `overlays/` enforce column and namespace rules.
+- `storage/` provides Parquet operations and dataset locks.
+- `events/` records mutations and redacts sensitive arguments.
+- `sync/` manages remote comparison, transfer and verification.
 
-Edge cases handled:
-- Interrupted pull/push retries.
-- Sidecar inventory mismatch (`_derived`, `_snapshots`, `_auxiliary`).
-- Hash mismatch in default derived and auxiliary content verification.
-- Archived storage is kept out of default live dataset-id discovery while explicit archived paths remain readable.
-- Strict bootstrap dataset-id enforcement.
+Keep producer-specific choices in the producing tool. A storage call should receive explicit sequences, annotation values or view metadata rather than infer scientific interpretation from a dataset name.
 
-## Architecture view stack
+## Mutation and read contracts
 
-Unless noted otherwise, the modules in this section live under `src/dnadesign/seqledger/src/`.
-Package-root Python should stay limited to `__init__.py` and `__main__.py`; cross-tool consumers import from `dnadesign.seqledger`, not sibling root modules.
+Base records have content-derived IDs. Annotations are namespaced and typed by the registry. Overlay resolution is last-writer-wins in part order, with creation time and filename determining that order. `write_overlay_part(overwrite=False)` checks occupied cells while holding the dataset write lock.
 
-- Context view:
-  - DenseGen/Infer write annotations into SeqLedger datasets.
-  - Notify consumes SeqLedger `.events.log`.
-- Container/module view:
-  - CLI/wiring: `cli/*`, `cli/commands/*`, `cli/commands/datasets/*`, `cli/commands/lifecycle/*`, `cli/commands/maintenance/*`, `cli/commands/namespace/*`, `cli/commands/query/*`, `cli/commands/read_views/*`, `cli/commands/remotes/*`, `cli/commands/sync/*`, `cli/commands/tooling/*`, `cli/support/*`
-  - Shared contracts: `contracts/*` for errors, schema constants, API dataclasses, and sequence normalization/id rules
-  - Dataset core: `dataset/*` coordinating helpers under `datasets/*`, with core identity/ingest/activity helpers under `datasets/core/*`, demo/mock generation under `datasets/demo/*`, lifecycle/registry/materialization/snapshot coordination under `datasets/lifecycle/*`, maintenance-gated mutation helpers under `datasets/maintenance/*`, maintenance-gated merge execution under `datasets/merge/*`, overlay mutation logic under `datasets/overlay/*`, overlay query/catalog logic under `datasets/query/*`, reserved state lifecycle under `datasets/state/*`, integrity checks under `datasets/validate/*`, and read/export flows under `datasets/views/*`
-  - Sync core: `sync/*` coordinating helpers under `sync/remote/*`, including execution orchestration under `sync/remote/execution.py`
-  - Runtime helpers: `runtime/*`, currently centered on DuckDB UTC session enforcement
-  - Overlay support: `overlays/*` plus `overlays/support/*`
-  - RegulonDB support: `regulondb/*` for source-specific promoter/regulator enrichment helpers
-  - Registry/event contracts: `registry/*` and `events/*`, keeping the import surface stable while decomposing internal helpers
-  - Ops entrypoints and test support outside `usr/src`: `../ops/sync_audit_drill.py` for the stable deterministic sync drill and `../../devtools/tests/support/usr.py` for cross-tool SeqLedger fixture helpers
-- Component/function view:
-  - Sync: `execute_pull`, `execute_push`, `verify_sidecar_state_match`, `stat_dataset`
-  - Overlay materialize: `materialize_dataset`, `validate_overlay_schema`
-  - Registry enforcement: `register_namespace`, `parse_columns_spec`
-  - Repair pre-clean dedupe: `apply_casefold_sequence_dedupe`
+Normal reads include overlays and exclude deleted records by default. Direct Parquet reads bypass those rules. Compaction consolidates overlay parts; materialization writes the effective annotations into the base table. Neither is required to inspect or export annotations.
 
-Runtime interaction scenario:
-- HPC batch appends overlays -> local `seqledger pull` stages and verifies -> local analysis/infer writes overlays -> `seqledger push` verifies remote parity -> operators inspect sync audit and `.events.log`.
+Use [maintenance commands](reference/maintenance.md) for deliberate rewrites. Event-log gardening also requires coordination with active consumers because their saved byte offsets become invalid after the log is rewritten.
 
-## Config-schema to behavior mapping
+## Transfer contracts
 
-| Key | Source | Behavior effect |
-| --- | --- | --- |
-| `--root` | CLI root callback | Selects dataset root boundary and path resolution context. |
-| `--verify` (`hash|auto|size|parquet`) | Sync CLI + diff resolver | Chooses primary verification method for diff/pull/push. |
-| `--verify-sidecars` / `--no-verify-sidecars` | Sync policy | Enables/disables strict sidecar parity checks for dataset mode. |
-| `--verify-derived-hashes` / `--no-verify-derived-hashes` | Sync policy + sidecar verifier | Explicitly retains or opts out of the default content-hash verification for `_derived` and `_auxiliary`. |
-| `SEQLEDGER_SYNC_STRICT_BOOTSTRAP_ID=1` | Sync CLI policy | Requires an explicit canonical dataset id on bootstrap pulls and disables local name guessing. |
-| `SEQLEDGER_SHOW_DEV_COMMANDS=1` | CLI app registration | Enables hidden dev subcommands in CLI surface. |
-| `SEQLEDGER_REMOTES_PATH` | Remote config loading | Selects remotes registry path for SSH sync profiles. |
+Dataset sync compares the primary table, events and sidecars. It defaults to hash verification and content-hash checks for `_derived` and `_auxiliary` files. Hashing cost grows with the amount of data, but disabling checks changes the fidelity guarantee.
 
-Precedence notes:
-- Explicit CLI flags override defaults.
-- Sidecar/derived-hash flags are dataset-only and fail fast in file mode.
+Pull stages data and verifies it before promotion. Push checks compatible event history while holding transfer locks. Transfers do not merge independently diverged histories. The [sync reference](operations/sync/modes.md#transfer-consistency) describes locking, history and verification rules; the [audit guide](operations/sync/audit-loop.md) explains machine-readable results.
 
-## Interaction map
+## Configuration boundaries
 
-- Upstream inputs:
-  - Tool outputs (DenseGen, Infer) as overlay attachments.
-  - Remote SSH roots for cross-location sync.
-- Downstream consumers:
-  - Notebook and analysis consumers reading canonical records + overlays.
-  - Notify operator workflows via `.events.log`.
-- Control/data flow:
-  - CLI -> command handlers -> dataset/sync/runtime modules -> filesystem/remote subprocesses.
-  - Registry and schema checks gate writes/materialization.
+| Setting | Effect |
+| --- | --- |
+| `--root` / `DNADESIGN_SEQLEDGER_ROOT` | Select the local dataset root; otherwise use `./seqledger_datasets` |
+| `--remotes-config` / `SEQLEDGER_REMOTES_PATH` | Select the private SSH remote configuration |
+| `--verify` | Choose primary-file verification for sync |
+| `--verify-sidecars` | Check complete dataset sidecar parity |
+| `--verify-derived-hashes` | Check overlay and auxiliary content hashes |
+| `--strict-bootstrap-id` | Require an explicit canonical ID for a bootstrap pull |
 
-## Math and operations notes
+Explicit CLI choices take precedence over environment defaults. Sidecar verification options apply to dataset transfers, not single-file transfers. For commands and setup, use the [sync guide](operations/sync/README.md).
 
-- Primary identity:
-  - `id = sha1("bio_type|sequence_norm")` (stable identity over normalized sequence and bio_type).
-- Diff/verification complexity:
-  - Primary hash verification is `O(file_size)`.
-  - Default sidecar content hashes scale with number and size of `_derived` and auxiliary files.
-- Overlay resolution:
-  - Last-writer-wins by overlay part ordering (`created_at`, filename tiebreak).
+## Validate a change
 
-## Evidence ledger
-
-- CLI wiring and sync surface:
-  - `src/dnadesign/seqledger/src/cli/__init__.py`
-  - `src/dnadesign/seqledger/src/cli/support/resolution/dataset_targets.py`
-  - `src/dnadesign/seqledger/src/cli/support/resolution/roots.py`
-  - `src/dnadesign/seqledger/src/cli/support/wiring/dependencies.py`
-  - `src/dnadesign/seqledger/src/cli/support/wiring/registration.py`
-  - `src/dnadesign/seqledger/src/cli/support/presentation/pretty.py`
-  - `src/dnadesign/seqledger/src/cli/support/presentation/rendering.py`
-  - `src/dnadesign/seqledger/src/cli/support/presentation/runtime.py`
-  - `src/dnadesign/seqledger/src/cli/commands/datasets/__init__.py`
-  - `src/dnadesign/seqledger/src/cli/commands/datasets/catalog.py`
-  - `src/dnadesign/seqledger/src/cli/commands/datasets/resolution.py`
-  - `src/dnadesign/seqledger/src/cli/commands/lifecycle/__init__.py`
-  - `src/dnadesign/seqledger/src/cli/commands/lifecycle/cli.py`
-  - `src/dnadesign/seqledger/src/cli/commands/lifecycle/materialize.py`
-  - `src/dnadesign/seqledger/src/cli/commands/lifecycle/snapshot.py`
-  - `src/dnadesign/seqledger/src/cli/commands/lifecycle/state.py`
-  - `src/dnadesign/seqledger/src/cli/commands/lifecycle/write.py`
-  - `src/dnadesign/seqledger/src/cli/commands/maintenance/__init__.py`
-  - `src/dnadesign/seqledger/src/cli/commands/maintenance/cli.py`
-  - `src/dnadesign/seqledger/src/cli/commands/maintenance/dedupe.py`
-  - `src/dnadesign/seqledger/src/cli/commands/maintenance/merge.py`
-  - `src/dnadesign/seqledger/src/cli/commands/maintenance/overlay.py`
-  - `src/dnadesign/seqledger/src/cli/commands/maintenance/registry.py`
-  - `src/dnadesign/seqledger/src/cli/commands/namespace/__init__.py`
-  - `src/dnadesign/seqledger/src/cli/commands/namespace/cli.py`
-  - `src/dnadesign/seqledger/src/cli/commands/query/__init__.py`
-  - `src/dnadesign/seqledger/src/cli/commands/query/cli.py`
-  - `src/dnadesign/seqledger/src/cli/commands/query/read.py`
-  - `src/dnadesign/seqledger/src/cli/commands/query/runtime.py`
-  - `src/dnadesign/seqledger/src/cli/commands/read_views/__init__.py`
-  - `src/dnadesign/seqledger/src/cli/commands/read_views/parquet_targets.py`
-  - `src/dnadesign/seqledger/src/cli/commands/remotes/__init__.py`
-  - `src/dnadesign/seqledger/src/cli/commands/remotes/cli.py`
-  - `src/dnadesign/seqledger/src/cli/commands/sync/__init__.py`
-  - `src/dnadesign/seqledger/src/cli/commands/sync/cli.py`
-  - `src/dnadesign/seqledger/src/cli/commands/tooling/__init__.py`
-  - `src/dnadesign/seqledger/src/cli/commands/tooling/cli.py`
-  - `src/dnadesign/seqledger/src/cli/commands/tooling/dev.py`
-  - `src/dnadesign/seqledger/src/cli/commands/tooling/shared.py`
-- Sync behavior and verification:
-  - `src/dnadesign/seqledger/src/sync/__init__.py`
-  - `src/dnadesign/seqledger/src/sync/remote/execution.py`
-  - `src/dnadesign/seqledger/src/sync/remote/sidecars.py`
-  - `src/dnadesign/seqledger/src/sync/remote/remote.py`
-  - `src/dnadesign/seqledger/src/sync/remote/diff.py`
-  - `src/dnadesign/seqledger/ops/sync_audit_drill.py`
-- Overlay/materialize and schema contracts:
-  - `src/dnadesign/seqledger/src/datasets/core/__init__.py`
-  - `src/dnadesign/seqledger/src/datasets/core/activity.py`
-  - `src/dnadesign/seqledger/src/datasets/core/events.py`
-  - `src/dnadesign/seqledger/src/datasets/core/identity.py`
-  - `src/dnadesign/seqledger/src/datasets/core/ingest.py`
-  - `src/dnadesign/seqledger/src/datasets/demo/__init__.py`
-  - `src/dnadesign/seqledger/src/datasets/demo/mock.py`
-  - `src/dnadesign/seqledger/src/datasets/lifecycle/__init__.py`
-  - `src/dnadesign/seqledger/src/datasets/lifecycle/materialize.py`
-  - `src/dnadesign/seqledger/src/datasets/lifecycle/registry.py`
-  - `src/dnadesign/seqledger/src/datasets/lifecycle/snapshot.py`
-  - `src/dnadesign/seqledger/src/datasets/lifecycle/write_session.py`
-  - `src/dnadesign/seqledger/src/datasets/maintenance/__init__.py`
-  - `src/dnadesign/seqledger/src/datasets/maintenance/dedupe.py`
-  - `src/dnadesign/seqledger/src/datasets/merge/__init__.py`
-  - `src/dnadesign/seqledger/src/datasets/merge/execution.py`
-  - `src/dnadesign/seqledger/src/datasets/merge/overlay_carry.py`
-  - `src/dnadesign/seqledger/src/datasets/overlay/__init__.py`
-  - `src/dnadesign/seqledger/src/datasets/overlay/attach.py`
-  - `src/dnadesign/seqledger/src/datasets/overlay/maintenance.py`
-  - `src/dnadesign/seqledger/src/datasets/overlay/policy.py`
-  - `src/dnadesign/seqledger/src/datasets/overlay/write.py`
-  - `src/dnadesign/seqledger/src/datasets/query/__init__.py`
-  - `src/dnadesign/seqledger/src/datasets/query/catalog.py`
-  - `src/dnadesign/seqledger/src/datasets/query/planner.py`
-  - `src/dnadesign/seqledger/src/datasets/state/__init__.py`
-  - `src/dnadesign/seqledger/src/datasets/state/facade.py`
-  - `src/dnadesign/seqledger/src/datasets/state/reserved_overlay.py`
-  - `src/dnadesign/seqledger/src/datasets/validate/__init__.py`
-  - `src/dnadesign/seqledger/src/datasets/validate/registry_modes.py`
-  - `src/dnadesign/seqledger/src/datasets/views/__init__.py`
-  - `src/dnadesign/seqledger/src/datasets/views/reporting.py`
-  - `src/dnadesign/seqledger/src/datasets/views/read_keys.py`
-  - `src/dnadesign/seqledger/src/contracts/__init__.py`
-  - `src/dnadesign/seqledger/src/contracts/errors.py`
-  - `src/dnadesign/seqledger/src/contracts/normalize.py`
-  - `src/dnadesign/seqledger/src/contracts/schema.py`
-  - `src/dnadesign/seqledger/src/contracts/types.py`
-  - `src/dnadesign/seqledger/src/events/__init__.py`
-  - `src/dnadesign/seqledger/src/events/actor.py`
-  - `src/dnadesign/seqledger/src/events/defaults.py`
-  - `src/dnadesign/seqledger/src/events/fingerprint.py`
-  - `src/dnadesign/seqledger/src/events/recording.py`
-  - `src/dnadesign/seqledger/src/events/redaction.py`
-  - `src/dnadesign/seqledger/src/overlays/support/digest_ledger.py`
-  - `src/dnadesign/seqledger/src/overlays/__init__.py`
-  - `src/dnadesign/seqledger/src/overlays/constants.py`
-  - `src/dnadesign/seqledger/src/overlays/metadata.py`
-  - `src/dnadesign/seqledger/src/overlays/paths.py`
-  - `src/dnadesign/seqledger/src/registry/__init__.py`
-  - `src/dnadesign/seqledger/src/registry/models.py`
-  - `src/dnadesign/seqledger/src/registry/storage.py`
-  - `src/dnadesign/seqledger/src/registry/typespec.py`
-  - `src/dnadesign/seqledger/src/registry/validation.py`
-  - `src/dnadesign/seqledger/src/runtime/__init__.py`
-  - `src/dnadesign/seqledger/src/runtime/duckdb.py`
-- Behavior and reliability tests:
-  - `src/dnadesign/seqledger/tests/sync/test_sync_iterative_batch_flow.py`
-  - `src/dnadesign/seqledger/tests/sync/test_sync_schema_adversarial.py`
-  - `src/dnadesign/seqledger/tests/docs_contract/test_sync.py`
-
-## Open questions and risk notes
-
-- `dataset/` remains a large orchestration surface; core identity/ingest helpers now live under `datasets/core/*`, demo/mock helpers under `datasets/demo/*`, registry freeze/write-session/materialization under `datasets/lifecycle/*`, maintenance operations under `datasets/maintenance/*`, merge execution under `datasets/merge/*`, and reserved-overlay paths under `datasets/state/*`.
-- The layout contract now depends on helper families remaining under sanctioned subpackages; adding new top-level `usr/src/*.py` helpers should be treated as an architecture regression unless they are true coordinators.
-- Closed helper clusters should keep nesting under their owning family instead of adding new sibling flat modules; `contracts/*`, `events/*`, `overlays/*`, `registry/*`, `cli/commands/datasets/*`, `cli/commands/lifecycle/*`, `cli/commands/maintenance/*`, `cli/commands/namespace/*`, `cli/commands/query/*`, `cli/commands/read_views/*`, `cli/commands/remotes/*`, `cli/commands/sync/*`, `cli/commands/tooling/*`, `datasets/core/*`, `datasets/demo/*`, `datasets/lifecycle/*`, `datasets/maintenance/*`, `datasets/merge/*`, `datasets/overlay/*`, `datasets/query/*`, `datasets/state/*`, `datasets/validate/*`, `datasets/views/*`, and `runtime/*` are the current precedent.
-- Default derived and auxiliary content hashing can add runtime cost on very large overlay trees; any opt-out should be an explicit operator decision tied to transfer-window constraints.
-- Sync audit output is strong for decision support; adding machine-readable audit snapshots may further improve automated orchestration loops.
+Start with the tests for the affected owner. Schema and overlay changes also need read/export coverage; sync changes need interruption, divergence and fidelity checks. [Sync verification drills](operations/sync/fidelity-drills.md) provide local test entry points. [Repository change gates](../../../../docs/repo-change-gate.md) define the shared documentation, architecture and lint checks.

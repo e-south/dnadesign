@@ -1,78 +1,35 @@
-# SeqLedger operations runbooks
-
+<!--
 **Type:** route
 **Plane:** data-plane
 **Owner-boundary:** seqledger
 **Entry artifact:** SeqLedger dataset, sync, or cross-tool shared-dataset work that still needs a route
 **Exit artifact:** SeqLedger runbook or downstream handoff route
-
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-Use this index to pick the next dataset, sync, or handoff step.
+[SeqLedger guide](../README.md)
 
-## Sync and transfer
+# SeqLedger operations runbooks
 
-| Need | Runbook |
-| --- | --- |
-| Pick a command chain by scenario, then drill into exact steps | [workflow-map.md](routes/workflow-map.md) |
-| Choose sync quickstart, setup, modes, or troubleshooting | [sync.md](sync/README.md) |
-| Run the minimum daily `diff` -> `pull` -> `push` loop | [sync-quickstart.md](sync/quickstart.md) |
-| Configure one-time SSH keys, remote profiles, and rotation | [sync-setup.md](sync/setup.md) |
-| Map source and target paths for dataset-directory vs file mode | [sync-modes.md](sync/modes.md) |
-| Diagnose transfer and verification failures in deterministic order | [sync-troubleshooting.md](sync/troubleshooting.md) |
-| Emit machine-readable transfer decisions for chained commands | [sync-audit-loop.md](sync/audit-loop.md) |
-| Iterate HPC batch writes with local pull/verify checkpoints | [hpc-agent-sync-flow.md](sync/hpc-agent-flow.md) |
-| Chain DenseGen and Infer updates with bidirectional sync | [chained-densegen-infer-sync-runbook.md](sync/chained-densegen-infer-runbook.md) |
+Choose the procedure that matches the dataset change you need. For a first local import and annotation, use the [quickstart](../getting-started/cli-quickstart.md).
 
-## Shared dataset assembly
+## Transfer data
 
-| Need | Runbook |
-| --- | --- |
-| Combine multiple SeqLedger-backed producer datasets before construct and infer share one downstream dataset | [multi-source-shared-dataset-assembly.md](assembly/multi-source-shared-dataset.md) |
-| Build one construct-backed dataset, then hand it to infer | [construct-infer-shared-dataset-runbook.md](assembly/construct-infer-shared-dataset-runbook.md) |
-| Route Permuter RT-lnRNA (`rt_lnrna`) variants through study-owned construct-subject promotion, Construct context realization, and Infer sidecars | [permuter-construct-infer-shared-dataset.md](assembly/permuter-construct-infer-shared-dataset.md) |
+- [Sync over SSH](sync/README.md): set up a remote, compare copies and transfer in one direction.
+- [Sync audit output](sync/audit-loop.md): inspect machine-readable transfer decisions.
+- [Iterative HPC workflow](sync/hpc-agent-flow.md): coordinate remote production with local analysis.
+- [Chained generation and inference](sync/chained-densegen-infer-runbook.md): an example using DenseGen and Infer.
 
-## Feature assembly
+## Combine or annotate datasets
 
-| Need | Runbook |
-| --- | --- |
-| Build one infer-annotated promoter feature dataset, then continue to Cluster or OPAL after choosing one explicit `X` column | [promoter-characterization-feature-matrix.md](promoter/characterization-feature-matrix.md) |
+- [Multi-source assembly](assembly/multi-source-shared-dataset.md): merge selected records and explicitly carry compatible annotations.
+- [Construct to Infer](assembly/construct-infer-shared-dataset-runbook.md): assemble sequence contexts and use the resulting dataset for inference.
+- [Permuter to Construct and Infer](assembly/permuter-construct-infer-shared-dataset.md): connect variant records to context realization and feature extraction.
+- [Promoter feature-matrix example](promoter/characterization-feature-matrix.md): a worked application of these steps before clustering or selection.
 
-## Validation and drills
+## Maintain and verify
 
-| Need | Runbook |
-| --- | --- |
-| Pressure-test schema, sidecar, and overlay fidelity failure paths | [sync-fidelity-drills.md](sync/fidelity-drills.md) |
-| Run one-pass mock batch plus adversarial pressure checks | [workflow-map.md](routes/workflow-map.md#pressure-test-loop-mock-batch--adversarial-schemas) |
-| Run deterministic preflight/run/verify cycle (optional drill toggle) | [workflow-map.md](routes/workflow-map.md#deterministic-harness-cycle) |
-| Run deterministic local `diff`/`pull`/`push` audit drill | [workflow-map.md](routes/workflow-map.md#deterministic-sync-audit-drill) using `uv run seqledger-sync-audit-drill` |
+[Maintenance](../reference/maintenance.md) covers snapshots, compaction, merging and materialization. The [workflow map](routes/workflow-map.md) distinguishes those operations from routine reads and exports.
 
-## Read order
-
-1. [workflow-map.md](routes/workflow-map.md): command chains by task.
-2. Sync lifecycle:
-   [sync-quickstart.md](sync/quickstart.md),
-   [sync-setup.md](sync/setup.md),
-   [sync-modes.md](sync/modes.md),
-   [sync-troubleshooting.md](sync/troubleshooting.md),
-   [sync-audit-loop.md](sync/audit-loop.md),
-   [hpc-agent-sync-flow.md](sync/hpc-agent-flow.md),
-   [chained-densegen-infer-sync-runbook.md](sync/chained-densegen-infer-runbook.md)
-3. Shared dataset assembly:
-   [multi-source-shared-dataset-assembly.md](assembly/multi-source-shared-dataset.md),
-   [construct-infer-shared-dataset-runbook.md](assembly/construct-infer-shared-dataset-runbook.md),
-   [permuter-construct-infer-shared-dataset.md](assembly/permuter-construct-infer-shared-dataset.md)
-4. Feature assembly:
-   [promoter-characterization-feature-matrix.md](promoter/characterization-feature-matrix.md)
-5. Validation drills:
-   [sync-fidelity-drills.md](sync/fidelity-drills.md),
-   [workflow-map.md#deterministic-sync-audit-drill](routes/workflow-map.md#deterministic-sync-audit-drill) using `uv run seqledger-sync-audit-drill`
-
-## Operator contract
-
-- Run `diff` before transfer decisions.
-- Default dataset sync contract is `--verify hash` with strict sidecar and `_derived`/`_auxiliary` content-hash checks enabled.
-- Use `--no-verify-sidecars` only when an operator explicitly accepts reduced fidelity checks.
-- Use `--no-verify-derived-hashes` only when an operator explicitly accepts reduced content-hash fidelity.
-- Use sync audit output (`Primary`, `.events.log`, `_snapshots`, `_derived`, `_auxiliary`) to decide pull/push actions.
+For contributors changing transfer behavior, [sync fidelity drills](sync/fidelity-drills.md) exercise failure paths and data checks. These are development checks, not prerequisites for using a dataset.

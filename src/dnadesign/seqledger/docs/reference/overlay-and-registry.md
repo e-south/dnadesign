@@ -1,14 +1,17 @@
-# SeqLedger overlay and registry contract
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
+[SeqLedger guide](../README.md)
+
+# SeqLedger overlay and registry contract
 
 ## Overlay merge semantics
 
-SeqLedger overlays are append-only parts under `_derived/<namespace>/`.
+SeqLedger stores an annotation namespace as a compact file at `_derived/<namespace>.parquet` or as incremental parts under `_derived/<namespace>/`. Reads combine these annotations with the base records.
 
-On read/materialize, overlay view is deterministic last-writer-wins:
+For reads and materialization, overlay resolution is deterministic and last-writer-wins:
 
 1. Overlay parts are ordered by `created_at` descending, then filename descending.
 2. For each join key (`id` or `sequence`), newest value wins per column.
@@ -16,7 +19,7 @@ On read/materialize, overlay view is deterministic last-writer-wins:
 Operational implications:
 
 - Join keys in a single overlay part must be unique.
-- Re-attaching the same namespace/columns in a newer part overrides older values.
+- When an overwrite is allowed, a newer part overrides older values for the same key and column. CLI attachment requires explicit `--allow-overwrite` for conflicts.
 - Compact parts periodically with `uv run seqledger maintenance overlay-compact ...` to reduce read overhead.
 - Refresh compact overlay metadata with `uv run seqledger maintenance overlay-refresh-metadata ...` when the namespace contract is current but the full-registry hash stamp is stale.
 - After compaction, future overlay-part appends are allowed; SeqLedger promotes the compact file into part form before appending.
@@ -33,7 +36,7 @@ All dataset mutations require a registry at the datasets root (`registry.yaml`).
 - For repo-owned shared roots such as `src/dnadesign/seqledger/datasets`, `registry.yaml` is a tracked cross-tool contract for sibling tools that write or validate namespaced overlays.
 - Keep shared-root registry changes committed and synced across clones before relying on `seqledger validate --strict`, `seqledger diff`, `seqledger pull`, or `seqledger push`.
 - `usr:registry_hash` is derived from the serialized `registry.yaml` bytes, so canonical namespace and column ordering is part of the current contract.
-- Overlay writers now also stamp `usr:namespace_contract_hash` for the specific namespace they emit.
+- Overlay writers stamp `usr:namespace_contract_hash` for the specific namespace they emit.
 - `usr:namespace_contract_hash` hashes only the namespace id plus ordered column name/type pairs; owner and description remain catalog metadata, not compatibility inputs.
 - Opt into namespace-scoped validation explicitly with `--registry-mode namespace-current`, `namespace-frozen`, or `namespace-either`.
 
@@ -80,7 +83,7 @@ uv run seqledger namespace show mock
 Freeze registry snapshot into dataset:
 
 ```bash
-uv run seqledger maintenance registry-freeze densegen_demo
+uv run seqledger maintenance registry-freeze example_sequences
 ```
 
 Auto-freeze behavior: on first dataset mutation with a registry present, SeqLedger writes `_registry/registry.<hash>.yaml` and stamps `usr:registry_hash` into `records.parquet`.
@@ -110,7 +113,7 @@ Sequence views are additive metadata. They do not replace sequence-derived base 
 
 - Canonical essentials are stable: `id`, `bio_type`, `sequence`, `alphabet`, `length`, `source`, `created_at`.
 - Base records are append-only; updates happen via overlays; base rewrites are maintenance operations.
-- Writes are atomic; snapshots are written under `_snapshots/`.
+- Dataset writes use a lock; snapshots are written under `_snapshots/`.
 - Tombstones are logical (`usr__deleted`, `usr__deleted_at`, `usr__deleted_reason`) and hidden by default.
 - `usr_state` fields are standardized and registry-governed.
 

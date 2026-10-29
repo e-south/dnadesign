@@ -1,5 +1,4 @@
-## Promoter Characterization Feature Matrix
-
+<!--
 **Type:** runbook
 **Plane:** data-plane
 **Owner-boundary:** seqledger
@@ -9,9 +8,13 @@
 **Summary:** Build one infer-annotated feature matrix from mixed promoter sources before branching into Cluster or OPAL.
 **Execution-kind:** staged
 **Status-kind:** seqledger-dataset-state
-
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
+
+[SeqLedger guide](../../README.md)
+
+## Promoter Characterization Feature Matrix
 
 Use this runbook when promoter candidates come from multiple SeqLedger-backed sources and downstream consumers should see one infer-annotated feature matrix with explicit provenance.
 

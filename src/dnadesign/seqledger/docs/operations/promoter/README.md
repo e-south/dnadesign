@@ -1,9 +1,10 @@
-## Promoter data routes
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-Use this folder for data-plane routes that assemble or annotate promoter
-feature datasets before downstream analysis.
+[SeqLedger guide](../../README.md) / [Operations](../README.md)
 
-- [Characterization feature matrix](characterization-feature-matrix.md): build one infer-annotated promoter feature dataset before Cluster or OPAL.
+# Promoter feature-matrix example
+
+[Build a characterization feature matrix](characterization-feature-matrix.md) shows how to combine promoter records, optional sequence contexts and Infer features before clustering or candidate selection. For general dataset operations, start with the [local quickstart](../../getting-started/cli-quickstart.md).
