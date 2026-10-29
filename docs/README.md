@@ -2,13 +2,13 @@
 doc_id: documentation-index
 surface: docs-router
 owner: dnadesign-maintainers
-last_verified: 2026-10-28
+last_verified: 2026-10-29
 ---
 
 ## Documentation Index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 
 Find the next task, command, or reference doc from the routes below.
 
@@ -36,7 +36,6 @@ contracts.
 
 | Tool | What it owns | First command | Next doc |
 | --- | --- | --- | --- |
-| `densegen` | existing workspaces and their current output state | `uv run dense workspace list` | [DenseGen workspaces](../src/dnadesign/densegen/workspaces/README.md) |
 | `construct` | packaged workspaces and their current output state | `uv run construct workspace list` | [Construct workspaces](../src/dnadesign/construct/workspaces/README.md) |
 | `infer` | packaged workspaces and their current output state | `uv run infer workspace list` | [infer workspaces](../src/dnadesign/infer/workspaces/README.md) |
 | `cluster` | packaged workspaces and their current output state | `uv run cluster workspace list` | [Cluster workspaces](../src/dnadesign/cluster/workspaces/README.md) |
@@ -50,7 +49,6 @@ Use these when one tool owns the next step.
 
 | Need | Primary workflow | Verify next |
 | --- | --- | --- |
-| Inspect a DenseGen workspace | [DenseGen docs overview](../src/dnadesign/densegen/docs/README.md) | Inspect records with [DenseGen outputs reference](../src/dnadesign/densegen/docs/reference/outputs.md). |
 | Build DNA constructs from templates or multiple parts into derived datasets | [Construct docs overview](../src/dnadesign/construct/docs/README.md) | Verify resulting lineage and sequence identity in [SeqLedger schema contract](../src/dnadesign/seqledger/docs/reference/schema-contract.md). |
 | Compose declared linear ssDNA parts into a local artifact bundle | [Construct linear ssDNA composition](../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md) | Verify the bundle manifest, optional Folding plot artifacts, and optional BaseRender review handoff. |
 | Select candidates from measured labels and sequence features | [OPAL demo and campaign workflow](../src/dnadesign/opal/docs/index.md) | Inspect and export the selected batch with [OPAL selection commands](../src/dnadesign/opal/docs/reference/cli.md#selection-batch). |
@@ -72,7 +70,6 @@ Use these when data moves through more than one tool and the shared record lives
 | Build a promoter feature dataset from anchors, wildtype/manual promoters, optional construct contexts, and infer outputs | [Promoter characterization feature matrix](../src/dnadesign/seqledger/docs/operations/promoter/characterization-feature-matrix.md) | Verify one explicit `infer__...` column is chosen as `X` or export a flattened matrix before continuing to the exploratory [cluster workflow](../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) or the downstream [SeqLedger dataset with infer-derived X -> OPAL active learning](../src/dnadesign/opal/docs/workflows/seqledger-infer-x-active-learning.md) workflow. |
 | Sync iterative HPC outputs to local analysis safely | [SeqLedger workflow map](../src/dnadesign/seqledger/docs/operations/routes/workflow-map.md) -> [SeqLedger HPC sync flow](../src/dnadesign/seqledger/docs/operations/sync/hpc-agent-flow.md) | Verify transfer parity with [SeqLedger sync audit loop](../src/dnadesign/seqledger/docs/operations/sync/audit-loop.md). |
 | Run cross-machine sync with stricter failure checks | [SeqLedger sync command contract](../src/dnadesign/seqledger/docs/operations/sync/README.md) | Verify sidecar and overlay fidelity with [SeqLedger sync fidelity drills](../src/dnadesign/seqledger/docs/operations/sync/fidelity-drills.md). |
-| Chain DenseGen -> SeqLedger -> Infer -> SeqLedger updates | [Chained DenseGen and Infer sync runbook](../src/dnadesign/seqledger/docs/operations/sync/chained-densegen-infer-runbook.md) | Verify downstream dataset state with [Infer docs](../src/dnadesign/infer/docs/README.md). |
 
 #### Scheduler and environment workflows
 
@@ -81,7 +78,7 @@ Use these when the next step is orchestration, environment setup, or audit outpu
 | Need | Primary workflow | Verify next |
 | --- | --- | --- |
 | Run BU SCC batch jobs with notifications | [BU SCC batch + notify runbook](bu-scc/runbooks/batch-notify.md) | Verify event delivery contract in [Notify SeqLedger events contract](notify/seqledger-events.md). |
-| Plan and execute deterministic DenseGen/Infer HPC orchestration runbooks | [Ops orchestration index](operations/README.md) | Verify command ordering and outcomes in [orchestration audit contract](operations/orchestration/runbooks.md#contract-rules). |
+| Plan and execute configured batch workflows | [Ops orchestration index](operations/README.md) | Verify command ordering and outcomes in [orchestration audit contract](operations/orchestration/runbooks.md#contract-rules). |
 
 ### Tool docs
 
@@ -95,14 +92,13 @@ files produced by other tools; their guides describe the required inputs.
 | `aligner` | n/a | [aligner docs](../src/dnadesign/aligner/docs/README.md) |
 | `cluster` | `uv run cluster --help` | [cluster README](../src/dnadesign/cluster/README.md) |
 | `cruncher` | `uv run cruncher --help` | [cruncher README](../src/dnadesign/cruncher/README.md) |
-| `densegen` | `uv run dense --help` | [DenseGen docs](../src/dnadesign/densegen/README.md) |
 | `construct` | `uv run construct --help` | [construct README](../src/dnadesign/construct/README.md) |
 | `junction` | `uv run junction --help` | [junction docs](../src/dnadesign/junction/docs/README.md); plans oligos directly from a request file |
 | `infer` | `uv run infer --help` | [infer README](../src/dnadesign/infer/README.md) |
 | `latentdna` | `uv run latentdna --help` | [latentdna README](../src/dnadesign/latentdna/README.md) |
 | `opal` | `uv run opal --help` | [opal README](../src/dnadesign/opal/README.md) |
 | `permuter` | `uv run permuter --help` | [permuter docs](../src/dnadesign/permuter/docs/README.md) |
-| `seqledger` | `uv run seqledger --help` | [usr README](../src/dnadesign/seqledger/README.md) |
+| `seqledger` | `uv run seqledger --help` | [SeqLedger README](../src/dnadesign/seqledger/README.md) |
 
 #### Artifact services
 

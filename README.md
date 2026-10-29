@@ -18,7 +18,6 @@ Each tool's documentation covers its setup, examples, inputs, and outputs.
 | --- | --- |
 | [**seqledger**](src/dnadesign/seqledger/) | Store, check, and sync tables of sequence records. |
 | [**infer**](src/dnadesign/infer/) | Run sequence models and add their predictions to datasets. |
-| [**densegen**](src/dnadesign/densegen/) | Generate sequence libraries from supplied parts and packing constraints. |
 | [**construct**](src/dnadesign/construct/) | Build DNA constructs from reusable templates. |
 | [**junction**](src/dnadesign/junction/) | Turn exact DNA targets into checked three-way-junction oligo plans. |
 | [**opal**](src/dnadesign/opal/) | Use measured results to choose which DNA designs to test next. |
