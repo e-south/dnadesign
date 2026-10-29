@@ -1,7 +1,7 @@
 ## Notify documentation index
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 
 Use this page for Notify command contracts and maintainer docs. If you need to set up, run, or recover a watcher, start with [Notify SeqLedger events runbook](../../../../docs/notify/seqledger-events.md).
 
@@ -40,7 +40,6 @@ Use this page for Notify command contracts and maintainer docs. If you need to s
 - [notify send contract](reference/command-contracts.md#notify-send): required flags, webhook source rules, and dry-run behavior.
 
 #### Shared watcher and scheduler docs
-- [DenseGen -> SeqLedger -> Notify tutorial](../../densegen/docs/tutorials/demo_usr_notify.md): shared tutorial for one local cross-tool path.
 - [BU SCC batch + notify runbook](../../../../docs/bu-scc/runbooks/batch-notify.md): shared scheduler-oriented workflow.
 
 #### Extend and debug internals

@@ -66,8 +66,7 @@ repos:
               src/dnadesign/cruncher/workspaces/.*/\\.cruncher/|
               src/dnadesign/cruncher/workspaces/.*/runs/|
               src/dnadesign/cruncher/workspaces/.*/results/|
-              src/dnadesign/cruncher/workspaces/.*/outputs/|
-              src/dnadesign/densegen/workspaces/.*/inputs/motif_artifacts/
+              src/dnadesign/cruncher/workspaces/.*/outputs/
             )
         exclude: >-
           (?x)^(

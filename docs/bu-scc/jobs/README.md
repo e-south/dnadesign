@@ -2,15 +2,13 @@
 doc_id: bu-scc-job-templates
 surface: ops-runbook
 owner: dnadesign-maintainers
-last_verified: 2026-10-28
+last_verified: 2026-10-29
 ---
 
 ## BU SCC job templates
 
 These scripts are submit-ready templates for BU SCC SGE jobs:
 
-- `densegen-cpu.qsub`: DenseGen CPU batch run
-- `densegen-analysis.qsub`: post-run DenseGen analysis (plots)
 - `evo2-gpu-infer.qsub`: Evo2 GPU infer batch run
 - `permuter-evaluate.qsub`: Permuter workspace evaluate batch run, optionally preceded by `permuter run`
 - `notify-watch.qsub`: Notify watcher for SeqLedger `.events.log`
@@ -30,15 +28,6 @@ mkdir -p "$SCC_LOG_ROOT"
 
 ```bash
 qsub -P <project> \
-  -o "${SCC_LOG_ROOT}/densegen-cpu.\$JOB_ID.out" \
-  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
-  docs/bu-scc/jobs/densegen-cpu.qsub
-qsub -P <project> \
-  -o "${SCC_LOG_ROOT}/densegen-analysis.\$JOB_ID.out" \
-  -hold_jid <densegen_cpu_job_name_or_id> \
-  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml \
-  docs/bu-scc/jobs/densegen-analysis.qsub
-qsub -P <project> \
   -o "${SCC_LOG_ROOT}/evo2-infer.\$JOB_ID.out" \
   -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
@@ -50,90 +39,6 @@ qsub -P <project> \
   -o "${SCC_LOG_ROOT}/notify-watch.\$JOB_ID.out" \
   docs/bu-scc/jobs/notify-watch.qsub
 ```
-
-### DenseGen CPU submissions
-
-Fresh-mode template run:
-
-```bash
-qsub -P <project> \
-  -o "${SCC_LOG_ROOT}/densegen-cpu.\$JOB_ID.out" \
-  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
-  docs/bu-scc/jobs/densegen-cpu.qsub
-```
-
-`densegen-cpu.qsub` command defaults:
-- validation: `uv run dense validate-config --probe-solver -c "$DENSEGEN_CONFIG"`
-- run: `DENSEGEN_RUN_ARGS` must include exactly one of `--fresh` or `--resume`
-- actor tags: `SEQLEDGER_ACTOR_TOOL=densegen`, `SEQLEDGER_ACTOR_RUN_ID=$JOB_ID.$SGE_TASK_ID`
-- thread alignment: `OMP_NUM_THREADS=${NSLOTS:-1}`
-- runtime trace: `<DENSEGEN_CONFIG directory>/outputs/logs/ops/runtime/dnadesign_densegen_cpu.$JOB_ID.trace.log`
-- GUROBI bootstrap defaults:
-  - `module load gurobi/10.0.1` when modules are available
-  - `GUROBI_HOME=/share/pkg.7/gurobi/10.0.1/install`
-  - `GRB_LICENSE_FILE=/usr/local/gurobi/gurobi.lic`
-  - `TOKENSERVER=sccsvc.bu.edu`
-  - `LD_LIBRARY_PATH=$GUROBI_HOME/lib:${LD_LIBRARY_PATH:-}`
-
-Override command args at submit time when needed:
-- `DENSEGEN_VALIDATE_ARGS` (example: `--probe-solver`)
-- `DENSEGEN_RUN_ARGS` (example: `--resume --extend-quota 8 --no-plot`)
-
-`densegen-analysis.qsub` command defaults:
-- analysis chain: `uv run dense plot -c "$DENSEGEN_CONFIG" --only "$DENSEGEN_ANALYSIS_PLOTS"`
-- default `DENSEGEN_ANALYSIS_PLOTS`: `source_cohort_concentration,stage_a_sampling_yield,stage_a_pool_diversity,plan_regulator_deployment_heatmap,placement_occupancy_map,retained_pool_coverage_by_regulator,attempt_outcome_timeline,solve_pressure_and_progress`
-- fail-fast gate: `DENSEGEN_ANALYSIS_PLOTS` must be non-empty
-- preflight gate: only the selected plots that depend on attempts/composition
-  require those artifacts to exist as finalized parquet or part files
-- read behavior: when part files exist, `dense plot` reads finalized tables
-  and part files directly without mutating on-disk artifacts
-- optional drilldown/video plots: append ids such as `source_plan_input_heatmap`, `tfbs_concentration_profile`, or `dense_array_showcase_video` only when they are explicitly needed
-- optional video plot: include `dense_array_showcase_video` only when FFmpeg is available in the queue environment
-- fail-fast gate: if `DENSEGEN_ANALYSIS_PLOTS` includes `dense_array_showcase_video` and `ffmpeg` is unavailable, the job exits with an explicit error
-
-Resume + quota extension submission:
-
-```bash
-qsub -P <project> \
-  -o "${SCC_LOG_ROOT}/densegen-cpu.\$JOB_ID.out" \
-  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--resume --extend-quota 8 --no-plot' \
-  docs/bu-scc/jobs/densegen-cpu.qsub
-```
-
-DenseGen + GUROBI with explicit 12-slot cap:
-
-```bash
-qsub -P <project> \
-  -o "${SCC_LOG_ROOT}/densegen-cpu.\$JOB_ID.out" \
-  -pe omp 12 \
-  -l h_rt=08:00:00 \
-  -l mem_per_core=8G \
-  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
-  docs/bu-scc/jobs/densegen-cpu.qsub
-```
-
-Override bootstrap values when needed:
-
-```bash
-qsub -P <project> \
-  -o "${SCC_LOG_ROOT}/densegen-cpu.\$JOB_ID.out" \
-  -pe omp 12 \
-  -l h_rt=08:00:00 \
-  -l mem_per_core=8G \
-  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot',GUROBI_MODULE=gurobi/10.0.1,GUROBI_HOME=/share/pkg.7/gurobi/10.0.1/install,GRB_LICENSE_FILE=/usr/local/gurobi/gurobi.lic,TOKENSERVER=sccsvc.bu.edu \
-  docs/bu-scc/jobs/densegen-cpu.qsub
-```
-
-When using GUROBI, keep config aligned with scheduler slots:
-- `densegen.solver.threads <= pe omp slots`
-- set `densegen.solver.solver_attempt_timeout_seconds` for per-solve limits
-- set `densegen.runtime.checkpoint_every` for flush/checkpoint cadence
-- keep overall job runtime bounded via scheduler `-l h_rt=...`
-
-For large campaigns with `runtime.round_robin: true`, avoid tiny turn caps:
-- raise `densegen.runtime.max_accepted_per_library` so each round-robin turn emits a meaningful batch
-- raise `output.usr.chunk_size` to reduce overlay-part fan-out
-- use ops runbooks so preflight `seqledger-overlay-guard` blocks unsafe projected overlay-part growth and compacts existing overlay parts when configured
 
 ### Evo2 GPU submissions
 
@@ -188,8 +93,8 @@ This wrapper is intentionally a Permuter surface, not an Infer workaround. Evo2 
 Preferred mode (profile-driven, secure by default):
 
 ```bash
-CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml
-NOTIFY_DIR="<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/outputs/notify/densegen"
+CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml
+NOTIFY_DIR="<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/outputs/notify/infer"
 WEBHOOK_FILE="$HOME/.config/dnadesign/notify_webhook.secret"
 
 mkdir -p "$(dirname "$WEBHOOK_FILE")"
@@ -200,7 +105,7 @@ uv run notify setup webhook \
   --secret-ref "file://$WEBHOOK_FILE"
 
 uv run notify setup slack \
-  --tool densegen \
+  --tool infer \
   --config "$CONFIG" \
   --profile "$NOTIFY_DIR/profile.json" \
   --cursor "$NOTIFY_DIR/cursor" \
@@ -208,7 +113,7 @@ uv run notify setup slack \
   --secret-source file \
   --secret-ref "file://$WEBHOOK_FILE" \
   --no-store-webhook \
-  --policy densegen
+  --policy infer
 
 # SCC TLS trust chain for HTTPS webhook delivery.
 export SSL_CERT_FILE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
@@ -224,7 +129,7 @@ Explicit env mode (no profile):
 ```bash
 qsub -P <project> \
   -o "${SCC_LOG_ROOT}/notify-watch.\$JOB_ID.out" \
-  -v NOTIFY_TOOL=densegen,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK,WEBHOOK_FILE="$WEBHOOK_FILE",NOTIFY_TLS_CA_BUNDLE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem \
+  -v NOTIFY_TOOL=infer,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK,WEBHOOK_FILE="$WEBHOOK_FILE",NOTIFY_TLS_CA_BUNDLE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem \
   docs/bu-scc/jobs/notify-watch.qsub
 ```
 
@@ -277,7 +182,6 @@ Scheduler stdout and runtime traces:
   invocations that omit the documented submit-time override
 - `permuter-evaluate.qsub` also tees its own runtime trace after it resolves
   the workspace
-- DenseGen runtime traces: `<DENSEGEN_CONFIG directory>/outputs/logs/ops/runtime/dnadesign_densegen_cpu.$JOB_ID.trace.log`
 - Permuter runtime traces: `<PERMUTER_WORKSPACE directory>/outputs/logs/ops/runtime/dnadesign_permuter_evaluate.$JOB_ID.trace.log`
 
 Tail logs:
@@ -290,7 +194,7 @@ tail -f outputs/logs/<job_name>.<job_id>.out
 
 For arrays, use `qsub -t ...` and consume `SGE_TASK_ID` inside scripts.
 
-Reference: [BU SCC Batch + Notify runbook: Job arrays](../runbooks/batch-notify.md#5-job-arrays-parameter-sweeps)
+Reference: [BU SCC Batch + Notify runbook: Job arrays](../runbooks/batch-notify.md#4-job-arrays-parameter-sweeps)
 
 ### Edit vs submit-time overrides
 

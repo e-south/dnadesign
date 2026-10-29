@@ -16,13 +16,6 @@ from typing import Any
 
 from ..core.errors import NotifyConfigError
 
-_DENSEGEN_PROFILE_PRESET = {
-    "only_actions": "densegen_health,densegen_flush_failed,materialize",
-    "only_tools": "densegen",
-    "include_args": False,
-    "include_context": False,
-    "include_raw_event": False,
-}
 _INFER_PROFILE_ACTIONS = (
     "attach,write_overlay_part,materialize,infer_feature_bundle_progress,infer_feature_bundle_complete"
 )
@@ -100,10 +93,6 @@ def policy_defaults(policy: str) -> dict[str, Any]:
     return dict(_WORKFLOW_POLICY_DEFAULTS[policy_name])
 
 
-register_workflow_policy(
-    policy="densegen",
-    defaults=dict(_DENSEGEN_PROFILE_PRESET),
-)
 register_workflow_policy(
     policy="infer",
     defaults={

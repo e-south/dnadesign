@@ -35,10 +35,6 @@ def enforce_workspace_layout(runbook: "OrchestrationRunbookV1") -> "Orchestratio
     if runbook.logging.stdout_dir.resolve() != expected_stdout_dir:
         raise ValueError(f"logging.stdout_dir must be exactly {expected_stdout_dir}")
 
-    if runbook.densegen is not None:
-        expected_config = (workspace_root / "config.yaml").resolve()
-        if runbook.densegen.config.resolve() != expected_config:
-            raise ValueError(f"densegen.config must be {expected_config}")
     if runbook.infer is not None:
         infer_config = runbook.infer.config.resolve()
         if not _is_path_within(path=infer_config, parent=workspace_root):

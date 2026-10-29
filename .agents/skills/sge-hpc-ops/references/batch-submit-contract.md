@@ -104,9 +104,6 @@ $SKILL_DIR/scripts/qa-sge-submit-preflight.sh \
 
 ### Runtime precheck examples
 
-- DenseGen CPU template:
-  - readable `DENSEGEN_CONFIG`
-  - `uv run dense validate-config --probe-solver -c "$DENSEGEN_CONFIG"`
 
 - Notify watcher template:
   - `NOTIFY_PROFILE` exists, or resolver inputs (`NOTIFY_TOOL` + `NOTIFY_CONFIG`) are present

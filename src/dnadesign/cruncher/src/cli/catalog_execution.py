@@ -15,11 +15,6 @@ import json
 from pathlib import Path
 from typing import Sequence
 
-from dnadesign.cruncher.app.motif_artifacts import (
-    artifact_filename,
-    build_densegen_artifact,
-    load_motif_payload,
-)
 from dnadesign.cruncher.cli.catalog_utils import ResolvedTarget, _matrix_site_count_from_tags, _safe_stem
 from dnadesign.cruncher.config.schema_v3 import CruncherConfig
 from dnadesign.cruncher.io.meme_export import write_minimal_meme_motif
@@ -97,59 +92,6 @@ def collect_pwm_payloads(
                 record["log_odds"] = pwm.log_odds().tolist()
         payloads.append(record)
     return payloads, resolved, rows
-
-
-def write_densegen_artifacts(
-    *,
-    catalog_root: Path,
-    targets: Sequence[ResolvedTarget],
-    out_dir: Path,
-    background: str,
-    pseudocount: float | None,
-    producer: str,
-    overwrite: bool,
-) -> tuple[list[dict[str, str]], list[dict[str, object]]]:
-    rows: list[dict[str, str]] = []
-    manifest_entries: list[dict[str, object]] = []
-
-    for target in sorted(targets, key=lambda t: (t.entry.source, t.entry.motif_id)):
-        motif_path = catalog_root / "normalized" / "motifs" / target.entry.source / f"{target.entry.motif_id}.json"
-        if not motif_path.exists():
-            raise FileNotFoundError(str(motif_path))
-
-        payload = load_motif_payload(motif_path)
-        artifact = build_densegen_artifact(
-            payload,
-            producer=producer,
-            background_policy=background,
-            pseudocount=pseudocount,
-        )
-        filename = artifact_filename(
-            tf_name=target.tf_name,
-            source=target.entry.source,
-            motif_id=target.entry.motif_id,
-        )
-        dest = out_dir / filename
-        if dest.exists() and not overwrite:
-            raise FileExistsError(str(dest))
-        dest.write_text(json.dumps(artifact, indent=2, sort_keys=True))
-        rows.append(
-            {
-                "tf_name": target.tf_name,
-                "source": target.entry.source,
-                "motif_id": target.entry.motif_id,
-                "artifact": str(dest),
-            }
-        )
-        manifest_entries.append(
-            {
-                "tf_name": target.tf_name,
-                "source": target.entry.source,
-                "motif_id": target.entry.motif_id,
-                "path": dest.name,
-            }
-        )
-    return rows, manifest_entries
 
 
 def write_meme_artifacts(

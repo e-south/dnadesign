@@ -23,7 +23,7 @@ def register_setup_list_workspaces_command(
 ) -> None:
     @setup_app.command("list-workspaces")
     def list_workspaces(
-        tool: str = typer.Option(..., "--tool", help="Tool name (for example: densegen)."),
+        tool: str = typer.Option(..., "--tool", help="Tool name (for example: infer)."),
         json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON output."),
     ) -> None:
         list_workspaces_handler(

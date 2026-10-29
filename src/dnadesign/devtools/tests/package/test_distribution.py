@@ -42,10 +42,9 @@ _DISTRIBUTION_DATA_EXCLUDES = [
     "reader_spop_*.parquet",
     "remotes.yaml",
 ]
-_DENSEGEN_DATA_EXCLUDES = [
-    "workspaces/*/config.probe.*.yaml",
-]
 _EXCLUDED_PACKAGE_SENTINELS = {
+    "dnadesign.densegen",
+    "dnadesign.densegen.src",
     "dnadesign.devtools",
     "dnadesign.devtools.package",
     "dnadesign.cruncher.src.devtools",
@@ -59,7 +58,6 @@ _EXCLUDED_PACKAGE_SENTINELS = {
 }
 _RETAINED_PACKAGE_SENTINELS = {
     "dnadesign.opal.campaigns.demo.notebooks_api",
-    "dnadesign.densegen.workspaces.demo.outputs.notebooks_api",
     "dnadesign.latentdna.workspaces.demo.outputs.notebooks_api",
 }
 _REQUIRED_WHEEL_MEMBERS = {
@@ -80,6 +78,7 @@ _REQUIRED_WHEEL_MEMBERS = {
     "dnadesign/seqledger/datasets/registry.yaml",
 }
 _FORBIDDEN_WHEEL_PREFIXES = (
+    "dnadesign/densegen/",
     "dnadesign/devtools/",
     "dnadesign/cruncher/src/devtools/",
     "dnadesign/libshuffle/",
@@ -98,6 +97,8 @@ _FORBIDDEN_WHEEL_PREFIXES = (
     "dnadesign/latentdna/workspaces/templates/promoter_reference_margin_benchmark/",
 )
 _FORBIDDEN_WHEEL_MEMBERS = {
+    "dnadesign/seqledger/scripts/port_reader_sfxi_densegen_archive.py",
+    "dnadesign/seqledger/scripts/port_mg1655_promoter_references.py",
     "dnadesign/seqledger/src/cli/commands/tooling/legacy.py",
     "dnadesign/seqledger/src/cli/commands/tooling/densegen.py",
     "dnadesign/junction/docs/assets/three-fragment-review.svg",
@@ -244,7 +245,6 @@ def test_distribution_excludes_internal_source_shelves(tmp_path: Path) -> None:
 
     assert project["tool"]["setuptools"]["include-package-data"] is False
     assert project["tool"]["setuptools"]["exclude-package-data"]["*"] == _DISTRIBUTION_DATA_EXCLUDES
-    assert project["tool"]["setuptools"]["exclude-package-data"]["dnadesign.densegen"] == _DENSEGEN_DATA_EXCLUDES
 
     source_root = tmp_path / "src"
     (source_root / "dnadesign" / "active").mkdir(parents=True)
@@ -309,11 +309,6 @@ def test_distribution_excludes_private_and_generated_package_data() -> None:
 
     excluded_cases = (
         (
-            "dnadesign.densegen",
-            repo_root / "src/dnadesign/densegen",
-            "workspaces/demo/config.probe.stall10.yaml",
-        ),
-        (
             "dnadesign.seqledger",
             repo_root / "src/dnadesign/seqledger",
             "remotes.yaml",
@@ -373,6 +368,8 @@ def test_built_wheel_retains_runtime_resources_without_internal_shelves(tmp_path
         "/".join(parts).removeprefix("src/").startswith(_FORBIDDEN_WHEEL_PREFIXES) for parts in source_members
     )
     assert not any("/reader_spop_" in "/".join(parts) for parts in source_members)
+    retired_scripts = {name for name in _FORBIDDEN_WHEEL_MEMBERS if "/scripts/" in name}
+    assert retired_scripts.isdisjoint("/".join(parts).removeprefix("src/") for parts in source_members)
 
     with zipfile.ZipFile(wheels[0]) as wheel:
         members = set(wheel.namelist())
@@ -391,9 +388,7 @@ def test_built_wheel_retains_runtime_resources_without_internal_shelves(tmp_path
     assert all(target.startswith(("https://", "#")) for target in re.findall(r"\]\(([^)]+)\)", metadata.get_payload()))
     requirements = [Requirement(value) for value in metadata.get_all("Requires-Dist", [])]
     assert {r.name for r in requirements if r.marker is None or r.marker.evaluate({"extra": ""})} == {"numpy"}
-    dense_arrays = next(r for r in requirements if r.name == "dense-arrays")
-    assert dense_arrays.url is None, "PyPI distributions must resolve through the package registry"
-    assert str(dense_arrays.specifier) == "==0.2.0"
+    assert {r.name for r in requirements}.isdisjoint({"dense-arrays", "ortools"})
     assert all(requirement.url is None for requirement in requirements)
 
     assert _REQUIRED_WHEEL_MEMBERS <= members
@@ -776,7 +771,7 @@ def test_scoring_install_is_small_and_full_tools_remain_explicit() -> None:
     base = {Requirement(value).name for value in project["project"]["dependencies"]}
     assert base == {"numpy"}
     full = {Requirement(value).name for value in profile_requirements(project["project"], "full")}
-    assert {"pandas", "pyarrow", "pydantic", "typer", "scikit-learn", "dense-arrays", "torch", "marimo"} <= full
+    assert {"pandas", "pyarrow", "pydantic", "typer", "scikit-learn", "torch", "marimo"} <= full
     assert project["dependency-groups"]["tools"] == ["dnadesign-tools[full]"]
     assert project["tool"]["uv"]["default-groups"] == ["tools"]
 

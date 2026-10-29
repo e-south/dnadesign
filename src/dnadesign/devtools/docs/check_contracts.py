@@ -121,10 +121,6 @@ PUBLIC_INTERFACE_DOC_PATHS = (
     "src/dnadesign/cruncher/docs/demos",
     "src/dnadesign/cruncher/docs/reference/cli.md",
     "src/dnadesign/cruncher/workspaces",
-    "src/dnadesign/densegen/README.md",
-    "src/dnadesign/densegen/docs/howto",
-    "src/dnadesign/densegen/docs/tutorials",
-    "src/dnadesign/densegen/workspaces/README.md",
     "src/dnadesign/ops/README.md",
     "src/dnadesign/ops/docs",
 )
@@ -155,13 +151,6 @@ AGENTS_PATH_LITERAL_EXCEPTIONS = {"./scripts/agent-verify", "scripts/agent-verif
 AGENTS_NEGATIVE_LINE_MARKERS = ("do not add", "does not ship", "does not exist")
 REPO_LOCAL_SKILLS_DIR = ".agents/skills"
 REPO_LOCAL_SKILL_DESCRIPTION_MAX_CHARS = 220
-DENSEGEN_DOC_LANGUAGE_PATHS = (
-    "src/dnadesign/densegen/README.md",
-    "src/dnadesign/densegen/AGENTS.md",
-    "src/dnadesign/densegen/docs",
-    "src/dnadesign/densegen/workspaces",
-)
-DENSEGEN_DISALLOWED_TERM_PATTERN = re.compile(r"\bcanonical\b", flags=re.IGNORECASE)
 CONSTRUCT_OPERATOR_DOC_PATHS = (
     "src/dnadesign/seqledger/docs/operations",
     "src/dnadesign/notify/docs/reference/command-contracts.md",
@@ -189,12 +178,10 @@ LEGACY_CONTRACT_SURFACE_DOC_PATTERNS = (
 SHARED_USR_DATASETS_ROOT = "src/dnadesign/seqledger/datasets"
 SHARED_USR_DATASET_LAYOUT_NUDGE = (
     "Shared repo SeqLedger dataset roots must be flat under src/dnadesign/seqledger/datasets; "
-    "move nested roots to owner-first ids like 'densegen_demo_sampling_baseline'. "
+    "move nested roots to owner-first ids like 'example_sequences'. "
     "archived/ is the only special top-level bucket."
 )
 OPS_OPERATIONAL_WORKFLOW_IDS = {
-    "densegen_batch_submit",
-    "densegen_batch_with_notify",
     "infer_batch_submit",
     "infer_batch_with_notify",
 }
@@ -230,11 +217,6 @@ CROSS_TOOL_DOC_METADATA_CONTRACTS: dict[str, dict[str, str]] = {
         "owner_boundary": "seqledger",
     },
     "src/dnadesign/seqledger/docs/operations/assembly/multi-source-shared-dataset.md": {
-        "type": "runbook",
-        "plane": "data-plane",
-        "owner_boundary": "seqledger",
-    },
-    "src/dnadesign/seqledger/docs/operations/sync/chained-densegen-infer-runbook.md": {
         "type": "runbook",
         "plane": "data-plane",
         "owner_boundary": "seqledger",

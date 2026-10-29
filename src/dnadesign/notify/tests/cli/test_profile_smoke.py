@@ -28,7 +28,7 @@ def test_profile_smoke_runs_setup_doctor_watch_in_order(tmp_path: Path, monkeypa
     calls: list[str] = []
 
     profile_path.write_text("{}", encoding="utf-8")
-    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    config_path.write_text("infer:\n  run:\n    id: demo\n", encoding="utf-8")
     ca_bundle.write_text("dummy", encoding="utf-8")
 
     def _fake_setup_slack_command(**_kwargs) -> None:
@@ -41,9 +41,9 @@ def test_profile_smoke_runs_setup_doctor_watch_in_order(tmp_path: Path, monkeypa
         calls.append("watch")
 
     def _fake_resolve_tool_events_path(*, tool: str, config: Path) -> tuple[Path, str | None]:
-        assert tool == "densegen"
+        assert tool == "infer"
         assert Path(config) == config_path
-        return events_path, "densegen"
+        return events_path, "infer"
 
     monkeypatch.setattr("dnadesign.notify.cli.bindings.run_setup_slack_command", _fake_setup_slack_command)
     monkeypatch.setattr("dnadesign.notify.cli.bindings.run_profile_doctor_command", _fake_profile_doctor_command)
@@ -59,7 +59,7 @@ def test_profile_smoke_runs_setup_doctor_watch_in_order(tmp_path: Path, monkeypa
             "--profile",
             str(profile_path),
             "--tool",
-            "densegen",
+            "infer",
             "--config",
             str(config_path),
             "--cursor",
@@ -67,7 +67,7 @@ def test_profile_smoke_runs_setup_doctor_watch_in_order(tmp_path: Path, monkeypa
             "--spool-dir",
             str(spool_dir),
             "--policy",
-            "densegen",
+            "infer",
             "--secret-source",
             "file",
             "--secret-ref",
@@ -75,7 +75,7 @@ def test_profile_smoke_runs_setup_doctor_watch_in_order(tmp_path: Path, monkeypa
             "--tls-ca-bundle",
             str(ca_bundle),
             "--only-tools",
-            "densegen",
+            "infer",
             "--dry-run",
             "--no-advance-cursor-on-dry-run",
         ],

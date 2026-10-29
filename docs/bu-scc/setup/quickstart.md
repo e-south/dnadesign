@@ -1,14 +1,14 @@
 ## BU SCC Quickstart: dnadesign (Interactive -> Batch -> Notify)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 
 ### Purpose
 
 **Intent:** Provide one copy/paste path from SCC login through first batch submissions and Notify setup.
 
 **When to use:**
-- You need DenseGen CPU jobs or Evo2 GPU jobs on BU SCC.
+- You need CPU analysis or Evo2 GPU jobs on BU SCC.
 - You want scheduler-managed runtime/resource limits and durable logs.
 - You want webhook monitoring from SeqLedger `.events.log`.
 
@@ -180,52 +180,9 @@ Queue-fair submit policy:
 - prefer dependency chains (`-hold_jid`) when order is required
 - respect the queue and do not skip the line
 
-Ordered-chain example:
-
-```bash
-JOB_A="$(qsub -terse -P <project> -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' docs/bu-scc/jobs/densegen-cpu.qsub)"
-qsub -P <project> -hold_jid "$JOB_A" -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--resume --extend-quota 8 --no-plot' docs/bu-scc/jobs/densegen-cpu.qsub
-```
-
 ### 7) Submit first jobs
 
-#### 7.1 DenseGen CPU (explicit fresh mode)
-
-```bash
-qsub -P <project> \
-  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
-  docs/bu-scc/jobs/densegen-cpu.qsub
-```
-
-#### 7.2 DenseGen + GUROBI (12-slot baseline)
-
-Use this when your config sets `densegen.solver.backend: GUROBI`.
-
-```bash
-qsub -P <project> \
-  -pe omp 12 \
-  -l h_rt=08:00:00 \
-  -l mem_per_core=8G \
-  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
-  docs/bu-scc/jobs/densegen-cpu.qsub
-```
-
-In config, keep `densegen.solver.threads <= 12`.
-`densegen-cpu.qsub` bootstraps GUROBI runtime defaults for BU SCC and accepts overrides via
-`GUROBI_MODULE`, `GUROBI_HOME`, `GRB_LICENSE_FILE`, and `TOKENSERVER`.
-`DENSEGEN_RUN_ARGS` is required and must include exactly one of `--fresh` or `--resume`.
-
-#### 7.2b DenseGen iterative resume + quota extension
-
-Use this when continuing a workspace across multiple batch submissions.
-
-```bash
-qsub -P <project> \
-  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--resume --extend-quota 8 --no-plot' \
-  docs/bu-scc/jobs/densegen-cpu.qsub
-```
-
-#### 7.3 Evo2 GPU inference
+#### Evo2 GPU inference
 
 ```bash
 INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml
@@ -254,15 +211,15 @@ Operational guidance:
 
 ### 8) Add Notify
 
-Notify watches SeqLedger `.events.log` only. It does not consume DenseGen `outputs/meta/events.jsonl`.
+Notify watches SeqLedger `.events.log` JSONL.
 
 Recommended deployment: submit a dedicated watcher batch job.
 
 Create a profile from workspace/run config before submitting watcher jobs:
 
 ```bash
-CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml
-NOTIFY_DIR="<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/outputs/notify/densegen"
+CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml
+NOTIFY_DIR="<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/outputs/notify/infer"
 WEBHOOK_FILE="$HOME/.config/dnadesign/notify_webhook.secret"
 
 mkdir -p "$(dirname "$WEBHOOK_FILE")"
@@ -273,7 +230,7 @@ uv run notify setup webhook \
   --secret-ref "file://$WEBHOOK_FILE"
 
 uv run notify setup slack \
-  --tool densegen \
+  --tool infer \
   --config "$CONFIG" \
   --profile "$NOTIFY_DIR/profile.json" \
   --cursor "$NOTIFY_DIR/cursor" \
@@ -281,7 +238,7 @@ uv run notify setup slack \
   --secret-source file \
   --secret-ref "file://$WEBHOOK_FILE" \
   --no-store-webhook \
-  --policy densegen
+  --policy infer
 ```
 
 Preferred mode (profile-driven, secure by default):
@@ -296,7 +253,7 @@ Explicit env mode (no profile):
 
 ```bash
 qsub -P <project> \
-  -v NOTIFY_TOOL=densegen,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK,WEBHOOK_FILE="$WEBHOOK_FILE" \
+  -v NOTIFY_TOOL=infer,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK,WEBHOOK_FILE="$WEBHOOK_FILE" \
   docs/bu-scc/jobs/notify-watch.qsub
 ```
 

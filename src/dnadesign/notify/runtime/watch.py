@@ -66,12 +66,6 @@ def watch_usr_events_loop(
     post_with_backoff: Callable[..., None],
 ) -> None:
     tool_event_state = ToolEventState()
-    densegen_bucket = tool_event_state.get_bucket("densegen_health")
-    densegen_bucket["notify_config"] = {
-        "progress_step_pct": progress_step_pct,
-        "progress_min_seconds": progress_min_seconds,
-        "progress_heartbeat_seconds": progress_heartbeat_seconds,
-    }
     infer_bucket = tool_event_state.get_bucket("infer_attach")
     infer_bucket["notify_config"] = {
         "progress_min_seconds": progress_min_seconds,

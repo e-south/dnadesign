@@ -471,7 +471,6 @@ def test_ops_package_data_declares_registry_and_runbook_templates() -> None:
     required = {
         "catalog/builtin.json",
         "providers/builtin/status.registry.yaml",
-        "runbooks/templates/densegen-analysis.qsub",
         "runbooks/templates/evo2-gpu-infer.qsub",
     }
     assert required <= set(paths)
@@ -505,8 +504,8 @@ def test_cli_catalog_list_emits_grouped_text_inventory() -> None:
     assert "ops.control-plane.orchestration" in result.output
     assert "cluster.downstream.exploratory-clustering" in result.output
     assert "Tool docs" in result.output
-    assert "densegen: DenseGen documentation" in result.output
-    assert "seqledger: SeqLedger docs" in result.output
+    assert "densegen: DenseGen documentation" not in result.output
+    assert "seqledger: SeqLedger" in result.output
     assert "Suggested next steps" in result.output
     assert "uv run ops catalog list --query <term>" in result.output
     assert "uv run ops catalog list --simple" in result.output
@@ -652,7 +651,7 @@ def test_cli_catalog_list_supports_tool_source_queries_for_promoter_path() -> No
     payload = json.loads(result.output)
     assert payload["filters"] == {"query": "promoter feature matrix"}
     tools = {entry["tool"] for entry in payload["tool_sources"]}
-    assert {"seqledger", "infer", "opal"}.issubset(tools)
+    assert {"seqledger", "infer"}.issubset(tools)
     assert "procedures" not in payload
 
 
@@ -677,9 +676,8 @@ def test_cli_catalog_list_supports_related_tool_sources() -> None:
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert payload["filters"] == {"related_to": "seqledger.data-plane.promoter-feature-matrix"}
-    assert payload["counts"] == {"tool_sources": 5}
+    assert payload["counts"] == {"tool_sources": 4}
     assert [entry["tool"] for entry in payload["tool_sources"]] == [
-        "densegen",
         "construct",
         "infer",
         "cluster",
@@ -762,23 +760,20 @@ def test_cli_catalog_show_emits_registered_entry() -> None:
     assert "Exit artifact: infer-annotated SeqLedger feature matrix ready for cluster or OPAL" in result.output
     assert "Status kind: seqledger-dataset-state" in result.output
     assert "Owner docs:" in result.output
-    assert "- seqledger: SeqLedger docs" in result.output
+    assert "- seqledger: SeqLedger" in result.output
     assert "Related tool docs:" in result.output
-    assert "- densegen: DenseGen documentation" in result.output
+    assert "- densegen: DenseGen documentation" not in result.output
     assert "- construct: Construct documentation" in result.output
-    assert "- infer: infer docs" in result.output
+    assert "- infer: Infer" in result.output
     assert "- cluster: Cluster docs" in result.output
     assert "- opal: OPAL documentation" in result.output
     assert "Related deep docs:" in result.output
     assert "- construct/template-contexts: Construct template contexts" in result.output
-    assert "- infer/architecture: Infer Architecture" in result.output
-    assert "- infer/evo2-provider: Evo2 Provider Reference" in result.output
-    assert "- infer/evo2-sequence-features: Evo2 Sequence-Feature Runbook" in result.output
+    assert "- infer/architecture:" in result.output
+    assert "- infer/evo2-provider:" in result.output
+    assert "- infer/evo2-sequence-features:" in result.output
     assert "- cluster/exploratory-clustering: Exploratory clustering workflow" in result.output
-    assert (
-        "- opal/seqledger-infer-x-active-learning: SeqLedger Dataset With Infer-Derived X -> OPAL Active Learning"
-        in (result.output)
-    )
+    assert "- opal/seqledger-infer-x-active-learning:" in result.output
     assert "Required status inputs:" in result.output
     assert "--seqledger-root <seqledger-root>" in result.output
     assert "--dataset <dataset>" in result.output
@@ -828,7 +823,6 @@ def test_cli_catalog_show_json_includes_related_procedures() -> None:
     assert payload["owner_tool_source"]["tool"] == "seqledger"
     assert payload["owner_tool_source"]["doc_path"] == "src/dnadesign/seqledger/docs/README.md"
     assert [entry["tool"] for entry in payload["related_tool_sources"]] == [
-        "densegen",
         "construct",
         "infer",
         "cluster",

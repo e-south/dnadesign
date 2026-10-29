@@ -29,8 +29,6 @@ from dnadesign.devtools.docs.check_contracts import (
     AGENTS_ROOT_FILENAMES,
     CONSTRUCT_LEGACY_OPERATOR_PATTERNS,
     CONSTRUCT_OPERATOR_DOC_PATHS,
-    DENSEGEN_DISALLOWED_TERM_PATTERN,
-    DENSEGEN_DOC_LANGUAGE_PATHS,
     ENTRYPOINT_LOCAL_PATH_PATTERN,
     ENTRYPOINT_MARKDOWN_FILES,
     INTERNAL_SOURCE_INREACH_PATTERN,
@@ -307,19 +305,6 @@ def _resolve_agents_path_literal(value: str, *, agents_path: Path, repo_root: Pa
     except ValueError:
         return None
     return resolved_target
-
-
-def _find_densegen_disallowed_term_issues(repo_root: Path) -> list[str]:
-    issues: list[str] = []
-    targets = _collect_markdown_files_from_relative_paths(repo_root, relative_paths=DENSEGEN_DOC_LANGUAGE_PATHS)
-    for path in targets:
-        content = path.read_text(encoding="utf-8")
-        match = DENSEGEN_DISALLOWED_TERM_PATTERN.search(content)
-        if match is None:
-            continue
-        line_no = content[: match.start()].count("\n") + 1
-        issues.append(f"{path}:{line_no}: term '{match.group(0)}' is not allowed in DenseGen docs.")
-    return issues
 
 
 def _find_construct_legacy_operator_doc_issues(repo_root: Path) -> list[str]:

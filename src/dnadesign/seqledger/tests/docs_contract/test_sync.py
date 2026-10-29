@@ -61,18 +61,14 @@ def test_sync_runbooks_keep_hash_and_auxiliary_contract_terms() -> None:
     sync_router = read_text("src/dnadesign/seqledger/docs/operations/sync/README.md")
     quickstart = read_text("src/dnadesign/seqledger/docs/operations/sync/quickstart.md")
     hpc = read_text("src/dnadesign/seqledger/docs/operations/sync/hpc-agent-flow.md")
-    chained = read_text("src/dnadesign/seqledger/docs/operations/sync/chained-densegen-infer-runbook.md")
     fidelity = read_text("src/dnadesign/seqledger/docs/operations/sync/fidelity-drills.md")
 
-    for text in (sync_router, quickstart, hpc, chained, fidelity):
+    for text in (sync_router, quickstart, hpc, fidelity):
         assert "_auxiliary" in text
     assert "--audit-json-out" in quickstart
     assert "--no-verify-derived-hashes" in hpc
-    assert "--no-verify-derived-hashes" in chained
     assert "--verify auto" not in hpc
     assert "--verify parquet" not in hpc
-    assert "--verify auto" not in chained
-    assert "--verify parquet" not in chained
 
 
 def test_sync_docs_avoid_agent_or_human_labeling_language() -> None:

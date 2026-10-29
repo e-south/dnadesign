@@ -92,8 +92,8 @@ def test_local_notify_smoke_harness_profile_mode(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
 
-    profile_path = workdir / "outputs" / "notify" / "densegen" / "profile.json"
-    cursor_path = workdir / "outputs" / "notify" / "densegen" / "cursor"
+    profile_path = workdir / "outputs" / "notify" / "infer" / "profile.json"
+    cursor_path = workdir / "outputs" / "notify" / "infer" / "cursor"
     capture_path = workdir / "captures" / "requests.jsonl"
     assert profile_path.exists()
     assert cursor_path.exists()

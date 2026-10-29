@@ -25,7 +25,7 @@ from dnadesign.notify.profiles.policy import (
 def test_resolve_workflow_policy_accepts_known_policy() -> None:
     assert resolve_workflow_policy(policy="construct") == "construct"
     assert resolve_workflow_policy(policy="infer") == "infer"
-    assert resolve_workflow_policy(policy="densegen") == "densegen"
+    assert resolve_workflow_policy(policy="infer") == "infer"
 
 
 def test_resolve_workflow_policy_rejects_unknown_policy() -> None:
@@ -39,14 +39,17 @@ def test_resolve_workflow_policy_rejects_legacy_infer_alias() -> None:
 
 
 def test_default_profile_path_for_tool_namespaces_by_tool() -> None:
-    assert str(default_profile_path_for_tool("densegen")) == "outputs/notify/densegen/profile.json"
+    assert str(default_profile_path_for_tool("infer")) == "outputs/notify/infer/profile.json"
 
 
 def test_policy_defaults_returns_independent_copy() -> None:
-    first = policy_defaults("densegen")
-    second = policy_defaults("densegen")
+    first = policy_defaults("infer")
+    second = policy_defaults("infer")
     first["only_actions"] = "changed"
-    assert second["only_actions"] == "densegen_health,densegen_flush_failed,materialize"
+    assert (
+        second["only_actions"]
+        == "attach,write_overlay_part,materialize,infer_feature_bundle_progress,infer_feature_bundle_complete"
+    )
 
 
 def test_construct_policy_defaults_are_scoped_to_construct_events() -> None:

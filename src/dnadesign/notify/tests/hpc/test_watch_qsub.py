@@ -51,14 +51,11 @@ def _write_fake_uv(bin_dir: Path) -> Path:
                 'if [[ "$1" == "run" && "$2" == "notify" && "$3" == "setup" &&',
                 '      "$4" == "resolve-events" ]]; then',
                 '  if [[ " $* " == *" --print-policy "* ]]; then',
-                '    echo "${FAKE_RESOLVED_POLICY:-densegen}"',
+                '    echo "${FAKE_RESOLVED_POLICY:-infer}"',
                 "    exit 0",
                 "  fi",
                 '  if [[ " $* " == *" --json "* ]]; then',
-                (
-                    '    echo "{\\"events\\":\\"$FAKE_EVENTS_PATH\\",'
-                    '\\"policy\\":\\"${FAKE_RESOLVED_POLICY:-densegen}\\"}"'
-                ),
+                ('    echo "{\\"events\\":\\"$FAKE_EVENTS_PATH\\",\\"policy\\":\\"${FAKE_RESOLVED_POLICY:-infer}\\"}"'),
                 "    exit 0",
                 "  fi",
                 '  echo "$FAKE_EVENTS_PATH"',
@@ -182,7 +179,7 @@ def test_qsub_script_profile_mode_can_load_webhook_from_file_when_env_is_unset(t
 
     profile_path = tmp_path / "notify.profile.json"
     profile_path.write_text(
-        '{"profile_version":2,"provider":"slack","webhook":{"source":"env","ref":"DENSEGEN_WEBHOOK"},"events":"/tmp/e"}\n',
+        '{"profile_version":2,"provider":"slack","webhook":{"source":"env","ref":"TEST_WEBHOOK"},"events":"/tmp/e"}\n',
         encoding="utf-8",
     )
     webhook_file = _write_webhook_secret(tmp_path)
@@ -191,9 +188,9 @@ def test_qsub_script_profile_mode_can_load_webhook_from_file_when_env_is_unset(t
     env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
     env["UV_CAPTURE"] = str(capture_path)
     env["NOTIFY_PROFILE"] = str(profile_path)
-    env["WEBHOOK_ENV"] = "DENSEGEN_WEBHOOK"
+    env["WEBHOOK_ENV"] = "TEST_WEBHOOK"
     env["WEBHOOK_FILE"] = str(webhook_file)
-    env.pop("DENSEGEN_WEBHOOK", None)
+    env.pop("TEST_WEBHOOK", None)
 
     result = subprocess.run(
         ["bash", str(script_path)],
@@ -224,18 +221,18 @@ def test_qsub_script_can_resolve_events_from_tool_config(tmp_path: Path) -> None
     webhook_file = _write_webhook_secret(tmp_path)
 
     config_path = tmp_path / "tool.config.yaml"
-    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    config_path.write_text("infer:\n  run:\n    id: demo\n", encoding="utf-8")
 
     env = dict(os.environ)
     env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
     env["UV_CAPTURE"] = str(capture_path)
     env["FAKE_EVENTS_PATH"] = str(events_path)
-    env["FAKE_RESOLVED_POLICY"] = "densegen"
-    env["NOTIFY_TOOL"] = "densegen"
+    env["FAKE_RESOLVED_POLICY"] = "infer"
+    env["NOTIFY_TOOL"] = "infer"
     env["NOTIFY_CONFIG"] = str(config_path)
     env["WEBHOOK_FILE"] = str(webhook_file)
-    env["WEBHOOK_ENV"] = "DENSEGEN_WEBHOOK"
-    env.pop("DENSEGEN_WEBHOOK", None)
+    env["WEBHOOK_ENV"] = "TEST_WEBHOOK"
+    env.pop("TEST_WEBHOOK", None)
 
     result = subprocess.run(
         ["bash", str(script_path)],
@@ -247,21 +244,24 @@ def test_qsub_script_can_resolve_events_from_tool_config(tmp_path: Path) -> None
     )
     assert result.returncode == 0, result.stderr
     calls = capture_path.read_text(encoding="utf-8")
-    assert "run notify setup resolve-events --tool densegen --config" in calls
+    assert "run notify setup resolve-events --tool infer --config" in calls
     assert "run notify seqledger-events watch" in calls
     assert "--events" in calls
     assert str(events_path) in calls
-    assert "--only-actions densegen_health,densegen_flush_failed,materialize" in calls
-    assert "--only-tools densegen" in calls
-    assert "--url-env DENSEGEN_WEBHOOK" in calls
+    assert (
+        "--only-actions attach,write_overlay_part,materialize,"
+        "infer_feature_bundle_progress,infer_feature_bundle_complete" in calls
+    )
+    assert "--only-tools infer" in calls
+    assert "--url-env TEST_WEBHOOK" in calls
     assert "--follow" in calls
     assert "--wait-for-events" in calls
     assert "--poll-interval-seconds 1.0" in calls
     assert "--stop-on-terminal-status" in calls
     assert "--on-truncate restart" in calls
     assert "--idle-timeout" in calls
-    assert f"--cursor {tmp_path / 'outputs' / 'notify' / 'densegen' / 'cursor'}" in calls
-    assert f"--spool-dir {tmp_path / 'outputs' / 'notify' / 'densegen' / 'spool'}" in calls
+    assert f"--cursor {tmp_path / 'outputs' / 'notify' / 'infer' / 'cursor'}" in calls
+    assert f"--spool-dir {tmp_path / 'outputs' / 'notify' / 'infer' / 'spool'}" in calls
 
 
 @pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
@@ -278,18 +278,18 @@ def test_qsub_script_accepts_missing_events_file_when_waiting(tmp_path: Path) ->
     webhook_file = _write_webhook_secret(tmp_path)
 
     config_path = tmp_path / "tool.config.yaml"
-    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    config_path.write_text("infer:\n  run:\n    id: demo\n", encoding="utf-8")
 
     env = dict(os.environ)
     env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
     env["UV_CAPTURE"] = str(capture_path)
     env["FAKE_EVENTS_PATH"] = str(events_path)
-    env["FAKE_RESOLVED_POLICY"] = "densegen"
-    env["NOTIFY_TOOL"] = "densegen"
+    env["FAKE_RESOLVED_POLICY"] = "infer"
+    env["NOTIFY_TOOL"] = "infer"
     env["NOTIFY_CONFIG"] = str(config_path)
     env["WEBHOOK_FILE"] = str(webhook_file)
-    env["WEBHOOK_ENV"] = "DENSEGEN_WEBHOOK"
-    env.pop("DENSEGEN_WEBHOOK", None)
+    env["WEBHOOK_ENV"] = "TEST_WEBHOOK"
+    env.pop("TEST_WEBHOOK", None)
 
     result = subprocess.run(
         ["bash", str(script_path)],
@@ -327,10 +327,10 @@ def test_qsub_script_applies_infer_policy_filters(tmp_path: Path) -> None:
     env["UV_CAPTURE"] = str(capture_path)
     env["EVENTS_PATH"] = str(events_path)
     env["WEBHOOK_FILE"] = str(webhook_file)
-    env["WEBHOOK_ENV"] = "DENSEGEN_WEBHOOK"
+    env["WEBHOOK_ENV"] = "TEST_WEBHOOK"
     env["NOTIFY_POLICY"] = "infer"
     env["NOTIFY_NAMESPACE"] = "infer"
-    env.pop("DENSEGEN_WEBHOOK", None)
+    env.pop("TEST_WEBHOOK", None)
 
     result = subprocess.run(
         ["bash", str(script_path)],
@@ -401,7 +401,7 @@ def test_qsub_script_requires_namespace_when_events_path_is_explicit_without_too
     env["UV_CAPTURE"] = str(capture_path)
     env["EVENTS_PATH"] = str(events_path)
     env["WEBHOOK_FILE"] = str(webhook_file)
-    env["NOTIFY_POLICY"] = "densegen"
+    env["NOTIFY_POLICY"] = "infer"
     env.pop("NOTIFY_NAMESPACE", None)
     env.pop("NOTIFY_TOOL", None)
 
@@ -472,11 +472,11 @@ def test_qsub_script_can_load_webhook_from_file_when_env_is_unset(tmp_path: Path
     env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
     env["UV_CAPTURE"] = str(capture_path)
     env["EVENTS_PATH"] = str(events_path)
-    env["WEBHOOK_ENV"] = "DENSEGEN_WEBHOOK"
+    env["WEBHOOK_ENV"] = "TEST_WEBHOOK"
     env["WEBHOOK_FILE"] = str(webhook_file)
     env["NOTIFY_POLICY"] = "generic"
     env["NOTIFY_NAMESPACE"] = "generic"
-    env.pop("DENSEGEN_WEBHOOK", None)
+    env.pop("TEST_WEBHOOK", None)
 
     result = subprocess.run(
         ["bash", str(script_path)],
@@ -488,7 +488,7 @@ def test_qsub_script_can_load_webhook_from_file_when_env_is_unset(tmp_path: Path
     )
     assert result.returncode == 0, result.stderr
     calls = capture_path.read_text(encoding="utf-8")
-    assert "--url-env DENSEGEN_WEBHOOK" in calls
+    assert "--url-env TEST_WEBHOOK" in calls
 
 
 @pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
@@ -508,11 +508,11 @@ def test_qsub_script_fails_fast_when_webhook_file_missing_and_env_unset(tmp_path
     env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
     env["UV_CAPTURE"] = str(capture_path)
     env["EVENTS_PATH"] = str(events_path)
-    env["WEBHOOK_ENV"] = "DENSEGEN_WEBHOOK"
+    env["WEBHOOK_ENV"] = "TEST_WEBHOOK"
     env["WEBHOOK_FILE"] = str(tmp_path / "missing.secret")
     env["NOTIFY_POLICY"] = "generic"
     env["NOTIFY_NAMESPACE"] = "generic"
-    env.pop("DENSEGEN_WEBHOOK", None)
+    env.pop("TEST_WEBHOOK", None)
 
     result = subprocess.run(
         ["bash", str(script_path)],
@@ -579,12 +579,12 @@ def test_qsub_script_can_enforce_terminal_status_on_idle_timeout(tmp_path: Path)
     env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
     env["UV_CAPTURE"] = str(capture_path)
     env["EVENTS_PATH"] = str(events_path)
-    env["WEBHOOK_ENV"] = "DENSEGEN_WEBHOOK"
+    env["WEBHOOK_ENV"] = "TEST_WEBHOOK"
     env["WEBHOOK_FILE"] = str(webhook_file)
     env["NOTIFY_POLICY"] = "generic"
-    env["NOTIFY_NAMESPACE"] = "densegen"
+    env["NOTIFY_NAMESPACE"] = "infer"
     env["NOTIFY_ENFORCE_TERMINAL_ON_IDLE"] = "1"
-    env.pop("DENSEGEN_WEBHOOK", None)
+    env.pop("TEST_WEBHOOK", None)
 
     result = subprocess.run(
         ["bash", str(script_path)],
@@ -619,13 +619,13 @@ def test_qsub_script_terminal_enforcement_allows_terminal_probe_success(tmp_path
     env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
     env["UV_CAPTURE"] = str(capture_path)
     env["EVENTS_PATH"] = str(events_path)
-    env["WEBHOOK_ENV"] = "DENSEGEN_WEBHOOK"
+    env["WEBHOOK_ENV"] = "TEST_WEBHOOK"
     env["WEBHOOK_FILE"] = str(webhook_file)
     env["NOTIFY_POLICY"] = "generic"
-    env["NOTIFY_NAMESPACE"] = "densegen"
+    env["NOTIFY_NAMESPACE"] = "infer"
     env["NOTIFY_ENFORCE_TERMINAL_ON_IDLE"] = "1"
     env["FAKE_WATCH_PROBE_STATUS"] = "success"
-    env.pop("DENSEGEN_WEBHOOK", None)
+    env.pop("TEST_WEBHOOK", None)
 
     result = subprocess.run(
         ["bash", str(script_path)],
@@ -715,13 +715,13 @@ def test_qsub_script_propagates_on_truncate_override_to_watch_and_probe(tmp_path
     env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
     env["UV_CAPTURE"] = str(capture_path)
     env["EVENTS_PATH"] = str(events_path)
-    env["WEBHOOK_ENV"] = "DENSEGEN_WEBHOOK"
+    env["WEBHOOK_ENV"] = "TEST_WEBHOOK"
     env["WEBHOOK_FILE"] = str(webhook_file)
     env["NOTIFY_POLICY"] = "generic"
-    env["NOTIFY_NAMESPACE"] = "densegen"
+    env["NOTIFY_NAMESPACE"] = "infer"
     env["NOTIFY_ENFORCE_TERMINAL_ON_IDLE"] = "1"
     env["NOTIFY_ON_TRUNCATE"] = "error"
-    env.pop("DENSEGEN_WEBHOOK", None)
+    env.pop("TEST_WEBHOOK", None)
 
     result = subprocess.run(
         ["bash", str(script_path)],

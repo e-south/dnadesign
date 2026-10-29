@@ -16,7 +16,6 @@ dependencies = ["numpy"]
 seqledger = "dnadesign._entrypoints:seqledger"
 seqledger-sync-audit-drill = "dnadesign._entrypoints:seqledger_sync_audit_drill"
 opal       = "dnadesign._entrypoints:opal"
-dense      = "dnadesign._entrypoints:dense"
 notify     = "dnadesign._entrypoints:notify"
 infer      = "dnadesign._entrypoints:infer"
 construct  = "dnadesign._entrypoints:construct"
@@ -92,11 +91,9 @@ full = [
   "dnadesign-tools[seqledger,infer,permuter,opal-notebook,ops,notify,folding,construct,baserender,junction,cluster,latentdna-notebook,cruncher-notebook]",
   "anyio>=4.14.2",
   "markdown-it-py>=4.0.0,<5",
-  "ortools>=9.9,<9.10",
   "pygments>=2.20.0",
   "xlrd",
   "torch>=2.13,<2.14; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
-  "dense-arrays==0.2.0",
   "netcdf4>=1.7.3",
   "fastparquet>=2025.12.0",
   "filelock>=4.2.4,<5",
@@ -160,6 +157,8 @@ exclude = [
   "dnadesign.*.prototypes.*",
   "dnadesign.*.archived",
   "dnadesign.*.archived.*",
+  "dnadesign.densegen",
+  "dnadesign.densegen.*",
   "dnadesign.archived",
   "dnadesign.archived.*",
   "dnadesign.prototypes",
@@ -172,8 +171,6 @@ exclude = [
   "dnadesign.seqledger.datasets.usr_regulondb_native_promoters.*",
   "dnadesign.opal.campaigns.*.notebooks",
   "dnadesign.opal.campaigns.*.notebooks.*",
-  "dnadesign.densegen.workspaces.*.outputs.notebooks",
-  "dnadesign.densegen.workspaces.*.outputs.notebooks.*",
   "dnadesign.latentdna.workspaces.*.outputs.notebooks",
   "dnadesign.latentdna.workspaces.*.outputs.notebooks.*",
 ]
@@ -253,25 +250,6 @@ exclude = [
   "workspaces/demo_anchor_template_shared_dataset/runbook.md",
   "workspaces/demo_anchor_template_shared_dataset/runbook.sh",
 ]
-"dnadesign.densegen" = [
-  "workspaces/_shared/workspace_runbook_flow.sh",
-  "workspaces/demo_dense_array_showcase/README.md",
-  "workspaces/demo_dense_array_showcase/config.yaml",
-  "workspaces/demo_dense_array_showcase/inputs/sites.csv",
-  "workspaces/demo_dense_array_showcase/playback-constraints.yaml",
-  "workspaces/demo_dense_array_showcase/playback.yaml",
-  "workspaces/demo_dense_array_showcase/runbook.md",
-  "workspaces/demo_dense_array_showcase/runbook.sh",
-  "workspaces/demo_sampling_baseline/README.md",
-  "workspaces/demo_sampling_baseline/config.yaml",
-  "workspaces/demo_sampling_baseline/runbook.md",
-  "workspaces/demo_sampling_baseline/runbook.sh",
-  "workspaces/demo_tfbs_baseline/README.md",
-  "workspaces/demo_tfbs_baseline/config.yaml",
-  "workspaces/demo_tfbs_baseline/inputs/sites.csv",
-  "workspaces/demo_tfbs_baseline/runbook.md",
-  "workspaces/demo_tfbs_baseline/runbook.sh",
-]
 "dnadesign.infer" = [
   "docs/operations/examples/pressure_test_infer_config.yaml",
   "docs/operations/examples/workspace_local_records_config.yaml",
@@ -326,8 +304,6 @@ exclude = [
 "dnadesign.ops" = [
   "catalog/builtin.json",
   "providers/builtin/status.registry.yaml",
-  "runbooks/templates/densegen-analysis.qsub",
-  "runbooks/templates/densegen-cpu.qsub",
   "runbooks/templates/evo2-gpu-infer.qsub",
   "runbooks/templates/notify-watch.qsub",
 ]
@@ -345,9 +321,6 @@ exclude = [
 "*" = [
   "reader_spop_*.parquet",
   "remotes.yaml",
-]
-"dnadesign.densegen" = [
-  "workspaces/*/config.probe.*.yaml",
 ]
 
 [tool.pytest.ini_options]

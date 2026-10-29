@@ -247,38 +247,6 @@ def _list_construct_workspace_names(repo_root: Path | None, search_root: Path) -
     return sorted(dict.fromkeys(names))
 
 
-def _densegen_workspace_roots(repo_root: Path | None, search_root: Path) -> tuple[Path, ...]:
-    roots = [search_root]
-    if repo_root is not None:
-        roots.append((repo_root / "src/dnadesign/densegen/workspaces").resolve())
-    env_root = str(os.environ.get("DENSEGEN_WORKSPACE_ROOT") or "").strip()
-    if env_root:
-        roots.insert(0, Path(env_root))
-    return _dedupe_paths(roots)
-
-
-def _resolve_densegen_config_from_known_roots(workspace_name: str, repo_root: Path | None, search_root: Path) -> Path:
-    direct_config = search_root / "config.yaml"
-    if search_root.name == workspace_name and direct_config.exists() and direct_config.is_file():
-        return direct_config.resolve()
-    roots = _densegen_workspace_roots(repo_root, search_root)
-    for root in roots:
-        candidate = root / workspace_name / "config.yaml"
-        if candidate.exists() and candidate.is_file():
-            return candidate.resolve()
-    return (roots[0] / workspace_name / "config.yaml").resolve()
-
-
-def _list_densegen_workspace_names(repo_root: Path | None, search_root: Path) -> list[str]:
-    names: list[str] = []
-    direct_config = search_root / "config.yaml"
-    if direct_config.exists() and direct_config.is_file():
-        names.append(search_root.name)
-    for root in _densegen_workspace_roots(repo_root, search_root):
-        names.extend(_list_workspace_names_from_root(root))
-    return sorted(dict.fromkeys(names))
-
-
 def _infer_workspace_roots(repo_root: Path | None, search_root: Path) -> tuple[Path, ...]:
     search_root_resolved = search_root.resolve()
     if search_root_resolved.name == "workspaces":
@@ -319,11 +287,6 @@ register_tool_workspace_resolver(
     tool="construct",
     resolve_config=_resolve_construct_config_from_known_roots,
     list_workspaces=_list_construct_workspace_names,
-)
-register_tool_workspace_resolver(
-    tool="densegen",
-    resolve_config=_resolve_densegen_config_from_known_roots,
-    list_workspaces=_list_densegen_workspace_names,
 )
 register_tool_workspace_resolver(
     tool="infer",

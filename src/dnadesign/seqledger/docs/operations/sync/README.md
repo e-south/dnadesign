@@ -5,7 +5,7 @@
 **Entry artifact:** sync intent that still needs a task-specific transfer route
 **Exit artifact:** chosen sync runbook for setup, execution, or troubleshooting
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 -->
 
 [SeqLedger guide](../../README.md) / [Operations](../README.md)
@@ -25,5 +25,3 @@ Start with [SSH and remote setup](setup.md), then follow the [transfer quickstar
 | Test sync changes locally | [Verification drills](fidelity-drills.md) |
 
 Full dataset transfers default to primary-file hash verification, sidecar checks and content hashes for `_derived` and `_auxiliary` files. They do not preserve cross-host file ownership or permission bits. The [verification reference](modes.md#transfer-consistency) explains history checks, locking and partial-transfer options.
-
-For a producer-specific example, see the [generation and inference transfer workflow](chained-densegen-infer-runbook.md).

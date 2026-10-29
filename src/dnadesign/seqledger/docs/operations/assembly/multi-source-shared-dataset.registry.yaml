@@ -10,13 +10,10 @@ summary: Merge multiple SeqLedger-backed sources, preserve explicit carry, and h
 execution_kind: staged
 status_kind: seqledger-dataset-state
 related_tools:
-  - densegen
   - construct
   - infer
   - notify
 related_tool_routes:
-  - tool: densegen
-    route: seqledger-notify-tutorial
   - tool: construct
     route: template-contexts
   - tool: infer

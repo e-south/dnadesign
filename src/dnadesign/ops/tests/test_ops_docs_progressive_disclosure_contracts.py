@@ -187,73 +187,32 @@ def test_ops_docs_index_has_progressive_disclosure_routes() -> None:
 
 
 def test_orchestration_runbook_doc_keeps_run_order_and_contract_sections() -> None:
-    text = _read(_repo_root() / "docs" / "operations" / "orchestration/runbooks.md")
+    text = _read(_repo_root() / "docs/operations/orchestration/runbooks.md")
     _assert_token_order(
         text,
         [
-            "### Why this exists",
-            "### Runbook bootstrap path",
-            "### 2-minute dry-run path",
-            "### Orchestration workflow ids",
-            "### Runbook schema (v1)",
-            "### Planner and executor commands",
-            "### Contract rules",
+            "### Prepare a runbook",
+            "### Paths and resources",
+            "### Plan, execute and inspect",
+            "### Fill remaining Infer lanes",
         ],
-        label="docs/operations/orchestration/runbooks.md",
+        label="orchestration guide",
     )
-    assert "uv run ops runbook init" in text
-    assert "--project <project>" in text
-    assert "--preset bu-scc-dunlop" in text
-    assert "uv run ops runbook presets" in text
-    assert "uv run ops runbook fill-infer --study-dir /path/to/study" in text
-    assert "uv run ops runbook active-jobs" in text
-    assert "ops runbook diagnostics session-counts" in text
-    assert "--allow-unknown-active-jobs" in text
-    assert "Infer scaffolds also include notify by default" in text
-    assert "**Type:** runbook" in text
-    assert "**Plane:** control-plane" in text
-    assert "**Owner-boundary:** ops" in text
-    assert "It does not own durable SeqLedger-backed data-plane workflows" in text
-    assert "default is `300`" in text
-    assert "operator and agent review" not in text
-    assert "--command-timeout-seconds" in text
-    assert "mode=auto" in text
-    assert "none -> fresh" in text
-    assert "resume_ready -> resume" in text
-    assert "partial -> contract error" in text
-    assert "<workspace-root>/outputs/logs/ops/audit/<file>.json" in text
-    assert "<path-to-audit.json>" not in text
-    assert "Only workspace-scoped audit paths are accepted" in text
-    assert "prune-ops-logs" in text
-    assert "logging.retention.keep_last" in text
-    assert "logging.retention.max_age_days" in text
-    assert "outputs/logs/ops/runtime" in text
-    assert "seqledger-overlay-guard" in text
-    assert "seqledger-records-part-guard" in text
-    assert "seqledger-archived-overlay-guard" in text
-    assert "densegen-overlay-guard" not in text
-    assert "densegen.overlay_guard.overlay_namespace" in text
-    assert "densegen.overlay_guard.namespace" not in text
-    assert "transient operational working directories at repo root" in text
-    assert "/scratch" in text
-    assert "resources.gpu_memory_gib" in text
-    assert "model.parallelism" in text
-    assert "gpu_capability=8.9 -> 45.0 GiB" in text
-    assert "gpu_capability=9.0 -> 80.0 GiB" in text
-    assert "does not render `seqledger-overlay-guard`" in text
-    assert "does not pass `INFER_RUN_ARGS=--overwrite`" in text
-    assert "without implicitly pruning the namespace" in text
-    assert "python -m dnadesign.ops.orchestrator.gates" not in text
-    assert "--mode fresh --allow-fresh-reset" in text
-    assert "--no-discover-active-jobs" in text
-    assert "operator-visible warning" in text
-    assert "skips non-sequence-view Infer runbooks before SGE plan rendering" in text
-    assert "densegen_batch_with_notify" in text
+    for command in ("init", "plan", "execute", "active-jobs", "fill-infer"):
+        assert f"ops runbook {command}" in text
+    for contract in (
+        "--project",
+        "--audit-json",
+        "--mode fresh --allow-fresh-reset",
+        "--command-timeout-seconds",
+        "Only workspace-scoped audit paths",
+        "logging.retention.keep_last",
+        "resources.gpu_memory_gib",
+    ):
+        assert contract in text
+    assert "densegen_batch" not in text
     assert "infer_batch_with_notify" in text
-    assert "project: <project>" in text
     assert "project: dunlop" not in text
-    assert "with_notify_slack" not in text
-    assert "precedents" not in text
 
 
 def test_repo_docs_index_exposes_ops_tool_and_operations_route() -> None:
@@ -309,7 +268,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "### Boundary reminders" not in text
     assert "ops.control-plane.orchestration" in text
     assert "seqledger.data-plane.hpc-sync" in text
-    assert "seqledger.data-plane.chained-densegen-infer-sync" in text
+    assert "seqledger.data-plane.chained-densegen-infer-sync" not in text
     assert "seqledger.data-plane.multi-source-source-of-truth" in text
     assert "seqledger.data-plane.construct-infer-source-of-truth" in text
     assert "seqledger.data-plane.promoter-feature-matrix" in text
@@ -319,7 +278,7 @@ def test_runbook_catalog_covers_cross_tool_inventory_without_relocating_owners()
     assert "../../src/dnadesign/seqledger/docs/operations/sync/hpc-agent-flow.md" in text
     assert "../../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md" in text
     assert "../../src/dnadesign/opal/docs/workflows/seqledger-infer-x-active-learning.md" in text
-    assert "../../src/dnadesign/densegen/docs/README.md" in text
+    assert "../../src/dnadesign/densegen/docs/README.md" not in text
     assert "../../src/dnadesign/construct/docs/README.md" in text
     assert "../../src/dnadesign/infer/docs/README.md" in text
     assert "drift is a docs-check failure" not in text

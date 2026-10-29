@@ -28,12 +28,12 @@ def _event(action: str = "write_overlay_part") -> dict:
         "timestamp_utc": "2026-02-06T00:00:00+00:00",
         "action": action,
         "dataset": {"name": "demo", "root": "/tmp/datasets"},
-        "args": {"namespace": "densegen"},
+        "args": {"namespace": "infer"},
         "metrics": {"rows_written": 3},
-        "artifacts": {"overlay": {"namespace": "densegen"}},
+        "artifacts": {"overlay": {"namespace": "infer"}},
         "fingerprint": {"rows": 1, "cols": 2, "size_bytes": 128, "sha256": None},
         "registry_hash": "abc123",
-        "actor": {"tool": "densegen", "run_id": "run-1", "host": "host", "pid": 123},
+        "actor": {"tool": "infer", "run_id": "run-1", "host": "host", "pid": 123},
         "version": "0.1.0",
     }
 
@@ -65,7 +65,7 @@ def test_profile_wizard_writes_generic_policy_without_filters(tmp_path: Path, mo
             "--secret-source",
             "env",
             "--url-env",
-            "DENSEGEN_WEBHOOK",
+            "INFER_WEBHOOK",
         ],
     )
     assert result.exit_code == 0
@@ -96,7 +96,7 @@ def test_profile_wizard_writes_v2_profile_with_env_source(tmp_path: Path, monkey
             "--secret-source",
             "env",
             "--url-env",
-            "DENSEGEN_WEBHOOK",
+            "INFER_WEBHOOK",
         ],
     )
     assert result.exit_code == 0
@@ -104,13 +104,13 @@ def test_profile_wizard_writes_v2_profile_with_env_source(tmp_path: Path, monkey
     assert data["profile_version"] == 2
     assert data["provider"] == "slack"
     assert data["events"] == str(events)
-    assert data["webhook"] == {"source": "env", "ref": "DENSEGEN_WEBHOOK"}
+    assert data["webhook"] == {"source": "env", "ref": "INFER_WEBHOOK"}
     assert "url_env" not in data
     assert "Next steps:" in result.stdout
     assert "notify profile doctor --profile" in result.stdout
     assert "notify seqledger-events watch --profile" in result.stdout
     assert "--dry-run" in result.stdout
-    assert "export DENSEGEN_WEBHOOK" in result.stdout
+    assert "export INFER_WEBHOOK" in result.stdout
     assert "NOTIFY_PROFILE" in result.stdout
     assert "docs/bu-scc/jobs/notify-watch.qsub" in result.stdout
 
@@ -136,7 +136,7 @@ def test_profile_wizard_persists_progress_tunables(tmp_path: Path, monkeypatch) 
             "--secret-source",
             "env",
             "--url-env",
-            "DENSEGEN_WEBHOOK",
+            "INFER_WEBHOOK",
             "--progress-step-pct",
             "12",
             "--progress-min-seconds",
@@ -195,18 +195,18 @@ def test_profile_wizard_defaults_to_namespaced_profile_and_runtime_paths(tmp_pat
             "--events",
             str(events),
             "--policy",
-            "densegen",
+            "infer",
             "--secret-source",
             "env",
         ],
     )
     assert result.exit_code == 0
-    profile = tmp_path / "outputs" / "notify" / "densegen" / "profile.json"
+    profile = tmp_path / "outputs" / "notify" / "infer" / "profile.json"
     assert profile.exists()
     data = json.loads(profile.read_text(encoding="utf-8"))
     assert data["webhook"] == {"source": "env", "ref": "NOTIFY_WEBHOOK"}
-    assert data["cursor"] == str((tmp_path / "outputs" / "notify" / "densegen" / "cursor").resolve())
-    assert data["spool_dir"] == str((tmp_path / "outputs" / "notify" / "densegen" / "spool").resolve())
+    assert data["cursor"] == str((tmp_path / "outputs" / "notify" / "infer" / "cursor").resolve())
+    assert data["spool_dir"] == str((tmp_path / "outputs" / "notify" / "infer" / "spool").resolve())
 
 
 def test_profile_wizard_requires_policy_or_profile_for_default_events_mode_profile(tmp_path: Path, monkeypatch) -> None:
@@ -250,7 +250,7 @@ def test_profile_wizard_stores_tls_ca_bundle_path(tmp_path: Path, monkeypatch) -
             "--events",
             str(events),
             "--policy",
-            "densegen",
+            "infer",
             "--secret-source",
             "env",
             "--tls-ca-bundle",
@@ -258,7 +258,7 @@ def test_profile_wizard_stores_tls_ca_bundle_path(tmp_path: Path, monkeypatch) -
         ],
     )
     assert result.exit_code == 0
-    profile = tmp_path / "outputs" / "notify" / "densegen" / "profile.json"
+    profile = tmp_path / "outputs" / "notify" / "infer" / "profile.json"
     data = json.loads(profile.read_text(encoding="utf-8"))
     assert data["tls_ca_bundle"] == str(ca_bundle.resolve())
 
@@ -282,11 +282,11 @@ def test_profile_wizard_can_emit_json_output(tmp_path: Path, monkeypatch) -> Non
             "--events",
             str(events),
             "--policy",
-            "densegen",
+            "infer",
             "--secret-source",
             "env",
             "--url-env",
-            "DENSEGEN_WEBHOOK",
+            "INFER_WEBHOOK",
             "--json",
         ],
     )
@@ -296,8 +296,8 @@ def test_profile_wizard_can_emit_json_output(tmp_path: Path, monkeypatch) -> Non
     assert payload["profile"] == str(profile.resolve())
     assert payload["events"] == str(events)
     assert payload["events_exists"] is True
-    assert payload["policy"] == "densegen"
-    assert payload["webhook"] == {"source": "env", "ref": "DENSEGEN_WEBHOOK"}
+    assert payload["policy"] == "infer"
+    assert payload["webhook"] == {"source": "env", "ref": "INFER_WEBHOOK"}
     assert isinstance(payload.get("next_steps"), list)
 
 
@@ -377,7 +377,7 @@ def test_profile_wizard_auto_falls_back_to_file_secret_ref(tmp_path: Path, monke
 
 def test_profile_wizard_rejects_yaml_path_for_events(tmp_path: Path, monkeypatch) -> None:
     cfg_path = tmp_path / "config.yaml"
-    cfg_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    cfg_path.write_text("infer:\n  run:\n    id: demo\n", encoding="utf-8")
     profile = tmp_path / "notify.profile.json"
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
 
@@ -396,12 +396,12 @@ def test_profile_wizard_rejects_yaml_path_for_events(tmp_path: Path, monkeypatch
             "--secret-source",
             "env",
             "--url-env",
-            "DENSEGEN_WEBHOOK",
+            "INFER_WEBHOOK",
         ],
     )
     assert result.exit_code == 1
     assert "SeqLedger .events.log" in result.stdout
-    assert "inspect run --seqledger-events-path" in result.stdout
+    assert "--tool and --config" in result.stdout
 
 
 def test_profile_wizard_reports_actionable_cursor_directory_error(tmp_path: Path, monkeypatch) -> None:
@@ -430,7 +430,7 @@ def test_profile_wizard_reports_actionable_cursor_directory_error(tmp_path: Path
             "--secret-source",
             "env",
             "--url-env",
-            "DENSEGEN_WEBHOOK",
+            "INFER_WEBHOOK",
         ],
     )
     assert result.exit_code == 1
@@ -472,7 +472,7 @@ def test_profile_wizard_stores_absolute_events_path(tmp_path: Path, monkeypatch)
             "--secret-source",
             "env",
             "--url-env",
-            "DENSEGEN_WEBHOOK",
+            "INFER_WEBHOOK",
         ],
     )
     assert result.exit_code == 0

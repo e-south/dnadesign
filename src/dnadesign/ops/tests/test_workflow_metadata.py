@@ -32,41 +32,19 @@ def test_infer_notify_workflow_metadata_is_explicit() -> None:
     assert definition.allowed_notify_policies == ("generic", "infer")
 
 
-def test_densegen_submit_workflow_metadata_is_explicit() -> None:
-    definition = workflow_metadata.resolve_workflow_metadata("densegen_batch_submit")
-
-    assert definition.tool == "densegen"
-    assert definition.requires_notify is False
-    assert definition.requires_gpus is False
-    assert definition.allowed_notify_policies == ()
-
-
 def test_resolve_workflow_id_for_tool_and_notify_contract() -> None:
-    assert workflow_metadata.resolve_workflow_id(tool="densegen", with_notify=False) == "densegen_batch_submit"
-    assert workflow_metadata.resolve_workflow_id(tool="densegen", with_notify=True) == "densegen_batch_with_notify"
     assert workflow_metadata.resolve_workflow_id(tool="infer", with_notify=False) == "infer_batch_submit"
     assert workflow_metadata.resolve_workflow_id(tool="infer", with_notify=True) == "infer_batch_with_notify"
 
 
 def test_retired_notify_workflow_ids_fail_fast_with_replacement_hint() -> None:
     try:
-        workflow_metadata.resolve_workflow_metadata("densegen_batch_with_notify_slack")
-    except ValueError as exc:
-        assert (
-            str(exc) == "unsupported orchestration workflow id: densegen_batch_with_notify_slack "
-            "(retired; use densegen_batch_with_notify; supported: "
-            "densegen_batch_submit, densegen_batch_with_notify, infer_batch_submit, infer_batch_with_notify)"
-        )
-    else:
-        raise AssertionError("expected ValueError for retired densegen workflow id")
-
-    try:
         workflow_metadata.resolve_workflow_metadata("infer_batch_with_notify_slack")
     except ValueError as exc:
         assert (
             str(exc) == "unsupported orchestration workflow id: infer_batch_with_notify_slack "
             "(retired; use infer_batch_with_notify; supported: "
-            "densegen_batch_submit, densegen_batch_with_notify, infer_batch_submit, infer_batch_with_notify)"
+            "infer_batch_submit, infer_batch_with_notify)"
         )
     else:
         raise AssertionError("expected ValueError for retired infer workflow id")
@@ -76,7 +54,6 @@ def test_validate_workflow_contract_rejects_infer_notify_policy_densegen() -> No
     try:
         workflow_metadata.validate_workflow_contract(
             workflow_id="infer_batch_with_notify",
-            densegen_present=False,
             infer_present=True,
             notify_present=True,
             notify_tool="infer",
@@ -93,5 +70,4 @@ def test_validate_workflow_contract_rejects_infer_notify_policy_densegen() -> No
 
 
 def test_workflow_classification_helpers_return_false_for_unknown_id() -> None:
-    assert workflow_metadata.is_densegen_workflow_id("unknown_workflow") is False
     assert workflow_metadata.is_infer_workflow_id("unknown_workflow") is False

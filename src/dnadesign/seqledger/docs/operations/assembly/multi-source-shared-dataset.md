@@ -9,7 +9,7 @@
 **Execution-kind:** staged
 **Status-kind:** seqledger-dataset-state
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 -->
 
 [SeqLedger guide](../../README.md)
@@ -41,7 +41,7 @@ result as a cross-tool source of truth.
 ### When to use this path
 
 - upstream records already exist in multiple SeqLedger datasets
-- one upstream source may come from DenseGen while another comes from seeded controls, manual imports, or other SeqLedger-backed producers
+- one upstream source may come from an external generator while another comes from seeded controls, manual imports, or other SeqLedger-backed producers
 - one downstream construct dataset should remain the durable shared handoff boundary for infer and downstream consumers
 - source labels or other carried overlays must survive the pre-construct consolidation step
 
@@ -70,7 +70,7 @@ uv run construct seed anchor-template-demo \
 
 # Reuse explicit dataset ids across merge, construct, infer, and notify.
 export PRIMARY_INPUT_DATASET="anchor_parts_demo" # Use the seeded anchor controls as the primary dataset for the tracer bullet.
-export EXTRA_INPUT_DATASET="<existing_densegen_or_manual_usr_dataset>" # Replace this with a real upstream dataset that already exists under "$USR_ROOT".
+export EXTRA_INPUT_DATASET="<existing_generated_or_manual_dataset>" # Replace this with a real upstream dataset that already exists under "$USR_ROOT".
 export DOWNSTREAM_DATASET="multi_source_construct_truth_demo" # Reuse one downstream dataset id across construct, infer, and notify.
 ```
 
@@ -84,12 +84,12 @@ Before step 2, do one of the following explicitly:
 
 - keep `PRIMARY_INPUT_DATASET="anchor_parts_demo"` and replace `EXTRA_INPUT_DATASET` with a real upstream dataset that already exists under `"$USR_ROOT"`; or
 - point both ids at real upstream datasets that already exist under `"$USR_ROOT"`; or
-- create/import the missing dataset through your own upstream DenseGen/manual SeqLedger flow first, then return here.
+- create/import the missing dataset through your own upstream an external generator/manual SeqLedger flow first, then return here.
 
 Tracer-bullet example when the seeded control dataset should act as the primary input:
 
 ```bash
-export EXTRA_INPUT_DATASET="<existing_densegen_or_manual_usr_dataset>" # Replace with the real upstream dataset that should be folded into the primary input dataset.
+export EXTRA_INPUT_DATASET="<existing_generated_or_manual_dataset>" # Replace with the real upstream dataset that should be folded into the primary input dataset.
 ```
 
 ### 2) Validate and consolidate the upstream SeqLedger datasets
@@ -218,7 +218,6 @@ The Ops control plane is downstream from this runbook. It should not replace the
 - Construct-backed shared dataset handoff: [construct-infer-shared-dataset-runbook.md](../assembly/construct-infer-shared-dataset-runbook.md)
 - SeqLedger maintenance merge contract: [../reference/maintenance.md](../../reference/maintenance.md)
 - Construct workflow docs: [../../../../construct/docs/README.md](../../../../construct/docs/README.md)
-- DenseGen workflow docs: [../../../../densegen/docs/README.md](../../../../densegen/docs/README.md)
 - Infer workflow docs: [../../../../infer/docs/README.md](../../../../infer/docs/README.md)
 - Broader feature-matrix branch: [../promoter/characterization-feature-matrix.md](../promoter/characterization-feature-matrix.md)
 - Notify operator contract: [../../../../../../docs/notify/seqledger-events.md](../../../../../../docs/notify/seqledger-events.md)

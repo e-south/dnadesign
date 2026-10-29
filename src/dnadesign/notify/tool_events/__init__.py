@@ -19,7 +19,6 @@ from .core import (
     tool_event_message_override,
     tool_event_status_override,
 )
-from .densegen import register_densegen_handlers
 from .infer import register_infer_handlers
 from .packs_builtin import register_builtin_tool_event_packs
 from .types import ToolEventDecision, ToolEventState
@@ -32,7 +31,6 @@ __all__ = [
     "evaluate_tool_event",
     "register_infer_handlers",
     "register_builtin_tool_event_packs",
-    "register_densegen_handlers",
     "register_tool_event_handlers",
     "register_tool_event_pack",
     "supported_tool_event_packs",

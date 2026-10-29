@@ -1,7 +1,7 @@
 ## Cruncher CLI
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-22
+**Last verified:** 2026-10-29
 
 
 **Last updated by:** cruncher-maintainers on 2026-07-13
@@ -957,8 +957,8 @@ Subcommands:
 * `catalog resolve` — resolve a TF name to cached candidates
 * `catalog show` — show metadata for a cached `<source>:<motif_id>`
 * `catalog pwms` — summarize or export resolved PWMs (matrix or site-derived)
-* `catalog export-densegen` — export DenseGen motif artifacts (one JSON per motif)
-* `catalog export-sites` — export cached binding sites as CSV/Parquet for DenseGen
+* `catalog export-meme` — export motifs as MEME files
+* `catalog export-sites` — export binding sites as CSV or Parquet
 * `catalog logos` — render PWM logos for selected TFs or motif refs
 
 Note: `catalog logos` is idempotent for identical inputs. If matching logos already exist
@@ -971,17 +971,12 @@ Examples:
 * `cruncher catalog show <config> regulondb:RDBECOLITFC00214`
 * `cruncher catalog pwms <config>`
 * `cruncher catalog pwms --set 1 <config>`
-* `cruncher catalog export-sites --set 1 --out densegen/sites.csv <config>`
-* `cruncher catalog export-sites --set 1 --densegen-workspace demo_tfbs_baseline <config>`
-* `cruncher catalog export-densegen --set 1 --out densegen/pwms <config>`
-* `cruncher catalog export-densegen --set 1 --densegen-workspace demo_sampling_baseline <config>`
+* `cruncher catalog export-sites --set 1 --out exports/sites.csv <config>`
+* `cruncher catalog export-meme --set 1 --out exports/motifs <config>`
 * `cruncher catalog logos --set 1 <config>`
 
-`catalog export-densegen` and `catalog export-sites` accept `--densegen-workspace` (packaged DenseGen
-workspace name, explicit workspace path, or name under `DNADESIGN_DENSEGEN_WORKSPACES_ROOT`).
-When provided, outputs default to the workspace `inputs/` locations and must stay within that directory.
-`catalog export-densegen` removes existing artifact JSONs for the selected TFs by default; use
-`--no-clean` to keep prior artifacts.
+`catalog export-sites` requires an explicit `--out` path. Both export commands
+refuse existing output files unless `--overwrite` is supplied.
 
 ---
 

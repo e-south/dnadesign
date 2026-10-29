@@ -7,7 +7,7 @@ baserender = {status = "active", catalog = true}
 cluster = {status = "active", catalog = true}
 construct = {status = "active", catalog = true}
 cruncher = {status = "active", catalog = true}
-densegen = {status = "maintenance", catalog = false, replacement = "https://github.com/e-south/dense-arrays"}
+densegen = {status = "retired", catalog = false, installed = false}
 folding = {status = "active", catalog = true}
 infer = {status = "active", catalog = true}
 junction = {status = "active", catalog = true}

@@ -18,13 +18,6 @@ from pathlib import Path
 from .models import USRDestination, USRProducerContract
 
 
-def _densegen_destination(config_path: Path) -> USRDestination:
-    from dnadesign.densegen.contracts import resolve_densegen_usr_output_contract
-
-    destination = resolve_densegen_usr_output_contract(config_path)
-    return USRDestination("densegen", destination.config_path, destination.usr_root, destination.usr_dataset)
-
-
 def _infer_destination(config_path: Path) -> USRDestination:
     from dnadesign.infer.contracts import resolve_infer_usr_output_contract
 
@@ -37,27 +30,6 @@ def _construct_destination(config_path: Path) -> USRDestination:
 
     destination = resolve_construct_usr_output_contract(config_path)
     return USRDestination("construct", destination.config_path, destination.usr_root, destination.usr_dataset)
-
-
-def _resolve_densegen_usr_contract(config_path: Path) -> USRProducerContract:
-    from dnadesign.densegen.contracts import resolve_densegen_usr_producer_contract
-
-    densegen_contract = resolve_densegen_usr_producer_contract(config_path)
-    return USRProducerContract(
-        tool="densegen",
-        config_path=densegen_contract.config_path,
-        run_root=densegen_contract.run_root,
-        usr_root=densegen_contract.usr_root,
-        usr_dataset=densegen_contract.usr_dataset,
-        supports_overlay_parts=densegen_contract.supports_overlay_parts,
-        supports_records_parts=densegen_contract.supports_records_parts,
-        usr_chunk_size=densegen_contract.usr_chunk_size,
-        records_path=densegen_contract.records_path,
-        parquet_chunk_size=densegen_contract.parquet_chunk_size,
-        round_robin=densegen_contract.round_robin,
-        max_accepted_per_library=densegen_contract.max_accepted_per_library,
-        generation_total_quota=densegen_contract.generation_total_quota,
-    )
 
 
 def _resolve_infer_usr_contract(config_path: Path) -> USRProducerContract:
@@ -106,7 +78,6 @@ class _ProducerAdapter:
 
 _USR_PRODUCER_ADAPTERS = {
     "construct": _ProducerAdapter(_construct_destination, _resolve_construct_usr_contract),
-    "densegen": _ProducerAdapter(_densegen_destination, _resolve_densegen_usr_contract),
     "infer": _ProducerAdapter(_infer_destination, _resolve_infer_usr_contract),
 }
 

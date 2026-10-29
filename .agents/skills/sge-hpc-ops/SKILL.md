@@ -12,7 +12,6 @@ Run SGE-family workloads safely with explicit capability probing, workflow-aware
 ## Scope
 In scope:
 - scheduler capability probing before command generation
-- workflow routing for DenseGen batch, DenseGen plus Notify Slack, OnDemand request, and OnDemand handoff
 - deterministic interactive and batch execution planning
 - verify-before-submit checks plus QA/runtime preflight gates
 - active-job snapshot and session-status reporting for user-facing HPC status
@@ -51,8 +50,7 @@ Clarification policy:
 ### Step 1: Route workflow and execution locus
 - classify request using `references/workflow-router.md`
 - select exactly one `route_id`:
-  - `densegen_batch_submit`
-  - `densegen_batch_with_notify`
+  - `infer_batch`
   - `ondemand_session_request`
   - `ondemand_session_handoff`
   - `generic_sge_ops`
@@ -92,12 +90,10 @@ Clarification policy:
 - if running jobs are more than 3 and additional submissions are requested, warn and require explicit confirmation
 - in over-threshold cases, propose arrays or dependency chains before raw parallel submits
 - respect the queue and do not skip the line
-- for DenseGen + notify chains, follow `references/workload-dnadesign.md`
 ### Step 5a: Use runbook-native orchestration commands when available
 - prefer command-first Ops entrypoints from `references/runbook-entrypoints.md`, including `uv run ops catalog list --simple`, `uv run ops runbook presets`, `uv run ops runbook init`, `uv run ops runbook plan`, `uv run ops runbook active-jobs`, and `uv run ops runbook execute`, over path-discovery heuristics
 - treat native OPS gate outputs as canonical for machine-readable scheduler tokens such as `advisor`, `submit_gate`, and `queue_policy`; keep the repo-local shell overlays aligned to those values
 - for automatic active-job discovery, prefer the explicit OPS scheduler identity carried in submitted job metadata and audit JSON; do not infer matches from workspace-path token overlap alone
-- DenseGen defaults to notify-enabled runbooks; use `--no-notify` only for explicit batch-only requests, and treat `--no-submit` as the default pressure-test path before any real submit
 ### Step 6: Apply verify-before-submit gate
 - verify project/account flags, script readability, and shell init compatibility (`#!/bin/bash -l`)
 - run scheduler syntax validation (`qsub -verify`, fallback `qsub -w v`)
@@ -110,7 +106,6 @@ Clarification policy:
 - submit only when checks are green
 ### Step 7: Monitor and recover
 - use bounded queue/log monitoring loops with timeout and teardown
-- keep separate run handles for each submitted job (`densegen_job_id`, `notify_job_id`)
 - track transitions with `qstat` and post-run evidence with `qacct` when available
 - triage `Eqw` and process-reaper events before retries or mutations
 - for Infer cold starts, distinguish `fetch -> weight hydration -> GPU residency -> first attach events` from a true hang by checking GPU memory, dataset `.events.log` growth, watcher cursor movement, and spool backlog
@@ -150,15 +145,13 @@ Return:
 - unresolved unknowns, stale-policy remediations, and next checks
 ## Trigger Tests
 Should trigger:
-- "start a densegen workspace x batch job on bu scc"
+- "Plan an Infer batch job on BU SCC."
 - "also track and wire up notify for slack notifications"
 - "submit a request for an interactive on demand session"
 - "i've just entered into an ondemand session, do the following task"
 - "Submit this qsub job on BU SCC."
 - "Help me debug an Eqw job and recover safely."
 - "This job keeps getting killed by the process reaper."
-- "Run a DenseGen workflow for stress ethanol and cipro workspace for two hours."
-- "Start DenseGen batch for stress ethanol and cipro without notify."
 - "Show my active SGE jobs and tell me if I should submit more right now."
 Should not trigger:
 - "Write a Flask endpoint."
@@ -166,7 +159,8 @@ Should not trigger:
 - "Tune a Kubernetes deployment."
 - "Do a local shell refactor with no scheduler involvement."
 ## Examples
-- "Show my active BU SCC jobs, tell me whether I should submit more now, and recommend arrays vs `-hold_jid`"; "Plan a DenseGen batch submit with Notify wiring, but stop at the verify-before-submit gate"; "I am already inside OnDemand; probe the session, report status, and continue with the next SGE step safely."
+- "Plan an Infer batch with Notify, stopping before submission."
+- "I am already inside OnDemand; check the session and continue the requested job."
 ## Troubleshooting
 - Undertriggering: expand scheduler, notify, and OnDemand handoff phrases in description.
 - Overtriggering: tighten non-scheduler coding boundaries in description and trigger tests.

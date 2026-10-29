@@ -102,8 +102,8 @@ def resolve_existing_file_path(*, field: str, path_value: Path) -> Path:
 
 def events_path_hint() -> str:
     return (
-        "Find the SeqLedger .events.log path with `uv run dense inspect run --seqledger-events-path` from the DenseGen "
-        "workspace, or use `uv run dense inspect run --seqledger-events-path -c <config.yaml>`."
+        "Use the SeqLedger .events.log dataset path <root>/<dataset>/.events.log "
+        "or resolve it with --tool and --config."
     )
 
 

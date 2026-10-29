@@ -31,8 +31,8 @@ def test_documentation_preparation_is_explicit(path: str) -> None:
     scope = determine_scope(
         event_name="pull_request",
         changed_files=[path],
-        tool_names={"opal", "densegen"},
-        external_integration_tool_names={"densegen"},
+        tool_names={"opal", "infer"},
+        external_integration_tool_names={"infer"},
     )
     assert scope.documentation_only
     assert not scope.run_full_core
@@ -51,8 +51,8 @@ def test_unclassified_and_lifecycle_changes_keep_broad_checks(path: str) -> None
     scope = determine_scope(
         event_name="pull_request",
         changed_files=[path],
-        tool_names={"opal", "densegen"},
-        external_integration_tool_names={"densegen"},
+        tool_names={"opal", "infer"},
+        external_integration_tool_names={"infer"},
     )
     assert scope.run_full_core
     assert not scope.documentation_only
@@ -70,8 +70,8 @@ def test_mixed_or_packaged_inputs_do_not_use_documentation_preparation(path: str
     scope = determine_scope(
         event_name="pull_request",
         changed_files=["README.md", path],
-        tool_names={"opal", "densegen"},
-        external_integration_tool_names={"densegen"},
+        tool_names={"opal", "infer"},
+        external_integration_tool_names={"infer"},
     )
     assert scope.affected_tools == ["opal"]
     assert not scope.documentation_only
@@ -132,42 +132,42 @@ def test_determine_scope_non_pr_runs_full_core_and_external_integration() -> Non
     result = determine_scope(
         event_name="push",
         changed_files=[],
-        tool_names={"densegen", "seqledger"},
-        external_integration_tool_names={"densegen"},
+        tool_names={"infer", "seqledger"},
+        external_integration_tool_names={"infer"},
     )
 
     assert result.run_full_core is True
     assert result.run_external_integration is True
-    assert result.affected_tools == ["densegen", "seqledger"]
-    assert result.external_integration_tools == ["densegen"]
+    assert result.affected_tools == ["infer", "seqledger"]
+    assert result.external_integration_tools == ["infer"]
 
 
 def test_determine_scope_pr_selects_provider_and_declared_consumer() -> None:
     result = determine_scope(
         event_name="pull_request",
         changed_files=["src/dnadesign/seqledger/src/cli.py"],
-        tool_names={"densegen", "seqledger"},
-        external_integration_tool_names={"densegen"},
+        tool_names={"infer", "seqledger"},
+        external_integration_tool_names={"infer"},
     )
 
     assert result.run_full_core is False
     assert result.run_external_integration is True
-    assert result.affected_tools == ["densegen", "seqledger"]
-    assert result.external_integration_tools == ["densegen"]
+    assert result.affected_tools == ["infer", "seqledger"]
+    assert result.external_integration_tools == ["infer"]
 
 
-def test_determine_scope_pr_densegen_change_triggers_external_integration_lane() -> None:
+def test_determine_scope_pr_infer_change_triggers_external_integration_lane() -> None:
     result = determine_scope(
         event_name="pull_request",
-        changed_files=["src/dnadesign/densegen/src/cli/main.py"],
-        tool_names={"densegen", "seqledger"},
-        external_integration_tool_names={"densegen"},
+        changed_files=["src/dnadesign/infer/src/cli/main.py"],
+        tool_names={"infer", "seqledger"},
+        external_integration_tool_names={"infer"},
     )
 
     assert result.run_full_core is False
     assert result.run_external_integration is True
-    assert result.affected_tools == ["densegen"]
-    assert result.external_integration_tools == ["densegen"]
+    assert result.affected_tools == ["infer"]
+    assert result.external_integration_tools == ["infer"]
 
 
 @pytest.mark.parametrize("path", ["pyproject.toml", "uv.lock", "setup.py"])
@@ -175,36 +175,36 @@ def test_package_configuration_change_triggers_full_core_and_external_integratio
     result = determine_scope(
         event_name="pull_request",
         changed_files=[path],
-        tool_names={"densegen", "seqledger"},
-        external_integration_tool_names={"densegen"},
+        tool_names={"infer", "seqledger"},
+        external_integration_tool_names={"infer"},
     )
 
     assert result.run_full_core is True
     assert result.run_external_integration is True
-    assert result.affected_tools == ["densegen", "seqledger"]
-    assert result.external_integration_tools == ["densegen"]
+    assert result.affected_tools == ["infer", "seqledger"]
+    assert result.external_integration_tools == ["infer"]
 
 
 def test_determine_scope_pr_python_version_change_triggers_full_compatibility() -> None:
     result = determine_scope(
         event_name="pull_request",
         changed_files=[".python-version"],
-        tool_names={"densegen", "seqledger"},
-        external_integration_tool_names={"densegen"},
+        tool_names={"infer", "seqledger"},
+        external_integration_tool_names={"infer"},
     )
 
     assert result.run_full_core is True
     assert result.run_external_integration is True
-    assert result.affected_tools == ["densegen", "seqledger"]
-    assert result.external_integration_tools == ["densegen"]
+    assert result.affected_tools == ["infer", "seqledger"]
+    assert result.external_integration_tools == ["infer"]
 
 
 def test_determine_scope_pr_docs_only_skips_tool_coverage_gate() -> None:
     result = determine_scope(
         event_name="pull_request",
         changed_files=["docs/README.md"],
-        tool_names={"densegen", "seqledger"},
-        external_integration_tool_names={"densegen"},
+        tool_names={"infer", "seqledger"},
+        external_integration_tool_names={"infer"},
     )
 
     assert result.run_full_core is False
@@ -214,13 +214,13 @@ def test_determine_scope_pr_docs_only_skips_tool_coverage_gate() -> None:
     assert result.run_coverage_gate is False
 
 
-@pytest.mark.parametrize("tool", ["densegen", "opal"])
+@pytest.mark.parametrize("tool", ["infer", "opal"])
 def test_tool_readme_edit_does_not_trigger_runtime_or_external_tests(tool) -> None:
     result = determine_scope(
         event_name="pull_request",
         changed_files=[f"src/dnadesign/{tool}/README.md"],
-        tool_names={"densegen", "opal"},
-        external_integration_tool_names={"densegen"},
+        tool_names={"infer", "opal"},
+        external_integration_tool_names={"infer"},
     )
     assert not result.run_full_core
     assert not result.run_coverage_gate
@@ -231,70 +231,70 @@ def test_determine_scope_pr_shared_code_change_triggers_full_core_and_external_i
     result = determine_scope(
         event_name="pull_request",
         changed_files=["src/dnadesign/devtools/quality/tool_coverage.py"],
-        tool_names={"densegen", "seqledger"},
-        external_integration_tool_names={"densegen"},
+        tool_names={"infer", "seqledger"},
+        external_integration_tool_names={"infer"},
     )
 
     assert result.run_full_core is True
     assert result.run_external_integration is True
-    assert result.affected_tools == ["densegen", "seqledger"]
-    assert result.external_integration_tools == ["densegen"]
+    assert result.affected_tools == ["infer", "seqledger"]
+    assert result.external_integration_tools == ["infer"]
 
 
 def test_determine_scope_pr_shared_package_root_change_triggers_full_core_and_external_integration() -> None:
     result = determine_scope(
         event_name="pull_request",
         changed_files=["src/dnadesign/__init__.py"],
-        tool_names={"densegen", "seqledger"},
-        external_integration_tool_names={"densegen"},
+        tool_names={"infer", "seqledger"},
+        external_integration_tool_names={"infer"},
     )
 
     assert result.run_full_core is True
     assert result.run_external_integration is True
-    assert result.affected_tools == ["densegen", "seqledger"]
-    assert result.external_integration_tools == ["densegen"]
+    assert result.affected_tools == ["infer", "seqledger"]
+    assert result.external_integration_tools == ["infer"]
 
 
 def test_determine_scope_pr_shared_contract_package_change_triggers_full_core() -> None:
     result = determine_scope(
         event_name="pull_request",
         changed_files=["src/dnadesign/contracts/artifacts.py"],
-        tool_names={"contracts", "densegen", "seqledger"},
-        external_integration_tool_names={"densegen"},
+        tool_names={"contracts", "infer", "seqledger"},
+        external_integration_tool_names={"infer"},
     )
 
     assert result.run_full_core is True
     assert result.run_external_integration is True
-    assert result.affected_tools == ["contracts", "densegen", "seqledger"]
-    assert result.external_integration_tools == ["densegen"]
+    assert result.affected_tools == ["contracts", "infer", "seqledger"]
+    assert result.external_integration_tools == ["infer"]
 
 
-def test_determine_scope_pr_external_integration_tool_is_not_densegen() -> None:
+def test_determine_scope_pr_external_integration_selection_includes_consumers() -> None:
     result = determine_scope(
         event_name="pull_request",
         changed_files=["src/dnadesign/cruncher/src/cli.py"],
-        tool_names={"cruncher", "densegen", "seqledger"},
-        external_integration_tool_names={"cruncher", "densegen"},
+        tool_names={"cruncher", "infer", "seqledger"},
+        external_integration_tool_names={"cruncher", "infer"},
     )
 
     assert result.run_full_core is False
     assert result.run_external_integration is True
-    assert result.affected_tools == ["cruncher", "densegen", "seqledger"]
-    assert result.external_integration_tools == ["cruncher", "densegen"]
+    assert result.affected_tools == ["cruncher", "infer", "seqledger"]
+    assert result.external_integration_tools == ["cruncher", "infer"]
 
 
 def test_determine_scope_pr_baseline_file_triggers_full_core() -> None:
     result = determine_scope(
         event_name="pull_request",
         changed_files=[".github/tool-coverage-baseline.json"],
-        tool_names={"densegen", "seqledger"},
-        external_integration_tool_names={"densegen"},
+        tool_names={"infer", "seqledger"},
+        external_integration_tool_names={"infer"},
     )
 
     assert result.run_full_core is True
     assert result.run_external_integration is False
-    assert result.affected_tools == ["densegen", "seqledger"]
-    assert result.external_integration_tools == ["densegen"]
+    assert result.affected_tools == ["infer", "seqledger"]
+    assert result.external_integration_tools == ["infer"]
 
 
 def test_determine_scope_disables_heavy_when_no_external_integration_tools_exist() -> None:
@@ -347,26 +347,26 @@ def test_discover_external_integration_tools_detects_marked_conftest(tmp_path: P
 def test_discover_repo_tools_excludes_devtools_and_dunder_dirs(tmp_path: Path) -> None:
     src_root = tmp_path / "src" / "dnadesign"
     (src_root / "seqledger").mkdir(parents=True, exist_ok=True)
-    (src_root / "densegen").mkdir(parents=True, exist_ok=True)
+    (src_root / "infer").mkdir(parents=True, exist_ok=True)
     (src_root / "devtools").mkdir(parents=True, exist_ok=True)
     (src_root / "__pycache__").mkdir(parents=True, exist_ok=True)
     (src_root / "archived").mkdir(parents=True, exist_ok=True)
     (src_root / "prototypes").mkdir(parents=True, exist_ok=True)
 
     tool_names = discover_repo_tools(repo_root=tmp_path)
-    assert tool_names == {"densegen", "seqledger"}
+    assert tool_names == {"infer", "seqledger"}
 
 
 def test_discover_repo_tools_excludes_legacy_data_directories(tmp_path: Path) -> None:
     src_root = tmp_path / "src" / "dnadesign"
     (src_root / "seqledger").mkdir(parents=True, exist_ok=True)
-    (src_root / "densegen").mkdir(parents=True, exist_ok=True)
+    (src_root / "infer").mkdir(parents=True, exist_ok=True)
     (src_root / "densehairpins").mkdir(parents=True, exist_ok=True)
     (src_root / "evoinference").mkdir(parents=True, exist_ok=True)
     (src_root / "sequences").mkdir(parents=True, exist_ok=True)
 
     tool_names = discover_repo_tools(repo_root=tmp_path)
-    assert tool_names == {"densegen", "seqledger"}
+    assert tool_names == {"infer", "seqledger"}
 
 
 def test_discover_repo_tools_keeps_latentdna_and_ignores_cache_only_dirs(tmp_path: Path) -> None:

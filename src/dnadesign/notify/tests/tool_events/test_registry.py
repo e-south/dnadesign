@@ -84,7 +84,7 @@ def test_activate_tool_event_pack_supports_custom_pack() -> None:
 
 def test_supported_tool_event_packs_include_infer_builtin_pack() -> None:
     packs = set(supported_tool_event_packs())
-    assert "densegen" in packs
+    assert "densegen" not in packs
     assert "infer" in packs
 
 

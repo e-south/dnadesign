@@ -84,8 +84,8 @@ def test_materialize_source_record_sequence_views_writes_missing_sidecars(tmp_pa
     assert {view.product_kind for view in views} == {"source_record"}
     assert {view.orientation for view in views} == {"unknown"}
     assert {view.recommended_pooling for view in views} == {"seq_mean"}
-    assert {row.source_family for row in semantics} == {"densegen_demo"}
-    assert {row.selection_basis for row in semantics} == {"densegen_source_record"}
+    assert {row.source_family for row in semantics} == {"usr_source"}
+    assert {row.selection_basis for row in semantics} == {"source_record"}
 
     rerun = materialize_source_record_sequence_views(
         usr_root=usr_root,
@@ -208,3 +208,15 @@ def test_materialize_source_record_sequence_views_refuses_archived_dataset(tmp_p
             dataset_names=["archived/example"],
             write=False,
         )
+
+
+@pytest.mark.parametrize(
+    "name", ["densegen_demo_sampling_baseline", "densegen_study_constitutive_sigma_panel", "densegen_other"]
+)
+def test_dataset_name_does_not_assign_scientific_semantics(name: str) -> None:
+    from dnadesign.seqledger.scripts.materialize_source_record_sequence_views import _profile_for_dataset
+
+    profile = _profile_for_dataset(name, profiles={})
+    assert profile.source_family == "usr_source"
+    assert profile.selection_basis == "source_record"
+    assert profile.role_tags == ("source_record",)

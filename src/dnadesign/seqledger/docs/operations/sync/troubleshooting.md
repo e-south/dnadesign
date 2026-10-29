@@ -1,6 +1,6 @@
 <!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 -->
 
 [SeqLedger guide](../../README.md)
@@ -34,5 +34,4 @@ Use this sequence when sync commands fail or verification blocks transfer.
 - Target modes and mapping: [modes.md](modes.md)
 - Machine-readable decisions: [audit-loop.md](audit-loop.md)
 - HPC loop: [hpc-agent-flow.md](hpc-agent-flow.md)
-- Chained DenseGen/Infer flow: [chained-densegen-infer-runbook.md](chained-densegen-infer-runbook.md)
 - Adversarial drills: [fidelity-drills.md](fidelity-drills.md)

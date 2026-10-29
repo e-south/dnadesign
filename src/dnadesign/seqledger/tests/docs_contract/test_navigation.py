@@ -33,7 +33,7 @@ def test_docs_indexes_route_to_expected_usr_surfaces() -> None:
 
     assert "../src/dnadesign/seqledger/docs/operations/routes/workflow-map.md" in docs_index_links
     assert "../src/dnadesign/seqledger/docs/operations/sync/hpc-agent-flow.md" in docs_index_links
-    assert "../src/dnadesign/seqledger/docs/operations/sync/chained-densegen-infer-runbook.md" in docs_index_links
+    assert "../src/dnadesign/seqledger/docs/operations/sync/chained-densegen-infer-runbook.md" not in docs_index_links
     assert (
         "../src/dnadesign/seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md"
         in docs_index_links

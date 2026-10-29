@@ -8,70 +8,28 @@ Use this router before emitting any scheduler commands.
 - `execution_locus`: `local_shell`, `scc_login_shell`, `ondemand_shell`, `ondemand_app_shell`, or `unknown`
 - `session_handoff_state`: `none`, `session_request_pending`, or `session_ready`
 
-### DenseGen notify policy
-
-- For runbook-native Ops execution, DenseGen uses notify by default and routes to `densegen_batch_with_notify`.
-- Use `densegen_batch_submit` only when the request explicitly opts out (`--no-notify`, "without notify", "notify off").
-
 ### Routes
 
-#### `densegen_batch_submit`
+#### `infer_batch`
 
 Trigger cues:
-- "start a densegen workspace ... batch job ... without notify"
-- "run densegen ... notify off"
-- "use --no-notify"
+- "plan or submit an Infer batch"
+- "run inference with Notify"
 
 Execution contract:
-1. Load `probe-first-contract.md`, `session-status-reporting.md`, `submission-shape-advisor.md`, and `batch-submit-contract.md`.
-2. Validate DenseGen config path and solver probe.
-3. Validate output placement and project quota context.
-4. Run submit QA preflight on selected template.
-5. Run session-status check and apply warning when running_jobs > 3.
-6. Run shape advisor for planned submit count.
-7. Render operator brief for user-facing submit gate.
-8. Submit `docs/bu-scc/jobs/densegen-cpu.qsub`.
-9. Capture job id and log path.
+1. Select the Infer configuration and its destination dataset.
+2. Use `ops runbook init --workflow infer` with an explicit project or preset.
+3. Runbooks enable notify by default; use `--no-notify` for an explicit batch-only request.
+4. Check configuration, GPU resources, output storage, notification setup and active jobs using the runbook plan and probe-first contract.
+5. Review `ops runbook execute --no-submit` output and scheduler verification before submission.
+6. Retain the audit path, workload job ID and any watcher job ID; monitor with bounded checks.
 
 Required evidence:
-- config validation output
-- storage and quota check output
-- qa preflight pass output
-- session-status output
-- shape-advisor output
-- operator-brief output
-- densegen job handle
+- runbook and Infer configuration paths
+- resource, storage and active-job checks
+- preflight results and planned commands
+- audit path and submitted job IDs when execution was requested
 
-#### `densegen_batch_with_notify`
-
-Trigger cues:
-- "start a densegen workspace ... batch job ..."
-- "start densegen ... and wire up notify/slack"
-- "run a densegen workflow stress ethanol and cipro workspace for two hours"
-
-Execution contract:
-1. Scaffold or select runbook via Ops (`uv run ops runbook presets` or `uv run ops runbook init --workflow densegen ... --project <project>|--preset <preset>`).
-2. Set up notify profile via `uv run notify setup slack ...`.
-3. Run submit QA preflight for watcher and densegen templates.
-4. Run session-status check and apply warning when running_jobs > 3.
-5. Run shape advisor for planned submit count.
-6. Render operator brief for user-facing submit gate.
-7. Submit watcher job with `NOTIFY_PROFILE`.
-8. Submit DenseGen batch job.
-9. Capture both job ids and log paths.
-10. Monitor both jobs with bounded loops.
-
-Required evidence:
-- notify profile path
-- qa preflight pass output for both templates
-- session-status output
-- shape-advisor output
-- operator-brief output
-- watcher job handle
-- densegen job handle
-
-Boundary:
-- Notify consumes SeqLedger `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
 
 #### `ondemand_session_request`
 
@@ -108,7 +66,6 @@ Required evidence:
 #### `generic_sge_ops`
 
 Trigger cues:
-- other SGE operations without DenseGen/Notify/OnDemand-specific language
 - "help debug Eqw", "job tracking", "process reaper", "memory per core", "array conversion", "batch dependency pipeline"
 
 Execution contract:

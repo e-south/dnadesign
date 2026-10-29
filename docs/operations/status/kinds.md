@@ -9,7 +9,6 @@ Registered public OPS routes and their status-kind providers:
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `ops.control-plane.orchestration` | `ops-audit-json` | `control` | `orchestration_audit` | `workspace` | `cheap` | `--audit-json` | `ops` |
 | `seqledger.data-plane.hpc-sync` | `seqledger-sync-audit` | `data` | `sync_audit` | `workspace` | `cheap` | `--sync-audit-json` | `seqledger` |
-| `seqledger.data-plane.chained-densegen-infer-sync` | `seqledger-sync-audit` | `data` | `sync_audit` | `workspace` | `cheap` | `--sync-audit-json` | `seqledger` |
 | `seqledger.data-plane.multi-source-source-of-truth` | `seqledger-dataset-state` | `data` | `dataset_snapshot` | `workspace` | `cheap` | `--seqledger-root`, `--dataset` | `seqledger` |
 | `seqledger.data-plane.construct-infer-source-of-truth` | `seqledger-dataset-state` | `data` | `dataset_snapshot` | `workspace` | `cheap` | `--seqledger-root`, `--dataset` | `seqledger` |
 | `seqledger.data-plane.promoter-feature-matrix` | `seqledger-dataset-state` | `data` | `dataset_snapshot` | `workspace` | `cheap` | `--seqledger-root`, `--dataset` | `seqledger` |

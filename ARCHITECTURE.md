@@ -2,14 +2,14 @@
 doc_id: architecture
 surface: system-of-record
 owner: dnadesign-maintainers
-last_verified: 2026-10-28
+last_verified: 2026-10-29
 ---
 
 # ARCHITECTURE
 
 **Type:** system-of-record
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 
 ## At a glance
 `dnadesign` is a uv-managed monorepo of modular bioinformatics tools under `src/dnadesign/`, with shared CI/devtools and operator runbooks in `docs/`.
@@ -45,7 +45,7 @@ This file is the architecture map: it names system boundaries, major flows, and 
   and generic readiness evaluation; it must not own sibling-specific provider
   implementations or study-specific status/preflight policy.
 - Shared operational plane: Notify (`src/dnadesign/notify/`) consumes SeqLedger events as integration signals without controlling producer tools.
-- Shared storage semantics: SeqLedger overlay/compaction/file-shape contracts use SeqLedger domain terms and stay tool-agnostic so DenseGen, Infer, and future producers can share one records store.
+- Shared storage semantics: SeqLedger overlay/compaction/file-shape contracts use SeqLedger domain terms and stay tool-agnostic so Construct, Infer, and external producers can share one records store.
 - Shared developer infrastructure: devtools modules provide repository-only CI scope detection, docs checks, coverage gates, and quality entropy reporting. Installed command launchers live in `src/dnadesign/_entrypoints.py` and do not import devtools.
 - Operator-facing HPC boundary: BU SCC guidance and templates live in `docs/bu-scc/`.
 

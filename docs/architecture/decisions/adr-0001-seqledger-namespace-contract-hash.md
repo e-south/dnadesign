@@ -5,7 +5,6 @@
 **Owner:** dnadesign-maintainers
 
 ### Context
-SeqLedger is the durable data-plane contract for sibling tools such as `construct`, `densegen`, `infer`, and `cluster`.
 Today, overlay validation keys compatibility to `usr:registry_hash`, which is derived from the full serialized root `registry.yaml`.
 
 That full-root hash is too broad for cross-tool compatibility:

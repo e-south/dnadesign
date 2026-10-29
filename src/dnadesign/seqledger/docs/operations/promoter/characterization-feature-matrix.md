@@ -9,7 +9,7 @@
 **Execution-kind:** staged
 **Status-kind:** seqledger-dataset-state
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 -->
 
 [SeqLedger guide](../../README.md)
@@ -18,9 +18,9 @@
 
 Use this runbook when promoter candidates come from multiple SeqLedger-backed sources and downstream consumers should see one infer-annotated feature matrix with explicit provenance.
 
-Use this runbook to:
+This workflow combines:
 
-- upstream promoter sources such as DenseGen anchors plus wildtype or manually imported promoters
+- upstream promoter sources such as generated anchors plus wildtype or manually imported promoters
 - optional construct expansion into larger contexts such as 1 kb windows
 - explicit infer job matrices across model lanes and output planes
 - downstream handoff into clustering or OPAL once one chosen `infer__...` column exists
@@ -30,7 +30,7 @@ This runbook owns the data-plane workflow through infer write-back. It does not 
 ### Boundary decisions
 
 - SeqLedger owns the durable source of truth and cross-tool merge/carry semantics.
-- `densegen` and manual import paths only need to produce valid SeqLedger datasets plus any overlays that should survive consolidation.
+- External generation and manual import paths only need to produce valid SeqLedger datasets plus any overlays that should survive consolidation.
 - `construct` is optional contextualization. Use it only when a larger template-backed sequence context is part of the representation study.
 - `infer` owns the feature matrix write-back through explicit `infer__<model>__<job>__<out>` columns.
 - `cluster` and `opal` consume one chosen infer-derived `X` column; they do not decide how the upstream feature matrix is assembled.
@@ -38,7 +38,7 @@ This runbook owns the data-plane workflow through infer write-back. It does not 
 
 ### When to use this path
 
-- anchor-only sequences from DenseGen or curated wildtype promoters should be compared in the same study,
+- anchor-only sequences from generated libraries or curated wildtype promoters should be compared in the same study,
 - one branch should stay at the original sequence length while another branch is expanded through construct,
 - infer should annotate those branches with log likelihoods, pooled logits, or pooled embeddings,
 - downstream exploration should use one consolidated dataset contract before clustering or active learning starts.
@@ -64,7 +64,7 @@ Assume the upstream source datasets already exist in one SeqLedger root. Use the
 ```bash
 export USR_ROOT=/abs/path/to/usr_root # Reuse one explicit SeqLedger root across merge, construct, infer, cluster, and OPAL.
 export PRIMARY_INPUT_DATASET="promoter_sources_control" # Wildtype, manual, or seeded promoter records.
-export EXTRA_INPUT_DATASET="promoter_sources_densegen" # DenseGen-derived anchor records that should join the same study.
+export EXTRA_INPUT_DATASET="promoter_sources_generated" # Generated anchor records that should join the same study.
 export FEATURE_DATASET="promoter_feature_matrix_demo" # One semantic dataset id for downstream infer-derived feature columns.
 ```
 
@@ -80,7 +80,7 @@ If source rows already live in multiple SeqLedger datasets, merge them explicitl
 ```bash
 uv run seqledger --root "$USR_ROOT" validate "$PRIMARY_INPUT_DATASET" --strict # Validate the primary source dataset before mutation.
 uv run seqledger --root "$USR_ROOT" validate "$EXTRA_INPUT_DATASET" --strict # Validate the additional source dataset before merge.
-# Merge the DenseGen or auxiliary promoter source into the primary source dataset.
+# Merge the generated or auxiliary promoter source into the primary source dataset.
 uv run seqledger --root "$USR_ROOT" maintenance merge \
   --dest "$PRIMARY_INPUT_DATASET" \
   --src "$EXTRA_INPUT_DATASET" \

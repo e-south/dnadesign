@@ -1,7 +1,7 @@
 ## Notify command contracts
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 
 This page is the tool-local source for Notify command invocation contracts and fail-fast behavior.
 
@@ -24,7 +24,6 @@ This page is the tool-local source for Notify command invocation contracts and f
 - Purpose: resolve expected SeqLedger `.events.log` path and default policy without writing profile artifacts.
 - Requires resolver mode with `--tool` and exactly one of `--config` or `--workspace`.
 - Built-in resolver policies:
-  - `densegen` -> `densegen`
   - `infer` -> `infer`
   - `construct` -> `construct`
 - Workspace shorthand is repo-rooted for all resolver-mode tools. Outside the repo checkout, set `DNADESIGN_REPO_ROOT=<repo-root>` or pass `--config` explicitly.
@@ -70,7 +69,6 @@ This page is the tool-local source for Notify command invocation contracts and f
   - `restart` reopens from start and resumes follow loop.
 - Resolver mode fails when the expected auto-profile file is missing and prints setup guidance.
 - If profile `events_source` disagrees with current resolver inputs, watch fails fast with mismatch details.
-- DenseGen running cadence can be tuned with `--progress-heartbeat-seconds` (or profile `progress_heartbeat_seconds`).
 - Live delivery source contract without profile webhook values: exactly one of `--url`, `--url-env`, or `--secret-ref`.
 - `--dry-run` bypasses webhook posting and can run without webhook URL resolution.
 
@@ -96,7 +94,6 @@ This page is the tool-local source for Notify command invocation contracts and f
 ### observer boundary
 
 - Notify reads SeqLedger `"<dataset>/.events.log"` JSONL streams.
-- Notify does not consume DenseGen runtime telemetry (`outputs/meta/events.jsonl`).
 - Notify resolves observation paths and delivery wiring; it does not launch upstream tool runs.
 
 ### no-silent-fallback contract

@@ -1,7 +1,7 @@
 ## Workspace Runbook Steps
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-22
+**Last verified:** 2026-10-29
 
 
 **Last updated by:** cruncher-maintainers on 2026-04-05
@@ -250,7 +250,6 @@ This table is generated from workspace machine runbooks and is the standard cros
 | `pairwise_laci_arac` | `analyze_summary` | Analyze run outputs; set analysis.trajectory_video.enabled=true in configs/config.yaml to emit plots/chain_trajectory_video.mp4. | `cruncher analyze --summary -c configs/config.yaml` |
 | `pairwise_laci_arac` | `export_sequences_latest` |  | `cruncher export sequences --latest -c configs/config.yaml` |
 | `pairwise_laci_arac` | `render_logos` |  | `cruncher catalog logos --source pairwise_laci_arac_merged_meme_oops --set 1 -c configs/config.yaml` |
-| `pairwise_laci_arac` | `export_densegen` |  | `cruncher catalog export-densegen --set 1 --densegen-workspace study_constitutive_sigma_panel -c configs/config.yaml` |
 | `pairwise_laci_arac` | `study_run_length_vs_score` | Sweep sequence_length with a step-2 grid plus base-config anchor and emit length-vs-score aggregates. | `cruncher study run --spec configs/studies/length_vs_score.study.yaml --force-overwrite` |
 | `pairwise_laci_arac` | `study_run_diversity_vs_score` | Sweep diversity from 0.00 to 1.00 at fixed workspace sequence_length and emit diversity-vs-score aggregates. | `cruncher study run --spec configs/studies/diversity_vs_score.study.yaml --force-overwrite` |
 | `pairwise_soxr_soxs` | `reset_workspace` |  | `cruncher workspaces reset --root . --confirm` |

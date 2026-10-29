@@ -21,7 +21,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
-from dnadesign.ops.contracts import ResumeReadinessPolicy, resolve_resume_readiness_policy, resolve_usr_destination
+from dnadesign.ops.contracts import ResumeReadinessPolicy, resolve_resume_readiness_policy
 
 from ..runbooks.schema import OrchestrationRunbookV1
 from .mode_tools import InferModeProbeError, resolve_mode_tool_adapter
@@ -529,16 +529,6 @@ class ModeDecision:
     reason: str
 
 
-def _densegen_usr_record_candidates(runbook: OrchestrationRunbookV1) -> tuple[Path, ...]:
-    if runbook.densegen is None:
-        return ()
-    if not runbook.densegen.config.exists() or not runbook.densegen.config.is_file():
-        return ()
-    contract = resolve_usr_destination(tool="densegen", config_path=runbook.densegen.config)
-    dataset_root = contract.usr_root / contract.usr_dataset
-    return (dataset_root / "records.parquet",)
-
-
 def _candidate_record_paths_for_resume(runbook: OrchestrationRunbookV1) -> tuple[Path, ...]:
     workspace_root = runbook.workspace_root
     tables_root = workspace_root / "outputs" / "tables"
@@ -550,7 +540,6 @@ def _candidate_record_paths_for_resume(runbook: OrchestrationRunbookV1) -> tuple
     for directory in candidate_dirs:
         candidates.append(directory / "records.parquet")
         candidates.extend(sorted(directory.glob("records__part-*.parquet")))
-    candidates.extend(_densegen_usr_record_candidates(runbook))
     deduped: list[Path] = []
     seen: set[Path] = set()
     for path in candidates:

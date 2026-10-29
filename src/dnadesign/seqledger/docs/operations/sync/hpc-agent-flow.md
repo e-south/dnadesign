@@ -9,7 +9,7 @@
 **Execution-kind:** iterative
 **Status-kind:** seqledger-sync-audit
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 -->
 
 [SeqLedger guide](../../README.md)
@@ -29,7 +29,7 @@ Default sync contract:
 
 - Source of truth for datasets: SeqLedger dataset roots (not git-tracked files).
 - Transfer path: `uv run seqledger diff/pull/push` over SSH remotes.
-- Target workflows: `densegen` and `infer` batch outputs feeding shared SeqLedger datasets.
+- Target workflows: producer batch outputs feeding shared SeqLedger datasets.
 - Naming boundary: distinguish workspace-local export roots from shared SeqLedger
   roots instead of treating them as the same thing implicitly.
 
@@ -59,7 +59,7 @@ uv run seqledger remotes show bu-scc
 ```
 
 If the producer writes to a workspace-local export root such as
-`src/dnadesign/densegen/workspaces/<workspace>/outputs/usr_datasets`, either:
+`/path/to/workspace/outputs/seqledger_datasets`, either:
 
 - create an explicit remote profile for that workspace-export root, or
 - mirror the approved dataset into the shared SeqLedger root before using it as the

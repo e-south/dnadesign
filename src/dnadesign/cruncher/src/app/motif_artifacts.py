@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/cruncher/src/app/motif_artifacts.py
 
-Helpers for exporting DenseGen motif artifacts.
+Helpers for exporting motif artifacts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -120,65 +120,6 @@ def resolve_background(payload: dict, *, policy: str) -> list[float]:
             raise ValueError("Motif record is missing matrix; cannot compute background.")
         return _background_from_matrix(matrix)
     raise ValueError(f"Unknown background policy: {policy}")
-
-
-def build_densegen_artifact(
-    payload: dict,
-    *,
-    producer: str,
-    background_policy: str,
-    pseudocount: float | None,
-) -> dict:
-    descriptor = payload.get("descriptor") or {}
-    if descriptor.get("alphabet") not in (None, "ACGT"):
-        raise ValueError("Only ACGT motifs are supported for DenseGen artifacts.")
-    motif_id = descriptor.get("motif_id")
-    if not motif_id:
-        raise ValueError("Motif record is missing motif_id.")
-    matrix_semantics = payload.get("matrix_semantics")
-    if matrix_semantics != "probabilities":
-        raise ValueError("DenseGen motif artifacts require probability matrices.")
-    matrix = payload.get("matrix")
-    if matrix is None:
-        raise ValueError("Motif record is missing matrix.")
-    probs = _normalize_prob_matrix(matrix)
-    background = resolve_background(payload, policy=background_policy)
-    background = _normalize_background(background)
-    log_odds = None
-    raw_log_odds = payload.get("log_odds_matrix")
-    if pseudocount in (None, 0) and raw_log_odds is not None:
-        log_odds = _normalize_log_odds_matrix(raw_log_odds)
-        if len(log_odds) != len(probs):
-            raise ValueError("log_odds_matrix length must match matrix length")
-    if log_odds is None:
-        log_odds = _compute_log_odds(probs, background, pseudocount=pseudocount)
-
-    def _as_row_dict(row: Sequence[float]) -> dict:
-        return {"A": float(row[0]), "C": float(row[1]), "G": float(row[2]), "T": float(row[3])}
-
-    artifact = {
-        "schema_version": "1.0",
-        "producer": producer,
-        "motif_id": motif_id,
-        "alphabet": "ACGT",
-        "matrix_semantics": "probabilities",
-        "background": _as_row_dict(background),
-        "probabilities": [_as_row_dict(row) for row in probs],
-        "log_odds": [_as_row_dict(row) for row in log_odds],
-    }
-    optional_fields = {
-        "tf_name": descriptor.get("tf_name"),
-        "source": descriptor.get("source"),
-        "organism": descriptor.get("organism"),
-        "provenance": payload.get("provenance"),
-        "checksums": payload.get("checksums"),
-        "tags": descriptor.get("tags"),
-        "length": descriptor.get("length"),
-    }
-    for key, val in optional_fields.items():
-        if val is not None:
-            artifact[key] = val
-    return artifact
 
 
 def artifact_filename(*, tf_name: str | None, source: str | None, motif_id: str) -> str:

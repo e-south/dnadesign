@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/cruncher/src/cli/commands/catalog_export_commands.py
 
-Catalog export command registration for DenseGen artifacts and site tables.
+Catalog export command registration for motif artifacts and site tables.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -22,15 +22,11 @@ from rich.table import Table
 from dnadesign.cruncher.app.motif_artifacts import build_manifest
 from dnadesign.cruncher.cli.catalog_execution import (
     collect_site_export_rows,
-    write_densegen_artifacts,
     write_meme_artifacts,
     write_site_export,
 )
 from dnadesign.cruncher.cli.catalog_targets import _resolve_site_targets, _resolve_targets
 from dnadesign.cruncher.cli.catalog_utils import (
-    _remove_existing_artifacts,
-    _require_densegen_inputs_path,
-    _resolve_densegen_workspace,
     _resolve_export_format,
     _resolve_user_path,
 )
@@ -39,53 +35,7 @@ from dnadesign.cruncher.cli.config_resolver import ConfigResolutionError, resolv
 from dnadesign.cruncher.utils.paths import resolve_catalog_root, resolve_workspace_root
 
 
-def _resolve_densegen_artifact_out_dir(
-    *,
-    config_path: Path,
-    densegen_workspace: str | None,
-    out_dir: Path | None,
-) -> Path:
-    base_dir = resolve_workspace_root(config_path)
-    if densegen_workspace:
-        densegen_root = _resolve_densegen_workspace(densegen_workspace, config_path=config_path)
-        inputs_root = densegen_root / "inputs"
-        if out_dir is None:
-            return inputs_root / "motif_artifacts"
-        return _require_densegen_inputs_path(
-            out_dir,
-            inputs_root=inputs_root,
-            label="--out",
-            base_dir=base_dir,
-        )
-    if out_dir is None:
-        raise typer.BadParameter("--out is required when --densegen-workspace is not set.")
-    return out_dir
-
-
-def _resolve_densegen_site_out_path(
-    *,
-    config_path: Path,
-    densegen_workspace: str | None,
-    out_path: Path | None,
-) -> Path:
-    base_dir = resolve_workspace_root(config_path)
-    if densegen_workspace:
-        densegen_root = _resolve_densegen_workspace(densegen_workspace, config_path=config_path)
-        inputs_root = densegen_root / "inputs"
-        if out_path is None:
-            return inputs_root / "densegen_sites.parquet"
-        return _require_densegen_inputs_path(
-            out_path,
-            inputs_root=inputs_root,
-            label="--out",
-            base_dir=base_dir,
-        )
-    if out_path is None:
-        raise typer.BadParameter("--out is required when --densegen-workspace is not set.")
-    return out_path
-
-
-def _resolve_densegen_export_targets(
+def _resolve_motif_export_targets(
     *,
     cfg: object,
     config_path: Path,
@@ -105,7 +55,7 @@ def _resolve_densegen_export_targets(
         )
     except (ValueError, FileNotFoundError) as exc:
         console.print(f"Error: {exc}")
-        console.print("Hint: run cruncher fetch motifs/sites before catalog export-densegen.")
+        console.print("Hint: run cruncher fetch motifs/sites before catalog export-meme.")
         raise typer.Exit(code=1) from exc
 
 
@@ -156,7 +106,7 @@ def _manifest_anchor(path: Path) -> Path:
     return path.parent
 
 
-def _write_densegen_manifest_file(
+def _write_motif_manifest_file(
     *,
     out_dir: Path,
     producer: str,
@@ -181,18 +131,6 @@ def _write_densegen_manifest_file(
     return manifest_path
 
 
-def _print_densegen_export_table(*, table_rows: list[dict[str, str]], manifest_path: Path) -> None:
-    table = Table(title="DenseGen motif artifacts", header_style="bold")
-    table.add_column("TF")
-    table.add_column("Source")
-    table.add_column("Motif ID")
-    table.add_column("Artifact")
-    for row in table_rows:
-        table.add_row(row["tf_name"], row["source"], row["motif_id"], row["artifact"])
-    console.print(table)
-    console.print(f"[green]Wrote manifest:[/] {manifest_path}")
-
-
 def _print_meme_export_table(*, table_rows: list[dict[str, str]], manifest_path: Path) -> None:
     table = Table(title="MEME motif exports", header_style="bold")
     table.add_column("TF")
@@ -206,7 +144,7 @@ def _print_meme_export_table(*, table_rows: list[dict[str, str]], manifest_path:
 
 
 def _print_site_export_table(*, table_rows: list[dict[str, str]], out_path: Path, row_count: int) -> None:
-    table = Table(title="DenseGen binding-site export", header_style="bold")
+    table = Table(title="Binding-site export", header_style="bold")
     table.add_column("TF")
     table.add_column("Source")
     table.add_column("Motif ID")
@@ -265,7 +203,7 @@ def register_catalog_export_commands(app: typer.Typer) -> None:
         producer_clean = producer.strip()
         if not producer_clean:
             raise typer.BadParameter("--producer must be a non-empty string.")
-        targets, _catalog = _resolve_densegen_export_targets(
+        targets, _catalog = _resolve_motif_export_targets(
             cfg=cfg,
             config_path=config_path,
             tfs=tf,
@@ -302,127 +240,7 @@ def register_catalog_export_commands(app: typer.Typer) -> None:
         manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True))
         _print_meme_export_table(table_rows=table_rows, manifest_path=manifest_path)
 
-    @app.command("export-densegen", help="Export DenseGen motif artifacts (one file per motif).")
-    def export_densegen(
-        config: Path | None = typer.Argument(
-            None,
-            help="Path to cruncher config.yaml (resolved from workspace/CWD if omitted).",
-            metavar="CONFIG",
-        ),
-        config_option: Path | None = typer.Option(
-            None,
-            "--config",
-            "-c",
-            help="Path to cruncher config.yaml (overrides positional CONFIG).",
-        ),
-        tf: list[str] = typer.Option([], "--tf", help="TF name to include (repeatable)."),
-        ref: list[str] = typer.Option([], "--ref", help="Catalog reference (<source>:<motif_id>, repeatable)."),
-        set_index: int | None = typer.Option(
-            None,
-            "--set",
-            help="Regulator set index from config (1-based).",
-        ),
-        source: str | None = typer.Option(
-            None,
-            "--source",
-            help="Limit TF resolution to a single source adapter.",
-        ),
-        densegen_workspace: str | None = typer.Option(
-            None,
-            "--densegen-workspace",
-            help="DenseGen workspace name or path (defaults --out to inputs/motif_artifacts).",
-        ),
-        out_dir: Path | None = typer.Option(
-            None,
-            "--out",
-            "-o",
-            help="Directory to write DenseGen motif artifacts.",
-        ),
-        background: str = typer.Option(
-            "record",
-            "--background",
-            help="Background policy: record | uniform | matrix.",
-        ),
-        pseudocount: float | None = typer.Option(
-            None,
-            "--pseudocount",
-            help="Optional pseudocount for log-odds (>= 0).",
-        ),
-        producer: str = typer.Option(
-            "cruncher",
-            "--producer",
-            help="Producer label for DenseGen artifacts.",
-        ),
-        clean: bool = typer.Option(
-            True,
-            "--clean/--no-clean",
-            help="Remove existing motif artifacts for selected TFs before export.",
-        ),
-        overwrite: bool = typer.Option(False, "--overwrite", help="Allow overwriting existing files."),
-    ) -> None:
-        try:
-            config_path = resolve_config_path(config_option or config)
-        except ConfigResolutionError as exc:
-            console.print(str(exc))
-            raise typer.Exit(code=1)
-        cfg = load_config_or_exit(config_path)
-        if background not in {"record", "uniform", "matrix"}:
-            raise typer.BadParameter("--background must be 'record', 'uniform', or 'matrix'.")
-        producer_clean = producer.strip()
-        if not producer_clean:
-            raise typer.BadParameter("--producer must be a non-empty string.")
-        targets, _catalog = _resolve_densegen_export_targets(
-            cfg=cfg,
-            config_path=config_path,
-            tfs=tf,
-            refs=ref,
-            set_index=set_index,
-            source=source,
-        )
-        out_dir = _resolve_densegen_artifact_out_dir(
-            config_path=config_path,
-            densegen_workspace=densegen_workspace,
-            out_dir=out_dir,
-        )
-
-        catalog_root = resolve_catalog_root(config_path, cfg.catalog.catalog_root)
-        out_dir = _resolve_user_path(out_dir, base_dir=resolve_workspace_root(config_path))
-        out_dir.mkdir(parents=True, exist_ok=True)
-
-        if clean:
-            removed = _remove_existing_artifacts(out_dir, tf_names=[target.tf_name for target in targets])
-            if removed:
-                console.print(f"[dim]Removed {removed} existing artifact(s) for selected TFs.[/]")
-
-        try:
-            table_rows, manifest_entries = write_densegen_artifacts(
-                catalog_root=catalog_root,
-                targets=targets,
-                out_dir=out_dir,
-                background=background,
-                pseudocount=pseudocount,
-                producer=producer_clean,
-                overwrite=overwrite,
-            )
-        except FileNotFoundError as exc:
-            console.print(f"[red]Missing motif file:[/] {exc}")
-            raise typer.Exit(code=1)
-        except FileExistsError as exc:
-            console.print(f"[red]Artifact already exists:[/] {exc}")
-            raise typer.Exit(code=1)
-
-        manifest_path = _write_densegen_manifest_file(
-            out_dir=out_dir,
-            producer=producer_clean,
-            manifest_entries=manifest_entries,
-            config_path=config_path,
-            catalog_root=catalog_root,
-            background=background,
-            pseudocount=pseudocount,
-        )
-        _print_densegen_export_table(table_rows=table_rows, manifest_path=manifest_path)
-
-    @app.command("export-sites", help="Export cached binding sites for DenseGen (CSV/Parquet).")
+    @app.command("export-sites", help="Export cached binding sites as CSV or Parquet.")
     def export_sites(
         config: Path | None = typer.Argument(
             None,
@@ -447,13 +265,8 @@ def register_catalog_export_commands(app: typer.Typer) -> None:
             "--source",
             help="Limit TF resolution to a single source adapter.",
         ),
-        densegen_workspace: str | None = typer.Option(
-            None,
-            "--densegen-workspace",
-            help="DenseGen workspace name or path (defaults --out to inputs/densegen_sites.parquet).",
-        ),
-        out_path: Path | None = typer.Option(
-            None,
+        out_path: Path = typer.Option(
+            ...,
             "--out",
             "-o",
             help="Output file path (.csv or .parquet).",
@@ -478,11 +291,6 @@ def register_catalog_export_commands(app: typer.Typer) -> None:
             refs=ref,
             set_index=set_index,
             source=source,
-        )
-        out_path = _resolve_densegen_site_out_path(
-            config_path=config_path,
-            densegen_workspace=densegen_workspace,
-            out_path=out_path,
         )
         out_path = _resolve_user_path(out_path, base_dir=resolve_workspace_root(config_path))
         _prepare_site_export_output_path(out_path=out_path, overwrite=overwrite)

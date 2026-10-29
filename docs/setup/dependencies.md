@@ -1,7 +1,7 @@
 ## Dependency maintenance
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-26
+**Last verified:** 2026-10-29
 
 This document is the canonical home for dependency management, including Python packages (`uv`) and system binaries (`pixi`).
 
@@ -100,8 +100,7 @@ published advisories and adverse package statuses without installing GPU runtime
 Its JSON output is retained as release evidence. This does not establish that every
 reported vulnerability is reachable through DNADesign.
 
-The optional `infer-evo2` profile currently includes FlashAttention 2.8.3, affected
-by [GHSA-7g5w-pq96-8c5w](https://github.com/advisories/GHSA-7g5w-pq96-8c5w)
-in its checkpoint-loading code. The advisory lists no patched release. The release
-gate remains closed until an upstream fix or a reviewed mitigation is qualified;
-no advisory exclusion is configured.
+The optional `infer-evo2` profile requires FlashAttention 2.8.3.post2 or newer.
+The [upstream release](https://github.com/Dao-AILab/flash-attention/releases/tag/v2.8.3.post2)
+restricts checkpoint deserialization. Continue auditing the resolved environment before each release;
+a clean dependency audit does not establish GPU execution coverage.

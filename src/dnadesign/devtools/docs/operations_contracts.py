@@ -60,8 +60,6 @@ def _is_runbook_demo_doc(*, path: Path, repo_root: Path) -> bool:
         return True
     if rel.endswith("/workspaces/README.md"):
         return True
-    if rel.startswith("src/dnadesign/densegen/workspaces/") and rel.endswith("/README.md"):
-        return True
     return False
 
 

@@ -51,10 +51,6 @@ component_management:
       name: notify
       paths:
         - src/dnadesign/notify/**
-    - component_id: densegen
-      name: densegen
-      paths:
-        - src/dnadesign/densegen/**
     - component_id: infer
       name: infer
       paths:

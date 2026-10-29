@@ -18,7 +18,7 @@ from dnadesign.ops.orchestrator import plan_tools
 
 
 def test_list_registered_plan_tools_returns_sorted_read_only_tuple() -> None:
-    assert plan_tools.list_registered_plan_tools() == ("densegen", "infer")
+    assert plan_tools.list_registered_plan_tools() == ("infer",)
 
 
 def test_registered_plan_tools_exactly_match_schema_workflow_tools() -> None:

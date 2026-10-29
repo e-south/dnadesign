@@ -17,7 +17,6 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..core.errors import NotifyConfigError
-from .densegen_common import _duration_hhmmss
 from .types import ToolEventDecision, ToolEventState
 
 _INFER_PROGRESS_STEP_PCT_SMALL_TARGET = 25
@@ -33,6 +32,14 @@ _INFER_FEATURE_SIDECAR_ACTIONS = (
 )
 _INFER_FEATURE_BUNDLE_PROGRESS_ACTION = "infer_feature_bundle_progress"
 _INFER_FEATURE_BUNDLE_COMPLETE_ACTION = "infer_feature_bundle_complete"
+
+
+def _duration_hhmmss(seconds: float) -> str:
+    total = max(0, int(round(float(seconds))))
+    hours = total // 3600
+    minutes = (total % 3600) // 60
+    secs = total % 60
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
 def _eta_to_overall_complete_seconds(

@@ -25,7 +25,7 @@ def register_send_command(
     @app.command("send")
     def send(
         status: str = typer.Option(..., help="Status: success|failure|started|running."),
-        tool: str = typer.Option(..., help="Tool name (densegen, infer, opal, etc.)."),
+        tool: str = typer.Option(..., help="Tool name (construct, infer, opal, etc.)."),
         run_id: str = typer.Option(..., help="Run identifier."),
         provider: str = typer.Option(..., help="Provider: generic|slack|discord."),
         url: str | None = typer.Option(None, help="Webhook URL."),

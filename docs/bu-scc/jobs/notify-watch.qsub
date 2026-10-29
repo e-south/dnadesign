@@ -93,7 +93,6 @@ cursor_offset_or_zero() {
 policy_default_actions() {
   local policy_name="$1"
   case "$policy_name" in
-    densegen) printf '%s\n' "densegen_health,densegen_flush_failed,materialize" ;;
     infer) printf '%s\n' "attach,write_overlay_part,materialize,infer_feature_bundle_progress,infer_feature_bundle_complete" ;;
     *) printf '%s\n' "" ;;
   esac
@@ -102,7 +101,6 @@ policy_default_actions() {
 policy_default_tools() {
   local policy_name="$1"
   case "$policy_name" in
-    densegen) printf '%s\n' "densegen" ;;
     infer) printf '%s\n' "infer" ;;
     *) printf '%s\n' "" ;;
   esac
@@ -340,7 +338,7 @@ resolve_webhook_env
 
 if [[ -z "$NOTIFY_POLICY" ]]; then
   echo "Missing NOTIFY_POLICY." >&2
-  echo "Set NOTIFY_POLICY=densegen|infer|generic, or provide NOTIFY_TOOL with NOTIFY_CONFIG so policy can be resolved." >&2
+  echo "Set NOTIFY_POLICY=infer|generic, or provide NOTIFY_TOOL with NOTIFY_CONFIG so policy can be resolved." >&2
   exit 2
 fi
 
@@ -361,10 +359,6 @@ if [[ -z "$SPOOL_DIR" ]]; then
 fi
 
 case "$NOTIFY_POLICY" in
-  densegen)
-    POLICY_ACTIONS="densegen_health,densegen_flush_failed,materialize"
-    POLICY_TOOLS="densegen"
-    ;;
   infer)
     POLICY_ACTIONS="attach,write_overlay_part,materialize,infer_feature_bundle_progress,infer_feature_bundle_complete"
     POLICY_TOOLS="infer"
@@ -375,7 +369,7 @@ case "$NOTIFY_POLICY" in
     ;;
   *)
     echo "Unsupported NOTIFY_POLICY: $NOTIFY_POLICY" >&2
-    echo "Supported policies: densegen | infer | generic" >&2
+    echo "Supported policies: infer | generic" >&2
     exit 2
     ;;
 esac

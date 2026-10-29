@@ -114,15 +114,15 @@ def test_find_operational_runbook_path_issues_flags_repo_root_runbook(tmp_path: 
             [
                 "runbook:",
                 "  schema_version: 1",
-                "  id: demo_densegen_run",
-                "  workflow_id: densegen_batch_submit",
+                "  id: demo_infer_run",
+                "  workflow_id: infer_batch_submit",
                 "  project: dunlop",
                 "  workspace_root: /tmp/workspace",
                 "  logging:",
-                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/demo_densegen_run",
-                "  densegen:",
+                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/demo_infer_run",
+                "  infer:",
                 "    config: /tmp/workspace/config.yaml",
-                "    qsub_template: docs/bu-scc/jobs/densegen-cpu.qsub",
+                "    qsub_template: docs/bu-scc/jobs/infer-evo2-gpu.qsub",
                 "  resources:",
                 "    pe_omp: 16",
                 "    h_rt: 08:00:00",
@@ -155,15 +155,15 @@ def test_find_operational_runbook_path_issues_ignores_untracked_yaml_noise_in_gi
             [
                 "runbook:",
                 "  schema_version: 1",
-                "  id: demo_densegen_run",
-                "  workflow_id: densegen_batch_submit",
+                "  id: demo_infer_run",
+                "  workflow_id: infer_batch_submit",
                 "  project: dunlop",
                 "  workspace_root: /tmp/workspace",
                 "  logging:",
-                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/demo_densegen_run",
-                "  densegen:",
+                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/demo_infer_run",
+                "  infer:",
                 "    config: /tmp/workspace/config.yaml",
-                "    qsub_template: docs/bu-scc/jobs/densegen-cpu.qsub",
+                "    qsub_template: docs/bu-scc/jobs/infer-evo2-gpu.qsub",
                 "  resources:",
                 "    pe_omp: 16",
                 "    h_rt: 08:00:00",
@@ -179,7 +179,7 @@ def test_find_operational_runbook_path_issues_ignores_untracked_yaml_noise_in_gi
                 "runbook:",
                 "  schema_version: 1",
                 "  id: generated_noise",
-                "  workflow_id: densegen_batch_submit",
+                "  workflow_id: infer_batch_submit",
                 "  project: dunlop",
                 "  workspace_root: /tmp/workspace",
             ]
@@ -197,20 +197,20 @@ def test_find_operational_runbook_path_issues_ignores_untracked_yaml_noise_in_gi
 
 def test_find_operational_runbook_path_issues_allows_packaged_presets(tmp_path: Path) -> None:
     _write(
-        tmp_path / "src" / "dnadesign" / "ops" / "runbooks" / "presets" / "densegen_demo.yaml",
+        tmp_path / "src" / "dnadesign" / "ops" / "runbooks" / "presets" / "infer_demo.yaml",
         "\n".join(
             [
                 "runbook:",
                 "  schema_version: 1",
-                "  id: demo_densegen_run",
-                "  workflow_id: densegen_batch_submit",
+                "  id: demo_infer_run",
+                "  workflow_id: infer_batch_submit",
                 "  project: dunlop",
                 "  workspace_root: /tmp/workspace",
                 "  logging:",
-                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/demo_densegen_run",
-                "  densegen:",
+                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/demo_infer_run",
+                "  infer:",
                 "    config: /tmp/workspace/config.yaml",
-                "    qsub_template: docs/bu-scc/jobs/densegen-cpu.qsub",
+                "    qsub_template: docs/bu-scc/jobs/infer-evo2-gpu.qsub",
                 "  resources:",
                 "    pe_omp: 16",
                 "    h_rt: 08:00:00",
@@ -227,17 +227,17 @@ def test_find_operational_runbook_path_issues_allows_packaged_presets(tmp_path: 
 
 def test_find_operational_runbook_path_issues_allows_workspace_runbooks_dir(tmp_path: Path) -> None:
     _write(
-        tmp_path / "workspace" / "outputs" / "logs" / "ops" / "runbooks" / "densegen_demo.yaml",
+        tmp_path / "workspace" / "outputs" / "logs" / "ops" / "runbooks" / "infer_demo.yaml",
         "\n".join(
             [
                 "runbook:",
                 "  schema_version: 1",
-                "  id: densegen_demo",
-                "  workflow_id: densegen_batch_submit",
+                "  id: infer_demo",
+                "  workflow_id: infer_batch_submit",
                 "  project: dunlop",
                 "  workspace_root: /tmp/workspace",
                 "  logging:",
-                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/densegen_demo",
+                "    stdout_dir: /tmp/workspace/outputs/logs/ops/sge/infer_demo",
             ]
         )
         + "\n",
@@ -256,7 +256,7 @@ def test_find_operational_runbook_path_issues_skips_generated_output_yaml_noise(
                 "runbook:",
                 "  schema_version: 1",
                 "  id: generated_noise",
-                "  workflow_id: densegen_batch_submit",
+                "  workflow_id: infer_batch_submit",
                 "  project: dunlop",
                 "  workspace_root: /tmp/workspace",
             ]
@@ -279,7 +279,7 @@ def test_find_shared_utils_path_issues_flags_top_level_utils_package(tmp_path: P
 
 
 def test_find_shared_utils_path_issues_allows_tool_local_utils(tmp_path: Path) -> None:
-    allowed_tool_utils_path = tmp_path / "src" / "dnadesign" / "densegen" / "src" / "utils"
+    allowed_tool_utils_path = tmp_path / "src" / "dnadesign" / "infer" / "src" / "utils"
     allowed_tool_utils_path.mkdir(parents=True, exist_ok=True)
 
     issues = _find_shared_utils_path_issues(tmp_path)
@@ -308,7 +308,7 @@ def test_find_transient_operational_artifact_path_issues_allows_workspace_nested
         tmp_path
         / "src"
         / "dnadesign"
-        / "densegen"
+        / "infer"
         / "workspaces"
         / "study"
         / "outputs"
@@ -365,7 +365,7 @@ def test_find_stale_overlay_guard_term_issues_accepts_usr_overlay_guard_terms(tm
                 "**Owner:** maintainers",
                 f"**Last verified:** {dt.date.today().isoformat()}",
                 "",
-                "Use seqledger-overlay-guard with densegen.overlay_guard.overlay_namespace.",
+                "Use seqledger-overlay-guard with infer.overlay_guard.overlay_namespace.",
                 "",
             ]
         )
@@ -384,7 +384,7 @@ def test_ops_deprecated_semantics_check_flags_legacy_terms(tmp_path: Path) -> No
             [
                 "## Ops runbook",
                 "",
-                "Use `densegen_batch_with_notify_slack`.",
+                "Use `infer_batch_with_notify_slack`.",
                 "",
                 "The precedents surface remains available.",
                 "Use infer_local_runtime and notify_profile_doctor.",

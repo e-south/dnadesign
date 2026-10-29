@@ -1,7 +1,7 @@
 ## BU SCC Operations
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 
 This directory is the canonical source for BU SCC platform policy, submission vocabulary, and job templates for `dnadesign`.
 
@@ -33,6 +33,6 @@ This directory is the canonical source for BU SCC platform policy, submission vo
 ### Fast links
 
 - Notify watcher setup and event-stream operations: [../notify/seqledger-events.md](../notify/seqledger-events.md).
-- Large model and dataset transfer patterns on SCC: [runbooks/batch-notify.md#7-large-downloads-and-datasetmodel-transfer](runbooks/batch-notify.md#7-large-downloads-and-datasetmodel-transfer).
+- Large model and dataset transfer patterns on SCC: [runbooks/batch-notify.md#6-large-downloads-and-datasetmodel-transfer](runbooks/batch-notify.md#6-large-downloads-and-datasetmodel-transfer).
 - Optional Codex repo-local skill overlay: [../../.agents/skills/sge-hpc-ops/SKILL.md](../../.agents/skills/sge-hpc-ops/SKILL.md).
 - SCC OnDemand entrypoint and service overview: [https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/](https://www.bu.edu/tech/support/research/system-usage/connect-scc/scc-ondemand/).

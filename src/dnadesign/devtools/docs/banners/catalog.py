@@ -77,14 +77,6 @@ BANNERS = (
         "optimize",
     ),
     BannerSpec(
-        "src/dnadesign/densegen/assets/densegen-banner.svg",
-        "src/dnadesign/densegen/README.md",
-        "densegen",
-        "GENERATE LIBRARIES",
-        "Generate reproducible DNA libraries from workspace inputs.",
-        "generate",
-    ),
-    BannerSpec(
         "src/dnadesign/devtools/tests/support/assets/testsupport-banner.svg",
         "src/dnadesign/devtools/tests/support/README.md",
         "testsupport",

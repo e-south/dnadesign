@@ -60,7 +60,7 @@ def test_notify_docs_readme_keeps_operator_progressive_disclosure() -> None:
     assert "Notify command contracts" in text
     assert "route map only" not in text
     assert "Start here for setup, watching, and recovery." in text
-    assert "DenseGen runtime telemetry (`outputs/meta/events.jsonl`) is not Notify input." in text
+    assert ".events.log" in text
 
 
 def test_notify_usr_events_manual_keeps_setup_run_recover_flow() -> None:
@@ -209,7 +209,6 @@ def test_notify_agents_route_operator_workflow_to_repo_skill_and_docs() -> None:
     assert "src/dnadesign/notify/docs/reference/command-contracts.md" in skill
     assert "docs/bu-scc/runbooks/batch-notify.md" in skill
     assert ".events.log" in skill
-    assert "outputs/meta/events.jsonl" in skill
     assert "--secret-source file --secret-ref file://" in skill
     assert "one watcher per live Infer lane config" in skill
     assert "one watcher per destination" in skill

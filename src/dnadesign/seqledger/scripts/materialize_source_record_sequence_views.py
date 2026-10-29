@@ -56,28 +56,6 @@ class SourceRecordSidecarResult:
     by_dataset: dict[str, dict[str, object]]
 
 
-DATASET_PROFILES: dict[str, SourceRecordSemanticProfile] = {
-    "densegen_demo_sampling_baseline": SourceRecordSemanticProfile(
-        source_family="densegen_demo",
-        selection_basis="densegen_source_record",
-        view_collections=("densegen_demo_sampling_baseline_source_records",),
-        role_tags=("source_record", "demo_fixture"),
-    ),
-    "densegen_study_constitutive_sigma_panel": SourceRecordSemanticProfile(
-        source_family="densegen_generated",
-        selection_basis="densegen_source_record",
-        view_collections=("densegen_study_constitutive_sigma_panel_source_records",),
-        role_tags=("source_record", "design_population"),
-    ),
-    "usr_demo_cli_examples": SourceRecordSemanticProfile(
-        source_family="demo_fixture",
-        selection_basis="demo_source_record",
-        view_collections=("usr_demo_cli_examples_source_records",),
-        role_tags=("source_record", "demo_fixture"),
-    ),
-}
-
-
 def _default_usr_root() -> Path:
     return Path(__file__).resolve().parents[1] / "datasets"
 
@@ -100,13 +78,6 @@ def _profile_for_dataset(
     profile = profiles.get(name)
     if profile is not None:
         return profile
-    if name.startswith("densegen_"):
-        return SourceRecordSemanticProfile(
-            source_family="densegen_generated",
-            selection_basis="densegen_source_record",
-            view_collections=(f"{name}_source_records",),
-            role_tags=("source_record", "design_population"),
-        )
     return SourceRecordSemanticProfile(
         source_family="usr_source",
         selection_basis="source_record",
@@ -229,9 +200,7 @@ def materialize_source_record_sequence_views(
     _validate_requested_names(names)
     created_at = now_utc()
     created_by = "dnadesign.seqledger.materialize_source_record_sequence_views"
-    resolved_profiles = dict(DATASET_PROFILES)
-    if profiles is not None:
-        resolved_profiles.update(profiles)
+    resolved_profiles = dict(profiles or {})
 
     by_dataset: dict[str, dict[str, object]] = {}
     planned_views: list[tuple[Dataset, list[SequenceViewRecord], list[ViewSemanticsRecord]]] = []

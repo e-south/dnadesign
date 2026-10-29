@@ -197,9 +197,6 @@ from dnadesign.devtools.docs.public_surface_contracts import (
     _find_construct_legacy_operator_doc_issues as _find_construct_legacy_operator_doc_issues,
 )
 from dnadesign.devtools.docs.public_surface_contracts import (
-    _find_densegen_disallowed_term_issues as _find_densegen_disallowed_term_issues,
-)
-from dnadesign.devtools.docs.public_surface_contracts import (
     _find_deprecated_docs_entrypoint_issues as _find_deprecated_docs_entrypoint_issues,
 )
 from dnadesign.devtools.docs.public_surface_contracts import (
@@ -347,13 +344,6 @@ def main(argv: list[str] | None = None) -> int:
     if interface_doc_issues:
         print("Public interface docs contract check failed:")
         for issue in interface_doc_issues:
-            print(f" - {issue}")
-        return 1
-
-    densegen_disallowed_term_issues = _find_densegen_disallowed_term_issues(repo_root)
-    if densegen_disallowed_term_issues:
-        print("DenseGen docs language check failed:")
-        for issue in densegen_disallowed_term_issues:
             print(f" - {issue}")
         return 1
 

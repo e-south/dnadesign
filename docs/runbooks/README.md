@@ -1,7 +1,7 @@
 ## Runbook Catalog
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 
 For command-first routing, start with `uv run ops catalog list --simple`, then
 open the linked runbook or tool doc once you know the route.
@@ -43,9 +43,8 @@ This table is generated from `*.registry.yaml` sidecars. Edit those files instea
 
 | Registry id | Procedure | Type | Plane | Execution kind | Status kind | Summary |
 | --- | --- | --- | --- | --- | --- | --- |
-| `ops.control-plane.orchestration` | [Orchestration runbooks](../operations/orchestration/runbooks.md) | `runbook` | `control-plane` | `executable` | `ops-audit-json` | Deterministic control-plane runbook contract for DenseGen or Infer batch submit flows with optional Notify chaining. |
+| `ops.control-plane.orchestration` | [Orchestration runbooks](../operations/orchestration/runbooks.md) | `runbook` | `control-plane` | `executable` | `ops-audit-json` | Deterministic control-plane runbook contract for Infer batch submit flows with optional Notify chaining. |
 | `seqledger.data-plane.hpc-sync` | [SeqLedger HPC Sync Flow](../../src/dnadesign/seqledger/docs/operations/sync/hpc-agent-flow.md) | `runbook` | `data-plane` | `iterative` | `seqledger-sync-audit` | Keep one SeqLedger dataset synchronized between HPC and local analysis with explicit diff, pull, and push verification. |
-| `seqledger.data-plane.chained-densegen-infer-sync` | [Chained DenseGen and Infer Sync Runbook](../../src/dnadesign/seqledger/docs/operations/sync/chained-densegen-infer-runbook.md) | `runbook` | `data-plane` | `iterative` | `seqledger-sync-audit` | Coordinate DenseGen-on-HPC and Infer-local writes against one SeqLedger dataset with explicit sync checkpoints. |
 | `seqledger.data-plane.multi-source-source-of-truth` | [Multi-Source Shared Dataset Assembly](../../src/dnadesign/seqledger/docs/operations/assembly/multi-source-shared-dataset.md) | `runbook` | `data-plane` | `staged` | `seqledger-dataset-state` | Merge multiple SeqLedger-backed sources, preserve explicit carry, and hand one construct-backed shared dataset to Infer and Notify. |
 | `seqledger.data-plane.construct-infer-source-of-truth` | [Construct -> SeqLedger -> Infer Shared Dataset Runbook](../../src/dnadesign/seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md) | `runbook` | `data-plane` | `staged` | `seqledger-dataset-state` | Realize construct outputs into one shared SeqLedger dataset and use that dataset as the durable Infer handoff. |
 | `seqledger.data-plane.permuter-construct-infer-handoff` | [Permuter -> Construct -> Infer Shared Dataset Runbook](../../src/dnadesign/seqledger/docs/operations/assembly/permuter-construct-infer-shared-dataset.md) | `runbook` | `data-plane` | `staged` | `seqledger-dataset-state` | Route Permuter-originated RT-lnRNA (rt_lnrna) variants through study-owned construct-subject promotion, Construct context realization, and Infer-owned sidecars without coupling tool internals. |
@@ -59,7 +58,6 @@ This table is generated from `*.tool-source.yaml` sidecars. Edit those files ins
 
 | Tool | Docs entrypoint | What you will find |
 | --- | --- | --- |
-| `densegen` | [DenseGen documentation](../../src/dnadesign/densegen/docs/README.md) | Tool-owned tutorials, HPC runbooks, and event-producing demo flows. |
 | `construct` | [Construct documentation](../../src/dnadesign/construct/docs/README.md) | Tool-owned workspace demos, sequence realization docs, and named-part placement contracts. |
 | `seqledger` | [SeqLedger guide](../../src/dnadesign/seqledger/docs/README.md) | Tool-owned dataset lifecycle docs, dataset handoffs, sync routes, and promoter feature assembly. |
 | `infer` | [Infer guide](../../src/dnadesign/infer/docs/README.md) | Tool-owned feature extraction runbooks, Evo2 docs, feature-schema contracts, and pressure-test flows. |

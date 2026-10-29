@@ -146,16 +146,10 @@ else
   pass "skill surfaces avoid workflow_id routing leakage"
 fi
 
-if rg -qi "start a densegen workspace x batch job on bu scc" "$SKILL_FILE"; then
-  pass "trigger test includes densegen batch prompt"
+if rg -qi "plan an infer batch job on bu scc" "$SKILL_FILE"; then
+  pass "trigger test includes Infer batch prompt"
 else
-  fail "missing densegen batch trigger prompt"
-fi
-
-if rg -qi "run a densegen workflow .*stress.*ethanol.*cipro.*two hours" "$SKILL_FILE"; then
-  pass "trigger test includes stress ethanol cipro two-hour prompt"
-else
-  fail "missing stress ethanol cipro two-hour trigger prompt"
+  fail "missing Infer batch trigger prompt"
 fi
 
 if rg -qi "also track and wire up notify for slack notifications" "$SKILL_FILE"; then
@@ -224,16 +218,10 @@ else
   fail "interactive contract missing ondemand handoff guidance"
 fi
 
-if rg -q "DenseGen \+ Notify Slack chained workflow" "$ROOT_DIR/references/workload-dnadesign.md"; then
-  pass "dnadesign workload includes chained densegen+notify flow"
+if rg -q "Infer with optional Notify" "$ROOT_DIR/references/workload-dnadesign.md"; then
+  pass "dnadesign workload includes Infer and Notify flow"
 else
-  fail "dnadesign workload missing chained densegen+notify flow"
-fi
-
-if rg -q 'Default packaged solver backend is `CBC`|Solver backend defaults are workspace-specific' "$ROOT_DIR/references/workload-dnadesign.md"; then
-  pass "dnadesign workload reference documents solver backend guidance"
-else
-  fail "dnadesign workload reference missing solver backend guidance"
+  fail "dnadesign workload missing Infer and Notify flow"
 fi
 
 if rg -q "pquota" "$ROOT_DIR/references/workload-dnadesign.md"; then
@@ -314,13 +302,13 @@ else
   fail "skill docs missing ops runbook presets entrypoint"
 fi
 
-if rg -q "DenseGen scaffolds include notify by default|--no-notify" "$ROOT_DIR/references/workload-dnadesign.md"; then
+if rg -q -- "--no-notify" "$ROOT_DIR/references/workload-dnadesign.md"; then
   pass "dnadesign workload reference aligns notify default guidance"
 else
   fail "dnadesign workload reference missing notify default guidance"
 fi
 
-for route_id in densegen_batch_submit densegen_batch_with_notify ondemand_session_request ondemand_session_handoff generic_sge_ops; do
+for route_id in infer_batch ondemand_session_request ondemand_session_handoff generic_sge_ops; do
   if rg -q "$route_id" "$ROOT_DIR/references/workflow-router.md"; then
     pass "workflow router includes $route_id"
   else

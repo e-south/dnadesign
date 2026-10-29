@@ -45,10 +45,7 @@ def test_list_registered_workflow_tools_returns_sorted_read_only_tuple() -> None
 def test_build_workflow_tool_registry_returns_read_only_mapping() -> None:
     registry = workflow_tools.build_workflow_tool_registry(
         contract_name="dummy tool adapter",
-        adapters=(
-            DummyAdapter(tool="infer"),
-            DummyAdapter(tool="densegen"),
-        ),
+        adapters=(DummyAdapter(tool="infer"),),
     )
 
     assert workflow_tools.list_registered_workflow_tools(registry) == runbook_schema.list_workflow_tools()
@@ -57,46 +54,22 @@ def test_build_workflow_tool_registry_returns_read_only_mapping() -> None:
 
 
 def test_validate_workflow_tool_registry_rejects_schema_drift() -> None:
-    registry = {"infer": DummyAdapter(tool="infer")}
+    registry = {"unknown": DummyAdapter(tool="unknown")}
     with pytest.raises(RuntimeError, match="dummy tool adapter registry does not match workflow tool set"):
         workflow_tools.validate_workflow_tool_registry(registry, contract_name="dummy tool adapter")
 
 
 def test_resolve_workflow_tool_adapter_for_runbook_requires_single_matching_tool() -> None:
-    registry = {
-        "densegen": DummyAdapter(tool="densegen"),
-        "infer": DummyAdapter(tool="infer"),
-    }
-
+    registry = {"infer": DummyAdapter(tool="infer")}
     with pytest.raises(ValueError, match="runbook workload contract must define exactly one tool block"):
         workflow_tools.resolve_workflow_tool_adapter_for_runbook(
             registry,
             contract_name="dummy tool adapter",
-            runbook=SimpleNamespace(
-                workflow_id="infer_batch_submit",
-                densegen=object(),
-                infer=object(),
-            ),
+            runbook=SimpleNamespace(workflow_id="infer_batch_submit", infer=None),
         )
-
-    with pytest.raises(ValueError, match="runbook workload contract does not match workflow tool"):
-        workflow_tools.resolve_workflow_tool_adapter_for_runbook(
-            registry,
-            contract_name="dummy tool adapter",
-            runbook=SimpleNamespace(
-                workflow_id="infer_batch_submit",
-                densegen=object(),
-                infer=None,
-            ),
-        )
-
     adapter = workflow_tools.resolve_workflow_tool_adapter_for_runbook(
         registry,
         contract_name="dummy tool adapter",
-        runbook=SimpleNamespace(
-            workflow_id="infer_batch_submit",
-            densegen=None,
-            infer=object(),
-        ),
+        runbook=SimpleNamespace(workflow_id="infer_batch_submit", infer=object()),
     )
     assert adapter.tool == "infer"

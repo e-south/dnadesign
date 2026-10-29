@@ -30,7 +30,6 @@ _PROFILE_IMPORTS = {
         "markdown_it",
         "matplotlib",
         "openpyxl",
-        "ortools",
         "PIL",
         "pygments",
         "Levenshtein",
@@ -43,7 +42,6 @@ _PROFILE_IMPORTS = {
         "duckdb",
         "xlrd",
         "torch",
-        "dense_arrays",
         "polars",
         "altair",
         "vegafusion",
@@ -146,10 +144,6 @@ def seqledger_sync_audit_drill():
 
 def opal():
     return _run("dnadesign.opal:main", "opal")
-
-
-def dense():
-    return _run("dnadesign.densegen:app", "full")
 
 
 def notify():

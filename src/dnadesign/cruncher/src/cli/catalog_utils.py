@@ -12,11 +12,9 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import json
-import os
 import re
 import shutil
 from dataclasses import dataclass
-from importlib import util as importlib_util
 from pathlib import Path
 from typing import Sequence
 
@@ -25,11 +23,9 @@ import typer
 from dnadesign.cruncher.store.catalog_index import CatalogEntry
 from dnadesign.cruncher.store.motif_store import MotifRef
 from dnadesign.cruncher.utils.hashing import sha256_bytes, sha256_lines, sha256_path
-from dnadesign.cruncher.utils.paths import resolve_workspace_root
 
 _SAFE_RE = re.compile(r"[^A-Za-z0-9._-]+")
 LOGO_MANIFEST_NAME = "logo_manifest.json"
-_DENSEGEN_WORKSPACES_ROOT_ENV = "DNADESIGN_DENSEGEN_WORKSPACES_ROOT"
 
 
 @dataclass(frozen=True)
@@ -70,77 +66,11 @@ def _dedupe(values: Sequence[str]) -> list[str]:
     return output
 
 
-def _densegen_workspaces_root(config_path: Path) -> Path | None:
-    del config_path
-    env_root = str(os.environ.get(_DENSEGEN_WORKSPACES_ROOT_ENV, "")).strip()
-    if env_root:
-        candidate = Path(env_root).expanduser().resolve()
-        if candidate.is_dir():
-            return candidate
-        return None
-
-    densegen_spec = importlib_util.find_spec("dnadesign.densegen")
-    if densegen_spec is not None:
-        locations = list(densegen_spec.submodule_search_locations or [])
-        for location in locations:
-            package_root = Path(location).resolve()
-            candidate = package_root / "workspaces"
-            if candidate.is_dir():
-                return candidate
-    return None
-
-
 def _resolve_user_path(path: Path, *, base_dir: Path) -> Path:
     candidate = path.expanduser()
     if candidate.is_absolute():
         return candidate.resolve()
     return (base_dir / candidate).resolve()
-
-
-def _resolve_densegen_workspace(selector: str, *, config_path: Path) -> Path:
-    raw = str(selector or "").strip()
-    if not raw:
-        raise typer.BadParameter("--densegen-workspace must be a non-empty string.")
-    candidate = Path(raw).expanduser()
-    looks_like_path = candidate.is_absolute() or any(sep in raw for sep in (os.sep, os.altsep) if sep)
-    if looks_like_path:
-        resolved = _resolve_user_path(candidate, base_dir=resolve_workspace_root(config_path))
-    else:
-        root = _densegen_workspaces_root(config_path)
-        if root is None:
-            env_root = str(os.environ.get(_DENSEGEN_WORKSPACES_ROOT_ENV, "")).strip()
-            if env_root:
-                raise typer.BadParameter(
-                    "Unable to resolve DenseGen workspaces root from "
-                    f"{_DENSEGEN_WORKSPACES_ROOT_ENV}={env_root!r}. "
-                    "Set it to an existing directory or pass --densegen-workspace as an absolute path."
-                )
-            raise typer.BadParameter(
-                "Unable to locate DenseGen workspaces root from installed package metadata. "
-                f"Set {_DENSEGEN_WORKSPACES_ROOT_ENV} or "
-                "Pass --densegen-workspace as an absolute path."
-            )
-        resolved = (root / raw).resolve()
-    if not resolved.exists():
-        raise typer.BadParameter(f"DenseGen workspace not found: {resolved}")
-    if not resolved.is_dir():
-        raise typer.BadParameter(f"DenseGen workspace is not a directory: {resolved}")
-    config_candidate = resolved / "config.yaml"
-    if not config_candidate.is_file():
-        raise typer.BadParameter(f"DenseGen workspace missing config.yaml: {config_candidate}")
-    inputs_root = resolved / "inputs"
-    if not inputs_root.is_dir():
-        raise typer.BadParameter(f"DenseGen workspace missing inputs/ directory: {inputs_root}")
-    return resolved
-
-
-def _require_densegen_inputs_path(path: Path, *, inputs_root: Path, label: str, base_dir: Path) -> Path:
-    resolved = _resolve_user_path(path, base_dir=base_dir)
-    try:
-        resolved.relative_to(inputs_root.resolve())
-    except ValueError as exc:
-        raise typer.BadParameter(f"{label} must be under {inputs_root} when --densegen-workspace is set.") from exc
-    return resolved
 
 
 def _remove_existing_artifacts(out_dir: Path, *, tf_names: Sequence[str]) -> int:

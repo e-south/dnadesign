@@ -128,6 +128,7 @@ def test_n_nucleotide_surcharge_is_explicit() -> None:
 
 
 def test_purchase_price_figure_is_square_generic_and_deterministic(tmp_path: Path) -> None:
+    existing_figures = set(plt.get_fignums())
     snapshot = load_pricing_snapshot(default_pricing_snapshot_path())
     first = render_purchase_price_comparison(snapshot, _scenario(), output_stem=tmp_path / "first")
     second = render_purchase_price_comparison(snapshot, _scenario(), output_stem=tmp_path / "second")
@@ -140,7 +141,7 @@ def test_purchase_price_figure_is_square_generic_and_deterministic(tmp_path: Pat
     assert "Budget capacity" not in svg
     assert "Portal prices" not in svg
     assert first.png_path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
-    assert plt.get_fignums() == []
+    assert set(plt.get_fignums()) == existing_figures
 
 
 def test_importing_renderer_preserves_the_selected_backend() -> None:

@@ -1,7 +1,7 @@
 ## BU SCC Batch + Notify Runbook (`dnadesign` platform workflows)
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 
 ### Purpose
 
@@ -12,7 +12,6 @@
 - Any run that needs explicit runtime/resource control.
 - Any run that needs event-driven webhook notifications.
 
-**Key boundary:** Notify consumes **SeqLedger `<dataset>/.events.log`** (JSONL), not DenseGen `outputs/meta/events.jsonl`.
 
 Related docs:
 - Install/bootstrap: [BU SCC Install bootstrap](../setup/install.md)
@@ -81,7 +80,6 @@ set -euo pipefail
 ### 3) Canonical job scripts
 
 Use versioned templates from [BU SCC jobs README](../jobs/README.md):
-- [DenseGen CPU batch template](../jobs/densegen-cpu.qsub)
 - [Evo2 GPU template](../jobs/evo2-gpu-infer.qsub)
 - [Permuter evaluate template](../jobs/permuter-evaluate.qsub)
 - [Notify watcher template](../jobs/notify-watch.qsub)
@@ -94,9 +92,6 @@ Submit examples:
 
 ```bash
 qsub -P <project> \
-  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
-  docs/bu-scc/jobs/densegen-cpu.qsub
-qsub -P <project> \
   -v INFER_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml \
   docs/bu-scc/jobs/evo2-gpu-infer.qsub
 qsub -P <project> \
@@ -107,79 +102,10 @@ qsub -P <project> docs/bu-scc/jobs/notify-watch.qsub
 
 ---
 
-### 4) DenseGen + GUROBI: resource and time caps
+### 4) Job arrays (parameter sweeps)
 
-For DenseGen GUROBI runs, cap runtime at three layers:
-
-1. Scheduler-level cap (SGE):
-- `-pe omp <N>` for CPU slots
-- `-l h_rt=<HH:MM:SS>` for job walltime
-- `-l mem_per_core=<size>` for per-slot memory
-
-2. Solver-level cap (DenseGen config):
-- `densegen.solver.threads` (set `<= N`)
-- `densegen.solver.solver_attempt_timeout_seconds` (per-solve cap)
-
-3. Runtime durability cadence (DenseGen config):
-- `densegen.runtime.checkpoint_every` (flush/checkpoint cadence)
-- Overall walltime remains controlled by scheduler `-l h_rt=...`
-
-Example config fragment:
-
-```yaml
-densegen:
-  solver:
-    backend: GUROBI
-    strategy: iterate
-    threads: 12
-    solver_attempt_timeout_seconds: 60
-  runtime:
-    checkpoint_every: 50
-```
-
-Example submit command:
-
-```bash
-qsub -P <project> \
-  -pe omp 12 \
-  -l h_rt=08:00:00 \
-  -l mem_per_core=8G \
-  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--fresh --no-plot' \
-  docs/bu-scc/jobs/densegen-cpu.qsub
-```
-
-Iterative contribution submit (resume + quota growth):
-
-```bash
-qsub -P <project> \
-  -pe omp 12 \
-  -l h_rt=08:00:00 \
-  -l mem_per_core=8G \
-  -v DENSEGEN_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,DENSEGEN_RUN_ARGS='--resume --extend-quota 8 --no-plot' \
-  docs/bu-scc/jobs/densegen-cpu.qsub
-```
-
-`densegen-cpu.qsub` defaults are:
-- validation: `--probe-solver`
-- run mode: `DENSEGEN_RUN_ARGS` must include exactly one of `--fresh` or `--resume`
-- override via `DENSEGEN_VALIDATE_ARGS` and `DENSEGEN_RUN_ARGS` at submit time.
-- runtime trace: `<DENSEGEN_CONFIG directory>/outputs/logs/ops/runtime/dnadesign_densegen_cpu.$JOB_ID.trace.log`
-- GUROBI runtime bootstrap defaults for BU SCC are applied in-template and can be overridden via
-  `GUROBI_MODULE`, `GUROBI_HOME`, `GRB_LICENSE_FILE`, and `TOKENSERVER`.
-
-Before long runs:
-
-```bash
-uv run dense validate-config --probe-solver -c <dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml
-uv run dense inspect config --probe-solver -c <dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml
-```
-
-DenseGen config references:
-- Solver schema and constraints: `src/dnadesign/densegen/docs/reference/config.md`
-
----
-
-### 5) Job arrays (parameter sweeps)
+This scheduler skeleton selects one configuration per task. Add the owning
+tool's command and resource requests before submission.
 
 ```bash
 #!/bin/bash -l
@@ -196,13 +122,11 @@ set -euo pipefail
 
 TASK_ID="${SGE_TASK_ID}"
 CONFIG="/project/<project>/<user>/runs/config_${TASK_ID}.yaml"
-uv run dense validate-config --probe-solver -c "$CONFIG"
-uv run dense run --no-plot -c "$CONFIG"
 ```
 
 ---
 
-### 6) Notify deployment patterns (BU SCC-safe)
+### 5) Notify deployment patterns (BU SCC-safe)
 
 #### Mode A (recommended): dedicated watcher batch job
 
@@ -212,8 +136,8 @@ This keeps webhook source, filters, cursor, and spool settings decoupled from su
 Template submit example:
 
 ```bash
-CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml
-NOTIFY_DIR="<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/outputs/notify/densegen"
+CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml
+NOTIFY_DIR="<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/outputs/notify/infer"
 WEBHOOK_FILE="$HOME/.config/dnadesign/notify_webhook.secret"
 
 mkdir -p "$(dirname "$WEBHOOK_FILE")"
@@ -224,7 +148,7 @@ uv run notify setup webhook \
   --secret-ref "file://$WEBHOOK_FILE"
 
 uv run notify setup slack \
-  --tool densegen \
+  --tool infer \
   --config "$CONFIG" \
   --profile "$NOTIFY_DIR/profile.json" \
   --cursor "$NOTIFY_DIR/cursor" \
@@ -232,7 +156,7 @@ uv run notify setup slack \
   --secret-source file \
   --secret-ref "file://$WEBHOOK_FILE" \
   --no-store-webhook \
-  --policy densegen
+  --policy infer
 
 qsub -P <project> \
   -v NOTIFY_PROFILE="$NOTIFY_DIR/profile.json",WEBHOOK_FILE="$WEBHOOK_FILE" \
@@ -243,12 +167,12 @@ qsub -P <project> \
 
 Use this when you intentionally do not want a profile file.
 If `EVENTS_PATH` is omitted, the script resolves it from `NOTIFY_TOOL` and `NOTIFY_CONFIG`.
-If `EVENTS_PATH` is explicit, set `NOTIFY_POLICY` (`densegen`, `infer`, or `generic`)
-and `NOTIFY_NAMESPACE` (for example, `densegen`).
+If `EVENTS_PATH` is explicit, set `NOTIFY_POLICY` (`infer` or `generic`)
+and `NOTIFY_NAMESPACE` (for example, `infer`).
 
 ```bash
 qsub -P <project> \
-  -v NOTIFY_TOOL=densegen,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK,WEBHOOK_FILE="$WEBHOOK_FILE" \
+  -v NOTIFY_TOOL=infer,NOTIFY_CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/<workspace>/config.yaml,WEBHOOK_ENV=NOTIFY_WEBHOOK,WEBHOOK_FILE="$WEBHOOK_FILE" \
   docs/bu-scc/jobs/notify-watch.qsub
 ```
 
@@ -259,7 +183,7 @@ For durable delivery, keep watchers in batch.
 
 ---
 
-### 7) Large downloads and dataset/model transfer
+### 6) Large downloads and dataset/model transfer
 
 Recommended pattern:
 - Use BU Data Transfer Node for large model prefetch and large SeqLedger dataset push/pull.
@@ -281,7 +205,7 @@ set -euo pipefail
 
 # Example: transfer-only operations
 # uv run python scripts/prefetch_models.py
-# uv run seqledger pull densegen_demo_hpc bu-scc -y
+# uv run seqledger pull inference_demo bu-scc -y
 QSUB
 ```
 
@@ -290,12 +214,10 @@ Transfer reference:
 
 ---
 
-### 8) Package boundary reminders
+### 7) Package boundary reminders
 
-- DenseGen runtime diagnostics: `outputs/meta/events.jsonl` (DenseGen-only diagnostics)
 - Notify input: SeqLedger `<dataset>/.events.log`
 
-Do not configure Notify against DenseGen runtime events.
 
 ---
 

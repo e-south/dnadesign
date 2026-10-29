@@ -104,41 +104,9 @@ def _resolve_infer_usr_output_for_mode_probe(infer_config: Path):
         raise ValueError(f"infer probe requires one SeqLedger destination in config {infer_config}: {message}") from exc
 
 
-def _has_densegen_resume_artifacts(runbook: OrchestrationRunbookV1) -> bool:
-    workspace_root = runbook.workspace_root
-    markers = [
-        workspace_root / "outputs" / "meta" / "run_manifest.json",
-        workspace_root / "outputs" / "tables" / "records.parquet",
-    ]
-    if runbook.densegen is not None and runbook.densegen.config.exists() and runbook.densegen.config.is_file():
-        contract = resolve_usr_destination(tool="densegen", config_path=runbook.densegen.config)
-        markers.append(contract.usr_root / contract.usr_dataset / "records.parquet")
-    if any(path.exists() for path in markers):
-        return True
-    tables_root = workspace_root / "outputs" / "tables"
-    candidate_dirs = [tables_root]
-    nested_tables_root = tables_root / "tables"
-    if nested_tables_root.exists():
-        candidate_dirs.append(nested_tables_root)
-    for directory in candidate_dirs:
-        if any(directory.glob("records__part-*.parquet")):
-            return True
-        if any(directory.glob("attempts_part-*.parquet")):
-            return True
-    return False
-
-
 def _has_infer_resume_artifacts(runbook: OrchestrationRunbookV1) -> bool:
     infer_config = runbook.infer.config if runbook.infer is not None else None
     return bool(_infer_overlay_artifacts(runbook.workspace_root, infer_config=infer_config))
-
-
-def _run_args_for_densegen(runbook: OrchestrationRunbookV1, mode: ResolvedMode) -> str:
-    if runbook.densegen is None:
-        raise ValueError("densegen mode adapter requires runbook.densegen")
-    if mode == "fresh":
-        return runbook.densegen.run_args.fresh
-    return runbook.densegen.run_args.resume
 
 
 def _infer_config_uses_sequence_view_inputs(config_path: Path) -> bool:
@@ -176,11 +144,6 @@ def _run_args_for_infer(runbook: OrchestrationRunbookV1, mode: ResolvedMode) -> 
 _MODE_TOOL_ADAPTERS = build_workflow_tool_registry(
     contract_name="mode tool adapter",
     adapters=(
-        ModeToolAdapter(
-            tool="densegen",
-            has_resume_artifacts=_has_densegen_resume_artifacts,
-            run_args_for_mode=_run_args_for_densegen,
-        ),
         ModeToolAdapter(
             tool="infer",
             has_resume_artifacts=_has_infer_resume_artifacts,

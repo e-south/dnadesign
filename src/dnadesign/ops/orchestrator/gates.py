@@ -744,13 +744,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     usr_overlay_parser.add_argument(
         "--tool",
-        default="densegen",
+        default="infer",
         help="Tool config adapter for SeqLedger overlay guard inputs.",
     )
     usr_overlay_parser.add_argument("--config", required=True, help="Tool config path.")
     usr_overlay_parser.add_argument("--workspace-root", required=True, help="Tool workspace root path.")
     usr_overlay_parser.add_argument("--mode", choices=("fresh", "resume"), required=True)
-    usr_overlay_parser.add_argument("--run-args", required=True, help="DenseGen run args for selected mode.")
+    usr_overlay_parser.add_argument("--run-args", required=True, help="Producer run args for selected mode.")
     usr_overlay_parser.add_argument(
         "--max-projected-overlay-parts",
         type=_positive_int,
@@ -765,7 +765,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     usr_overlay_parser.add_argument(
         "--overlay-namespace",
-        default="densegen",
+        default="infer",
         help="Overlay namespace to evaluate for part growth.",
     )
     usr_overlay_parser.add_argument(
@@ -781,13 +781,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     usr_records_part_parser.add_argument(
         "--tool",
-        default="densegen",
+        default="infer",
         help="Tool config adapter for records-part guard inputs.",
     )
     usr_records_part_parser.add_argument("--config", required=True, help="Tool config path.")
     usr_records_part_parser.add_argument("--workspace-root", required=True, help="Tool workspace root path.")
     usr_records_part_parser.add_argument("--mode", choices=("fresh", "resume"), required=True)
-    usr_records_part_parser.add_argument("--run-args", required=True, help="DenseGen run args for selected mode.")
+    usr_records_part_parser.add_argument("--run-args", required=True, help="Producer run args for selected mode.")
     usr_records_part_parser.add_argument(
         "--max-projected-records-parts",
         type=_positive_int,
@@ -819,7 +819,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     usr_archived_overlay_parser.add_argument(
         "--tool",
-        default="densegen",
+        default="infer",
         help="Tool config adapter for archived-overlay guard inputs.",
     )
     usr_archived_overlay_parser.add_argument("--config", required=True, help="Tool config path.")

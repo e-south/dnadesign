@@ -78,7 +78,7 @@ Use these when the next step is orchestration, environment setup, or audit outpu
 | Need | Primary workflow | Verify next |
 | --- | --- | --- |
 | Run BU SCC batch jobs with notifications | [BU SCC batch + notify runbook](bu-scc/runbooks/batch-notify.md) | Verify event delivery contract in [Notify SeqLedger events contract](notify/seqledger-events.md). |
-| Plan and execute configured batch workflows | [Ops orchestration index](operations/README.md) | Verify command ordering and outcomes in [orchestration audit contract](operations/orchestration/runbooks.md#contract-rules). |
+| Plan and execute configured batch workflows | [Ops orchestration index](operations/README.md) | Verify command ordering and outcomes in [orchestration audit contract](operations/orchestration/runbooks.md#plan-execute-and-inspect). |
 
 ### Tool docs
 
@@ -130,7 +130,7 @@ files produced by other tools; their guides describe the required inputs.
 - [Plans](../PLANS.md): proposal, execution-plan, and decision lifecycle.
 - [Quality score](../QUALITY_SCORE.md): quality rubric and improvement framework.
 - Cross-tool handoff rules live in [Architecture](../ARCHITECTURE.md#cross-tool-information-architecture), [Design](../DESIGN.md#information-architecture-invariants), and the shared dataset workflows linked above.
-- Scheduler accumulation rules live in [Ops orchestration runbook contracts](operations/orchestration/runbooks.md#single-study-accumulation-contract).
+- Scheduler accumulation rules live in [Ops orchestration runbook contracts](operations/orchestration/runbooks.md#fill-remaining-infer-lanes).
 
 ### Operations
 

@@ -130,7 +130,7 @@ def _validate_audit_json_path_for_execute(*, audit_json_path: Path, workspace_ro
 
 def _build_init_payload(
     *,
-    workflow: Literal["densegen", "infer"],
+    workflow: Literal["infer"],
     with_notify: bool,
     runbook_id: str,
     project: str,
@@ -142,8 +142,6 @@ def _build_init_payload(
     h_rt: str | None,
     mem_per_core: str | None,
     notify_qsub_template: str,
-    densegen_qsub_template: str,
-    densegen_post_run_qsub_template: str,
     infer_qsub_template: str,
 ) -> dict[str, object]:
     from dnadesign.ops.runbooks.path_policy import WORKSPACE_SGE_STDOUT_RELATIVE_DIR
@@ -185,54 +183,20 @@ def _build_init_payload(
             "qsub_template": notify_qsub_template,
             "smoke": "dry",
         }
-    if workflow == "densegen":
-        payload["runbook"]["densegen"] = {
-            "config": str(workspace_contract / "config.yaml"),
-            "qsub_template": densegen_qsub_template,
-            "run_args": {
-                "fresh": "--fresh --no-plot",
-                "resume": "--resume --no-plot",
-            },
-            "post_run": {
-                "qsub_template": densegen_post_run_qsub_template,
-            },
-            "overlay_guard": {
-                "max_projected_overlay_parts": 10000,
-                "max_existing_overlay_parts": 1000,
-                "auto_compact_existing_overlay_parts": True,
-                "overlay_namespace": "densegen",
-            },
-            "records_part_guard": {
-                "max_projected_records_parts": 10000,
-                "max_existing_records_parts": 1000,
-                "max_existing_records_part_age_days": 14,
-                "auto_compact_existing_records_parts": True,
-            },
-            "archived_overlay_guard": {
-                "max_archived_entries": 1000,
-                "max_archived_bytes": 2147483648,
-            },
-        }
-        payload["runbook"]["resources"] = {
-            "pe_omp": pe_omp if pe_omp is not None else 12,
-            "h_rt": h_rt or "08:00:00",
-            "mem_per_core": mem_per_core or "8G",
-        }
-    else:
-        payload["runbook"]["infer"] = {
-            "config": str(workspace_contract / "config.yaml"),
-            "qsub_template": infer_qsub_template,
-            "cuda_module": cuda_module,
-            "gcc_module": gcc_module,
-        }
-        payload["runbook"]["resources"] = {
-            "pe_omp": pe_omp if pe_omp is not None else 4,
-            "h_rt": h_rt or "04:00:00",
-            "mem_per_core": mem_per_core or "8G",
-            "gpus": 1,
-            "gpu_capability": "8.9",
-            "gpu_memory_gib": 45.0,
-        }
+    payload["runbook"]["infer"] = {
+        "config": str(workspace_contract / "config.yaml"),
+        "qsub_template": infer_qsub_template,
+        "cuda_module": cuda_module,
+        "gcc_module": gcc_module,
+    }
+    payload["runbook"]["resources"] = {
+        "pe_omp": pe_omp if pe_omp is not None else 4,
+        "h_rt": h_rt or "04:00:00",
+        "mem_per_core": mem_per_core or "8G",
+        "gpus": 1,
+        "gpu_capability": "8.9",
+        "gpu_memory_gib": 45.0,
+    }
     return payload
 
 
@@ -464,7 +428,7 @@ def runbook_diagnostics_operator_brief(
 def runbook_init(
     runbook: Annotated[Path, typer.Option("--runbook", help="Output path for orchestration runbook yaml.")],
     workflow: Annotated[
-        Literal["densegen", "infer"],
+        Literal["infer"],
         typer.Option("--workflow", help="Workflow family for scaffolded runbook."),
     ],
     workspace_root: Annotated[
@@ -550,10 +514,6 @@ def runbook_init(
         return Path(relative_path)
 
     notify_template = _template_or_default(preset_templates.get("notify", "docs/bu-scc/jobs/notify-watch.qsub"))
-    densegen_template = _template_or_default(preset_templates.get("densegen", "docs/bu-scc/jobs/densegen-cpu.qsub"))
-    densegen_post_run_template = _template_or_default(
-        preset_templates.get("densegen_post_run", "docs/bu-scc/jobs/densegen-analysis.qsub")
-    )
     infer_template = _template_or_default(preset_templates.get("infer", "docs/bu-scc/jobs/evo2-gpu-infer.qsub"))
     resolved_workspace_root = _resolve_workspace_root_for_init(workspace_root, repo_base=repo_base)
     payload = _build_init_payload(
@@ -569,11 +529,6 @@ def runbook_init(
         h_rt=h_rt,
         mem_per_core=mem_per_core,
         notify_qsub_template=_contract_path(notify_template, runbook_parent=runbook_path.parent),
-        densegen_qsub_template=_contract_path(densegen_template, runbook_parent=runbook_path.parent),
-        densegen_post_run_qsub_template=_contract_path(
-            densegen_post_run_template,
-            runbook_parent=runbook_path.parent,
-        ),
         infer_qsub_template=_contract_path(infer_template, runbook_parent=runbook_path.parent),
     )
     runbook_path.parent.mkdir(parents=True, exist_ok=True)

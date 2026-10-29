@@ -70,7 +70,6 @@ shasum "$tmpdir"/run*.log
 Use these after editing the repo-local skill or BU SCC operator docs.
 
 ```bash
-uv run pytest -q src/dnadesign/densegen/tests/docs/test_bu_scc_docs_contracts.py
 uv run python -m dnadesign.devtools.docs.checks --repo-root .
 ```
 

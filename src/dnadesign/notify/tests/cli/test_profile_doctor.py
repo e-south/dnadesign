@@ -26,12 +26,12 @@ def _event(action: str = "write_overlay_part") -> dict:
         "timestamp_utc": "2026-02-06T00:00:00+00:00",
         "action": action,
         "dataset": {"name": "demo", "root": "/tmp/datasets"},
-        "args": {"namespace": "densegen"},
+        "args": {"namespace": "infer"},
         "metrics": {"rows_written": 3},
-        "artifacts": {"overlay": {"namespace": "densegen"}},
+        "artifacts": {"overlay": {"namespace": "infer"}},
         "fingerprint": {"rows": 1, "cols": 2, "size_bytes": 128, "sha256": None},
         "registry_hash": "abc123",
-        "actor": {"tool": "densegen", "run_id": "run-1", "host": "host", "pid": 123},
+        "actor": {"tool": "infer", "run_id": "run-1", "host": "host", "pid": 123},
         "version": "0.1.0",
     }
 
@@ -57,7 +57,7 @@ def test_profile_doctor_fails_when_webhook_env_is_missing(tmp_path: Path) -> Non
                 "profile_version": 2,
                 "provider": "slack",
                 "events": str(events),
-                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
             }
         ),
         encoding="utf-8",
@@ -71,7 +71,7 @@ def test_profile_doctor_fails_when_webhook_env_is_missing(tmp_path: Path) -> Non
 
 def test_profile_doctor_rejects_non_usr_events_file(tmp_path: Path, monkeypatch) -> None:
     cfg_path = tmp_path / "config.yaml"
-    cfg_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    cfg_path.write_text("infer:\n  run:\n    id: demo\n", encoding="utf-8")
     profile = tmp_path / "notify.profile.json"
     profile.write_text(
         json.dumps(
@@ -79,12 +79,12 @@ def test_profile_doctor_rejects_non_usr_events_file(tmp_path: Path, monkeypatch)
                 "profile_version": 2,
                 "provider": "slack",
                 "events": str(cfg_path),
-                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
             }
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
+    monkeypatch.setenv("INFER_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
 
     runner = CliRunner()
     result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile)])
@@ -94,7 +94,7 @@ def test_profile_doctor_rejects_non_usr_events_file(tmp_path: Path, monkeypatch)
 
 def test_profile_doctor_rejects_non_usr_events_file_v2_secret_ref(tmp_path: Path, monkeypatch) -> None:
     cfg_path = tmp_path / "config.yaml"
-    cfg_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    cfg_path.write_text("infer:\n  run:\n    id: demo\n", encoding="utf-8")
     profile = tmp_path / "notify.profile.json"
     profile.write_text(
         json.dumps(
@@ -115,7 +115,7 @@ def test_profile_doctor_rejects_non_usr_events_file_v2_secret_ref(tmp_path: Path
     result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile)])
     assert result.exit_code == 1
     assert "SeqLedger .events.log" in result.stdout
-    assert "inspect run --seqledger-events-path" in result.stdout
+    assert "--tool and --config" in result.stdout
 
 
 def test_profile_doctor_rejects_legacy_profile_version_1(tmp_path: Path, monkeypatch) -> None:
@@ -127,13 +127,13 @@ def test_profile_doctor_rejects_legacy_profile_version_1(tmp_path: Path, monkeyp
             {
                 "profile_version": 1,
                 "provider": "slack",
-                "url_env": "DENSEGEN_WEBHOOK",
+                "url_env": "INFER_WEBHOOK",
                 "events": str(events),
             }
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
+    monkeypatch.setenv("INFER_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
 
     runner = CliRunner()
     result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile)])
@@ -151,13 +151,13 @@ def test_profile_doctor_rejects_legacy_preset_field(tmp_path: Path, monkeypatch)
                 "profile_version": 2,
                 "provider": "slack",
                 "events": str(events),
-                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
-                "preset": "densegen",
+                "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
+                "preset": "infer",
             }
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
+    monkeypatch.setenv("INFER_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
 
     runner = CliRunner()
     result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile)])
@@ -175,13 +175,13 @@ def test_profile_doctor_rejects_policy_without_explicit_filters(tmp_path: Path, 
                 "profile_version": 2,
                 "provider": "slack",
                 "events": str(events),
-                "policy": "densegen",
-                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "policy": "infer",
+                "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
             }
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
+    monkeypatch.setenv("INFER_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
 
     runner = CliRunner()
     result = runner.invoke(app, ["profile", "doctor", "--profile", str(profile)])
@@ -200,12 +200,12 @@ def test_profile_doctor_passes_when_wiring_is_valid(tmp_path: Path, monkeypatch)
                 "provider": "slack",
                 "events": str(events),
                 "cursor": str(tmp_path / "notify.cursor"),
-                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
             }
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
+    monkeypatch.setenv("INFER_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
     _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()
@@ -225,12 +225,12 @@ def test_profile_doctor_can_emit_json_output(tmp_path: Path, monkeypatch) -> Non
                 "provider": "slack",
                 "events": str(events),
                 "cursor": str(tmp_path / "notify.cursor"),
-                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
             }
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
+    monkeypatch.setenv("INFER_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
     _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()
@@ -252,7 +252,7 @@ def test_profile_doctor_json_reports_structured_error(tmp_path: Path) -> None:
                 "profile_version": 2,
                 "provider": "slack",
                 "events": str(events),
-                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
             }
         ),
         encoding="utf-8",
@@ -276,12 +276,12 @@ def test_profile_doctor_rejects_non_slack_webhook_for_slack_provider(tmp_path: P
                 "profile_version": 2,
                 "provider": "slack",
                 "events": str(events),
-                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
             }
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
+    monkeypatch.setenv("INFER_WEBHOOK", "https://example.invalid/webhook")
     _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()
@@ -320,22 +320,22 @@ def test_profile_doctor_passes_with_secret_ref_profile(tmp_path: Path, monkeypat
 
 def test_profile_doctor_allows_missing_events_when_profile_has_events_source(tmp_path: Path, monkeypatch) -> None:
     events = tmp_path / "future" / ".events.log"
-    config_path = tmp_path / "densegen.config.yaml"
+    config_path = tmp_path / "infer.config.yaml"
     profile = tmp_path / "notify.profile.json"
-    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    config_path.write_text("infer:\n  run:\n    id: demo\n", encoding="utf-8")
     profile.write_text(
         json.dumps(
             {
                 "profile_version": 2,
                 "provider": "slack",
                 "events": str(events),
-                "events_source": {"tool": "densegen", "config": str(config_path)},
-                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "events_source": {"tool": "infer", "config": str(config_path)},
+                "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
             }
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
+    monkeypatch.setenv("INFER_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
     _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()
@@ -346,22 +346,22 @@ def test_profile_doctor_allows_missing_events_when_profile_has_events_source(tmp
 
 def test_profile_doctor_json_reports_missing_events_as_pending_for_events_source(tmp_path: Path, monkeypatch) -> None:
     events = tmp_path / "future" / ".events.log"
-    config_path = tmp_path / "densegen.config.yaml"
+    config_path = tmp_path / "infer.config.yaml"
     profile = tmp_path / "notify.profile.json"
-    config_path.write_text("densegen:\n  run:\n    id: demo\n", encoding="utf-8")
+    config_path.write_text("infer:\n  run:\n    id: demo\n", encoding="utf-8")
     profile.write_text(
         json.dumps(
             {
                 "profile_version": 2,
                 "provider": "slack",
                 "events": str(events),
-                "events_source": {"tool": "densegen", "config": str(config_path)},
-                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "events_source": {"tool": "infer", "config": str(config_path)},
+                "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
             }
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
+    monkeypatch.setenv("INFER_WEBHOOK", "https://hooks.slack.com/services/T000/B000/XXX")
     _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()

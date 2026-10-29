@@ -9,7 +9,7 @@ runbook control. Tool and study status runtime policy stays outside OPS core.
 ### What OPS is
 
 OPS is the neutral orchestration and status shell for cross-tool work in `dnadesign`.
-It does not own DenseGen, Infer, Notify, OPAL, SeqLedger, or study status runtime policy.
+Infer, Notify, OPAL and SeqLedger own their runtime behavior; studies own their analysis policy.
 Repo-local scheduler assumptions must stay explicit: generic `ops runbook init` requires `--project <project>` or an explicit preset such as `--preset bu-scc-dunlop`; it does not silently infer site identity.
 It owns:
 

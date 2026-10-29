@@ -23,7 +23,6 @@ operator runbooks listed below.
 
 ### Contracts
 - Notify input contract is SeqLedger `.events.log` JSONL only.
-- DenseGen runtime diagnostics (`outputs/meta/events.jsonl`) are out of scope.
 - `profile_version` must be `2`.
 
 ### Tests

@@ -1,7 +1,7 @@
 ## Distribution builds and verification
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 
 DNADesign has one distribution version, declared in `pyproject.toml`. Runtime
 `dnadesign.__version__` reads installed metadata. Individual tools can version
@@ -85,9 +85,8 @@ uv run --locked pytest -q src/dnadesign/devtools/tests/package
 ```
 
 These tests build a wheel and source archive, install outside the source checkout,
-exercise NumPy-only OPAL scoring, install the full locked dependency set, check
-Construct placement and invoke OPAL, Construct, LatentDNA and DenseGen CLI help.
-They also exercise build and download verification. The normal CI test scope
+exercise NumPy-only OPAL scoring and the installed tool commands, and check
+runtime resources. They also exercise build and download verification. The normal CI test scope
 includes this package suite. A successful build is separate from passing these
 runtime checks and the relevant tool tests.
 

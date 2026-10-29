@@ -12,20 +12,18 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import re
-import shlex
 from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .runbook_layout import enforce_workspace_layout
-from .runbook_paths import DENSEGEN_POST_RUN_TEMPLATE_DEFAULT, _resolve_repo_root_from_module, resolve_runbook_paths
+from .runbook_paths import _resolve_repo_root_from_module, resolve_runbook_paths
 from .workflow_metadata import (
     NotifyPolicy,
     OrchestrationWorkflowId,
     WorkflowTool,
-    is_densegen_workflow_id,
     is_infer_workflow_id,
     list_workflow_ids,
     list_workflow_tools,
@@ -36,7 +34,6 @@ from .workflow_metadata import (
 
 # Re-export workflow metadata helpers for downstream imports from schema.
 _WORKFLOW_METADATA_HELPERS = (
-    is_densegen_workflow_id,
     is_infer_workflow_id,
     list_workflow_tools,
     resolve_workflow_tool,
@@ -78,26 +75,6 @@ class StrictBaseModel(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_default=True)
 
 
-class DensegenRunArgs(StrictBaseModel):
-    fresh: str = "--fresh --no-plot"
-    resume: str = "--resume --no-plot"
-
-    @field_validator("fresh", "resume")
-    @classmethod
-    def _validate_args(cls, value: str, info: ValidationInfo) -> str:
-        text = str(value).strip()
-        if not text:
-            raise ValueError("run args must be non-empty")
-        try:
-            args = shlex.split(text)
-        except ValueError as exc:
-            raise ValueError("run args must be shell-parseable") from exc
-        required_flag = "--fresh" if info.field_name == "fresh" else "--resume"
-        if required_flag not in args:
-            raise ValueError(f"run args for {info.field_name} mode must include {required_flag}")
-        return text
-
-
 class CpuResourceContract(StrictBaseModel):
     pe_omp: int = Field(ge=1)
     h_rt: str
@@ -120,28 +97,11 @@ class CpuResourceContract(StrictBaseModel):
         return text
 
 
-def _default_densegen_post_run_resources() -> CpuResourceContract:
-    return CpuResourceContract(pe_omp=4, h_rt="01:00:00", mem_per_core="4G")
-
-
-class DensegenPostRunContract(StrictBaseModel):
-    qsub_template: Path = DENSEGEN_POST_RUN_TEMPLATE_DEFAULT
-    resources: CpuResourceContract = Field(default_factory=_default_densegen_post_run_resources)
-
-    @field_validator("qsub_template")
-    @classmethod
-    def _normalize_path(cls, value: Path) -> Path:
-        text = str(value).strip()
-        if not text:
-            raise ValueError("path must be non-empty")
-        return Path(text).expanduser()
-
-
 class UsrOverlayGuardContract(StrictBaseModel):
     max_projected_overlay_parts: int = Field(default=10_000, ge=1)
     max_existing_overlay_parts: int = Field(default=1_000, ge=1)
     auto_compact_existing_overlay_parts: bool = True
-    overlay_namespace: str = "densegen"
+    overlay_namespace: str = "infer"
 
     @model_validator(mode="before")
     @classmethod
@@ -157,43 +117,18 @@ class UsrOverlayGuardContract(StrictBaseModel):
     def _validate_overlay_namespace(cls, value: str) -> str:
         text = str(value).strip()
         if not text:
-            raise ValueError("densegen.overlay_guard.overlay_namespace must be non-empty")
+            raise ValueError("overlay_guard.overlay_namespace must be non-empty")
         if _USR_OVERLAY_NAMESPACE_PATTERN.fullmatch(text) is None:
             raise ValueError(
-                "densegen.overlay_guard.overlay_namespace must match ^[a-z][a-z0-9_]*$ "
+                "overlay_guard.overlay_namespace must match ^[a-z][a-z0-9_]*$ "
                 "for SeqLedger overlay namespace compatibility"
             )
         return text
 
 
-class DensegenRecordsPartGuardContract(StrictBaseModel):
-    max_projected_records_parts: int = Field(default=10_000, ge=1)
-    max_existing_records_parts: int = Field(default=1_000, ge=1)
-    max_existing_records_part_age_days: int = Field(default=14, ge=1)
-    auto_compact_existing_records_parts: bool = True
-
-
 class UsrArchivedOverlayGuardContract(StrictBaseModel):
     max_archived_entries: int = Field(default=1_000, ge=0)
     max_archived_bytes: int = Field(default=2_147_483_648, ge=0)
-
-
-class DensegenWorkloadContract(StrictBaseModel):
-    config: Path
-    qsub_template: Path = Path("docs/bu-scc/jobs/densegen-cpu.qsub")
-    run_args: DensegenRunArgs = Field(default_factory=DensegenRunArgs)
-    post_run: DensegenPostRunContract = Field(default_factory=DensegenPostRunContract)
-    overlay_guard: UsrOverlayGuardContract = Field(default_factory=UsrOverlayGuardContract)
-    records_part_guard: DensegenRecordsPartGuardContract = Field(default_factory=DensegenRecordsPartGuardContract)
-    archived_overlay_guard: UsrArchivedOverlayGuardContract = Field(default_factory=UsrArchivedOverlayGuardContract)
-
-    @field_validator("config", "qsub_template")
-    @classmethod
-    def _normalize_path(cls, value: Path) -> Path:
-        text = str(value).strip()
-        if not text:
-            raise ValueError("path must be non-empty")
-        return Path(text).expanduser()
 
 
 def _default_infer_overlay_guard() -> UsrOverlayGuardContract:
@@ -328,7 +263,6 @@ class OrchestrationRunbookV1(StrictBaseModel):
     workflow_id: OrchestrationWorkflowId
     project: str
     workspace_root: Path
-    densegen: DensegenWorkloadContract | None = None
     infer: InferWorkloadContract | None = None
     notify: NotifyContract | None = None
     logging: LoggingContract
@@ -357,7 +291,6 @@ class OrchestrationRunbookV1(StrictBaseModel):
     def _validate_workflow_contracts(self) -> "OrchestrationRunbookV1":
         validate_workflow_contract(
             workflow_id=self.workflow_id,
-            densegen_present=self.densegen is not None,
             infer_present=self.infer is not None,
             notify_present=self.notify is not None,
             notify_tool=(self.notify.tool if self.notify is not None else None),

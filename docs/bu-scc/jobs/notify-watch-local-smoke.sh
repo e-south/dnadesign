@@ -94,9 +94,9 @@ CAPTURE_PATH="$CAPTURE_DIR/requests.jsonl"
 PORT_PATH="$CAPTURE_DIR/server.port"
 SECRETS_DIR="$WORKDIR/secrets"
 WEBHOOK_FILE_PATH="$SECRETS_DIR/notify.webhook"
-PROFILE_PATH="$WORKDIR/outputs/notify/densegen/profile.json"
-CURSOR_PATH="$WORKDIR/outputs/notify/densegen/cursor"
-SPOOL_DIR="$WORKDIR/outputs/notify/densegen/spool"
+PROFILE_PATH="$WORKDIR/outputs/notify/infer/profile.json"
+CURSOR_PATH="$WORKDIR/outputs/notify/infer/cursor"
+SPOOL_DIR="$WORKDIR/outputs/notify/infer/spool"
 
 mkdir -p "$(dirname "$EVENTS_PATH")" "$CAPTURE_DIR" "$SECRETS_DIR" "$(dirname "$PROFILE_PATH")"
 
@@ -109,27 +109,14 @@ events_path = pathlib.Path(sys.argv[1])
 event = {
     "event_version": 1,
     "timestamp_utc": "2026-02-12T12:00:00+00:00",
-    "action": "densegen_health",
+    "action": "infer_feature_bundle_complete",
     "dataset": {"name": "demo", "root": str(events_path.parent)},
     "args": {"status": "completed"},
-    "metrics": {
-        "rows_written": 3,
-        "densegen": {
-            "run_quota": 3,
-            "rows_written_session": 3,
-            "quota_progress_pct": 100.0,
-            "tfbs_total_library": 3,
-            "tfbs_unique_used": 2,
-            "tfbs_coverage_pct": 66.7,
-            "plans_attempted": 3,
-            "plans_solved": 2,
-            "run_elapsed_seconds": 5.0,
-        },
-    },
-    "artifacts": {"overlay": {"namespace": "densegen"}},
+    "metrics": {"rows_written": 3},
+    "artifacts": {"overlay": {"namespace": "infer"}},
     "fingerprint": {"rows": 1, "cols": 2, "size_bytes": 128, "sha256": None},
     "registry_hash": "abc123",
-    "actor": {"tool": "densegen", "run_id": "smoke", "host": "localhost", "pid": 1},
+    "actor": {"tool": "infer", "run_id": "smoke", "host": "localhost", "pid": 1},
     "version": "0.1.0",
 }
 events_path.write_text(json.dumps(event) + "\n", encoding="utf-8")
@@ -200,7 +187,7 @@ if [[ "$MODE" == "profile" ]]; then
       --events "$EVENTS_PATH" \
       --profile "$PROFILE_PATH" \
       --provider generic \
-      --policy densegen \
+      --policy infer \
       --secret-source env \
       --url-env NOTIFY_WEBHOOK \
       --force
@@ -221,8 +208,8 @@ else
     CURSOR_PATH="$CURSOR_PATH" \
     SPOOL_DIR="$SPOOL_DIR" \
     NOTIFY_PROVIDER="generic" \
-    NOTIFY_POLICY="densegen" \
-    NOTIFY_NAMESPACE="densegen" \
+    NOTIFY_POLICY="infer" \
+    NOTIFY_NAMESPACE="infer" \
     WEBHOOK_ENV="NOTIFY_WEBHOOK" \
     WEBHOOK_FILE="$WEBHOOK_FILE_PATH" \
     NOTIFY_IDLE_TIMEOUT_SECONDS="$IDLE_TIMEOUT_SECONDS" \

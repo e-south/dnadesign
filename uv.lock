@@ -29,15 +29,6 @@ name = "flash-attn"
 requires-dist = ["torch", "einops"]
 
 [[package]]
-name = "absl-py"
-version = "2.3.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/10/2a/c93173ffa1b39c1d0395b7e842bbdc62e556ca9d8d3b5572926f3e4ca752/absl_py-2.3.1.tar.gz", hash = "sha256:a97820526f7fbfd2ec1bce83f3f25e3a14840dac0d8e02a0b71cd75db3f77fc9", size = 116588, upload-time = "2025-07-03T09:31:44.05Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/8f/aa/ba0014cc4659328dc818a28827be78e6d97312ab0cb98105a770924dc11e/absl_py-2.3.1-py3-none-any.whl", hash = "sha256:eeecf07f0c2a93ace0772c92e596ace6d3d3996c042b2128459aaae2a76de11d", size = 135811, upload-time = "2025-07-03T09:31:42.253Z" },
-]
-
-[[package]]
 name = "altair"
 version = "6.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -365,21 +356,6 @@ wheels = [
 ]
 
 [[package]]
-name = "dense-arrays"
-version = "0.2.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-    { name = "ortools" },
-    { name = "rich" },
-    { name = "typer" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/cd/58/2ba7b35d2cc0f278d23cdca64539ba0ea89d7a8908bcad13476a602d63c9/dense_arrays-0.2.0.tar.gz", hash = "sha256:8d489c171e7150e70dba3393852a78e874465d6d67fee2d2b9674498a2097cd6", size = 203176, upload-time = "2026-10-07T02:21:15.048Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/85/01/68d3f8c96ec5765e2c47e0ccfd993baf0b54288fe7c85205ec3f188bfe8d/dense_arrays-0.2.0-py3-none-any.whl", hash = "sha256:c85297b6fb6b0a9a170050cc36f42cb151127a669023d718e695f612f6e5a9ab", size = 90110, upload-time = "2026-10-07T02:21:13.621Z" },
-]
-
-[[package]]
 name = "distlib"
 version = "0.4.4"
 source = { registry = "https://pypi.org/simple" }
@@ -496,7 +472,6 @@ full = [
     { name = "biopython" },
     { name = "certifi" },
     { name = "click" },
-    { name = "dense-arrays" },
     { name = "duckdb" },
     { name = "fastparquet" },
     { name = "filelock" },
@@ -511,7 +486,6 @@ full = [
     { name = "netcdf4" },
     { name = "numba" },
     { name = "openpyxl" },
-    { name = "ortools" },
     { name = "pandas" },
     { name = "pillow" },
     { name = "plotly" },
@@ -750,7 +724,6 @@ requires-dist = [
     { name = "click", marker = "extra == 'notify'", specifier = ">=8.3.3" },
     { name = "click", marker = "extra == 'ops'", specifier = ">=8.3.3" },
     { name = "cmake", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=3.18" },
-    { name = "dense-arrays", marker = "extra == 'full'", specifier = "==0.2.0" },
     { name = "dnadesign-tools", extras = ["baserender"], marker = "extra == 'cruncher'" },
     { name = "dnadesign-tools", extras = ["cruncher"], marker = "extra == 'cruncher-notebook'" },
     { name = "dnadesign-tools", extras = ["infer"], marker = "extra == 'infer-evo2'" },
@@ -789,7 +762,6 @@ requires-dist = [
     { name = "numpy" },
     { name = "onnx", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'", specifier = ">=1.22.0" },
     { name = "openpyxl", marker = "extra == 'opal'" },
-    { name = "ortools", marker = "extra == 'full'", specifier = ">=9.9,<9.10" },
     { name = "packaging", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'infer-evo2'" },
     { name = "pandas", marker = "extra == 'cruncher'" },
     { name = "pandas", marker = "extra == 'opal'" },
@@ -1196,15 +1168,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/0d/bc/6281ec7f9baaf71ee57c3b1748da2d3148d15d253e1a03006f204aa68ca5/igraph-1.0.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:1a27753cd80680a8f676c2d5a467aaa4a95e510b30748398ec4e4aeb982130e8", size = 2048555, upload-time = "2025-10-23T12:22:29.49Z" },
     { url = "https://files.pythonhosted.org/packages/7d/da/dd2867c25adbb41563720f14b5fc895c98bf88be682a3faff4f7b3118d2a/igraph-1.0.0-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:2d04c2c76f686fb1f554ee35dfd3085f5e73b7965ba6b4cf06d53e66b1955522", size = 5683134, upload-time = "2025-10-23T12:22:32.423Z" },
     { url = "https://files.pythonhosted.org/packages/1d/b7/88f433819c54b496cb0315fce28e658970cb20ff5dbd52a5a605ce2888de/igraph-1.0.0-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:05c79a2a8fca695b2f217a6fa7f2549f896f757d4db41be32a055400cb19cc30", size = 6594509, upload-time = "2025-10-23T12:22:35.831Z" },
-]
-
-[[package]]
-name = "immutabledict"
-version = "4.2.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ce/12/1da8e1a9050d0603ba65fb1796ed8860a705b906701c96e77f85cc7490be/immutabledict-4.2.2.tar.gz", hash = "sha256:cb6ed3090df593148f94cb407d218ca526fd2639694afdb553dc4f50ce6feeca", size = 6099, upload-time = "2025-10-12T13:32:59.755Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/63/7b/04ab6afa1ff7eb9ccb09049918c0407b205f5009092c0416147d163e4e2b/immutabledict-4.2.2-py3-none-any.whl", hash = "sha256:97c31d098a2c850e93a958badeef765e4736ed7942ec73e439facd764a3a7217", size = 4736, upload-time = "2025-10-12T13:32:58.326Z" },
 ]
 
 [[package]]
@@ -1883,23 +1846,6 @@ wheels = [
 ]
 
 [[package]]
-name = "ortools"
-version = "9.9.3963"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "absl-py" },
-    { name = "immutabledict" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "protobuf" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/ad/95504cd7d0bedab94cc3cbcbf4b87003bb82eb9fab7149c115c0246fa78d/ortools-9.9.3963-cp312-cp312-macosx_10_15_x86_64.whl", hash = "sha256:6dcf1974f278952034c727cdaec13de817b9f84d477c97ffb9a5441fccad36dd", size = 19383019, upload-time = "2024-03-07T13:37:01.361Z" },
-    { url = "https://files.pythonhosted.org/packages/79/68/0dd518cb682e0d6f7b7f77862d774d2c0eace55ebb4209b2e0ad8c57a9ff/ortools-9.9.3963-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:05b233c700788a2df1869f3579056c5ccca87bc2e74172b94997c3a45507bd4d", size = 18236664, upload-time = "2024-03-07T13:37:05.298Z" },
-    { url = "https://files.pythonhosted.org/packages/3b/e8/d2c34853ddf4e1769d999844a0940a2ec5e5579d54e62978f480d988eb44/ortools-9.9.3963-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:55f4f600492f34fc2313c46413c67cea74a637c2b12d03e24694fac3ac68a313", size = 24752048, upload-time = "2024-03-07T13:37:14.005Z" },
-]
-
-[[package]]
 name = "packaging"
 version = "26.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2046,7 +1992,6 @@ version = "6.33.5"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ba/25/7c72c307aafc96fa87062aa6291d9f7c94836e43214d43722e86037aac02/protobuf-6.33.5.tar.gz", hash = "sha256:6ddcac2a081f8b7b9642c09406bc6a4290128fce5f471cddd165960bb9119e5c", size = 444465, upload-time = "2026-01-29T21:51:33.494Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a2/6b/e48dfc1191bc5b52950246275bf4089773e91cb5ba3592621723cdddca62/protobuf-6.33.5-cp39-abi3-macosx_10_9_universal2.whl", hash = "sha256:a5cb85982d95d906df1e2210e58f8e4f1e3cdc088e52c921a041f9c9a0386de5", size = 427766, upload-time = "2026-01-29T21:51:25.413Z" },
     { url = "https://files.pythonhosted.org/packages/9b/53/a9443aa3ca9ba8724fdfa02dd1887c1bcd8e89556b715cfbacca6b63dbec/protobuf-6.33.5-cp39-abi3-manylinux2014_x86_64.whl", hash = "sha256:cbf16ba3350fb7b889fca858fb215967792dc125b35c7976ca4818bee3521cf0", size = 323465, upload-time = "2026-01-29T21:51:28.925Z" },
     { url = "https://files.pythonhosted.org/packages/57/bf/2086963c69bdac3d7cff1cc7ff79b8ce5ea0bec6797a017e1be338a46248/protobuf-6.33.5-py3-none-any.whl", hash = "sha256:69915a973dd0f60f31a08b8318b73eab2bd6a392c79184b3612226b0a3f8ec02", size = 170687, upload-time = "2026-01-29T21:51:32.557Z" },
 ]

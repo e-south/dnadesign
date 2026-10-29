@@ -1,10 +1,10 @@
 ## Notify: consuming SeqLedger events
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 
 Use this runbook to set up, run, and recover `notify` watcher loops.
-Notify consumes SeqLedger `.events.log` only. It does not consume DenseGen telemetry (`outputs/meta/events.jsonl`).
+Notify consumes SeqLedger `.events.log` JSONL.
 
 ### Entry contract
 
@@ -21,32 +21,32 @@ Notify consumes SeqLedger `.events.log` only. It does not consume DenseGen telem
 ```bash
 # Resolver inputs.
 WORKSPACE=<workspace>
-CONFIG=<dnadesign_repo>/src/dnadesign/densegen/workspaces/$WORKSPACE/config.yaml
-PROFILE=<dnadesign_repo>/src/dnadesign/densegen/workspaces/$WORKSPACE/outputs/notify/densegen/profile.json
+CONFIG=<dnadesign_repo>/src/dnadesign/infer/workspaces/$WORKSPACE/config.yaml
+PROFILE=<dnadesign_repo>/src/dnadesign/infer/workspaces/$WORKSPACE/outputs/notify/infer/profile.json
 
 # Optional trust roots for shared compute environments.
 export SSL_CERT_FILE=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
 
 # Confirm workspace names.
-uv run notify setup list-workspaces --tool densegen
+uv run notify setup list-workspaces --tool infer
 
 # Create or resolve webhook secret reference from a local secret file.
 WEBHOOK_SECRET_FILE=/abs/path/to/notify.webhook
 touch "$WEBHOOK_SECRET_FILE"
 chmod 600 "$WEBHOOK_SECRET_FILE"
-WEBHOOK_REF="$(uv run notify setup webhook --secret-source file --secret-ref "file://$WEBHOOK_SECRET_FILE" --name densegen-shared --json | python -c 'import json,sys; print(json.load(sys.stdin)["webhook"]["ref"])')"
+WEBHOOK_REF="$(uv run notify setup webhook --secret-source file --secret-ref "file://$WEBHOOK_SECRET_FILE" --name inference-shared --json | python -c 'import json,sys; print(json.load(sys.stdin)["webhook"]["ref"])')"
 
 # Create or refresh watcher profile.
-uv run notify setup slack --tool densegen --workspace "$WORKSPACE" --secret-ref "$WEBHOOK_REF" --secret-source file --policy densegen
+uv run notify setup slack --tool infer --workspace "$WORKSPACE" --secret-ref "$WEBHOOK_REF" --secret-source file --policy infer
 
 # Validate before watch.
 uv run notify profile doctor --profile "$PROFILE"
 
 # Dry-run payload mapping.
-uv run notify seqledger-events watch --tool densegen --workspace "$WORKSPACE" --dry-run --no-advance-cursor-on-dry-run
+uv run notify seqledger-events watch --tool infer --workspace "$WORKSPACE" --dry-run --no-advance-cursor-on-dry-run
 
 # Live watch loop.
-uv run notify seqledger-events watch --tool densegen --workspace "$WORKSPACE" --follow --wait-for-events --stop-on-terminal-status --idle-timeout 900
+uv run notify seqledger-events watch --tool infer --workspace "$WORKSPACE" --follow --wait-for-events --stop-on-terminal-status --idle-timeout 900
 ```
 
 Follow-loop truncate behavior:
@@ -71,7 +71,7 @@ Fail-fast reminders:
 ### Setup flow
 
 Resolver shorthand notes:
-- DenseGen and Infer use `--workspace <workspace-name>`.
+- Infer uses `--workspace <workspace-name>`.
 - Construct uses `--workspace <workspace-name>` only when the workspace registry has one project, otherwise use `--workspace <workspace-name>:<project-id>`.
 - Workspace shorthand for any tool is repo-rooted. Outside the repo checkout, set `DNADESIGN_REPO_ROOT=<repo-root>` or pass `--config` explicitly.
 - External construct workspace roots can be exposed to Notify with `CONSTRUCT_WORKSPACE_ROOT`.
@@ -83,13 +83,13 @@ Default resolver-mode artifact paths:
 
 ```bash
 # Resolve expected events path without writing profile artifacts.
-uv run notify setup resolve-events --tool densegen --workspace "$WORKSPACE"
+uv run notify setup resolve-events --tool infer --workspace "$WORKSPACE"
 
 # Create profile from workspace resolver mode.
-uv run notify setup slack --tool densegen --workspace "$WORKSPACE" --secret-source file --secret-ref file://<abs-path-to-webhook-secret> --policy densegen
+uv run notify setup slack --tool infer --workspace "$WORKSPACE" --secret-source file --secret-ref file://<abs-path-to-webhook-secret> --policy infer
 
 # Create profile from explicit config path.
-uv run notify setup slack --tool densegen --config "$CONFIG" --secret-source file --secret-ref file://<abs-path-to-webhook-secret> --policy densegen
+uv run notify setup slack --tool infer --config "$CONFIG" --secret-source file --secret-ref file://<abs-path-to-webhook-secret> --policy infer
 
 # Example construct resolver inputs.
 CONSTRUCT_CONFIG=/abs/path/to/construct/config.yaml
@@ -174,7 +174,7 @@ uv run notify profile doctor --profile "$PROFILE"
 uv run notify profile doctor --profile "$PROFILE" --json
 
 # Regenerate profile when events_source drift is detected.
-uv run notify setup slack --tool densegen --workspace "$WORKSPACE" --force
+uv run notify setup slack --tool infer --workspace "$WORKSPACE" --force
 
 # Replay spooled payloads.
 uv run notify spool drain --profile "$PROFILE"
@@ -188,23 +188,10 @@ uv run notify spool drain --profile "$PROFILE" --fail-fast
 - Using repository root config instead of workspace `config.yaml`.
 - Mixing `--events` with resolver mode (`--tool` + `--workspace` or `--config`).
 - Running live HTTPS delivery without trust roots.
-- Expecting Notify to consume DenseGen telemetry (`outputs/meta/events.jsonl`).
 - Sharing one cursor or spool path across unrelated runs.
 - Starting a new live watcher on an old stream without seeding the cursor when
   replay is not desired.
 - Expecting default policy filters to surface SeqLedger maintenance merge actions. If merge/carry operations must be visible, pass `--only-actions merge_datasets,attach,materialize` or set `NOTIFY_ACTIONS` explicitly.
-
-### DenseGen progress semantics
-
-`densegen_health` progress messages are rendered from `metrics.densegen.*` in the SeqLedger event stream.
-
-- `Quota (run session)` uses `rows_written_session/run_quota`; this is independent of watcher start time.
-- `Remaining to quota` reports `run_quota - rows_written_session`.
-- `Workspace rows` comes from event `fingerprint.rows` (dataset total rows at emit time).
-- `Runtime` is DenseGen run-session elapsed time from emitted metrics.
-- `Plan yield` is shown only when solved/attempted is below 100% to avoid low-signal noise.
-- `Session throughput` and `ETA to quota` are computed from `rows_written_session` and `run_elapsed_seconds`.
-- Running updates emit on quota-step changes or heartbeat cadence (`progress_heartbeat_seconds`, default 1800 seconds).
 
 ### Infer progress semantics
 
@@ -228,4 +215,3 @@ uv run notify spool drain --profile "$PROFILE" --fail-fast
 - Notify operations overview: [docs/notify/README.md](README.md)
 - Notify command contracts: [src/dnadesign/notify/docs/reference/command-contracts.md](../../src/dnadesign/notify/docs/reference/command-contracts.md)
 - Construct-backed consolidated dataset handoff: [Construct -> SeqLedger -> Infer shared dataset runbook](../../src/dnadesign/seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
-- DenseGen integration walkthrough: [DenseGen -> SeqLedger -> Notify tutorial](../../src/dnadesign/densegen/docs/tutorials/demo_usr_notify.md)

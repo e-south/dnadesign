@@ -19,7 +19,6 @@ keywords:
   - promoter
   - active learning
 related_tools:
-  - densegen
   - construct
   - infer
   - cluster

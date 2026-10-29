@@ -1,4 +1,13 @@
-"""Mutation contracts for locks, audit retention and failed reduction cleanup."""
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_operation_safety.py
+
+Mutation contracts for locks, audit retention and failed reduction cleanup.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
 
 import json
 from concurrent.futures import ThreadPoolExecutor

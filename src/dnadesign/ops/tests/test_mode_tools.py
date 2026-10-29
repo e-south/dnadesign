@@ -228,7 +228,7 @@ def test_register_mode_tool_adapter_requires_tool_name_match() -> None:
 
 def test_list_registered_mode_tools_returns_sorted_read_only_tuple() -> None:
     registered_tools = mode_tools.list_registered_mode_tools()
-    assert registered_tools == ("densegen", "infer")
+    assert registered_tools == ("infer",)
     assert isinstance(registered_tools, tuple)
 
 

@@ -7,7 +7,7 @@
 **Exit artifact:** Ops schema, plan, execute, or read-only progress docs
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 
 Batch orchestration and read-only Ops status checks start here. Dataset
 assembly, construct realization, and infer write-back stay in the shared SeqLedger
@@ -54,19 +54,18 @@ Use these when you still need command lookup before choosing a runbook lifecycle
 
 | Need | Start here | Verify next |
 | --- | --- | --- |
-| Bootstrap a runbook from scratch | [runbook bootstrap path](orchestration/runbooks.md#runbook-bootstrap-path) | [runbook schema (v1)](orchestration/runbooks.md#runbook-schema-v1) |
-| Validate command order without side effects | [2-minute dry-run path](orchestration/runbooks.md#2-minute-dry-run-path) | [contract rules](orchestration/runbooks.md#contract-rules) |
-| Run batch-only orchestration | [orchestration workflow ids](orchestration/runbooks.md#orchestration-workflow-ids) | [planner and executor commands](orchestration/runbooks.md#planner-and-executor-commands) |
-| Run batch plus notify orchestration | [orchestration workflow ids](orchestration/runbooks.md#orchestration-workflow-ids) | [notify command contracts](../../src/dnadesign/notify/docs/reference/command-contracts.md) |
-| Run generation now and refresh plots in the same submit chain | [runbook schema (v1)](orchestration/runbooks.md#runbook-schema-v1) | [contract rules](orchestration/runbooks.md#contract-rules) |
+| Bootstrap a runbook from scratch | [runbook bootstrap path](orchestration/runbooks.md#prepare-a-runbook) | [paths and resources](orchestration/runbooks.md#paths-and-resources) |
+| Validate command order without side effects | [plan and inspect](orchestration/runbooks.md#plan-execute-and-inspect) | [contract rules](orchestration/runbooks.md#plan-execute-and-inspect) |
+| Run batch-only orchestration | [orchestration workflow ids](orchestration/runbooks.md#paths-and-resources) | [planner and executor commands](orchestration/runbooks.md#plan-execute-and-inspect) |
+| Run batch plus notify orchestration | [orchestration workflow ids](orchestration/runbooks.md#paths-and-resources) | [notify command contracts](../../src/dnadesign/notify/docs/reference/command-contracts.md) |
 
 ### Contracts
 
-1. [runbook init command contract](orchestration/runbooks.md#runbook-bootstrap-path)
-2. [runbook plan command contract](orchestration/runbooks.md#planner-and-executor-commands)
-3. [runbook execute command contract](orchestration/runbooks.md#planner-and-executor-commands)
-4. [Runbook schema (v1)](orchestration/runbooks.md#runbook-schema-v1)
-5. [Contract rules](orchestration/runbooks.md#contract-rules)
+1. [runbook init command contract](orchestration/runbooks.md#prepare-a-runbook)
+2. [runbook plan command contract](orchestration/runbooks.md#plan-execute-and-inspect)
+3. [runbook execute command contract](orchestration/runbooks.md#plan-execute-and-inspect)
+4. [Paths and resources](orchestration/runbooks.md#paths-and-resources)
+5. [Execution and audit rules](orchestration/runbooks.md#plan-execute-and-inspect)
 6. `uv run ops runbook presets` for site/account defaults accepted by
    `ops runbook init --preset`.
 

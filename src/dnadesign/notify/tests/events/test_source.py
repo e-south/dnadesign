@@ -431,68 +431,6 @@ def test_resolve_tool_events_path_accepts_legacy_infer_alias(tool_alias: str, tm
     assert policy == "infer"
 
 
-def test_resolve_tool_events_path_densegen_from_usr_output_config(tmp_path: Path) -> None:
-    run_root = tmp_path / "workspace"
-    run_root.mkdir(parents=True, exist_ok=True)
-    config = run_root / "config.yaml"
-    config.write_text(
-        "\n".join(
-            [
-                "densegen:",
-                "  run:",
-                f"    root: {run_root}",
-                "    id: demo_densegen_run",
-                "  output:",
-                "    targets: [usr]",
-                "    usr:",
-                "      dataset: densegen_demo_source",
-                "      root: outputs/usr_datasets",
-                "    schema:",
-                "      bio_type: dna",
-                "      alphabet: dna_4",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    events_path, policy = resolve_tool_events_path(tool="densegen", config=config)
-
-    assert events_path == (run_root / "outputs" / "usr_datasets" / "densegen_demo_source" / ".events.log").resolve()
-    assert policy == "densegen"
-
-
-def test_resolve_tool_events_path_densegen_supports_shared_usr_root_outside_outputs(tmp_path: Path) -> None:
-    run_root = tmp_path / "workspace"
-    run_root.mkdir(parents=True, exist_ok=True)
-    config = run_root / "config.yaml"
-    config.write_text(
-        "\n".join(
-            [
-                "densegen:",
-                "  run:",
-                f"    root: {run_root}",
-                "    id: demo_densegen_run",
-                "  output:",
-                "    targets: [usr]",
-                "    usr:",
-                "      dataset: densegen_demo_source",
-                f"      root: {tmp_path / 'external_usr'}",
-                "    schema:",
-                "      bio_type: dna",
-                "      alphabet: dna_4",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    events_path, policy = resolve_tool_events_path(tool="densegen", config=config)
-
-    assert events_path == (tmp_path / "external_usr" / "densegen_demo_source" / ".events.log").resolve()
-    assert policy == "densegen"
-
-
 def test_register_tool_events_source_supports_custom_tool(tmp_path: Path) -> None:
     config = tmp_path / "custom.yaml"
     config.write_text("x: 1\n", encoding="utf-8")
@@ -551,7 +489,6 @@ def test_source_builtin_module_uses_public_tool_contracts_only() -> None:
             imported_modules.add(str(node.module or ""))
 
     assert "dnadesign.construct" in imported_modules
-    assert "dnadesign.densegen.contracts" in imported_modules
     assert "dnadesign.infer.contracts" in imported_modules
     assert not any(module.startswith("dnadesign.construct.src") for module in imported_modules)
     assert not any(module.startswith("dnadesign.densegen.src") for module in imported_modules)

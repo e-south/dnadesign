@@ -14,17 +14,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-WorkflowTool = Literal["densegen", "infer"]
-NotifyPolicy = Literal["densegen", "infer", "generic"]
+WorkflowTool = Literal["infer"]
+NotifyPolicy = Literal["infer", "generic"]
 OrchestrationWorkflowId = Literal[
-    "densegen_batch_submit",
-    "densegen_batch_with_notify",
     "infer_batch_submit",
     "infer_batch_with_notify",
 ]
 
 _RETIRED_WORKFLOW_ID_REPLACEMENTS: dict[str, OrchestrationWorkflowId] = {
-    "densegen_batch_with_notify_slack": "densegen_batch_with_notify",
     "infer_batch_with_notify_slack": "infer_batch_with_notify",
 }
 
@@ -39,20 +36,6 @@ class WorkflowMetadata:
 
 
 _WORKFLOW_METADATA_BY_ID: dict[str, WorkflowMetadata] = {
-    "densegen_batch_submit": WorkflowMetadata(
-        workflow_id="densegen_batch_submit",
-        tool="densegen",
-        requires_notify=False,
-        requires_gpus=False,
-        allowed_notify_policies=(),
-    ),
-    "densegen_batch_with_notify": WorkflowMetadata(
-        workflow_id="densegen_batch_with_notify",
-        tool="densegen",
-        requires_notify=True,
-        requires_gpus=False,
-        allowed_notify_policies=("densegen", "generic"),
-    ),
     "infer_batch_submit": WorkflowMetadata(
         workflow_id="infer_batch_submit",
         tool="infer",
@@ -115,11 +98,6 @@ def resolve_workflow_id(*, tool: WorkflowTool, with_notify: bool) -> Orchestrati
     return matches[0]
 
 
-def is_densegen_workflow_id(workflow_id: str) -> bool:
-    metadata = _WORKFLOW_METADATA_BY_ID.get(str(workflow_id or "").strip())
-    return metadata is not None and metadata.tool == "densegen"
-
-
 def is_infer_workflow_id(workflow_id: str) -> bool:
     metadata = _WORKFLOW_METADATA_BY_ID.get(str(workflow_id or "").strip())
     return metadata is not None and metadata.tool == "infer"
@@ -128,7 +106,6 @@ def is_infer_workflow_id(workflow_id: str) -> bool:
 def validate_workflow_contract(
     *,
     workflow_id: str,
-    densegen_present: bool,
     infer_present: bool,
     notify_present: bool,
     notify_tool: WorkflowTool | None,
@@ -140,7 +117,6 @@ def validate_workflow_contract(
 ) -> None:
     metadata = resolve_workflow_metadata(workflow_id)
     workload_presence = {
-        "densegen": densegen_present,
         "infer": infer_present,
     }
     expected_tool = metadata.tool

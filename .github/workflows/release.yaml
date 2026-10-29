@@ -111,7 +111,7 @@ jobs:
           project_version="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
           uv pip install --python build/wheel-smoke/bin/python "dnadesign-tools[full]==$project_version" --find-links dist
           uv pip check --python build/wheel-smoke/bin/python
-          for command in opal construct dense latentdna; do
+          for command in opal construct seqledger infer notify latentdna cruncher; do
             "build/wheel-smoke/bin/$command" --help > /dev/null
           done
           site_packages="$(build/wheel-smoke/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"

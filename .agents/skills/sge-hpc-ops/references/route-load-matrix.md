@@ -23,12 +23,7 @@ Load when needed by task scope:
 
 ### Route packs
 
-`densegen_batch_submit`
-- `batch-submit-contract.md`
-- `automation-qa-preflight.md`
-- `workload-dnadesign.md`
-
-`densegen_batch_with_notify`
+`infer_batch`
 - `batch-submit-contract.md`
 - `automation-qa-preflight.md`
 - `workload-dnadesign.md`
@@ -59,9 +54,9 @@ submit artifact checks:
 
 ### Minimal loading examples
 
-DenseGen batch with Notify:
+Infer batch:
 1. base pack
-2. route pack: `densegen_batch_with_notify`
+2. route pack: `infer_batch`
 3. cross-cutting: status + submit-shape + BU SCC policy (if BU context)
 
 OnDemand handoff (already in session):

@@ -54,23 +54,23 @@ def register_profile_wizard_command(
         progress_step_pct: int | None = typer.Option(
             None,
             "--progress-step-pct",
-            help="DenseGen progress heartbeat threshold as percentage points (1-100).",
+            help="Inference progress heartbeat threshold as percentage points (1-100).",
         ),
         progress_min_seconds: float | None = typer.Option(
             None,
             "--progress-min-seconds",
-            help="Minimum spacing between DenseGen progress heartbeats in seconds.",
+            help="Minimum spacing between Inference progress heartbeats in seconds.",
         ),
         progress_heartbeat_seconds: float | None = typer.Option(
             None,
             "--progress-heartbeat-seconds",
-            help="Maximum spacing between DenseGen running updates in seconds.",
+            help="Maximum spacing between Inference running updates in seconds.",
         ),
         tls_ca_bundle: Path | None = typer.Option(None, "--tls-ca-bundle", help="CA bundle file for HTTPS webhooks."),
         policy: str | None = typer.Option(
             None,
             "--policy",
-            help="Workflow policy defaults: densegen|infer|generic.",
+            help="Workflow policy defaults: construct|infer|generic.",
         ),
         secret_source: str = typer.Option(
             "auto",

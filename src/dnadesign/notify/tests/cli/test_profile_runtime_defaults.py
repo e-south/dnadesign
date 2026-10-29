@@ -26,12 +26,12 @@ def _event(action: str = "write_overlay_part") -> dict:
         "timestamp_utc": "2026-02-06T00:00:00+00:00",
         "action": action,
         "dataset": {"name": "demo", "root": "/tmp/datasets"},
-        "args": {"namespace": "densegen"},
+        "args": {"namespace": "infer"},
         "metrics": {"rows_written": 3},
-        "artifacts": {"overlay": {"namespace": "densegen"}},
+        "artifacts": {"overlay": {"namespace": "infer"}},
         "fingerprint": {"rows": 1, "cols": 2, "size_bytes": 128, "sha256": None},
         "registry_hash": "abc123",
-        "actor": {"tool": "densegen", "run_id": "run-1", "host": "host", "pid": 123},
+        "actor": {"tool": "infer", "run_id": "run-1", "host": "host", "pid": 123},
         "version": "0.1.0",
     }
 
@@ -57,7 +57,7 @@ def test_usr_events_watch_can_use_profile_defaults(tmp_path: Path) -> None:
                 "profile_version": 2,
                 "provider": "generic",
                 "events": str(events),
-                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
             }
         ),
         encoding="utf-8",
@@ -75,7 +75,7 @@ def test_usr_events_watch_can_use_profile_defaults(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0
-    assert '"tool": "densegen"' in result.stdout
+    assert '"tool": "infer"' in result.stdout
 
 
 def test_usr_events_watch_can_use_profile_context_flags(tmp_path: Path) -> None:
@@ -90,7 +90,7 @@ def test_usr_events_watch_can_use_profile_context_flags(tmp_path: Path) -> None:
                 "events": str(events),
                 "include_context": True,
                 "include_raw_event": True,
-                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
             }
         ),
         encoding="utf-8",
@@ -165,7 +165,7 @@ def test_usr_events_watch_rejects_profiles_with_plain_url(tmp_path: Path) -> Non
                 "provider": "generic",
                 "url": "https://example.invalid/webhook",
                 "events": str(events),
-                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
             }
         ),
         encoding="utf-8",
@@ -194,7 +194,7 @@ def test_spool_drain_can_use_profile_defaults(tmp_path: Path, monkeypatch) -> No
     _write_events(events, [_event()])
     payload = {
         "status": "running",
-        "tool": "densegen",
+        "tool": "infer",
         "run_id": "run-1",
         "timestamp": "2026-02-06T00:00:00+00:00",
         "host": "host",
@@ -212,7 +212,7 @@ def test_spool_drain_can_use_profile_defaults(tmp_path: Path, monkeypatch) -> No
                 "provider": "generic",
                 "events": str(events),
                 "spool_dir": str(spool_dir),
-                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
             }
         ),
         encoding="utf-8",
@@ -224,7 +224,7 @@ def test_spool_drain_can_use_profile_defaults(tmp_path: Path, monkeypatch) -> No
         sent.append(body)
 
     monkeypatch.setattr("dnadesign.notify.cli.bindings.post_json", _fake_post)
-    monkeypatch.setenv("DENSEGEN_WEBHOOK", "https://example.invalid/webhook")
+    monkeypatch.setenv("INFER_WEBHOOK", "https://example.invalid/webhook")
     _set_ssl_cert_file(monkeypatch, tmp_path)
 
     runner = CliRunner()
@@ -246,7 +246,7 @@ def test_usr_events_watch_resolves_profile_relative_events_path(tmp_path: Path, 
                 "profile_version": 2,
                 "provider": "generic",
                 "events": "events.log",
-                "webhook": {"source": "env", "ref": "DENSEGEN_WEBHOOK"},
+                "webhook": {"source": "env", "ref": "INFER_WEBHOOK"},
             }
         ),
         encoding="utf-8",
@@ -265,4 +265,4 @@ def test_usr_events_watch_resolves_profile_relative_events_path(tmp_path: Path, 
         ],
     )
     assert result.exit_code == 0
-    assert '"tool": "densegen"' in result.stdout
+    assert '"tool": "infer"' in result.stdout

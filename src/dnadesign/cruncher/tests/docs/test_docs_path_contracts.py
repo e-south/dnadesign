@@ -425,12 +425,14 @@ def test_docs_define_strict_ht_dataset_contracts() -> None:
     assert "`ht_sites: true` is strict." in config
 
 
-def test_cli_densegen_export_examples_use_active_workspace_names() -> None:
+def test_cli_catalog_exports_use_explicit_destinations() -> None:
     cli = (_package_root() / "docs" / "reference" / "cli.md").read_text()
     assert "demo_meme_three_tfs" not in cli
     assert "densegen_prep_three_tf" not in cli
-    assert "cruncher catalog export-sites --set 1 --densegen-workspace demo_tfbs_baseline <config>" in cli
-    assert "cruncher catalog export-densegen --set 1 --densegen-workspace demo_sampling_baseline <config>" in cli
+    assert "catalog export-sites --set 1 --out exports/sites.csv" in cli
+    assert "catalog export-meme --set 1 --out exports/motifs" in cli
+    assert "export-densegen" not in cli
+    assert "--densegen-workspace" not in cli
 
 
 def test_new_optimization_workspaces_have_config_and_runbook_with_flow_order() -> None:

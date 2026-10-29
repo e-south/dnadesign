@@ -5,7 +5,7 @@
 **Entry artifact:** SeqLedger dataset, sync, or cross-tool shared-dataset work that still needs a route
 **Exit artifact:** SeqLedger runbook or downstream handoff route
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 -->
 
 [SeqLedger guide](../README.md)
@@ -19,7 +19,6 @@ Choose the procedure that matches the dataset change you need. For a first local
 - [Sync over SSH](sync/README.md): set up a remote, compare copies and transfer in one direction.
 - [Sync audit output](sync/audit-loop.md): inspect machine-readable transfer decisions.
 - [Iterative HPC workflow](sync/hpc-agent-flow.md): coordinate remote production with local analysis.
-- [Chained generation and inference](sync/chained-densegen-infer-runbook.md): an example using DenseGen and Infer.
 
 ## Combine or annotate datasets
 

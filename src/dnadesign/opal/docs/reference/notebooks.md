@@ -15,7 +15,7 @@ entrypoints:
 ---
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 -->
 
 [OPAL docs](../index.md)
@@ -218,12 +218,12 @@ confidence level. Materialized visual manifests may also carry a generic
 `axis_scale` object derived from source plot params, including comparable
 y-limits and reference lines. OPAL applies that scale mechanically; the study
 owns the scientific meaning of scale classes such as negative MSE or target
-count. DenseGen targets, oracle meaning, split logic, and suite-level
+count. Target definitions, oracle meaning, split logic, and suite-level
 interpretation remain study-owned.
 
 Relationship pairs use campaign-member identity, not display names. If a
-campaign set contains duplicate campaign slugs, such as the same DenseGen
-campaign repeated across seed roots, OPAL disambiguates members with
+campaign set contains duplicate campaign slugs, such as the same campaign
+repeated across seed roots, OPAL disambiguates members with
 `config_path` or `workdir` before building collection rows. This prevents
 seed-replicate comparisons from cross-joining rows that happen to share a
 slug.

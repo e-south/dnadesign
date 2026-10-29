@@ -1,7 +1,7 @@
 ## Notify Operations
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-10-29
 
 `notify` sends webhook notifications from SeqLedger `.events.log` streams.
 Start here for setup, watching, and recovery. Use [Notify SeqLedger events operator manual](seqledger-events.md) when you want the full ordered procedure.
@@ -14,7 +14,7 @@ If you already have a workspace and a webhook secret file, jump to [Quick path](
 - Reusable Slack/profile workflows use file-backed secret references (`--secret-source file` + `--secret-ref file://...`) with owner-only permissions (`chmod 600`).
 - Explicit one-off or local-receiver drills can also use runtime overrides such as `--url` or `--url-env`.
 - `notify ... --dry-run` can validate routing and event parsing without webhook URL resolution.
-- Notify reads SeqLedger `.events.log`; DenseGen runtime telemetry (`outputs/meta/events.jsonl`) is not Notify input.
+- Notify reads SeqLedger `.events.log` JSONL.
 - When starting a live watcher on an existing stream with a materialized
   profile but no cursor file yet, seed the cursor to the current `.events.log`
   size first unless replay is intentional.
@@ -35,9 +35,9 @@ If you already have a workspace and a webhook secret file, jump to [Quick path](
 ### Quick path
 
 ```bash
-uv run notify setup slack --tool densegen --workspace <workspace> --secret-source file --secret-ref file://<abs-path-to-webhook-secret> --policy densegen
-uv run notify profile doctor --profile <config-dir>/outputs/notify/densegen/profile.json
-uv run notify seqledger-events watch --tool densegen --workspace <workspace> --follow --wait-for-events
+uv run notify setup slack --tool infer --workspace <workspace> --secret-source file --secret-ref file://<abs-path-to-webhook-secret> --policy infer
+uv run notify profile doctor --profile <config-dir>/outputs/notify/infer/profile.json
+uv run notify seqledger-events watch --tool infer --workspace <workspace> --follow --wait-for-events
 ```
 
 For the full quickstart (including webhook setup and dry-run checks), use [Minimal operator quickstart](seqledger-events.md#minimal-operator-quickstart).

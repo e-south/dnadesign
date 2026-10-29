@@ -21,14 +21,12 @@ In scope:
 - file-backed webhook setup for reusable watcher profiles
 - resolver-mode and explicit-path Notify setup
 - `notify profile doctor`, `notify seqledger-events watch`, and `notify spool drain`
-- repo-rooted workspace shorthand for DenseGen, Infer, and Construct
 - routing to scheduler-managed watcher flows when BU SCC batch is involved
 
 Out of scope:
 - generic Slack workspace administration
 - non-Notify scheduler submission planning; use `.agents/skills/sge-hpc-ops/SKILL.md`
 - changing Notify code with no operator-workflow question
-- treating DenseGen runtime telemetry as Notify input
 
 ## Success Criteria
 
@@ -67,8 +65,7 @@ Out of scope:
   Notify routing and resume posture matter.
 - Resolver shorthand is repo-rooted. Outside the repo checkout, use explicit
   `--config` or the runbook guidance for `DNADESIGN_REPO_ROOT`.
-- Notify consumes `"<dataset>/.events.log"` only. DenseGen
-  `outputs/meta/events.jsonl` is not Notify input.
+- Notify consumes the destination dataset's `.events.log`.
 
 4. Route scheduler-backed watcher work outward instead of expanding this skill.
 - For BU SCC batch submits or long-running watcher jobs, use
@@ -107,7 +104,6 @@ Should trigger:
 Should not trigger:
 - "Submit this BU SCC batch job."
 - "Rotate a Slack workspace admin secret."
-- "Explain DenseGen runtime telemetry."
 - "Refactor Notify code."
 
 ## References

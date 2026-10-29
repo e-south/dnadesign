@@ -13,26 +13,7 @@ from __future__ import annotations
 
 from .models import ResumeReadinessPolicy
 
-_DENSEGEN_RESUME_POLICY = ResumeReadinessPolicy(
-    tool="densegen",
-    required_record_columns=(
-        "densegen__run_id",
-        "densegen__input_name",
-        "densegen__plan",
-        "densegen__used_tfbs_detail",
-    ),
-    orphan_artifact_markers=(
-        "outputs/pools/pool_manifest.json",
-        "outputs/tables/attempts.parquet",
-        "outputs/tables/solutions.parquet",
-        "outputs/tables/run_metrics.parquet",
-        "outputs/meta/effective_config.json",
-    ),
-)
-
-_RESUME_READINESS_POLICIES: dict[str, ResumeReadinessPolicy] = {
-    "densegen": _DENSEGEN_RESUME_POLICY,
-}
+_RESUME_READINESS_POLICIES: dict[str, ResumeReadinessPolicy] = {}
 
 _TOOLS_WITHOUT_RESUME_POLICY = frozenset({"infer"})
 

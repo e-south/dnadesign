@@ -452,9 +452,8 @@ def test_find_undeclared_cross_tool_imports_allows_shared_contract_package(tmp_p
 @pytest.mark.parametrize(
     ("owner_tool", "imported_tool"),
     (
-        ("notify", "densegen"),
         ("notify", "infer"),
-        ("ops", "densegen"),
+        ("ops", "infer"),
     ),
 )
 def test_find_undeclared_cross_tool_imports_allows_contract_owner_edges(

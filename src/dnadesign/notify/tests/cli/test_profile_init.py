@@ -25,53 +25,18 @@ def _event(action: str = "write_overlay_part") -> dict:
         "timestamp_utc": "2026-02-06T00:00:00+00:00",
         "action": action,
         "dataset": {"name": "demo", "root": "/tmp/datasets"},
-        "args": {"namespace": "densegen"},
+        "args": {"namespace": "infer"},
         "metrics": {"rows_written": 3},
-        "artifacts": {"overlay": {"namespace": "densegen"}},
+        "artifacts": {"overlay": {"namespace": "infer"}},
         "fingerprint": {"rows": 1, "cols": 2, "size_bytes": 128, "sha256": None},
         "registry_hash": "abc123",
-        "actor": {"tool": "densegen", "run_id": "run-1", "host": "host", "pid": 123},
+        "actor": {"tool": "infer", "run_id": "run-1", "host": "host", "pid": 123},
         "version": "0.1.0",
     }
 
 
 def _write_events(path: Path, events: list[dict]) -> None:
     path.write_text("\n".join(json.dumps(event) for event in events) + "\n", encoding="utf-8")
-
-
-def test_profile_init_writes_densegen_policy_defaults(tmp_path: Path) -> None:
-    events = tmp_path / "events.log"
-    profile = tmp_path / "notify.profile.json"
-    _write_events(events, [_event()])
-
-    runner = CliRunner()
-    result = runner.invoke(
-        app,
-        [
-            "profile",
-            "init",
-            "--profile",
-            str(profile),
-            "--provider",
-            "slack",
-            "--url-env",
-            "DENSEGEN_WEBHOOK",
-            "--events",
-            str(events),
-            "--policy",
-            "densegen",
-        ],
-    )
-
-    assert result.exit_code == 0
-    data = json.loads(profile.read_text(encoding="utf-8"))
-    assert data["profile_version"] == 2
-    assert data["provider"] == "slack"
-    assert data["webhook"] == {"source": "env", "ref": "DENSEGEN_WEBHOOK"}
-    assert data["policy"] == "densegen"
-    assert data["only_tools"] == "densegen"
-    assert "densegen_health" in data["only_actions"]
-    assert "url_env" not in data
 
 
 def test_profile_init_persists_progress_tunables(tmp_path: Path) -> None:
@@ -90,7 +55,7 @@ def test_profile_init_persists_progress_tunables(tmp_path: Path) -> None:
             "--provider",
             "slack",
             "--url-env",
-            "DENSEGEN_WEBHOOK",
+            "INFER_WEBHOOK",
             "--events",
             str(events),
             "--progress-step-pct",
@@ -125,7 +90,7 @@ def test_profile_init_writes_infer_policy_defaults(tmp_path: Path) -> None:
             "--provider",
             "slack",
             "--url-env",
-            "DENSEGEN_WEBHOOK",
+            "INFER_WEBHOOK",
             "--events",
             str(events),
             "--policy",
@@ -136,7 +101,7 @@ def test_profile_init_writes_infer_policy_defaults(tmp_path: Path) -> None:
     assert result.exit_code == 0
     data = json.loads(profile.read_text(encoding="utf-8"))
     assert data["profile_version"] == 2
-    assert data["webhook"] == {"source": "env", "ref": "DENSEGEN_WEBHOOK"}
+    assert data["webhook"] == {"source": "env", "ref": "INFER_WEBHOOK"}
     assert data["policy"] == "infer"
     assert data["only_tools"] == "infer"
     actions = data["only_actions"].split(",")
@@ -166,20 +131,20 @@ def test_profile_init_resolves_runtime_paths_from_cli_cwd(tmp_path: Path, monkey
             "--provider",
             "slack",
             "--url-env",
-            "DENSEGEN_WEBHOOK",
+            "INFER_WEBHOOK",
             "--events",
             str(events),
             "--cursor",
-            "outputs/notify/densegen/cursor",
+            "outputs/notify/infer/cursor",
             "--spool-dir",
-            "outputs/notify/densegen/spool",
+            "outputs/notify/infer/spool",
         ],
     )
 
     assert result.exit_code == 0
     data = json.loads(profile.read_text(encoding="utf-8"))
-    assert data["cursor"] == str((workspace / "outputs" / "notify" / "densegen" / "cursor").resolve())
-    assert data["spool_dir"] == str((workspace / "outputs" / "notify" / "densegen" / "spool").resolve())
+    assert data["cursor"] == str((workspace / "outputs" / "notify" / "infer" / "cursor").resolve())
+    assert data["spool_dir"] == str((workspace / "outputs" / "notify" / "infer" / "spool").resolve())
 
 
 def test_profile_init_refuses_overwrite_without_force(tmp_path: Path) -> None:
@@ -196,7 +161,7 @@ def test_profile_init_refuses_overwrite_without_force(tmp_path: Path) -> None:
         "--provider",
         "slack",
         "--url-env",
-        "DENSEGEN_WEBHOOK",
+        "INFER_WEBHOOK",
         "--events",
         str(events),
     ]

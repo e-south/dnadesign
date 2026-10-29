@@ -18,7 +18,6 @@ import pytest
 
 from dnadesign.devtools.docs.checks import (
     _find_agents_path_reference_issues,
-    _find_densegen_disallowed_term_issues,
     _find_deprecated_docs_entrypoint_issues,
     _find_docs_root_heading_style_issues,
     _find_entrypoint_local_path_literal_issues,
@@ -391,26 +390,6 @@ def test_agents_path_reference_check_ignores_local_worktrees(tmp_path: Path) -> 
 def test_agents_path_reference_check_ignores_build_dependencies(tmp_path: Path, directory: str) -> None:
     _write(tmp_path / directory / "dependency" / "AGENTS.md", "- Run `tests/missing.py`.\n")
     assert _find_agents_path_reference_issues(tmp_path) == []
-
-
-def test_densegen_docs_language_check_flags_canonical_term(tmp_path: Path) -> None:
-    _write(tmp_path / "src" / "dnadesign" / "densegen" / "README.md", "This is the canonical densegen guide.\n")
-
-    issues = _find_densegen_disallowed_term_issues(tmp_path)
-
-    assert any("term 'canonical'" in issue for issue in issues)
-
-
-def test_densegen_docs_language_check_accepts_plain_language(tmp_path: Path) -> None:
-    _write(tmp_path / "src" / "dnadesign" / "densegen" / "README.md", "DenseGen guide.\n")
-    _write(
-        tmp_path / "src" / "dnadesign" / "densegen" / "docs" / "tutorials" / "demo.md",
-        "## Demo\n\nUse this tutorial to run the workflow.\n",
-    )
-
-    issues = _find_densegen_disallowed_term_issues(tmp_path)
-
-    assert issues == []
 
 
 def test_main_fails_when_start_here_doc_is_present(tmp_path: Path) -> None:

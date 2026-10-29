@@ -16,7 +16,6 @@ Primary docs:
 
 ### Storage and quota precheck
 
-Run before large DenseGen submits:
 
 ```bash
 groups
@@ -27,79 +26,6 @@ Placement guidance:
 - keep hand-edited code and configs in repository paths under project storage
 - place large generated artifacts under project disk (`/project` or `/projectnb`) rather than home
 - use node-local scratch only for temporary runtime intermediates
-
-### Choose a DenseGen workspace
-
-Use the workspace that owns the run. Check its declared solver before submit:
-
-```bash
-CONFIG=src/dnadesign/densegen/workspaces/<workspace>/config.yaml
-grep -n "backend:" "$CONFIG"
-```
-
-### BU SCC DenseGen batch submit pattern
-
-Preferred runbook-native Ops path:
-
-```bash
-uv run ops runbook presets
-uv run ops runbook init \
-  --workflow densegen \
-  --runbook <runbook.yaml> \
-  --workspace-root src/dnadesign/densegen/workspaces/<workspace> \
-  --repo-root <repo> \
-  --preset bu-scc-dunlop \
-  --id <runbook-id> \
-  --h-rt 02:00:00 --pe-omp 16 --mem-per-core 8G
-```
-
-If you are not using the repo-owned BU SCC shortcut, replace `--preset bu-scc-dunlop`
-with an explicit `--project <project>`.
-
-DenseGen scaffolds include notify by default. Add `--no-notify` only when the request explicitly asks for batch-only submit.
-
-Direct qsub pattern (explicit manual submit path):
-
-```bash
-qsub -P <project> \
-  -pe omp 16 \
-  -l h_rt=08:00:00 \
-  -l mem_per_core=8G \
-  -v DENSEGEN_CONFIG=<repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml \
-  docs/bu-scc/jobs/densegen-cpu.qsub
-```
-
-### DenseGen + Notify Slack chained workflow
-
-Use this path for requests like "start DenseGen and also wire Notify for Slack".
-
-```bash
-CONFIG=<repo>/src/dnadesign/densegen/workspaces/<workspace>/config.yaml
-NOTIFY_DIR="<repo>/src/dnadesign/densegen/workspaces/<workspace>/outputs/notify/densegen"
-
-uv run notify setup slack \
-  --tool densegen \
-  --config "$CONFIG" \
-  --profile "$NOTIFY_DIR/profile.json" \
-  --cursor "$NOTIFY_DIR/cursor" \
-  --spool-dir "$NOTIFY_DIR/spool" \
-  --secret-source auto \
-  --policy densegen
-
-NOTIFY_JOB_ID="$(qsub -terse -P <project> \
-  -v NOTIFY_PROFILE="$NOTIFY_DIR/profile.json" \
-  docs/bu-scc/jobs/notify-watch.qsub)"
-
-DENSEGEN_JOB_ID="$(qsub -terse -P <project> \
-  -v DENSEGEN_CONFIG="$CONFIG" \
-  docs/bu-scc/jobs/densegen-cpu.qsub)"
-
-printf 'notify_job_id=%s\ndensegen_job_id=%s\n' "$NOTIFY_JOB_ID" "$DENSEGEN_JOB_ID"
-```
-
-Notes:
-- `notify-watch.qsub` uses `--wait-for-events`, so watcher-first submit is valid.
-- Notify watches SeqLedger `.events.log`, not DenseGen `outputs/meta/events.jsonl`.
 
 ### OnDemand session handoff in dnadesign context
 
@@ -114,18 +40,24 @@ pwd
 command -v qsub && qstat -u "$USER" | sed -n '1,60p'
 ```
 
-### GUROBI variant
-
-For `GUROBI` runs:
-- keep `densegen.solver.threads <= requested slots`
-- set solver and runtime caps in config before submit
-
 ### BU SCC transfer and connectivity guardrails
 
 - For large data movement, route through BU transferring-files guidance before suggesting transfer-node jobs.
 - For interactive reconnectability, route through BU OnDemand guidance before suggesting qrsh-only flows.
 
-Solver backend defaults are workspace-specific; verify `config.yaml` before submit.
+### Infer with optional Notify
+
+Prepare and inspect the runbook with `ops runbook init --workflow infer` and
+`ops runbook plan`. Infer configurations define the model, records and feature
+destination. Verify model requirements against the requested GPU resources.
+Runbooks include Notify by default; use `--no-notify` for batch-only execution.
+For notification setup and scheduler details, follow
+`docs/operations/orchestration/runbooks.md` and
+`docs/bu-scc/runbooks/batch-notify.md`.
+
+Notify reads the destination dataset's `.events.log`. Preserve a separate cursor
+and spool for each watched destination. Record both workload and watcher job IDs.
+
 
 ### Study-owned Infer workloads
 
