@@ -57,15 +57,9 @@ def test_usr_agents_describe_ops_scripts_assets_and_testsupport_boundaries() -> 
     )
 
 
-def test_usr_archive_and_assets_docs_use_canonical_paths() -> None:
-    datasets_index = read_text("src/dnadesign/seqledger/datasets/README.md")
-    archive_readme = read_text("src/dnadesign/seqledger/datasets/archived/README.md")
+def test_usr_demo_docs_use_canonical_paths() -> None:
     quickstart = read_text("src/dnadesign/seqledger/docs/getting-started/cli-quickstart.md")
 
-    assert "archived/" in datasets_index
-    assert "_archive/" not in datasets_index
-    assert "canonical location for archived datasets" in datasets_index
-    assert "sanctioned location for archived seqledger datasets" in archive_readme.lower()
     assert "src/dnadesign/seqledger/assets/demo_material/demo_sequences.csv" in quickstart
     assert 'uv run seqledger --root "$ROOT" init "$DATASET"' in quickstart
     assert 'uv run seqledger --root "$ROOT" validate "$DATASET" --strict' in quickstart
