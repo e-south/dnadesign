@@ -1,31 +1,22 @@
-# Artifact Naming Grammar
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-15
+**Last verified:** 2026-10-28
+-->
 
-Artifact IDs state:
+[LatentDNA guide](../README.md) / [Reference](README.md)
 
-1. what is represented or compared
-2. the representation family, when relevant
-3. the model family, when relevant
-4. the sequence scope, when relevant
+# Artifact naming grammar
 
-Canonical examples:
+Choose IDs that describe the represented data or comparison. Include the model, layer, sequence context or transformation when those distinctions matter within the workspace.
 
-- `intermediate_embedding_20b_merged_anchor_insert_seq_mean`
-- `intermediate_embedding_20b_full_context_1kb`
-- `output_layer_mean_7b_merged_anchor_insert_seq_mean`
-- `design_centroid_margins`
-- `context_delta_distribution_intermediate_embedding_7b`
-- `representation_health_summary`
-- `design_structure_summary`
-- `sigma35_ordinal_audit`
-- `context_robustness_summary`
-- `appendix_umap_gallery`
+Examples:
 
-Forbidden naming patterns in study-facing surfaces:
+- `encoder_layer12_insert_mean`
+- `encoder_layer12_context_mean`
+- `insert_context_distances`
+- `reference_neighborhoods`
+- `representation_health`
 
-- atlas-first bundle names
-- UI-metaphor names
-- benchmark-owned export ids
-- `primary` or `main` when they encode internal priority rather than meaning
+Use the same ID when referring to an artifact from recipes, exports and plots. Prefer names with a stable scientific or computational meaning over publication panel numbers or temporary priorities such as `main`.
+
+Keep display labels and layout in configuration. An ID identifies an artifact; it does not determine model identity, plot colors or panel arrangement. See [plot presentation](workspace-schema.md#plot-presentation) and [manifests](artifact-manifests.md).

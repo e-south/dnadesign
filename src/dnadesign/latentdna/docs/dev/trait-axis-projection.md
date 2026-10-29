@@ -1,8 +1,12 @@
-# Trait Axis Projection
-
+<!--
 **Owner:** dnadesign-maintainers
 **Status:** implemented
-**Last verified:** 2026-08-09
+**Last verified:** 2026-10-28
+-->
+
+[LatentDNA guide](../README.md)
+
+# Trait Axis Projection
 
 `trait_axis_projection` fits a signed direction between declared low and high
 cohorts in an existing representation, then projects chosen rows onto that
@@ -24,12 +28,12 @@ emits counts, endpoint separation, source-value correlation when declared, and
 sensitivity results. Neither builder infers scientific meaning from column
 names.
 
-For low centroid \(c_l\), high centroid \(c_h\), and row vector \(x\):
+For low centroid $c_l$, high centroid $c_h$, and row vector $x$:
 
-\[
+$$
 a = \frac{c_h-c_l}{\lVert c_h-c_l \rVert_2}, \qquad
 s(x) = (x-c_l)^\top a
-\]
+$$
 
 The fitted direction is invalid when either cohort is empty, dimensions do not
 match, or the centroid difference has zero norm.

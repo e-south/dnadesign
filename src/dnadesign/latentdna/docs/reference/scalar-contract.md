@@ -1,7 +1,11 @@
-# Scalar Contract
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-11
+**Last verified:** 2026-10-28
+-->
+
+[LatentDNA guide](../README.md)
+
+# Scalar Contract
 
 Scalar tables are first-class artifacts keyed by rows or aligned support.
 

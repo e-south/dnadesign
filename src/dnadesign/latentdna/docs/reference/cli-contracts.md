@@ -1,128 +1,74 @@
-# latentdna CLI Contracts
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-26
+**Last verified:** 2026-10-28
+-->
 
-### Common flags
+[LatentDNA guide](../README.md) / [Reference](README.md)
 
-- All commands accept:
-  - `--workspace <id|path>` where the command needs a workspace
-  - `--format text|json|yaml`
-  - `--json`
-  - `--quiet`
-- Mutating commands also accept:
-  - `--force`
-  - `--dry-run`
-- Stochastic mutating commands additionally accept:
-  - `--seed`
-- Long-running recipe and deliverable commands accept:
-  - `--progress none|text|json`
+# CLI reference
 
-`--quiet` keeps text mode to one concise success line. `--dry-run` validates the declared target and reports the expected output paths without writing artifacts.
+Run `latentdna --help` to list command groups and `latentdna <group> <command> --help` for exact arguments. Commands that act on an analysis take `--workspace <id|path>`. Use an explicit path when running outside the workspace directory.
 
-Workspace-specific flags:
+## Choose a command
 
-- `latentdna workspace init --template <template-id>`
-- `latentdna workspace init --template /path/to/template --workspace /path/to/workspace`
-- `latentdna workspace snapshot --workspace <id|path>`
-- `latentdna workspace refresh --target <artifact-dir|catalog|runs|logs>`
-- `latentdna validate workspace --deep`
+| Task | Commands |
+| --- | --- |
+| Create or inspect configuration | `workspace init`, `workspace where`, `workspace list`, `workspace show`, `validate workspace`, `explain workspace` |
+| Inspect inputs and outputs | `inspect source`, `inspect views`, `inspect alignment`, `inspect landmarks`, `inspect missingness`, `inspect artifacts` |
+| Save row metadata or match views | `snapshot build`, `alignment build` |
+| Build and transform vectors | `view materialize`, `view derive`, `view reduce`, `view stats` |
+| Select rows and derive scalars | `sample build`, `scalar derive` |
+| Compare geometry | `neighbors fit`, `cluster fit`, `projection fit`, `distance score`, `enrich score`, `agreement compare` |
+| Export or plot | `export matrix`, `export table`, `export anndata`, `plot render` |
+| Run declared analyses | `recipe validate`, `recipe run`, `deliverable list`, `deliverable status`, `deliverable run` |
+| Review notebooks | `notebook generate`, `notebook smoke`, `inspect notebook-health` |
+| Inspect or clear generated state | `workspace snapshot`, `workspace refresh`, `runs list`, `runs show`, `runs prune` |
 
-### Primitive command groups
+`explain deliverable`, `explain plot` and `explain export` describe named configuration entries. `snapshot build` saves source rows and metadata; `workspace snapshot` reports analysis status. They serve different purposes.
 
-- `latentdna workspace init`
-- `latentdna workspace where`
-- `latentdna workspace list`
-- `latentdna workspace show`
-- `latentdna workspace snapshot`
-- `latentdna workspace refresh`
-- `latentdna validate workspace`
-- `latentdna inspect source`
-- `latentdna inspect views`
-- `latentdna inspect alignment`
-- `latentdna inspect landmarks`
-- `latentdna inspect missingness`
-- `latentdna inspect artifacts`
-- `latentdna snapshot build`
-- `latentdna alignment build`
-- `latentdna view materialize`
-- `latentdna view derive`
-- `latentdna view reduce`
-- `latentdna view stats`
-- `latentdna scalar derive`
-- `latentdna sample build`
-- `latentdna neighbors fit`
-- `latentdna cluster fit`
-- `latentdna projection fit`
-- `latentdna distance score`
-- `latentdna enrich score`
-- `latentdna agreement compare`
-- `latentdna export anndata`
-- `latentdna export matrix`
-- `latentdna export table`
-- `latentdna plot render`
-- `latentdna notebook generate`
-- `latentdna notebook smoke`
-- `latentdna recipe validate`
-- `latentdna recipe run`
-- `latentdna deliverable list`
-- `latentdna deliverable status`
-- `latentdna deliverable run`
-- `latentdna runs list`
-- `latentdna runs show`
-- `latentdna runs prune`
-- `latentdna inspect notebook-health`
+## Output and execution flags
 
-### Machine output contracts
+- `--format text|json|yaml` chooses output formatting; `--json` selects JSON directly.
+- `--quiet` reduces text output to a concise success line.
+- `--dry-run`, where supported, validates the target and reports expected outputs without writing them.
+- `--force`, where supported, replaces an existing artifact. Check the intended target before using it.
+- Stochastic analyses expose `--seed`; recipe and deliverable runs also expose `--progress none|text|json`.
 
-- Mutating commands emit `latentdna.command_result.v1`.
-- Artifact directories carry `latentdna.manifest.v1` manifests.
-- `latentdna deliverable status` emits `latentdna.deliverable_status.v1`.
-- `latentdna workspace snapshot` emits `latentdna.workspace_snapshot.v1` and writes `outputs/status/workspace_snapshot.json`; add `--dry-run` for read-only inspection without modifying the tracked study snapshot.
-- `latentdna neighbors fit` and `latentdna cluster fit` require exactly one of `--view` or `--reduced-view`; reduced views are already scope-fixed and cannot be combined with `--sample` or `--alignment`.
-- `latentdna workspace init --json` emits `latentdna.command_result.v1` with `artifact_kind=workspace`.
-- `latentdna notebook generate` may emit `status=attention` when the notebook artifact exists but the default deliverable plot has not been rendered yet.
-- `latentdna notebook generate` now fails fast when the default deliverable exists but has freshness drift; refresh it with `latentdna deliverable run <deliverable-id>` or `latentdna recipe run <recipe-id>` before regenerating the notebook.
-- `latentdna notebook smoke` exits non-zero when notebook health is `error`.
-- `latentdna inspect notebook-health` exits non-zero when stored notebook health is `error`.
-- Text mode stays concise; JSON mode is the stable automation surface.
+Options differ by command. For example, `workspace refresh` supports a preview but does not take `--force`, and `notebook smoke` checks the workspace without a notebook ID argument.
 
-### Implemented artifact families
+## Analysis constraints
 
-- `snapshot`: persisted key row ledgers plus `metadata.parquet` companions over declared sources without reloading vector columns
-- `view`: source-backed matrices from `column` and `bundle_matrix` sources plus derived `vector_difference`, `normalize`, `aggregate_by_key`, `apply_reducer`, and `concatenate` views
-- `alignment_set`: persisted key-support ledgers plus row-index mappings
-- `reducer`: persisted PCA state plus fit summaries
-- `reduced_view`: low-rank transformed matrices with explicit row support
-- `scalar_table`: `vector_norm`, safe `column_expression`, `select_columns`, `rename_columns`, and explicit `join_tables` outputs
-- `sample_set`: deterministic plotting scopes, explicit-id selections, and set-algebra unions/intersections over persisted sample artifacts
-- `sample build` may also preserve a declared `reference_set` while sampling from a view, so required control or reference rows do not disappear from downstream comparison plots.
-- `neighbor_set`: exact or approximate kNN results over explicit scopes
-- `cluster_set`: persisted k-means or Leiden assignments over explicit view/sample/alignment scopes plus recorded cluster provenance
-- `projection`: UMAP coordinates over explicit scopes
-- `distance_set`: landmark distance tables over existing view artifacts
-- `enrichment_set`: landmark-neighborhood enrichment tables over configured cohort columns
-- `agreement_set`: persisted kNN-overlap rows plus optional cluster-agreement and landmark-neighborhood summary rows
-- `export_bundle`: deterministic numeric matrices, aligned tables, or AnnData
-  `.h5ad` bundles plus row and feature ledgers, including alignment-backed
-  block projection when the workspace declares it
-- `plot`: artifact-driven `projection_scatter`, `projection_grid`, `heatmap`, `distance_scatter`, `xy_scatter`, `distribution`, `curve`, `correspondence_heatmap`, and `agreement_summary` outputs
-- `notebook`: generated read-only marimo artifact review apps over persisted outputs, including inline plot-file viewing, a workspace-wide plot browser over `outputs/plots`, and a persisted browser control plane in `outputs/notebooks/<id>/controls.json`; the control plane carries the candidate X inventory ledger so notebook startup can describe candidate rows/dimensions without loading view matrices
+`view reduce` fits PCA. `projection fit` fits UMAP on a declared sample; the configured distance metric determines neighborhood construction. A projection is a visualization of that geometry, not a measurement of sequence function.
 
-### Plot render modes
+`neighbors fit` and `cluster fit` require exactly one of `--view` or `--reduced-view`. Reduced views already have fixed rows and cannot also take `--sample` or `--alignment`. Neighbor metrics include Euclidean and cosine; clustering supports k-means and Leiden.
 
-- `latentdna plot render <plot-id>` supports two explicit modes.
-- Named mode: resolve `plot-id` from `plots.<plot-id>` in the workspace config and render from that declared recipe.
-- Inline mode: provide `--kind` plus the required artifact flags such as `--projection`, `--distance`, `--scalar`, `--enrichment`, or `--agreement`.
-- Projection plots may also declare `color_column`, `panel_titles`, and optional `label_column` plus `label_values` to keep multi-panel galleries visually comparable.
-- Scalar plots now also include `xy_scatter` for joined scalar tables, `curve` for reducer/enrichment summaries, and `correspondence_heatmap` for paired categorical cluster structure.
-- Mixing named and inline plot specs in one invocation is rejected.
+Source-backed views select a vector column or matrix bundle. Derived views support differences, normalization, aggregation, reducer application and concatenation. See [view contracts](view-contract.md) before combining representations.
 
-### External study path
+## Plot rendering
 
-- Use `latentdna workspace init --template /path/to/template --workspace /path/to/workspace` to copy an external template and its input files. Declare source paths and datasets in its configuration.
-- Use `latentdna workspace refresh` to clear workspace-local LatentDNA artifacts without touching upstream `usr/datasets`.
-- Use `latentdna workspace snapshot --workspace /path/to/workspace --json --dry-run` before study tooling inspects LatentDNA state.
-- Use `latentdna validate workspace --deep` to confirm the declared source keys, view vector columns, cohort columns, landmark selector columns, and study-binding files against the live study data without materializing embedding matrices.
-- Use `latentdna deliverable status <deliverable-id>` after recipe or deliverable runs to surface freshness drift from recorded input-path digests rather than only presence/absence checks.
-- Canonical runtime artifacts live directly under `outputs/`. Nested output roots are rejected.
+Use either a named `plots.<id>` entry or an inline plot specification, not both. Named plots provide a reusable configuration. Inline plots take `--kind` plus the relevant artifact arguments.
+
+For example, after the [local walkthrough](../getting-started/README.md) has fitted `example_pca`:
+
+```bash
+# Render explained variance from the saved reducer in the example workspace.
+latentdna plot render another_variance_plot --workspace /path/to/latentdna-demo \
+  --kind curve --reducer example_pca
+```
+
+Supported plot families include projection scatters and grids, heatmaps, distance and scalar scatters, distributions, curves, cluster correspondence and agreement summaries. Plotters read persisted artifacts; they do not run missing analyses implicitly. Layout, labels and hues come from [plot configuration](workspace-schema.md#plot-presentation).
+
+## Machine-readable results
+
+| Surface | Schema or behavior |
+| --- | --- |
+| Artifact-producing command result | `latentdna.command_result.v1` |
+| Artifact manifest | `latentdna.manifest.v1` |
+| Deliverable status | `latentdna.deliverable_status.v1` |
+| `latentdna workspace snapshot` | `latentdna.workspace_snapshot.v1` |
+
+A workspace snapshot writes `outputs/status/workspace_snapshot.json` unless `--dry-run` is set. Generated artifacts live directly under `outputs/`. Nested output roots are rejected.
+
+Notebook generation can return `attention` when a default plot is missing. It rejects stale default deliverables until they are rebuilt. `notebook smoke` and `inspect notebook-health` return a nonzero exit when health is `error`. See [operations](../operations/README.md) for the check-and-rebuild workflow.
+
+Use [manifests](artifact-manifests.md) to inspect input and implementation provenance, [exports](export-contract.md) for data handoffs, and [workspace schema](workspace-schema.md) for configuration details.

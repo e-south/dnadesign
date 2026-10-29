@@ -1,7 +1,11 @@
-# Alignment Contract
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-11
+**Last verified:** 2026-10-28
+-->
+
+[LatentDNA guide](../README.md)
+
+# Alignment Contract
 
 `alignment_set` is a first-class artifact. Cross-view work that depends on row correspondence must reuse a compiled alignment rather than ad hoc merge logic.
 
@@ -20,7 +24,7 @@ Persisted alignment artifacts include:
 
 Freshness notes:
 
-- alignment manifests now record concrete input paths as well as digests so deliverable status can report stale upstream inputs instead of falling back to `attention` for unknown provenance.
+- alignment manifests record concrete input paths as well as digests so deliverable status can report stale upstream inputs instead of falling back to `attention` for unknown provenance.
 
 See also:
 

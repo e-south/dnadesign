@@ -65,7 +65,7 @@ This table is generated from `*.tool-source.yaml` sidecars. Edit those files ins
 | `infer` | [Infer guide](../../src/dnadesign/infer/docs/README.md) | Tool-owned feature extraction runbooks, Evo2 docs, feature-schema contracts, and pressure-test flows. |
 | `cluster` | [Cluster docs](../../src/dnadesign/cluster/docs/README.md) | Tool-owned exploratory analysis workflow plus CLI, results, and artifact contracts. |
 | `opal` | [OPAL documentation](../../src/dnadesign/opal/docs/index.md) | Active-learning campaigns, configuration and candidate-selection workflows. |
-| `latentdna` | [LatentDNA Docs](../../src/dnadesign/latentdna/docs/README.md) | Representation-comparison workflows, workspace contracts, plots, snapshots, and notebook routes. |
+| `latentdna` | [LatentDNA guide](../../src/dnadesign/latentdna/docs/README.md) | Representation-comparison workflows, workspace contracts, plots, snapshots, and notebook routes. |
 | `notify` | [Notify Operations](../notify/README.md) | Tool-owned operator routes for watcher setup, delivery validation, recovery, and scheduler-adjacent notification flows. |
 | `cruncher` | [Cruncher documentation](../../src/dnadesign/cruncher/docs/README.md) | Tool-owned design-family docs for optimization, cassettes, YIU, studies, and portfolios. |
 | `ops` | [Ops docs](../../src/dnadesign/ops/docs/README.md) | Ops commands, packaged presets, and runbook lifecycle docs. |

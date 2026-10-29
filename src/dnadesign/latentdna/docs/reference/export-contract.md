@@ -1,7 +1,11 @@
-# Export Contract
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-11
+**Last verified:** 2026-10-28
+-->
+
+[LatentDNA guide](../README.md)
+
+# Export Contract
 
 `export matrix`, `export table`, and `export anndata` build deterministic
 handoff bundles with:
@@ -22,7 +26,7 @@ Key constraints:
 - row basis is explicit and may be a view, reduced view, sample, alignment, scalar table, or distance table artifact.
 - block order is stable and encoded in `features.parquet`.
 - alignment-backed block projection is explicit.
-- feature names use deterministic semantic prefixes such as `intermediate_embedding_20b_merged_anchor_insert_seq_mean_pc_001`.
+- feature names use deterministic semantic prefixes such as `encoder_insert_mean_pc_001`.
 - feature names must be unique across the full bundle; ambiguous ledgers fail fast.
 
 AnnData exports are an interoperability layer, not the LatentDNA runtime source

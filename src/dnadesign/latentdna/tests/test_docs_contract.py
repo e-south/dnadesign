@@ -29,7 +29,7 @@ def _is_scan_text_file(path: Path) -> bool:
     return "outputs" not in path.parts and "tests" not in path.parts and path.suffix.lower() in _TEXT_SUFFIXES
 
 
-def test_latentdna_readme_routes_to_reference_first_docs() -> None:
+def test_latentdna_readme_routes_to_walkthrough_and_reference_docs() -> None:
     repo_root = _repo_root()
     root = repo_root / "src/dnadesign/latentdna"
     readme = (root / "README.md").read_text(encoding="utf-8")
@@ -44,6 +44,7 @@ def test_latentdna_readme_routes_to_reference_first_docs() -> None:
     assert "docs/reference/workspace-schema.md" in readme
     assert "docs/integrations/study-workspaces.md" in readme
 
+    assert "getting-started/README.md" in docs_index
     assert "workflows/context-shift.md" in docs_index
     assert "workflows/cross-view-agreement.md" in docs_index
     assert "workflows/export-opal-x.md" in docs_index

@@ -1,7 +1,11 @@
-# Reference and view coverage
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-26
+**Last verified:** 2026-10-28
+-->
+
+[LatentDNA guide](../README.md)
+
+# Reference and view coverage
 
 A workspace declares reference membership, representation views, and the plots
 that compare them. Tool code resolves those declarations without choosing

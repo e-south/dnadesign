@@ -1,31 +1,29 @@
-# Landmark Neighborhoods
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-14
+**Last verified:** 2026-10-28
+-->
 
-This workflow owns the landmark-neighborhood analysis lane, but the current
-checked-in promoter-study slice is a reduction QA surface rather than a true
-neighborhood enrichment artifact.
+[LatentDNA guide](../README.md) / [Workflows](README.md)
 
-Current role in the promoter-study refactor:
+# Summarize landmark neighborhoods
 
-- internal reducer diagnostics only
+Use neighborhood enrichment to examine the metadata composition around declared reference sequences. It combines a saved nearest-neighbor graph with a cohort column, such as an experimental group or sequence class.
 
-Representative artifact path:
+## Required inputs
 
-1. Materialize the anchor-space view.
-2. Fit a reusable PCA reducer on that view.
-3. Record explained-variance metadata for maintainer-side diagnostics.
+- A materialized view and a neighbor artifact fitted on the intended row population.
+- Explicit landmark membership in that population.
+- A `kind: column` cohort declaration pointing to the metadata to summarize.
 
-Key invariants:
+Fit neighbors with `neighbors fit`, then pass that artifact, the cohort and the reference to `enrich score`. For example, with existing `embedding_knn`, `groups` and `reference` declarations:
 
-- Diagnostic reducer metadata stays internal and is not a named study deliverable.
-- Any optional scree rendering stays read-only and fails if reducer artifacts are missing.
-- Future neighborhood-enrichment work must add an explicit `enrichment_set`
-  artifact instead of reusing the scree surface name.
+```bash
+# Summarize cohort membership around the selected reference rows.
+latentdna enrich score reference_neighborhoods \
+  --workspace /path/to/workspace --neighbors embedding_knn \
+  --cohort groups --landmark reference
+```
 
-See also:
+The output table under `outputs/enrichments/reference_neighborhoods/` records each cohort’s fraction among neighbor hits and in the full neighbor population. Their ratio is `enrichment_ratio`; their difference is `enrichment_delta`. A ratio above one indicates that the cohort occurs more often among those hits than in the comparison population. A row that neighbors several reference members contributes once for each hit.
 
-- [control-distances.md](control-distances.md)
-- [deliverable-contract.md](../reference/deliverable-contract.md)
-- [alignment-contract.md](../reference/alignment-contract.md)
+Render a heatmap from the saved `enrichment_set`, or compare neighborhood structure across views using [cross-view agreement](cross-view-agreement.md). Keep the population, neighbor count and metric explicit when interpreting enrichment. See [landmark concepts](../concepts/landmarks.md) for reference definitions.

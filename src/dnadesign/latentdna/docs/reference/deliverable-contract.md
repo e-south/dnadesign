@@ -1,22 +1,25 @@
+<!--
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-10-28
+-->
+
+[LatentDNA guide](../README.md)
+
 # Deliverable Contract
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-11
+A deliverable groups the outputs needed to answer one configured analysis question. It names the recipe that builds them, their prerequisites and their acceptance checks.
 
-Deliverables are semantic bundles over one linked recipe plus declared prerequisites and outputs.
-
-Current status vocabulary:
+Status values:
 
 - `ok`
 - `attention`
 - `missing`
 - `error`
 
-Important current behavior:
+Required fields and checks:
 
 - deliverables must declare explicit `title`, `section`, `question`, `summary`,
-  `requires`, `outputs`, `docs_refs`, and `acceptance_checks` fields; legacy
-  `kind` and `description` fallbacks are rejected.
+  `requires`, `outputs`, `docs_refs`, and `acceptance_checks` fields. `kind` and `description` do not supply missing semantic fields.
 - `requires` must reference declared config objects or artifact families.
 - `outputs` must reference declared objects where relevant and must also be produced by the linked recipe.
 - deliverable status evaluates artifact freshness where manifests provide path-backed provenance.

@@ -1,7 +1,11 @@
-# View Contract
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-11
+**Last verified:** 2026-10-28
+-->
+
+[LatentDNA guide](../README.md)
+
+# View Contract
 
 Source-backed view kinds:
 

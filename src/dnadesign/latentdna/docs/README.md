@@ -1,44 +1,37 @@
-# LatentDNA Docs
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-LatentDNA docs are organized by task. Start with a workflow when you are
-running or reviewing a comparison, use reference docs when editing contracts,
-and use concepts when aligning terminology across workspaces.
+[LatentDNA](../README.md)
 
-### Choose a Path
+# LatentDNA guide
 
-- [Context-geometry workflow](workflows/context-shift.md)
-- [Cross-view agreement workflow](workflows/cross-view-agreement.md)
-- [Export an OPAL feature matrix](workflows/export-opal-x.md)
+Use LatentDNA to examine how sequence representations vary, which sequences are close to chosen references, and whether different representations preserve similar neighborhoods. It consumes precomputed vectors and records each analysis with its inputs and outputs.
 
-### Reference
+**Start with [Run a small local analysis](getting-started/README.md).** Create an example vector table, fit PCA, render a variance plot and export the reduced matrix.
 
-- [CLI contracts](reference/cli-contracts.md)
-- [Workspace schema](reference/workspace-schema.md)
-- [Workspace snapshot contract](reference/workspace-snapshot-contract.md)
-- [Artifact naming grammar](reference/artifact-naming.md)
-- [Reference router](reference/README.md)
-- [Concepts router](concepts/README.md)
+## The objects you work with
 
-### Operations and Development
+- A **source** identifies input data, such as a Parquet table or Infer feature sidecars.
+- A **view** selects a vector representation and its row identifiers. One source can provide several views.
+- A **workspace** holds `config.yaml`, input references and generated files under `outputs/`.
+- An **artifact** is a saved result with a manifest recording parameters and provenance. A **recipe** orders computations; a **deliverable** groups their expected outputs for review.
 
-- [Operations guide](operations/README.md)
-- [Development notes](dev/README.md)
-- [Trait axis projection dev spec](dev/trait-axis-projection.md)
-- [By-type docs index](index.md)
+## Choose a comparison
 
-### Package Routes
+| Analysis goal | Workflow |
+| --- | --- |
+| Measure change between paired representations of the same sequences | [Context comparisons](workflows/context-shift.md) |
+| Compare neighborhood or cluster structure across representations | [Cross-view agreement](workflows/cross-view-agreement.md) |
+| Measure resemblance to declared reference sequences or groups | [Reference distances](workflows/control-distances.md) |
+| Examine metadata composition around references | [Landmark neighborhoods](workflows/landmark-neighborhoods.md) |
+| Hand aligned features to another analysis tool | [Export matrices and tables](workflows/export-opal-x.md) |
 
-- Workflow-first index: [workflow router](workflows/README.md)
-- Workspace/config package surface: [src/workspaces/__init__.py](../src/workspaces/__init__.py)
-- CLI command surface: [src/cli/app.py](../src/cli/app.py)
-- Package README: [../README.md](../README.md)
+A distance is meaningful only in its declared [coordinate space](concepts/coordinate-spaces.md). Metadata labels describe the comparison; geometric proximity alone does not establish sequence function.
 
-### Adjacent handoffs
+## Configure and inspect
 
-- Upstream source-of-truth datasets: [SeqLedger README](../../seqledger/README.md)
-- Upstream vector generation: [Infer docs](../../infer/docs/README.md)
-- External study integration: [study workspaces](../../../../docs/integrations/study-workspaces.md)
-- Study-facing status surfaces: [workspace snapshot contract](reference/workspace-snapshot-contract.md)
+Use the [workspace guide](../workspaces/README.md) to organize an analysis and the [reference index](reference/README.md) for fields and commands. [Operations](operations/README.md) covers validation, missing or stale results, and notebook review. The [workspace snapshot](reference/workspace-snapshot-contract.md) summarizes artifact status, while [artifact naming](reference/artifact-naming.md) keeps larger analyses readable.
+
+For integrations, start with [SeqLedger](../../seqledger/), [Infer](../../infer/) or the [external-workspace contract](../../../../docs/integrations/study-workspaces.md). Contributors can use the [architecture guide](architecture/README.md) and [analysis implementation contracts](dev/README.md).

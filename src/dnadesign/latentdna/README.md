@@ -1,16 +1,14 @@
-![latentdna banner](docs/assets/latentdna-banner.svg)
+![LatentDNA banner](docs/assets/latentdna-banner.svg)
 
-LatentDNA compares learned sequence representations and turns those comparisons into workspace-owned tables, plots, snapshots, and notebooks for representation review. Study-specific labels live in workspace config, while downstream benchmarking and final selection stay with the owning study or consumer tool.
+LatentDNA compares learned sequence representations using dimensionality reduction, neighborhoods and reference-based distances. It works with precomputed vectors and saves the resulting tables, plots and analysis provenance in a workspace.
 
 ## Documentation
 
-- [LatentDNA docs](docs/README.md): workflow routing, contracts, concepts, and operations.
-- [Workspaces guide](workspaces/README.md): packaged templates and local workspace scaffolding.
-- [CLI contracts](docs/reference/cli-contracts.md): current command surface and machine output contracts.
-- [Workspace schema](docs/reference/workspace-schema.md): `latentdna.workspace.v1` core config shape.
-- [Workspace snapshot contract](docs/reference/workspace-snapshot-contract.md): study-facing status surface.
-- [Artifact naming grammar](docs/reference/artifact-naming.md): canonical representation, scope, and deliverable naming.
-- [Context-geometry workflow](docs/workflows/context-shift.md): paired anchor-versus-full-context geometry metrics.
-- [Cross-view agreement workflow](docs/workflows/cross-view-agreement.md): structural agreement diagnostics outside the promoter-study path.
-- [External study workspaces](../../../docs/integrations/study-workspaces.md): bind a private study without copying its policy into LatentDNA.
-- [Repository docs index](../../../docs/README.md): repo-wide upstream and downstream handoff index.
+Start with the [LatentDNA guide](docs/README.md) or [run a small local analysis](docs/getting-started/README.md). The example needs no model download or GPU.
+
+- [Analysis workflows](docs/workflows/README.md): choose a comparison and understand its outputs.
+- [Workspaces](workspaces/README.md): organize inputs, configuration and generated artifacts.
+- [CLI reference](docs/reference/cli-contracts.md) and [workspace schema](docs/reference/workspace-schema.md): configure and run an analysis.
+- [Operations](docs/operations/README.md): inspect outputs, check freshness and rebuild when inputs change.
+
+[Infer](../infer/) can generate vectors, and [SeqLedger](../seqledger/) can store their sequence records and sidecars. LatentDNA reads those inputs without running inference or changing the source datasets. [External study workspaces](../../../docs/integrations/study-workspaces.md) keep study-specific labels and interpretation with the analysis that uses them.

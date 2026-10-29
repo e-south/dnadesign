@@ -1,29 +1,30 @@
-# Control Distances
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-04-11
+**Last verified:** 2026-10-28
+-->
 
-This workflow covers landmark distance scoring and scalar margin derivation for control diagnostics.
+[LatentDNA guide](../README.md) / [Workflows](README.md)
 
-Primary checked-in promoter-study deliverable:
+# Compare sequences with references
 
-- `control_distance_margins`
+Reference distances locate each row relative to named sequences or groups in the same representation space. A landmark can retain its member rows, use their centroid, or select a medoid; declare that choice before scoring.
 
-Core artifact path:
+## Build the comparison
 
-1. Materialize the source-backed view that anchors the control distance surface.
-2. Score a `distance_set` against declared landmarks such as `spy_p` and `sul_ap`.
-3. Derive signed scalar margins with `scalar derive`.
-4. Render `distance_scatter` and `distribution` plots from the persisted artifacts.
+1. Materialize the view containing the query and reference rows.
+2. Declare landmark membership with metadata predicates and choose its representation.
+3. Run `distance score` with the view, landmarks and distance metric.
+4. If needed, derive a scalar contrast from the saved distances and render it as a scatter or distribution.
 
-Key invariants:
+For a workspace with an existing `embeddings` view and a declared `reference` landmark:
 
-- Landmark representations are explicit and recorded in the distance manifest.
-- Scalar expressions run through the safe expression surface only.
-- Distance and scalar plots never recompute missing prerequisites.
+```bash
+# Save cosine distances to the configured reference.
+latentdna distance score reference_distances \
+  --workspace /path/to/workspace --view embeddings \
+  --landmark reference --metric cosine
+```
 
-See also:
+For cosine distance, smaller values indicate greater directional resemblance. If a scalar subtracts two distances, state the subtraction order: changing it reverses the sign. A reference-relative score describes the chosen representation and reference membership; its relationship to measured function needs separate evidence.
 
-- [landmark-neighborhoods.md](landmark-neighborhoods.md)
-- [scalar-contract.md](../reference/scalar-contract.md)
-- [artifact-manifests.md](../reference/artifact-manifests.md)
+The distance manifest records the reference representation and metric. Plotting reads the persisted result and does not create missing prerequisites. See [landmarks](../concepts/landmarks.md), [scalar tables](../reference/scalar-contract.md) and [manifests](../reference/artifact-manifests.md).

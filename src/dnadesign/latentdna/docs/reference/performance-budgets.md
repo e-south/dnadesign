@@ -1,7 +1,11 @@
-# Performance budgets
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-27
+**Last verified:** 2026-10-28
+-->
+
+[LatentDNA guide](../README.md)
+
+# Performance budgets
 
 LatentDNA keeps interactive control paths separate from array-heavy analysis.
 Notebook controls and workspace summaries read manifest-backed shapes. Freshness
@@ -15,14 +19,14 @@ Checked-in tests use small fixtures to verify:
 
 - schema and artifact integrity;
 - manifest-backed row and dimension reporting;
-- bounded workspace and notebook control-plane work;
+- bounded workspace and notebook inspection;
 - explicit failure when required metadata is absent.
 
 Fixture tests prove behavior, not production-scale throughput. Calling
 workspaces should record representative timing and peak-memory evidence beside
 their own input manifests.
 
-## Runtime posture
+## Runtime and memory
 
 - Publish row counts and dimensions in manifests so browsers do not open large
   array files.
@@ -33,7 +37,7 @@ their own input manifests.
   the complete workload.
 - Treat seeded UMAP as single-worker even when a wider process thread cap is
   configured.
-- Measure cold start, warmed control-plane latency, analysis runtime, and peak
+- Measure cold start, warm inspection latency, analysis runtime, and peak
   resident memory separately. They answer different operational questions.
 
 Study-scale measurements and hardware-specific thresholds belong with the

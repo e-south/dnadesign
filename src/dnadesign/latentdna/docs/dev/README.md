@@ -1,7 +1,11 @@
-# Development
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-26
+**Last verified:** 2026-10-28
+-->
+
+[LatentDNA guide](../README.md)
+
+# Development
 
 Implementation contracts for reference coverage and representation analysis:
 

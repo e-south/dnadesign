@@ -1,10 +1,8 @@
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-27
+**Last verified:** 2026-10-28
+-->
 
-Open the latentdna docs index through the unified [latentdna docs](README.md) index.
+# LatentDNA documentation
 
-- Workflow: promoter-study pre-assay triage, context robustness, external export, and the linked study workflow notes
-- Reference: CLI contracts, workspace schema, workspace snapshot, artifact naming, source/view/alignment/scalar contracts, manifests, exports, deliverables, and performance budgets
-- Operations: snapshot consumption, freshness inspection, and status registry surfaces
-- Concepts: ownership boundary, coordinate spaces, and landmarks
-- Dev: reference-coverage and trait-axis projection contracts
+Open the [LatentDNA guide](README.md) for the local walkthrough, analysis choices and reference links.
