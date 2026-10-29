@@ -11,18 +11,8 @@ Use `construct compose` to join selected DNA segments in a declared order and
 save the sequence, annotations and provenance together. It writes a local
 artifact bundle without requiring a workspace or SeqLedger dataset.
 
-## When to use composition
-
-Use this route for explicit segment composition:
-
-- ordered physical segments are already selected;
-- annotations interpret spans but do not add sequence;
-- repeats are declared in the composition contract;
-- outputs should remain under a caller-chosen bundle root;
-- optional Folding and BaseRender outputs should be saved with the sequence.
-
-Use regular Construct workspaces when the task is template/context realization
-from SeqLedger-backed anchors, templates, and downstream `construct__*` lineage.
+For placement within a larger template, use a
+[Construct workspace](../../workspaces/README.md) instead.
 
 ## Try a small example
 
@@ -115,22 +105,21 @@ study-specific IDs when applying those lists.
 
 ## Outputs and tool integration
 
-`construct compose run` writes a producer-owned artifact bundle. Folding is a
-stateless service that may read the bundle manifest and write
-`secondary_structure_prediction_v2` plus ViennaRNA plot artifacts back into the
-same bundle. BaseRender remains the linear/component evidence renderer and
-consumes the emitted visual contract or generated job handoff.
+`construct compose run` writes sequence exports and a manifest into the
+configured directory. Folding can read this bundle and add
+`secondary_structure_prediction_v2` results and ViennaRNA plots. BaseRender
+uses the emitted visual contract or generated job configuration to render the
+sequence components.
 
-Folding bundle consumers should treat Construct's
-`linear_ssdna_composition_bundle_manifest_v1` manifest as a
-`producer_folding_bundle_v1`-compatible handoff, not as a Construct-private
-workspace format.
+For integrations, the `linear_ssdna_composition_bundle_manifest_v1` manifest
+implements the `producer_folding_bundle_v1` handoff. Running composition again
+at the same path rewrites generated outputs; choose a new `artifact_bundle`
+path to preserve an earlier result.
 
 ## Validation and failures
 
 - invalid YAML or contract shape fails before writing outputs;
 - invalid sequence transforms or span bounds fail during validation;
-- output path collisions are governed by the composition config;
 - missing required Folding backends fail the configured folding step;
 - advisory Folding requests must still emit explicit warning or error state.
 
