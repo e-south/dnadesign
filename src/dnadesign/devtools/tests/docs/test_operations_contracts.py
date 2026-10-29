@@ -85,6 +85,28 @@ def test_runbook_demo_snippet_check_accepts_commented_shell_and_yaml_blocks(tmp_
     assert issues == []
 
 
+def test_runbook_demo_snippet_check_accepts_a_yaml_block_explanation(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src/dnadesign/alpha/docs/tutorials/demo.md",
+        "\n".join(
+            [
+                "# Prepare a batch",
+                "",
+                "```yaml",
+                "# Fit the predictor reproducibly before ranking the next batch.",
+                "model:",
+                "  name: random_forest",
+                "  params:",
+                "    n_estimators: 100",
+                "    random_state: 7",
+                "```",
+            ]
+        ),
+    )
+
+    assert _find_runbook_demo_snippet_issues(tmp_path) == []
+
+
 def test_find_operational_runbook_path_issues_flags_repo_root_runbook(tmp_path: Path) -> None:
     _write(
         tmp_path / "demo_study.yaml",

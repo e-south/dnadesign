@@ -158,6 +158,10 @@ def _find_runbook_demo_snippet_issues(repo_root: Path) -> list[str]:
                         heredoc_end = heredoc_match.group(1)
 
             if lang in RUNBOOK_DEMO_YAML_LANGS:
+                # A block-level explanation keeps complete config examples readable.
+                first_content = next((line.strip() for line in block_lines if line.strip()), "")
+                if first_content.startswith("#") and first_content[1:].strip():
+                    continue
                 for idx, raw in enumerate(block_lines):
                     stripped = raw.strip()
                     if not stripped or stripped.startswith("#"):

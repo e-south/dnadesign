@@ -509,16 +509,18 @@ def _find_tool_readme_structure_issues(repo_root: Path) -> list[str]:
             continue
 
         next_index = next((idx for idx in non_empty_indices if idx > first_index), None)
-        if next_index is not None and lines[next_index].lstrip().startswith("#"):
-            issues.append(
-                f"{readme_path}: line after the banner must be narrative text; avoid repeating a top title heading."
-            )
+        intro_start = first_index + 1
+        if next_index is not None and lines[next_index].startswith("# "):
+            # A textual H1 makes the tool name available to heading navigation.
+            intro_start = next_index + 1
+        elif next_index is not None and lines[next_index].lstrip().startswith("#"):
+            issues.append(f"{readme_path}: line after the banner must be narrative text or a single H1 title.")
 
         first_heading_index = next(
-            (idx for idx in range(first_index + 1, len(lines)) if lines[idx].lstrip().startswith("#")),
+            (idx for idx in range(intro_start, len(lines)) if lines[idx].lstrip().startswith("#")),
             len(lines),
         )
-        intro_lines = lines[first_index + 1 : first_heading_index]
+        intro_lines = lines[intro_start:first_heading_index]
         while intro_lines and not intro_lines[0].strip():
             intro_lines.pop(0)
         while intro_lines and not intro_lines[-1].strip():

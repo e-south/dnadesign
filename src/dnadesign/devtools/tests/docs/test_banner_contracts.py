@@ -267,6 +267,20 @@ def test_tool_readme_structure_check_accepts_banner_narrative_and_docs_link(tmp_
     assert issues == []
 
 
+def test_tool_readme_structure_accepts_a_textual_title_before_the_intro(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "src/dnadesign/alpha/README.md",
+        "![Alpha banner](assets/alpha-banner.svg)\n\n"
+        "# Alpha\n\n"
+        "Alpha compares candidate sequence features.\n\n"
+        "## Get started\n\n[Guide](docs/README.md)\n",
+    )
+    _write(tmp_path / "src/dnadesign/alpha/assets/alpha-banner.svg", VALID_TOOL_BANNER_SVG)
+    _write(tmp_path / "src/dnadesign/alpha/docs/README.md", "# Alpha docs\n")
+
+    assert _find_tool_readme_structure_issues(tmp_path) == []
+
+
 def test_root_docs_entrypoint_check_accepts_banner_with_docs_index_link(tmp_path: Path) -> None:
     _write(
         tmp_path / "README.md",
