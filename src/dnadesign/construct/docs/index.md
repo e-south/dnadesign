@@ -1,9 +1,9 @@
-## Construct docs index
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-28
+-->
 
-This concise route page points to the unified [Construct docs](README.md) index, which combines task routes and document-type links in one place.
+# Construct guides and references
 
-- [Open the Construct docs index](README.md)
-- [Go straight to getting started](getting-started.md)
+[Open Construct documentation](README.md) for the task-based index, or go
+directly to [getting started](getting-started.md).

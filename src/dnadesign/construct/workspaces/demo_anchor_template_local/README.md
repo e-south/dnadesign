@@ -1,35 +1,38 @@
-## demo_anchor_template_local workspace
+[Construct workspaces](../README.md)
 
-Use this packaged workspace when you want the smallest Construct demo:
-one anchor part placed into one larger template, with the resulting sequence
-and `construct__*` provenance written into workspace-local SeqLedger datasets.
+# Place parts in a template
 
-Copy it into a new workspace id with:
+This demo places each supplied DNA part at one of two sites in a circular
+template. Each configuration saves either a 1,000-base window around the part
+or the full assembled construct to a separate SeqLedger dataset.
+
+For installation and a complete first run, follow
+[Build your first construct](../../docs/getting-started.md). To explore all
+four configurations, copy the demo with your Construct environment active:
 
 ```bash
-uv run construct workspace init --id my_anchor_template_demo --profile anchor-template-demo
+# Create a local workspace in the current directory.
+construct workspace init --id my_anchor_template_demo \
+  --profile anchor-template-demo
 cd my_anchor_template_demo
-uv run construct workspace show --workspace .
-./runbook.sh --mode dry-run --config config.slot_a.window.yaml
+# List its project names and configuration files.
+construct workspace show --workspace .
 ```
 
-This workspace keeps all IO in `outputs/usr_datasets` by default so the demo
-stays self-contained. The configs illustrate two independent choices:
+Continue with the [step-by-step runbook](runbook.md) to seed the inputs,
+preview a project and save its results. All demo data are stored under
+`outputs/usr_datasets` inside the copied workspace.
 
-- which slot in the template should receive the anchor (`slot_a` or `slot_b`)
-- whether the realized output should be a 1 kb window or the full template context
+## Choose an output
 
-If you want a shared SeqLedger root instead, edit the config `root:` fields
-deliberately and re-run `construct workspace show` to verify the project
-inventory.
+| Project | Configuration | Output |
+| --- | --- | --- |
+| `slot_a_window` | [Slot A window](config.slot_a.window.yaml) | 1,000 bases around the inserted part. |
+| `slot_a_full` | [Slot A full construct](config.slot_a.full.yaml) | The entire assembled template. |
+| `slot_b_window` | [Slot B window](config.slot_b.window.yaml) | 1,000 bases around the inserted part. |
+| `slot_b_full` | [Slot B full construct](config.slot_b.full.yaml) | The entire assembled template. |
 
-- Workspace registry: [construct.workspace.yaml](construct.workspace.yaml)
-- Runbook: [runbook.md](runbook.md)
-- Runbook wrapper: [runbook.sh](runbook.sh)
-- Configs:
-  - [config.slot_a.window.yaml](config.slot_a.window.yaml)
-  - [config.slot_a.full.yaml](config.slot_a.full.yaml)
-  - [config.slot_b.window.yaml](config.slot_b.window.yaml)
-  - [config.slot_b.full.yaml](config.slot_b.full.yaml)
-- Inputs notes: [inputs/README.md](inputs/README.md)
-- All workspaces: [../README.md](../README.md)
+The [workspace registry](construct.workspace.yaml) lists the expected input,
+template and output identities for each project. See the [input notes](inputs/README.md)
+for the seed receipt, or the [shared-dataset demo](../demo_anchor_template_shared_dataset/README.md)
+to combine placements in one output dataset.

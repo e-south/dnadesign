@@ -1,8 +1,10 @@
-## demo_anchor_template_local inputs
+[Demo workspace](../README.md)
+
+# Demo inputs
 
 - `seed_manifest.yaml` is written by `construct seed anchor-template-demo`.
 - The manifest records the seeded dataset ids, record ids, lengths, slot intervals, and template checksum.
 - This demo defaults anchor-part and template records to the workspace-local SeqLedger root `outputs/usr_datasets/`.
 - The seeded dataset ids are `anchor_parts_demo` and `template_parts_demo`.
 - Human-readable record names are materialized into `records.parquet` as `usr_label__primary` and `usr_label__aliases`.
-- No FASTA inputs are required for the ordinary tracer-bullet flow.
+- The demo sequences are packaged with Construct; no separate FASTA download is needed.

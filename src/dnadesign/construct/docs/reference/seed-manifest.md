@@ -1,13 +1,17 @@
-## Construct seed/import manifest reference
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-### Purpose
+[Construct docs](../README.md)
 
-Use `construct seed import-manifest` to materialize canonical anchor or template records into one or more SeqLedger datasets before you write construct configs.
+# Construct seed/import manifest reference
 
-### Shape
+## Purpose
+
+Use `construct seed import-manifest` to import DNA parts or templates into SeqLedger before writing a Construct configuration.
+
+## Shape
 
 ```yaml
 manifest_id: example_construct_inputs
@@ -32,7 +36,7 @@ datasets:
         sequence: AAAATTTTCCCCGGGG
 ```
 
-### Contract
+## Contract
 
 - `manifest_id`: required stable id for the import batch
 - `datasets`: required non-empty list
@@ -40,12 +44,12 @@ datasets:
 - `datasets[].records`: required non-empty list
 - `records[].label`: preferred human-readable record name
 - `records[].intended_role`: optional hint such as `anchor` or `template`; runtime construct configs still decide how a record is used
-- `records[].topology`: free text today, but use stable values like `linear` or `circular`
+- `records[].topology`: free text; use consistent values like `linear` or `circular`
 - `records[].sequence`: required DNA sequence
 - `records[].aliases`: optional alternate labels
 - `records[].source_ref`: optional canonical source note or local provenance hint
 
-### What gets written
+## What gets written
 
 - base SeqLedger records in the requested dataset ids
 - `usr_label__primary` / `usr_label__aliases` for human-readable names
@@ -56,7 +60,7 @@ datasets:
 - `construct_seed__topology`
 - `construct_seed__sha256`
 
-### Failure posture
+## Validation failures
 
 - malformed YAML: fail before any dataset mutation
 - empty dataset/record lists: fail before any dataset mutation
@@ -64,10 +68,11 @@ datasets:
 - duplicate dataset ids inside one manifest: fail before any dataset mutation
 - invalid DNA sequences: fail before any dataset mutation
 
-### CLI
+## CLI
 
 ```bash
-uv run construct seed import-manifest \
+# Run from a workspace with the Construct environment active.
+construct seed import-manifest \
   --manifest inputs/import_manifest.yaml \
   --root outputs/usr_datasets
 ```

@@ -1,101 +1,77 @@
-## demo_anchor_template_local Runbook
+[Local demo](README.md)
 
-**Workspace Path**
-- The workspace path printed by `construct workspace init` (default: `<cwd>/<your-workspace-id>/`).
+# Run template placements
 
-**Purpose**
-- Seed curated anchor-part and template datasets into the workspace-local SeqLedger root at `outputs/usr_datasets/`.
-- Replace one explicit `anchor_part_short_ref` interval inside the circular `template_backbone_dual_slot` template record.
-- Emit either a 1 kb centered window or a full realized template context into separate SeqLedger datasets.
+Run these commands from a copied demo workspace, with the Construct environment
+active. See [setup](../../docs/getting-started.md#install-and-activate) and
+[workspace creation](README.md) if you have not prepared one yet.
 
-**Registry first**
-- Inspect the project inventory before running anything:
-  - `uv run construct workspace show --workspace .`
-  - `uv run construct workspace doctor --workspace .`
-- `shared_usr_root` is a repo-relative hint for a deliberate shared mirror, not the default runtime root for this packaged workspace.
-- `workspace_usr_root` is the workspace-relative default used by the packaged configs and `runbook.sh`.
-- The workspace registry is [construct.workspace.yaml](construct.workspace.yaml).
-
-**File roles**
-- primary editable contract surfaces:
-  - `construct.workspace.yaml`
-  - `config.slot_*.yaml`
-  - `inputs/seed_manifest.yaml`
-- operator helpers:
-  - `runbook.md`
-  - `runbook.sh`
-- run outputs:
-  - `outputs/**`
-
-**Runbook command**
-- Default tracer bullet:
-  - `./runbook.sh --mode dry-run --config config.slot_a.window.yaml`
-- Materialize one selected config:
-  - `./runbook.sh --mode run --config config.slot_a.window.yaml`
-- Validate all packaged configs:
-  - `./runbook.sh --mode validate-all`
-
-`runbook.sh` seeds the curated demo inputs into `outputs/usr_datasets` before validation or execution so the packaged workspace stays self-contained by default. Set `CONSTRUCT_RUNBOOK_USR_ROOT=/path/to/shared/usr/root` only when a shared mirror is intentional.
-The wrapper also carries a project-root hint for `uv run --project ...`; override it with `CONSTRUCT_RUNBOOK_PROJECT_ROOT=/path/to/dnadesign` if needed.
-
-**Important note**
-- The provided full `template_backbone_dual_slot` record contains two exact `anchor_part_short_ref` matches:
-  - `slot_a`: `[2300, 2335)`
-  - `slot_b`: `[3621, 3656)`
-- The earlier scaffold-only interval `[405, 440)` does not apply to the full `template_backbone_dual_slot` record used here.
-
-### Step-by-step commands
-
-Run these commands from the workspace root:
+## Seed and inspect inputs
 
 ```bash
-set -euo pipefail # Fail fast on errors, unset variables, and pipe failures.
-
-# Bootstrap the local demo inputs and write a manifest with record ids.
-uv run construct seed anchor-template-demo \
-  --root "$PWD/outputs/usr_datasets" \
-  --manifest "$PWD/inputs/seed_manifest.yaml"
-
-# Inspect the workspace registry, verify drift, and inspect seeded labels.
-uv run construct workspace show --workspace . # Print workspace registry entries and resolved paths.
-uv run construct workspace doctor --workspace . # Check workspace registry/config consistency.
-# Inspect seeded anchor-part records and label fields.
-uv run seqledger --root "$PWD/outputs/usr_datasets" head anchor_parts_demo -n 10 \
-  --columns id,usr_label__primary,usr_label__aliases,sequence # Show seeded anchor-part labels and aliases.
-# Inspect seeded template records and label fields.
-uv run seqledger --root "$PWD/outputs/usr_datasets" head template_parts_demo -n 10 \
-  --columns id,usr_label__primary,usr_label__aliases,sequence # Show seeded template labels and aliases.
-
-# Validate and dry-run a 1 kb context realization around the slot_a incumbent.
-uv run construct validate config --config "$PWD/config.slot_a.window.yaml" --runtime # Validate slot_a window config with runtime paths.
-uv run construct run --config "$PWD/config.slot_a.window.yaml" --dry-run # Preview slot_a window outputs without mutating SeqLedger state.
-
-# Materialize the slot_a 1 kb outputs into workspace-local SeqLedger.
-uv run construct run --config "$PWD/config.slot_a.window.yaml" # Materialize slot_a window outputs.
-uv run seqledger --root "$PWD/outputs/usr_datasets" validate anchor_template_slot_a_window_1kb_demo --strict # Confirm the written output dataset satisfies the active SeqLedger registry.
-
-# Validate and dry-run the full-template realization for the same slot.
-uv run construct validate config --config "$PWD/config.slot_a.full.yaml" --runtime # Validate slot_a full-template config with runtime paths.
-uv run construct run --config "$PWD/config.slot_a.full.yaml" --dry-run # Preview the slot_a full-template output without writing records.
+# Import the four parts and the template into the local SeqLedger root.
+construct seed anchor-template-demo \
+  --root outputs/usr_datasets --manifest inputs/seed_manifest.yaml
+# Inspect project names, then check them against their configuration files.
+construct workspace show --workspace .
+# Check that project entries agree with their configuration files.
+construct workspace doctor --workspace .
+# Print input labels and DNA sequences.
+seqledger --root outputs/usr_datasets head anchor_parts_demo -n 4 \
+  --columns id,usr_label__primary,sequence
 ```
 
-### Variations
+`inputs/seed_manifest.yaml` records dataset IDs, record IDs and coordinates.
+The template contains two replaceable intervals: slot A at `[2300, 2335)` and
+slot B at `[3621, 3656)`, using zero-based, half-open coordinates.
 
-- Target the second incumbent location:
-  - swap `slot_a` for `slot_b`
-- Write to a shared SeqLedger root instead of the workspace-local one:
-  - edit the config `input.source.root`, `template.source.root`, and `output.target.root` fields intentionally
-  - re-run `uv run construct workspace show --workspace .`
-  - re-run `validate --runtime` before `run`
-- Accumulate multiple construct jobs into one existing output dataset:
-  - point multiple configs at the same `output.target.dataset`
-  - keep `output.on_conflict=error` for fail-fast collision detection
-  - use `output.on_conflict=ignore` only when idempotent reruns are intentional
+## Preview and save a window
 
-### SCC and remote sync
+```bash
+# Resolve the input records, placement and planned sequence lengths.
+construct workspace validate-project \
+  --workspace . --project slot_a_window --runtime
+# Preview output writes without saving assembled sequences.
+construct workspace run-project \
+  --workspace . --project slot_a_window --dry-run
+# Save the four assembled windows and their lineage.
+construct workspace run-project --workspace . --project slot_a_window
+# Validate the output dataset.
+seqledger --root outputs/usr_datasets validate \
+  anchor_template_slot_a_window_1kb_demo --strict
+```
 
-Construct does not define its own remote-sync contract. For BU SCC and other remote SeqLedger workflows, use the SeqLedger operations docs:
+The run reports four planned and four written rows. Validation ends with
+`OK: validation passed.` Each output is 1,000 bases, including the complete
+inserted part. Inspect its span using `construct__anchor_start` and
+`construct__anchor_end`, as shown in the [first-run guide](../../docs/getting-started.md#save-and-inspect-sequences).
 
-- [SeqLedger workflow map](../../../seqledger/docs/operations/routes/workflow-map.md)
-- [SeqLedger HPC sync flow](../../../seqledger/docs/operations/sync/hpc-agent-flow.md)
-- [SeqLedger sync command contract](../../../seqledger/docs/operations/sync/README.md)
+## Try the full construct or another slot
+
+```bash
+# Keep the full template after placing a part at slot A.
+construct workspace validate-project \
+  --workspace . --project slot_a_full --runtime
+# Preview the full-length output without saving it.
+construct workspace run-project \
+  --workspace . --project slot_a_full --dry-run
+```
+
+Remove `--dry-run` to save this output. Choose `slot_b_window` or `slot_b_full`
+to place the same parts at slot B. Each project has its own output dataset;
+see the [project table](README.md#choose-an-output).
+
+## Retries and data locations
+
+The demo uses `output.on_conflict: error`, so repeating a saved job fails on
+existing IDs. Use the [documented retry policy](../../docs/reference/outputs.md#dataset-write-behavior)
+when resuming an interrupted write. To store data elsewhere, set explicit
+input, template and output roots in the job config, or use
+[`--seqledger-root`](../../docs/reference/cli.md#command-map) consistently for
+validation and execution after importing the inputs there.
+
+The optional [shell wrapper](runbook.sh) combines seeding and execution, for
+example `./runbook.sh --mode dry-run --config config.slot_a.window.yaml`.
+It seeds inputs even in dry-run mode. It runs through `uv` using a DNADesign
+checkout path saved when the workspace was created; if that checkout moves,
+set `CONSTRUCT_RUNBOOK_PROJECT_ROOT` to its new path or use the commands above.

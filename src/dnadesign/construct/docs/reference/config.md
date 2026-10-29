@@ -1,14 +1,23 @@
-## Construct config reference
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-### Job shape
+[Construct docs](../README.md)
+
+# Construct config reference
+
+## Job shape
 
 One construct job either realizes one template against one input dataset
 selection or runs one annotation-aware `normalize_anchor` pass, and writes into
 one output dataset. Template-realization jobs may bind one or more named
 `input_field` parts from each selected input row into that template.
+
+This schema example uses placeholder record IDs. Replace them before running,
+or use the [packaged slot-A configuration](../../workspaces/demo_anchor_template_local/config.slot_a.window.yaml).
+Omit `input.ids` to process all input rows. Source and output paths are relative
+to the configuration file.
 
 ```yaml
 job:
@@ -63,9 +72,9 @@ job:
     allow_same_as_input: false
 ```
 
-### Input
+## Input
 
-- `input.source.kind`: current backend selector; today this must be `seqledger`
+- `input.source.kind: usr`: select SeqLedger as the input backend
 - `input.source.dataset`: required SeqLedger dataset id
 - `input.source.root`: required explicit SeqLedger root for construct jobs that read SeqLedger datasets
 - `input.field`: primary sequence-bearing field for one-slot jobs; set this to
@@ -75,7 +84,7 @@ job:
 - construct decides whether a sequence is used as a focal part or as a template; do not encode that role in the SeqLedger dataset id itself
 - flat `input.dataset`, `input.root`, and scalar `input.source: usr` are rejected; `input.source` must be a mapping
 
-### Template
+## Template
 
 Supported sources:
 
@@ -92,7 +101,7 @@ Fail-fast template rules:
 - flat `template.kind`, `template.sequence`, `template.path`, `template.dataset`, `template.root`, `template.record_id`, and scalar `template.source` are rejected
 - `circular` is explicit in the construct config so window extraction semantics stay audit-visible
 
-### Parts and placement
+## Parts and placement
 
 - each job must include at least one `input_field` part
 - each part is a named assembly slot with its own role, sequence source,
@@ -101,7 +110,7 @@ Fail-fast template rules:
   planning so one slot cannot overwrite another slot's resolved site
 - multi-slot jobs bind several `input_field` parts from the same input row, for
   example `candidate__lnrna_sequence` and `candidate__rt_cds_sequence`
-- every placement now has two explicit sub-blocks:
+- every placement has two sub-blocks:
   - `locator`: how construct finds the site
   - `guards`: optional assertions that prove the resolved site is the intended one
 - coordinate locators use `placement.locator.kind=coordinates` with `start` / `end`
@@ -120,7 +129,7 @@ Fail-fast template rules:
 - `placement.guards.require_unique_forward_matches: true` requires every configured guard kmer to match the template exactly once on the forward strand
 - flank locators always require unique forward-strand matches for both flanks; repeated flank kmers fail before assembly
 
-### Placement patterns
+## Placement patterns
 
 Common patterns:
 
@@ -137,7 +146,7 @@ Common patterns:
 - fully guarded swap:
   `kind: replace` plus `guards.replaced_sequence`, guard flanks, and `guards.require_unique_forward_matches: true`
 
-### Realization
+## Realization
 
 - `mode: full_construct`: write the entire realized construct
 - `mode: window`: extract a focal window around `focal_part`
@@ -154,13 +163,13 @@ Common patterns:
 - linear templates fail if the requested window would exceed boundaries
 - fixed-total windows fail if the focal part itself is longer than the requested emitted size
 
-### Normalize-anchor mode
+## Normalize-anchor mode
 
-`job.mode: normalize_anchor` is the analysis-view sibling path for reference/control material.
+`job.mode: normalize_anchor` derives a fixed-length analysis window from an input record.
 It derives a separate analysis product from a biological input row; it does not rewrite the
 native/reference sequence.
 
-- `job.normalize_anchor.product_kind`: today this must be `analysis_window`
+- `job.normalize_anchor.product_kind`: must be `analysis_window`
 - `job.normalize_anchor.target_length`: required emitted length, for example `60`
 - `job.normalize_anchor.focal_selector`: ordered selector chain; the first successful selector wins
 - `job.normalize_anchor.over_length_policy.kind=trim`: emit an exact-length window from the parent sequence around the focal point
@@ -182,23 +191,22 @@ Supported focal selectors:
   focal base
 - `sequence_midpoint`
 
-For the promoter-reference core60 lane, the intended high-confidence selector is
-`annotation_pair_midpoint` over `sigma70_minus35` and `sigma70_minus10`. A config that only
-declares this selector has no midpoint fallback: missing or ambiguous sigma-site annotations fail
-before write-back.
+For example, `annotation_pair_midpoint` can use two declared feature roles to
+choose a focal point. If it is the only selector, missing or ambiguous matches
+fail rather than falling back to the sequence midpoint.
 
-Over-length inputs use the annotation-pair focal point to choose an exact 60 bp analysis window.
-Construct evaluates candidate windows that contain the focal point, prefers retention of the
-selected sigma-site features, records clipped/lost annotations in the `derived` overlay, and writes
-`derived__source_interval_start_0` / `derived__source_interval_end_0` as 0-based half-open parent
-coordinates. The emitted row is `analysis_only=true` and `derived__product_kind=analysis_window`.
+For a longer input, Construct considers target-length windows containing the
+focal point and prioritizes retention of the selected features. It records
+clipped or lost annotations and the zero-based, half-open source interval in
+`derived__source_interval_start_0` and `derived__source_interval_end_0`. The
+result is marked `analysis_only=true` and
+`derived__product_kind=analysis_window`.
 
-Under-length inputs are never padded with arbitrary bases. They require
-`under_length_policy.kind=expand_from_template`. The study reference lane uses
-`placement_ref: replace:<start_0>-<end_0>`: Construct replaces that template interval with the short
-input sequence, extracts the exact target-length window around the sigma-site focal point, and records
-`derived__added_left_bp`, `derived__added_right_bp`, and template provenance. This is a pDual-context
-analysis view, not a new native promoter.
+Short inputs require an explicit template for expansion. A
+`placement_ref: replace:<start_0>-<end_0>` identifies the interval replaced by
+the short input. Construct extracts the requested window and records added
+left/right context and template provenance. The resulting analysis window
+includes template DNA; the original input record is unchanged.
 
 Fail-fast rules for `normalize_anchor`:
 
@@ -210,7 +218,7 @@ Fail-fast rules for `normalize_anchor`:
 - template expansion must still emit the exact target length
 - required retained roles are enforced after trimming/expansion and before write-back
 
-### Output variants
+## Output variants
 
 Classic template-realization jobs may add `job.output_variants` to emit explicit forward and
 whole-output reverse-complement products from one realized forward construct.
@@ -256,19 +264,19 @@ whole-output reverse-complement products from one realized forward construct.
 - with `output.on_conflict=ignore`, already-present base rows are skipped, but planned sequence-view
   rows are still written idempotently so reruns can complete missing semantic views
 
-### Output
+## Output
 
-- `output.target.kind`: current write backend selector; today this must be `seqledger`
+- `output.target.kind: usr`: select SeqLedger as the output backend
 - `output.target.dataset`: required SeqLedger dataset id
 - `output.target.root`: explicit output SeqLedger root; when omitted it defaults to `input.source.root`
 - `output.record_source`: optional human-readable source string written onto emitted SeqLedger rows
 - `output.on_conflict`:
   - `error`: fail during preflight if any planned output id already exists
-  - `ignore`: skip already-present output ids during run
+  - `ignore`: reuse existing sequences and complete missing lineage, labels or requested sequence views; reject conflicting metadata
 - `output.allow_same_as_input`: defaults to `false`; set to `true` only for intentional recursive accumulation
 - flat `output.dataset`, `output.root`, and `output.source` are rejected; use `output.target.*` plus `output.record_source`
 
-### Multi-slot and multi-template studies
+## Multi-slot and multi-template studies
 
 The current construct schema is intentionally one-template-per-job, but a
 single template job may assemble multiple named slots from one input row. Use
@@ -281,9 +289,8 @@ Represent larger template matrices by:
 2. inventorying them in `construct.workspace.yaml` under `project.artifacts.config`
 3. using `construct workspace show` plus `validate`/`run` per project
 
-This keeps each construct spec auditable and avoids hiding a template matrix
-inside one oversized config. Multi-slot placement remains part of the public
-job schema, not a study-local precomposition workaround.
+Each project can then be validated and run independently, while the workspace
+registry keeps the full set discoverable.
 
 Use `construct workspace doctor` to keep the registry and those config files aligned, then use
 `construct workspace validate-project` or `construct workspace run-project` to execute by project id.

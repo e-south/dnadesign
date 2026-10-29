@@ -1,10 +1,17 @@
+<!--
 ---
 doc_id: construct-annotated-sequence-parts
 title: Annotated sequence-part placement
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-21
+last_verified: 2026-10-28
 ---
+
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-10-28
+-->
+
+[Construct docs](../README.md)
 
 # Annotated sequence-part placement
 
@@ -27,7 +34,8 @@ Call `dnadesign.construct.place_annotated_part()` with an explicit linear
 template interval and orientation. The result records both source and realized
 feature coordinates, the source part's strandedness and topology, and its
 digest-pinned references. Reverse-complement placement transforms realized
-feature coordinates and sequences while retaining the complete source posture.
+feature coordinates and sequences while retaining the original coordinates
+and source references.
 
 This operation is not an assembly-readiness decision. Destination-specific
 restriction sites, homology ends, vector identity, and biological acceptance

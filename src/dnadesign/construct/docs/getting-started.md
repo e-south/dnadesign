@@ -1,68 +1,107 @@
----
-doc_id: construct-getting-started
-title: Construct getting started
-owner: dnadesign-maintainers
-status: active
-last_verified: 2026-10-28
----
+<!--
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-10-28
+-->
 
-# Construct getting started
+[Construct docs](README.md)
 
-This page gets you from zero to a validated Construct run with the fewest moving parts.
+# Build your first construct
 
-### Path 1: packaged isolated demo
+This demo replaces one interval in a template with each of the supplied DNA
+parts, then extracts a 1,000-base window around the inserted part. You will
+preview the outputs, save them to SeqLedger and inspect their coordinates.
+All demo data stay in a new workspace.
 
-```bash
-uv run construct workspace init --id demo_anchor_template --profile anchor-template-demo
-cd demo_anchor_template
-uv run construct workspace doctor --workspace .
-./runbook.sh --mode dry-run --config config.slot_a.window.yaml
-```
+## Install and activate
 
-Use this path when you want a known-good anchor/template tracer bullet. By default, `workspace init` creates the workspace under your current working directory and keeps construct IO inside `outputs/usr_datasets` in that workspace. If you use `--root` or `CONSTRUCT_WORKSPACE_ROOT`, `cd` into the printed workspace path instead. If the workspace lives outside the repo tree, reuse the `uv run --project /path/to/dnadesign construct ...` commands printed by `workspace init`.
-
-### Path 2: packaged shared-dataset demo
+From the DNADesign checkout:
 
 ```bash
-uv run construct workspace init --id demo_construct_shared_dataset --profile anchor-template-shared-dataset-demo
-cd demo_construct_shared_dataset
-uv run construct workspace doctor --workspace .
-./runbook.sh --mode dry-run-all
+# Install Construct and its data-storage dependencies.
+uv sync --locked --no-default-groups --extra construct
+# Keep the commands available when moving outside the checkout.
+source .venv/bin/activate
 ```
 
-Use this path when both packaged window projects should accumulate into one semantic SeqLedger dataset before infer or Notify pick it up. The profile keeps the shared-dataset contract explicit in `construct.workspace.yaml` by tracking both config artifacts and routing assertions instead of relying on manual config repointing.
+See [installation options](../../../../docs/setup/installation.md) for other
+DNADesign tools. Keep this environment active for the commands below.
 
-### Path 3: blank custom workspace
+## Create the demo workspace
 
 ```bash
-uv run construct workspace init --id my_construct_workspace
-cd my_construct_workspace
-uv run construct workspace doctor --workspace .
-uv run construct seed import-manifest \
-  --manifest inputs/import_manifest.template.yaml \
-  --root outputs/usr_datasets
+# Use a fresh temporary directory so the demo cannot overwrite an existing project.
+construct_demo_root=$(mktemp -d)
+construct workspace init --id construct_demo \
+  --root "$construct_demo_root" --profile anchor-template-demo
+cd "$construct_demo_root/construct_demo"
+
+# Import the packaged parts and template into this workspace's SeqLedger root.
+construct seed anchor-template-demo \
+  --root outputs/usr_datasets --manifest inputs/seed_manifest.yaml
+# Check that the workspace's project entries match their configuration files.
+construct workspace doctor --workspace .
 ```
 
-Then edit `config.yaml`, update the matching `project.artifacts.config` and `project.contract` entry in `construct.workspace.yaml`, run `workspace validate-project --runtime`, and finish with `workspace run-project --dry-run`.
+`workspace init` prints the workspace path. The seed command creates the input
+and template datasets and records their IDs in `inputs/seed_manifest.yaml`.
+A *project* is one named configuration in `construct.workspace.yaml`. Here,
+`slot_a_window` means placement at slot A followed by a 1,000-base window.
 
-The blank scaffold writes an explicit workspace-local
-`root: outputs/usr_datasets` entry into `config.yaml`, so an incomplete or
-misrouted workspace fails before materialization.
+## Preview the result
 
-### Keep the model simple
+```bash
+# Resolve input records, template coordinates and planned output lengths.
+construct workspace validate-project \
+  --workspace . --project slot_a_window --runtime
+# Plan the same job without writing output sequences or metadata.
+construct workspace run-project \
+  --workspace . --project slot_a_window --dry-run
+```
 
-- Packaged demos use local semantic datasets such as `anchor_parts_demo` and `template_parts_demo`.
-- Real projects choose their own stable dataset IDs; study vocabulary belongs
-  in the caller's config and provenance.
-- `anchor`, `template`, and `helper` are placement roles in the current config,
-  not biological classes or dataset path categories.
-- One construct job uses one template plus one or more placed parts.
-- Multi-template or slot-matrix studies are represented as multiple project entries in `construct.workspace.yaml`, each with its own tracked config artifact.
+Runtime validation prints the resolved input and output roots, the replacement
+interval and each planned sequence length. Inspect those before writing. The
+seed step above writes demo inputs; the Construct dry-run does not write the
+assembled outputs.
 
-### Continue reading
+The dry-run summary reports four planned outputs and no collisions:
 
-- [Construct docs](README.md)
-- [Workspaces guide](../workspaces/README.md)
-- [Construct -> SeqLedger -> Infer shared dataset runbook](../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
-- [Config reference](reference/config.md)
-- [Workspace registry reference](reference/workspace-registry.md)
+```text
+Config validated (dry run): job=anchor_template_slot_a_window_1kb rows=4 output_collisions=0
+```
+
+## Save and inspect sequences
+
+```bash
+# Write the planned sequences and their lineage to SeqLedger.
+construct workspace run-project --workspace . --project slot_a_window
+# Check the resulting dataset and inspect the inserted-part coordinates.
+seqledger --root outputs/usr_datasets validate \
+  anchor_template_slot_a_window_1kb_demo --strict
+seqledger --root outputs/usr_datasets head \
+  anchor_template_slot_a_window_1kb_demo -n 3 \
+  --columns id,usr_label__primary,construct__anchor_start,construct__anchor_end
+```
+
+The output dataset is under
+`outputs/usr_datasets/anchor_template_slot_a_window_1kb_demo/`. The `sequence`
+field contains the assembled window; `construct__anchor_start` and
+`construct__anchor_end` locate the inserted part using zero-based, half-open
+coordinates. Add `sequence` to `--columns` to print the DNA.
+
+The run summary should report `rows_planned=4`, `rows_written=4` and
+`rows_skipped_existing=0`. SeqLedger's strict validation then confirms:
+
+```text
+OK: validation passed.
+```
+
+The demo rejects a second write of the same output IDs. For a deliberate retry,
+use the [conflict policy](reference/outputs.md#dataset-write-behavior) rather
+than deleting or editing dataset files by hand.
+
+## Choose the next task
+
+- [Try another slot or the full template](../workspaces/demo_anchor_template_local/runbook.md).
+- [Combine placements in one dataset](../workspaces/demo_anchor_template_shared_dataset/runbook.md).
+- [Use your own sequences](../workspaces/README.md#create-a-workspace-for-your-own-inputs).
+- [Pass the results to Infer](../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md).

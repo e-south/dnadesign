@@ -1,101 +1,98 @@
-## Construct workspaces
+<!--
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-10-28
+-->
 
-Use this directory for packaged construct workspace templates and examples. New workspaces default to the current working directory unless `--root` or `CONSTRUCT_WORKSPACE_ROOT` is set.
+[Construct](../README.md) / [Construct docs](../docs/README.md)
 
-List the local construct workspaces in the active root plus the packaged templates with `uv run construct workspace list`.
+# Choose a Construct workspace
 
-### Start with one of these paths
+A workspace holds related construction jobs, their input references and output
+locations. Each project entry in `construct.workspace.yaml` names one YAML
+configuration. Use separate entries for alternative templates or window
+lengths; one template job can place several named parts from an input row.
 
-- [Packaged local demo](demo_anchor_template_local/README.md): a didactic anchor-into-template tracer bullet with both 1 kb window and full-context configs.
-- [Packaged shared-dataset demo](demo_anchor_template_shared_dataset/README.md): the same anchor/template contract, but with two audited projects writing into one downstream SeqLedger dataset.
-- Blank workspace: scaffold a project and import your own input and template datasets.
+## Choose a starting point
 
-### Quick start
+| Starting point | What it demonstrates |
+| --- | --- |
+| [Local demo](demo_anchor_template_local/README.md) | Place a part at either of two template slots; emit a window or the full construct. |
+| [Shared-dataset demo](demo_anchor_template_shared_dataset/README.md) | Write two placement projects into one output dataset. |
+| [Custom workspace](#create-a-workspace-for-your-own-inputs) | Import your own sequences and declare their placement. |
+
+Start with [installation and the complete demo](../docs/getting-started.md) if
+you have not used Construct before. With the environment active, inspect local
+workspaces and available templates:
 
 ```bash
-# Inspect the packaged construct workspaces before copying one.
-uv run construct workspace list
-
-# Blank workspace for a custom construct study.
-uv run construct workspace init --id demo_construct # Create a blank construct workspace scaffold.
-uv run construct workspace show --workspace demo_construct # Review tracked config artifacts and workspace contract.
-uv run construct workspace doctor --workspace demo_construct # Verify workspace registry/config health before editing or running.
-
-# Packaged local anchor/template demo copied into a new workspace id.
-uv run construct workspace init --id demo_anchor_template --profile anchor-template-demo # Copy the packaged local demo into a new workspace id.
-# The cd path below assumes the default workspace root from the current working directory.
-# If you used --root or CONSTRUCT_WORKSPACE_ROOT, cd into the printed workspace path instead.
-cd demo_anchor_template # Enter the newly initialized demo workspace.
-./runbook.sh --mode dry-run --config config.slot_a.window.yaml # Execute the packaged tracer-bullet dry run for the slot_a window config.
-
-# Packaged shared-dataset demo.
-uv run construct workspace init --id demo_construct_shared_dataset --profile anchor-template-shared-dataset-demo # Copy the packaged shared-dataset demo into a new workspace id.
-cd demo_construct_shared_dataset # Enter the newly initialized shared-dataset workspace.
-./runbook.sh --mode dry-run-all # Dry-run both packaged projects into one semantic SeqLedger dataset.
+# List workspaces under the active root and the packaged examples.
+construct workspace list
 ```
 
-If you initialize a workspace outside the repo tree, reuse the `uv run --project <repo-root> construct ...` commands printed by `workspace init` or the packaged `runbook.sh` wrapper.
+New workspaces are created at `<root>/<id>`. The root is the current directory
+unless you set `--root` or `CONSTRUCT_WORKSPACE_ROOT`; the ID is a directory
+name, not a path. Construct refuses to overwrite an existing workspace.
 
-### What `workspace init` creates
+## Create a workspace for your own inputs
 
-- blank profile:
-  - `workspaces/<id>/construct.workspace.yaml`
-  - `workspaces/<id>/config.yaml`
-  - `workspaces/<id>/inputs/README.md`
-  - `workspaces/<id>/inputs/import_manifest.template.yaml`
-- `anchor-template-demo` profile:
-  - `workspaces/<id>/construct.workspace.yaml`
-  - `workspaces/<id>/README.md`
-  - `workspaces/<id>/runbook.md`
-  - `workspaces/<id>/runbook.sh`
-  - `workspaces/<id>/config.slot_a.window.yaml`
-  - `workspaces/<id>/config.slot_a.full.yaml`
-  - `workspaces/<id>/config.slot_b.window.yaml`
-  - `workspaces/<id>/config.slot_b.full.yaml`
-  - `workspaces/<id>/inputs/README.md`
-- `anchor-template-shared-dataset-demo` profile:
-  - `workspaces/<id>/construct.workspace.yaml`
-  - `workspaces/<id>/README.md`
-  - `workspaces/<id>/runbook.md`
-  - `workspaces/<id>/runbook.sh`
-  - `workspaces/<id>/config.slot_a.window.yaml`
-  - `workspaces/<id>/config.slot_b.window.yaml`
-  - `workspaces/<id>/inputs/README.md`
-- all profiles:
-  - `workspaces/<id>/outputs/logs/ops/audit/`
+Run these commands from the directory where you want to keep the project:
 
-### Edit these first
+```bash
+# Create a blank configuration and input manifest template.
+construct workspace init --id my_construct
+# Enter the new workspace.
+cd my_construct
+# Inspect its generated project entry.
+construct workspace show --workspace .
+```
 
-- safe edit set for a blank workspace:
-  - `construct.workspace.yaml`
-  - `config.yaml`
-  - `inputs/import_manifest.template.yaml`
-- safe edit set for the packaged demo copy:
-  - `construct.workspace.yaml`
-  - `config.*.yaml`
-  - `inputs/seed_manifest.yaml`
-- operator helpers, not primary contract surfaces:
-  - `README.md`
-  - `runbook.md`
-  - `runbook.sh`
-- generated/run outputs:
-  - `outputs/**`
+Edit `inputs/import_manifest.template.yaml` with your input and template
+sequences, following the [import manifest reference](../docs/reference/seed-manifest.md).
+Then import them:
 
-### Workspace contract
+```bash
+# Import the edited manifest and print the resulting record IDs.
+construct seed import-manifest \
+  --manifest inputs/import_manifest.template.yaml --root outputs/usr_datasets
+```
 
-- Workspace ids must be directory names, not paths.
-- Existing workspaces are never overwritten.
-- Every workspace carries `construct.workspace.yaml` as the project registry and provenance surface.
-- Each workspace project keeps only identity fields (`id`) at top level, tracks config artifacts under `project.artifacts`, and moves audited routing fields under `project.contract`.
-- `construct workspace doctor` is the contract check for registry/config drift before project execution.
-- Packaged workspaces default construct IO to `outputs/usr_datasets`, consistent with repo workspace-scoping guidance.
-- Blank workspaces also scaffold explicit `root: outputs/usr_datasets` entries so custom studies do not fall back to repo-package datasets implicitly.
-- That workspace-local root is a construct-owned export only.
-  The shared study dataset exists only after an explicit copy or sync into a
-  named shared SeqLedger root.
-- External/shared SeqLedger roots remain allowed, but only through explicit `root:` fields or `construct seed --root <path>`.
-- One construct job uses one template; multi-template or slot-matrix studies are represented as multiple project entries and config files in the workspace registry.
-- The packaged local demo exposes `./runbook.sh --mode seed|validate|dry-run|run|validate-all` as the local workspace entrypoint.
-- The packaged shared-dataset demo exposes `./runbook.sh --mode seed|validate-all|dry-run-all|run-all` as the local workspace entrypoint for the shared-dataset flow; the authoritative cross-tool handoff still lives in `../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md`.
-- Study workspaces keep their concrete Construct configs outside the public
-  package and call the same workspace and CLI contracts.
+Use those IDs in `config.yaml` to choose the template, part placement and
+output dataset. Update the matching project entry in `construct.workspace.yaml`
+with the same dataset and template identities. The
+[configuration reference](../docs/reference/config.md) describes placement and
+window rules; the [registry reference](../docs/reference/workspace-registry.md)
+explains the fields checked against that configuration.
+
+```bash
+# Check the edited registry and configuration together.
+construct workspace doctor --workspace .
+# Validate actual inputs and preview the new project.
+construct workspace validate-project --workspace . --project my_construct --runtime
+# Preview the output before saving sequences.
+construct workspace run-project --workspace . --project my_construct --dry-run
+```
+
+Replace `my_construct` if you renamed the project. After reviewing the preview,
+repeat `run-project` without `--dry-run` to write the results.
+
+## Files to edit and inspect
+
+| File | Purpose |
+| --- | --- |
+| `construct.workspace.yaml` | Project names, configuration paths and expected dataset identities. |
+| `config.yaml` or `config.*.yaml` | Input, template, placement, window and output choices. |
+| `inputs/import_manifest.template.yaml` | Your input sequences for a blank workspace. |
+| `inputs/seed_manifest.yaml` | Demo seed receipt with record IDs and coordinates. |
+| `outputs/` | Generated data and run artifacts; change configuration and rerun to update them. |
+
+## Choose where data are stored
+
+Packaged and blank workspaces use `outputs/usr_datasets` for their SeqLedger
+root. To use another root, set the relevant input, template and output `root`
+fields in the job configuration, or use the explicit
+[`--seqledger-root` override](../docs/reference/cli.md#command-map).
+Registry root fields describe intended locations; runtime validation reports
+the paths actually used.
+
+For downstream reuse, see the
+[Construct → SeqLedger → Infer guide](../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md).

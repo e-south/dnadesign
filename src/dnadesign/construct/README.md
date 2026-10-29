@@ -1,17 +1,16 @@
 ![Construct banner](docs/assets/construct-banner.svg)
 
-Construct places declared DNA parts into named slots in a sequence context. It
-records the realized sequence, each part's span, and its lineage for downstream
-tools. The separate `compose` command joins already chosen linear ssDNA
-segments; that route is specialized and does not define Construct's general
-data model.
+Construct places DNA parts into named positions in a template sequence and
+produces the assembled sequences, part coordinates and source lineage. Use it
+to prepare complete constructs or fixed-length sequence windows for downstream
+analysis. For preselected linear ssDNA segments, `construct compose` writes a
+local sequence and visualization bundle.
 
 ## Documentation
 
-- [Construct docs](docs/README.md): first runs, workspaces, references, and cross-tool handoffs.
-- [Getting started](docs/getting-started.md): shortest validated path for a demo run or blank custom workspace.
-- [Workspace guide](workspaces/README.md): scaffold a blank workspace or copy a packaged demo profile.
-- [Template/context contract](docs/reference/template-contexts.md): realized sequence, named spans, lineage, and optional focal-span metadata.
-- [Linear ssDNA composition](docs/reference/linear-ssdna-composition.md): specialized composition of already chosen single-stranded segments.
-- [Annotated sequence-part placement](docs/reference/annotated-sequence-parts.md): atomic placement and nested-feature coordinate transformation for producer-authored parts.
-- [Repository docs index](../../../docs/README.md): repo-wide index for cross-tool workflows.
+- [Construct docs](docs/README.md): guides and references organized by task.
+- [Getting started](docs/getting-started.md): install Construct, run a small demo and inspect the resulting sequences.
+- [Workspaces](workspaces/README.md): choose a demo or configure your own inputs.
+- [Template contexts](docs/reference/template-contexts.md): pass assembled sequences and part coordinates to other tools.
+- [Linear ssDNA composition](docs/reference/linear-ssdna-composition.md): join already chosen segments into a local bundle.
+- [Repository docs](../../../docs/README.md): installation options and workflows across DNADesign tools.

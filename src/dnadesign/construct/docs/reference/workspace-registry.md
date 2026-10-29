@@ -1,13 +1,17 @@
-## Construct workspace registry reference
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-### Purpose
+[Construct docs](../README.md)
 
-`construct.workspace.yaml` is the project inventory for a construct workspace. Each entry binds one tracked config artifact to one explicit audited routing contract.
+# Construct workspace registry reference
 
-### Shape
+## Purpose
+
+`construct.workspace.yaml` is the project inventory for a construct workspace. Each entry names a configuration file and the input, template and output identities expected from it.
+
+## Shape
 
 ```yaml
 workspace:
@@ -33,7 +37,7 @@ workspace:
       notes: Windowed anchor placement against slot_a in the packaged dual-slot template.
 ```
 
-### Contract
+## Contract
 
 - one workspace registry inventories one construct study
 - one project entry maps to one construct config
@@ -43,24 +47,30 @@ workspace:
 - every project must declare a `contract:` block; flat legacy fields are rejected
 - when `project.contract.template` is present, it must include `id`, `dataset`, and `record_id` together
 - dataset ids stay semantic and biological at the SeqLedger layer
-- `project.contract` is an assertion surface, not the runtime source of truth; the config remains authoritative for runtime semantics
+- `project.contract` records expected identities for validation; the job config determines what runs
 
-### Root precedence
+## Root precedence
 
 - `workspace.roots.shared_usr_root` is a repo-relative hint for an intentional shared mirror
 - `workspace.roots.workspace_usr_root` is the workspace-relative default that packaged workspaces are expected to use
 - the runtime still follows the `root:` values in each construct config
-- if a config omits `root:`, construct resolves it from the config directory and package defaults, not from `construct.workspace.yaml`
+- SeqLedger-backed jobs require an explicit input root; template and output roots may inherit it
+- relative roots resolve from the configuration directory, not from the registry
 - use `workspace show` to inspect registry hints and `validate --runtime` or `workspace validate-project --runtime` to confirm the actual resolved roots before a write
 
-### Doctoring and execution
+## Check and run a project
 
 Use the registry-backed commands instead of memorizing config paths:
 
 ```bash
-uv run construct workspace doctor --workspace <workspace-dir>
-uv run construct workspace validate-project --workspace <workspace-dir> --project <id> --runtime
-uv run construct workspace run-project --workspace <workspace-dir> --project <id> --dry-run
+# Replace the workspace path and project ID with your own values.
+construct workspace doctor --workspace <workspace-dir>
+# Resolve actual inputs and output paths before execution.
+construct workspace validate-project \
+  --workspace <workspace-dir> --project <id> --runtime
+# Preview the output write.
+construct workspace run-project \
+  --workspace <workspace-dir> --project <id> --dry-run
 ```
 
 `workspace doctor` fails when:
@@ -70,10 +80,9 @@ uv run construct workspace run-project --workspace <workspace-dir> --project <id
 - `project.artifacts.config.job_id` drifts from `job.id`
 - `project.contract.input_dataset`, `project.contract.output_dataset`, or `project.contract.template.*` drift from the config
 
-### Design stance
+## Organize related jobs
 
-- keep `construct.workspace.yaml` small and auditable
-- keep project identity fields (`id`), tracked artifacts (`artifacts`), and audited routing fields (`contract`) separate
-- treat `project.artifacts.config` as the extension seam for future workspace-owned config metadata instead of adding more flat project keys
-- represent slot or template matrices as multiple project entries
-- do not collapse multiple templates into one construct job just to avoid adding registry entries
+Use one project entry per configuration. Several entries can share an output
+dataset when their conflict policy permits it. Keep placement and window
+settings in the job configuration; use the registry to find projects and check
+their dataset identities before execution.

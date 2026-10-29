@@ -1,106 +1,80 @@
-## demo_anchor_template_shared_dataset Runbook
+[Shared-dataset demo](README.md)
 
-**Workspace Path**
-- The workspace path printed by `construct workspace init` (default: `<cwd>/<your-workspace-id>/`).
+# Save two placements to one dataset
 
-**Purpose**
-- Seed curated anchor-part and template datasets into the workspace-local SeqLedger root at `outputs/usr_datasets/`.
-- Replace the explicit `anchor_part_short_ref` incumbents in both `slot_a` and `slot_b` with packaged anchor inputs.
-- Materialize both 1 kb window realizations into one semantic dataset, `anchor_template_shared_dataset_demo`.
-- Keep upstream `usr_label__primary` / `usr_label__aliases` visible on derived rows so analyst-facing reads stay human-scannable.
+Run these commands from a copied shared-dataset workspace with the Construct
+environment active. Follow the [setup and copy instructions](README.md) first.
 
-**Registry first**
-- Inspect the project inventory before running anything:
-  - `uv run construct workspace show --workspace .`
-  - `uv run construct workspace doctor --workspace .`
-- Each project entry tracks a config artifact path plus expected `job.id`, so
-  registry drift fails before execution.
-- `shared_usr_root` is a repo-relative hint for an intentional shared mirror, not the default runtime root for this packaged workspace.
-- `workspace_usr_root` is the workspace-relative default used by the packaged configs and `runbook.sh`.
-- The workspace registry is [construct.workspace.yaml](construct.workspace.yaml).
-
-**File roles**
-- primary editable contract surfaces:
-  - `construct.workspace.yaml`
-  - `config.slot_*.window.yaml`
-  - `inputs/seed_manifest.yaml`
-- operator helpers:
-  - `runbook.md`
-  - `runbook.sh`
-- run outputs:
-  - `outputs/**`
-
-**Runbook command**
-- Seed only:
-  - `./runbook.sh --mode seed`
-- Validate both packaged projects:
-  - `./runbook.sh --mode validate-all`
-- Dry-run both packaged projects:
-  - `./runbook.sh --mode dry-run-all`
-- Materialize the shared dataset:
-  - `./runbook.sh --mode run-all`
-
-`runbook.sh` seeds the curated demo inputs into `outputs/usr_datasets` before validation or execution so the packaged workspace stays self-contained by default. Set `CONSTRUCT_RUNBOOK_USR_ROOT=/path/to/shared/usr/root` only when a shared mirror is intentional.
-The wrapper also carries a project-root hint for `uv run --project ...`; override it with `CONSTRUCT_RUNBOOK_PROJECT_ROOT=/path/to/dnadesign` if needed.
-
-**Important note**
-- The provided full `template_backbone_dual_slot` record contains two exact `anchor_part_short_ref` matches:
-  - `slot_a`: `[2300, 2335)`
-  - `slot_b`: `[3621, 3656)`
-- This packaged shared-dataset demo only uses the two 1 kb window projects because they are the intended infer-ready downstream handoff shape.
-
-### Step-by-step commands
-
-Run these commands from the workspace root:
+## Prepare the inputs
 
 ```bash
-set -euo pipefail # Fail fast on errors, unset variables, and pipe failures.
-
-# Bootstrap the local demo inputs and write a manifest with record ids.
-uv run construct seed anchor-template-demo \
-  --root "$PWD/outputs/usr_datasets" \
-  --manifest "$PWD/inputs/seed_manifest.yaml"
-
-# Inspect the workspace registry, verify drift, and inspect seeded labels.
-uv run construct workspace show --workspace . # Print workspace registry entries and resolved paths.
-
-# Re-check the packaged registry/config contract before running anything.
-uv run construct workspace doctor --workspace .
-# Show seeded anchor-part labels and aliases.
-uv run seqledger --root "$PWD/outputs/usr_datasets" head anchor_parts_demo -n 10 --columns id,usr_label__primary,usr_label__aliases,sequence
-
-# Validate both packaged projects before any write.
-uv run construct workspace validate-project --workspace . --project slot_a_window --runtime # Validate slot_a runtime roots and template resolution.
-uv run construct workspace validate-project --workspace . --project slot_b_window --runtime # Validate slot_b runtime roots and template resolution.
-
-# Dry-run both projects into the shared output contract.
-uv run construct workspace run-project --workspace . --project slot_a_window --dry-run # Preview slot_a writes without mutating SeqLedger state.
-uv run construct workspace run-project --workspace . --project slot_b_window --dry-run # Preview slot_b writes without mutating SeqLedger state.
-
-# Materialize both windows into one semantic dataset.
-uv run construct workspace run-project --workspace . --project slot_a_window # Materialize slot_a rows into the shared dataset.
-uv run construct workspace run-project --workspace . --project slot_b_window # Materialize slot_b rows into the shared dataset.
-
-# Verify the shared dataset and inspect carried-through labels plus construct lineage.
-uv run seqledger --root "$PWD/outputs/usr_datasets" validate anchor_template_shared_dataset_demo --strict # Confirm the shared dataset satisfies the active SeqLedger registry.
-# Inspect the shared dataset with upstream labels plus construct lineage context.
-uv run seqledger --root "$PWD/outputs/usr_datasets" head anchor_template_shared_dataset_demo -n 10 --columns id,usr_label__primary,construct__input_dataset,construct__input_id,construct__template_id,construct__window_semantics
+# Seed the same four DNA parts and template used by the local demo.
+construct seed anchor-template-demo \
+  --root outputs/usr_datasets --manifest inputs/seed_manifest.yaml
+# Inspect the two projects and check their configuration files.
+construct workspace show --workspace .
+# Check the project entries against their configuration files.
+construct workspace doctor --workspace .
 ```
 
-### Variations
+The projects replace slot A at `[2300, 2335)` or slot B at `[3621, 3656)` in
+the template. Both extract a 1,000-base window centered on the inserted part.
+Coordinates are zero-based and half-open.
 
-- Write to a shared SeqLedger root instead of the workspace-local one:
-  - edit the config `root:` fields intentionally
-  - re-run `uv run construct workspace show --workspace .`
-  - re-run `validate-project --runtime` for both projects before `run-project`
-- Add more construct projects into the same semantic dataset:
-  - keep each project as its own `construct.workspace.yaml` entry
-  - keep `output.on_conflict=error` for fail-fast collision detection
-  - only widen the shared dataset when the consolidated downstream contract is intentional
+## Preview both placements
 
-### Cross-tool continuation
+```bash
+# Resolve both sets of inputs and check the shared output destination.
+construct workspace validate-project \
+  --workspace . --project slot_a_window --runtime
+# Resolve the slot B inputs and output destination.
+construct workspace validate-project \
+  --workspace . --project slot_b_window --runtime
+# Preview each write before adding sequences to the output dataset.
+construct workspace run-project \
+  --workspace . --project slot_a_window --dry-run
+# Preview the slot B write.
+construct workspace run-project \
+  --workspace . --project slot_b_window --dry-run
+```
 
-For the infer and downstream handoff that continues from this workspace, use the shared runbooks:
+Check that both previews name `anchor_template_shared_dataset_demo` as the
+output dataset under `outputs/usr_datasets`.
 
-- [Construct -> SeqLedger -> Infer shared dataset runbook](../../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
-- [Promoter characterization feature matrix](../../../seqledger/docs/operations/promoter/characterization-feature-matrix.md)
+## Save and inspect the combined dataset
+
+```bash
+# Append the windows from each placement.
+construct workspace run-project --workspace . --project slot_a_window
+# Append the slot B windows to the same dataset.
+construct workspace run-project --workspace . --project slot_b_window
+# Verify the dataset, then inspect source labels and input lineage.
+seqledger --root outputs/usr_datasets validate \
+  anchor_template_shared_dataset_demo --strict
+# Inspect source labels and input lineage for all eight windows.
+seqledger --root outputs/usr_datasets head \
+  anchor_template_shared_dataset_demo -n 8 \
+  --columns id,usr_label__primary,construct__input_id,construct__template_id
+```
+
+Each run writes four rows, giving eight windows in the combined dataset.
+`usr_label__primary` preserves the input label; `construct__*` columns record
+which input, template and placement produced each output. Labels can repeat
+across placements, so use record IDs and lineage to distinguish them.
+
+## Adapt or continue
+
+Add a project by creating its config and registering it in
+`construct.workspace.yaml`. Keep `output.on_conflict: error` to detect output
+ID collisions. For interrupted writes, see the
+[retry policy](../../docs/reference/outputs.md#dataset-write-behavior).
+To change storage roots, configure them explicitly and revalidate both
+projects before writing.
+
+The optional [shell wrapper](runbook.sh) provides `seed`, `validate-all`,
+`dry-run-all` and `run-all` modes. Every mode seeds inputs first. It uses the
+DNADesign checkout path saved during workspace creation; set
+`CONSTRUCT_RUNBOOK_PROJECT_ROOT` if that checkout moves.
+
+To calculate sequence-model outputs from these windows, continue with the
+[Construct → SeqLedger → Infer guide](../../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md).
