@@ -126,6 +126,7 @@ def write_view_semantics(
     with dataset_write_lock(dataset.dir):
         _validate_semantics_against_views(dataset, incoming)
         existing = {str(row.view_id): row for row in load_view_semantics(dataset)}
+        previous = {row.view_id: existing.get(row.view_id) for row in incoming}
         for row in incoming:
             current = existing.get(row.view_id)
             if current is None:
@@ -145,6 +146,10 @@ def write_view_semantics(
                 continue
             existing[row.view_id] = row
 
+        changed_count = sum(existing[view_id] != row for view_id, row in previous.items())
+        if changed_count == 0:
+            return 0
+
         sorted_rows = [existing[key] for key in sorted(existing)]
         target_path = view_semantics_path(dataset)
         _write_view_semantics_atomic(target_path, _rows_to_table(sorted_rows))
@@ -155,8 +160,8 @@ def write_view_semantics(
                     "count": len(incoming),
                     "conflict_policy": conflict_policy,
                 },
-                metrics={"view_semantics_written": len(incoming)},
+                metrics={"view_semantics_written": changed_count},
                 target_path=target_path,
                 actor=actor,
             )
-    return len(incoming)
+    return changed_count

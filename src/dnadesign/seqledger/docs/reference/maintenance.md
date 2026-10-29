@@ -20,27 +20,6 @@ Operational rules:
 - Do not hand-edit `_views/sequence_views.parquet`; rerun the owning import or realization step with the intended conflict policy.
 - Dataset-local `_views/sequence_views.parquet` sidecars are additive metadata and are not compacted via overlay maintenance commands.
 
-Merged promoter-anchor handoffs have their own sidecar materializer because
-plain merge intentionally does not copy sequence views:
-
-```bash
-# Dry-run the merged anchor sidecar plan.
-uv run python -m dnadesign.seqledger.scripts.materialize_promoter_anchor_sequence_views \
-  --dataset usr_prom_eth_cip_anchor
-
-# Write one construct_insert sequence view per merged anchor row.
-uv run python -m dnadesign.seqledger.scripts.materialize_promoter_anchor_sequence_views \
-  --dataset usr_prom_eth_cip_anchor \
-  --write
-```
-
-This helper writes `product_kind=construct_insert`, `context_kind=anchor_only`,
-`orientation=forward`, and `recommended_pooling=seq_mean` for each row in the
-merged anchor dataset. Rows sourced from
-`construct_prom_eth_cip_reference_core60` keep `analysis_only=true` and lineage
-metadata, but native or designed 60 bp rows are not duplicated or relabeled as
-`analysis_window`.
-
 ## Registry and overlay maintenance
 
 ```bash
@@ -133,8 +112,8 @@ uv run seqledger maintenance dedupe <dataset> --dry-run
 
 ```bash
 uv run seqledger maintenance merge \
-  --dest 60bp_dual_promoter_cpxR_LexA \
-  --src 60bp_dual_promoter_cpxR_LexA_v2 \
+  --dest candidate_library \
+  --src additional_candidates \
   --union-columns \
   --if-duplicate skip
 ```

@@ -6,41 +6,26 @@
 
 ## Dataset layout
 
+A data root lives outside the installed package and can contain flat or
+namespace-qualified dataset IDs. Choose IDs that identify the collection;
+keep tool provenance in overlay columns and human-readable record names in
+`usr_label__primary` or `usr_label__aliases`.
+
 ```text
-src/dnadesign/seqledger/
-├─ __init__.py, __main__.py  # package root only; public API is exported from __init__.py
-├─ assets/
-│  ├─ seqledger-banner.svg
-│  └─ demo_material/
-├─ src/
-├─ datasets/
-│  ├─ <dataset_id>/
-│  │  ├─ records.parquet
-│  │  ├─ _derived/
-│  │  ├─ meta.md
-│  │  ├─ .events.log
-│  │  ├─ _registry/
-│  │  └─ _snapshots/
-│  ├─ <namespace>/<dataset_name>/...
-│  └─ archived/
-│     ├─ <dataset_id-or-qualified-path>/...
-│     └─ promoter_misc_pytorch/
+<data-root>/
+├─ registry.yaml
+└─ <dataset-id>/
+   ├─ records.parquet
+   ├─ _derived/
+   ├─ _views/
+   ├─ meta.md
+   ├─ .events.log
+   ├─ _registry/
+   └─ _snapshots/
 ```
 
-Dataset ids may be flat (`dataset`) or namespace-qualified (`namespace/dataset`).
-Active shared study dataset ids must be flat owner-first ids such as
-`densegen_prom_eth_cip_source`, `usr_prom_eth_cip_anchor`,
-`construct_prom_eth_cip_context`, and `usr_prom_eth_cip_matrix`.
-
-Choose the least-coupled semantic id that still keeps the dataset understandable.
-
-- Prefer a flat dataset id when the biological collection is already specific, such as `usr_promoter_references`, `usr_pdual10_plasmid_template`, or `anchor_template_slot_a_window_1kb_demo`.
-- Use namespace-qualified ids only when they genuinely improve disambiguation instead of encoding tool routing.
-- Do not encode active handoffs as nested owner/study folders. Use `root_kind`, `owner_tool`, overlays, and study metadata for provenance.
-- Keep tool provenance in namespaced overlay columns such as `construct__*`, `densegen__*`, or `infer__*`, not in the dataset id itself, unless the dataset is truly tool-private scratch state.
-- Carry human-readable record names in record columns such as `usr_label__primary` / `usr_label__aliases`, not only in local notes or workspace conventions.
-
-`archived/` is the canonical dataset archive root. Archived datasets are intentionally excluded from the default live dataset-id namespace under `datasets/`, but explicit paths under `datasets/archived/**` remain supported. `datasets/archived/promoter_misc_pytorch/` is a legacy promoter-focused `.pt` archive bucket and is not a `records.parquet` dataset root.
+Use an explicit path or a separate data root when inspecting archived datasets.
+Dataset contents and operational records do not belong in the installed package.
 
 ## Maintainer code map
 

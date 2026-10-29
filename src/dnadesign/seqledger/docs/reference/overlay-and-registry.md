@@ -97,21 +97,14 @@ Semantic sequence views are stored outside overlay parts in dataset-local sideca
 Conflict behavior is explicit-only:
 
 - `error`: reject any conflicting existing semantic row
-- `idempotent`: allow exact repeats
+- `idempotent`: allow exact repeats without rewriting the sidecar or emitting a write event
 - `replace`: rewrite an existing view row
 - `append_alias`: add human aliases only when the semantic key is unchanged
 
-Sequence views are additive metadata. They do not replace sequence-derived base ids, and they are not inferred implicitly by downstream tools.
+Sequence-view and view-semantics writers return the number of distinct rows
+changed. An unchanged request returns zero; mixed batches count only changed rows.
 
-Merged anchor handoffs should use product kinds conservatively. For example,
-`usr_prom_eth_cip_anchor` is a construct-ready promoter-insert handoff, so its
-dataset-local sequence-view sidecar uses one `construct_insert` view per base
-row with `context_kind=anchor_only` and `recommended_pooling=seq_mean`. Rows
-that came from `construct_prom_eth_cip_reference_core60` keep
-`analysis_only=true` and parent lineage, but the merged handoff does not
-relabel every native or designed 60 bp row as `analysis_window`. The source
-`construct_prom_eth_cip_reference_core60` dataset remains the authoritative
-surface for true derived analysis-core products.
+Sequence views are additive metadata. They do not replace sequence-derived base ids, and they are not inferred implicitly by downstream tools.
 
 ## Design contracts
 

@@ -21,9 +21,8 @@ from .roots import normalize_seqledger_root, pkg_seqledger_root
 
 LEGACY_DATASET_PATH_ERROR = ARCHIVED_DATASET_ID_ERROR
 HISTORICAL_ARTIFACT_PATH_ERROR = (
-    "Paths under retired 'src/dnadesign/seqledger/archived/' are historical artifacts, not dataset roots. "
-    "Use datasets/archived/<dataset> for archived SeqLedger datasets or "
-    "datasets/archived/promoter_misc_pytorch/ for legacy PyTorch artifacts."
+    "Legacy artifact paths are not SeqLedger dataset roots. "
+    "Select a data root containing dataset directories with records.parquet."
 )
 
 

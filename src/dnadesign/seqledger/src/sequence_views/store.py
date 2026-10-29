@@ -297,6 +297,7 @@ def write_sequence_views(
             _validate_view_bounds(dataset, row, sequence_lengths=sequence_lengths, length_cache=length_cache)
 
         existing = {row.view_id: row for row in load_sequence_views(dataset)}
+        previous = {row.view_id: existing.get(row.view_id) for row in incoming}
         alias_to_view_id = _alias_index_by_view_id(existing)
         for row in incoming:
             incoming_aliases = _casefolded_aliases(row.aliases)
@@ -360,6 +361,10 @@ def write_sequence_views(
                 view_id=str(row.view_id),
             )
 
+        changed_count = sum(existing[view_id] != row for view_id, row in previous.items())
+        if changed_count == 0:
+            return 0
+
         sorted_rows = [existing[key] for key in sorted(existing)]
         target_path = sequence_views_path(dataset)
         _write_sequence_views_atomic(target_path, _rows_to_table(sorted_rows))
@@ -370,8 +375,8 @@ def write_sequence_views(
                     "count": len(incoming),
                     "conflict_policy": conflict_policy,
                 },
-                metrics={"views_written": len(incoming)},
+                metrics={"views_written": changed_count},
                 target_path=target_path,
                 actor=actor,
             )
-    return len(incoming)
+    return changed_count
