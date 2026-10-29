@@ -115,7 +115,7 @@ jobs:
             "build/wheel-smoke/bin/$command" --help > /dev/null
           done
           site_packages="$(build/wheel-smoke/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"
-          uvx --from pip-audit==2.10.1 pip-audit --strict --no-deps --disable-pip --vulnerability-service osv \
+          uvx --from pip-audit==2.10.1 pip-audit --strict --vulnerability-service osv \
             --path "$site_packages" --format json \
             --output build/release-evidence/installed-dependency-audit.json
       - name: Verify distribution metadata

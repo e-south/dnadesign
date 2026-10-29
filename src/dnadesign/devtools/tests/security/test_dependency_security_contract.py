@@ -310,3 +310,13 @@ def test_torch_boundary_guard_accepts_restricted_alias_load() -> None:
     source = "import torch\nloader = torch.load\nloader('safe.pt', weights_only=True)\n"
 
     assert _torch_boundary_violations(source, filename="fixture.py") == []
+
+
+def test_installed_package_audit_uses_path_mode_flags() -> None:
+    workflow = yaml.safe_load((_repo_root() / ".github/workflows/release.yaml").read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["build"]["steps"]
+    command = next(step["run"] for step in steps if '--path "$site_packages"' in step.get("run", ""))
+    audit_command = command[command.index("uvx --from pip-audit") :]
+    # pip-audit restricts these resolution flags to requirements-file mode.
+    assert "--no-deps" not in audit_command
+    assert "--disable-pip" not in audit_command
