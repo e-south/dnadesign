@@ -16,7 +16,7 @@ from pathlib import Path
 
 from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
-from ..io.artifact_dirs import staged_artifact
+from ..io.artifact_dirs import artifact_path, staged_artifact
 from ..io.manifest_io import write_manifest
 from ..runs.recorder import record_audit
 from ..samples.build import build_sample_artifact
@@ -41,7 +41,7 @@ def build_sample(
     force: bool = False,
 ) -> CommandResult:
     context = load_workspace_config(workspace)
-    sample_dir = context.output_root / "samples" / sample_id
+    sample_dir = artifact_path(context.output_root, "samples", sample_id)
     with staged_artifact(sample_dir, force=force) as staging_dir:
         artifact_dir, rows = build_sample_artifact(
             context,
@@ -63,7 +63,7 @@ def build_sample(
             input_entries = []
             input_digests = {}
             for input_sample_id in input_sample_ids or []:
-                input_path = context.output_root / "samples" / input_sample_id / "rows.parquet"
+                input_path = artifact_path(context.output_root, "samples", input_sample_id) / "rows.parquet"
                 input_entry = dependency_artifact_input(
                     context,
                     kind="sample_set",
@@ -74,7 +74,7 @@ def build_sample(
                 input_digests[f"sample_set:{input_sample_id}"] = input_entry.digest
         else:
             assert view_id is not None
-            input_path = context.output_root / "views" / view_id / "rows.parquet"
+            input_path = artifact_path(context.output_root, "views", view_id) / "rows.parquet"
             input_entry = dependency_artifact_input(
                 context,
                 kind="view_rows",

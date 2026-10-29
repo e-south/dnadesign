@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..distances.score import _select_indices
+from ..io.artifact_dirs import artifact_path
 from ..io.json_io import read_json
 from ..sources.resolver import inspect_source_schema, read_records_table, resolve_source
 from ..workspaces.loader import load_workspace_config
@@ -201,7 +202,7 @@ def inspect_notebook_health(workspace: str | Path) -> dict[str, object]:
     else:
         health_by_notebook: dict[str, object] = {}
         for notebook_id in notebook_ids:
-            health_path = context.output_root / "notebooks" / notebook_id / "health.json"
+            health_path = artifact_path(context.output_root, "notebooks", notebook_id) / "health.json"
             if not health_path.is_file():
                 raise FileNotFoundError(f"notebook health artifact not found: {health_path}")
             health_by_notebook[notebook_id] = read_json(health_path)

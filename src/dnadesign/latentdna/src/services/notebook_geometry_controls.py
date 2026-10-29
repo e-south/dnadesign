@@ -24,6 +24,7 @@ from ..contracts.notebook import (
     WorkspaceNotebookReferenceSet,
     WorkspaceNotebookTableRef,
 )
+from ..io.artifact_dirs import artifact_path
 from ..io.json_io import read_json
 from ..io.parquet_io import read_schema
 from ..metadata.axes import axis_style_map_from_config, axis_styles_payload
@@ -277,7 +278,7 @@ def _geometry_inventory(
         if role in {"hidden", "planned", "retired"}:
             continue
         shape = _view_shape(view_id, shape_cache=shape_cache)
-        view_dir = context.output_root / "views" / view_id
+        view_dir = artifact_path(context.output_root, "views", view_id)
         geometries.append(
             WorkspaceNotebookGeometry(
                 view_id=view_id,
@@ -452,7 +453,7 @@ def _table_inventory(
 def _view_row_schema_inventory(context, *, visible_view_ids: set[str]) -> dict[str, object]:
     schemas: dict[str, object] = {}
     for view_id in sorted(visible_view_ids):
-        rows_path = context.output_root / "views" / view_id / "rows.parquet"
+        rows_path = artifact_path(context.output_root, "views", view_id) / "rows.parquet"
         if not rows_path.is_file():
             continue
         try:

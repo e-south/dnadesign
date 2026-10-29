@@ -17,7 +17,7 @@ from pathlib import Path
 from ..alignments.builder import build_alignment_artifact
 from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
-from ..io.artifact_dirs import staged_artifact
+from ..io.artifact_dirs import artifact_path, staged_artifact
 from ..io.hashing import sha256_file
 from ..io.manifest_io import write_manifest
 from ..runs.recorder import record_audit
@@ -28,7 +28,7 @@ from ..workspaces.loader import load_workspace_config
 def build_alignment(workspace: str | Path, alignment_id: str, *, force: bool = False) -> CommandResult:
     context = load_workspace_config(workspace)
     alignment = context.require_alignment(alignment_id)
-    alignment_dir = context.output_root / "alignments" / alignment_id
+    alignment_dir = artifact_path(context.output_root, "alignments", alignment_id)
     with staged_artifact(alignment_dir, force=force) as staging_dir:
         (
             artifact_dir,

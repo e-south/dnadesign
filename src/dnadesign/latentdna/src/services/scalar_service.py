@@ -17,7 +17,7 @@ from pathlib import Path
 from ..contracts.errors import MissingArtifactError
 from ..contracts.manifest import ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
-from ..io.artifact_dirs import staged_artifact
+from ..io.artifact_dirs import artifact_path, staged_artifact
 from ..io.manifest_io import write_manifest
 from ..io.parquet_io import read_table
 from ..metrics.definitions import metric_definition_digests
@@ -30,8 +30,8 @@ from ._artifact_inputs import dependency_artifact_input
 
 
 def _resolve_table_source(context, source_id: str) -> tuple[str, Path]:
-    scalar_source_path = context.output_root / "scalars" / source_id / "table.parquet"
-    distance_source_path = context.output_root / "distances" / source_id / "table.parquet"
+    scalar_source_path = artifact_path(context.output_root, "scalars", source_id) / "table.parquet"
+    distance_source_path = artifact_path(context.output_root, "distances", source_id) / "table.parquet"
     if scalar_source_path.exists():
         return "scalar_table", scalar_source_path
     if distance_source_path.exists():
@@ -54,7 +54,7 @@ def _scalar_metric_definition_digests(context, table_path: Path) -> dict[str, st
 def derive_scalar(workspace: str | Path, scalar_id: str, *, force: bool = False) -> CommandResult:
     context = load_workspace_config(workspace)
     scalar = context.require_scalar(scalar_id)
-    scalar_dir = context.output_root / "scalars" / scalar_id
+    scalar_dir = artifact_path(context.output_root, "scalars", scalar_id)
     with staged_artifact(scalar_dir, force=force) as staging_dir:
         artifact_dir, rows, columns = derive_scalar_artifact(context, scalar_id=scalar_id, artifact_dir=staging_dir)
         if scalar.derive.kind == "vector_norm":
@@ -167,7 +167,7 @@ def build_scalar(
     force: bool = False,
 ) -> CommandResult:
     context = load_workspace_config(workspace)
-    scalar_dir = context.output_root / "scalars" / scalar_id
+    scalar_dir = artifact_path(context.output_root, "scalars", scalar_id)
     with staged_artifact(scalar_dir, force=force) as staging_dir:
         resolved_params = dict(params or {})
         built = build_scalar_artifact(

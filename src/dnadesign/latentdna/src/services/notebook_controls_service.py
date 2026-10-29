@@ -21,6 +21,7 @@ from ..contracts.notebook import (
     WorkspaceNotebookPlotEntry,
     WorkspaceNotebookRuntimePaths,
 )
+from ..io.artifact_dirs import artifact_path
 from ..io.json_io import read_json
 from .candidate_inventory_service import build_candidate_inventory
 from .notebook_context_audit import build_workspace_notebook_context_audit
@@ -29,7 +30,7 @@ from .view_shape_cache import ViewShapeCache, view_shape_cache_from_inventory
 
 
 def _runtime_paths(context, *, notebook_id: str) -> WorkspaceNotebookRuntimePaths:
-    notebook_dir = context.output_root / "notebooks" / notebook_id
+    notebook_dir = artifact_path(context.output_root, "notebooks", notebook_id)
 
     def relative_to_notebook(target: Path) -> str:
         return Path(relpath(target, start=notebook_dir)).as_posix()
@@ -38,7 +39,9 @@ def _runtime_paths(context, *, notebook_id: str) -> WorkspaceNotebookRuntimePath
         workspace_relative_path=relative_to_notebook(context.workspace_dir),
         output_relative_path=relative_to_notebook(context.output_root),
         catalog_relative_path=relative_to_notebook(context.output_root / "catalog.json"),
-        health_relative_path=relative_to_notebook(context.output_root / "notebooks" / notebook_id / "health.json"),
+        health_relative_path=relative_to_notebook(
+            artifact_path(context.output_root, "notebooks", notebook_id) / "health.json"
+        ),
     )
 
 
@@ -73,7 +76,7 @@ def _plot_controls(
             context.config.deliverables[deliverable_id].title if deliverable_id in context.config.deliverables else ""
         )
         plot = context.require_plot(plot_id)
-        manifest_path = context.output_root / "plots" / plot_id / "manifest.json"
+        manifest_path = artifact_path(context.output_root, "plots", plot_id) / "manifest.json"
         manifest: dict[str, object] = {}
         if manifest_path.is_file():
             try:

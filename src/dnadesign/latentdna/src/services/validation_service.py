@@ -21,6 +21,7 @@ from dnadesign.seqledger import SequencesError
 from ..contracts.errors import SourceResolutionError, WorkspaceValidationError
 from ..contracts.notebook import WorkspaceNotebookControls
 from ..contracts.workspace import ColumnCohortConfig, SourceBackedViewConfig
+from ..io.artifact_dirs import artifact_path
 from ..io.json_io import read_json
 from ..io.parquet_io import read_schema
 from ..sources.resolver import inspect_source_schema, resolve_source
@@ -91,7 +92,7 @@ def _materialized_view_matrix_shape(matrix_path: Path) -> tuple[int, ...]:
 def _deep_validate_notebook_artifacts(context) -> list[dict[str, object]]:
     notebook_details: list[dict[str, object]] = []
     for notebook_id in sorted(context.config.notebooks):
-        notebook_dir = context.output_root / "notebooks" / notebook_id
+        notebook_dir = artifact_path(context.output_root, "notebooks", notebook_id)
         notebook_path = notebook_dir / "notebook.py"
         controls_path = notebook_dir / "controls.json"
         artifact_present = notebook_dir.exists()
@@ -222,7 +223,7 @@ def _deep_validate_workspace(workspace: str | Path) -> dict[str, object]:
                 )
             except Exception as exc:
                 raise WorkspaceValidationError(f"view {view_id} row-column contract is invalid: {exc}") from exc
-            view_dir = context.output_root / "views" / view_id
+            view_dir = artifact_path(context.output_root, "views", view_id)
             rows_path = view_dir / "rows.parquet"
             matrix_path = view_dir / "matrix.npy"
             if rows_path.is_file() and matrix_path.is_file():

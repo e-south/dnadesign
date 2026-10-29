@@ -17,7 +17,7 @@ from pathlib import Path
 from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
 from ..enrichments.score import score_enrichment_artifact
-from ..io.artifact_dirs import staged_artifact
+from ..io.artifact_dirs import artifact_path, staged_artifact
 from ..io.hashing import sha256_file
 from ..io.manifest_io import write_manifest
 from ..runs.recorder import record_audit
@@ -35,7 +35,7 @@ def score_enrichment(
     force: bool = False,
 ) -> CommandResult:
     context = load_workspace_config(workspace)
-    enrichment_dir = context.output_root / "enrichments" / enrichment_id
+    enrichment_dir = artifact_path(context.output_root, "enrichments", enrichment_id)
     with staged_artifact(enrichment_dir, force=force) as staging_dir:
         artifact_dir, rows, summary = score_enrichment_artifact(
             context,
@@ -56,12 +56,12 @@ def score_enrichment(
                 ArtifactInput(
                     kind="neighbor_set",
                     id=neighbors_id,
-                    digest=sha256_file(context.output_root / "neighbors" / neighbors_id / "indices.npy"),
+                    digest=sha256_file(artifact_path(context.output_root, "neighbors", neighbors_id) / "indices.npy"),
                 ),
                 ArtifactInput(
                     kind="neighbor_rows",
                     id=neighbors_id,
-                    digest=sha256_file(context.output_root / "neighbors" / neighbors_id / "rows.parquet"),
+                    digest=sha256_file(artifact_path(context.output_root, "neighbors", neighbors_id) / "rows.parquet"),
                 ),
             ],
             params={

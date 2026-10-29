@@ -21,6 +21,7 @@ from ..contracts.ids import validate_identifier
 from ..contracts.manifest import ArtifactManifest, ArtifactOutput
 from ..contracts.plot import ResolvedPlotSpec
 from ..contracts.result import CommandResult
+from ..io.artifact_dirs import artifact_path
 from ..io.json_io import write_json
 from ..io.manifest_io import write_manifest
 from ..plots.recipes import resolve_plot_spec
@@ -206,7 +207,7 @@ def render_plot(
         label_column=label_column,
         label_values=label_values,
     )
-    plot_dir = context.output_root / "plots" / plot_id
+    plot_dir = artifact_path(context.output_root, "plots", plot_id)
     if plot_dir.exists() and not force:
         raise ArtifactConflictError(f"plot artifact already exists: {plot_dir}")
 

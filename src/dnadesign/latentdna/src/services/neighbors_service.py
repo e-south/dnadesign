@@ -16,7 +16,7 @@ from pathlib import Path
 
 from ..contracts.manifest import ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
-from ..io.artifact_dirs import staged_artifact
+from ..io.artifact_dirs import artifact_path, staged_artifact
 from ..io.manifest_io import write_manifest
 from ..neighbors.fit import fit_neighbor_artifact
 from ..runs.recorder import record_audit
@@ -48,7 +48,7 @@ def fit_neighbors(
     force: bool = False,
 ) -> CommandResult:
     context = load_workspace_config(workspace)
-    neighbor_dir = context.output_root / "neighbors" / neighbor_id
+    neighbor_dir = artifact_path(context.output_root, "neighbors", neighbor_id)
     with staged_artifact(neighbor_dir, force=force) as staging_dir:
         metric_value = metric or context.config.defaults.metric
         backend_value = backend or context.config.defaults.neighbor_backend

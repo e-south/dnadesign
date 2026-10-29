@@ -17,6 +17,7 @@ from typing import Iterable
 
 from ..contracts.deliverable import ARTIFACT_REFERENCE_CATEGORIES
 from ..contracts.errors import ContractViolationError
+from ..io.artifact_dirs import artifact_path
 from ..workspaces.loader import WorkspaceContext
 
 ARTIFACT_KIND_DIRS: dict[str, str] = {
@@ -56,7 +57,7 @@ def artifact_kind_for_category(category: str) -> str:
 def artifact_dir(context: WorkspaceContext, *, artifact_kind: str, artifact_id: str) -> Path:
     if artifact_kind not in ARTIFACT_KIND_DIRS:
         raise ContractViolationError(f"unsupported artifact kind: {artifact_kind}")
-    return context.output_root / ARTIFACT_KIND_DIRS[artifact_kind] / artifact_id
+    return artifact_path(context.output_root, ARTIFACT_KIND_DIRS[artifact_kind], artifact_id)
 
 
 def artifact_manifest_path(context: WorkspaceContext, *, artifact_kind: str, artifact_id: str) -> Path:

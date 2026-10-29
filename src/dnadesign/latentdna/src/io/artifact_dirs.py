@@ -18,7 +18,22 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from ..contracts.errors import ArtifactConflictError
+from ..contracts.errors import ArtifactConflictError, WorkspaceValidationError
+from ..contracts.ids import validate_identifier
+
+
+def artifact_path(output_root: Path, category: str, artifact_id: str) -> Path:
+    """Resolve a managed artifact without accepting paths as identifiers."""
+    validate_identifier(category, label="artifact category")
+    validate_identifier(artifact_id, label="artifact id")
+    destination = output_root / category / artifact_id
+    require_contained_path(output_root, destination)
+    return destination
+
+
+def require_contained_path(output_root: Path, path: Path) -> None:
+    if not path.resolve().is_relative_to(output_root.resolve()):
+        raise WorkspaceValidationError(f"artifact path must stay inside the output root: {path}")
 
 
 @contextmanager
@@ -36,8 +51,11 @@ def staged_artifact(destination: Path, *, force: bool = False) -> Iterator[Path]
 
 
 def stage_artifact_dir(parent_dir: Path, artifact_id: str) -> Path:
+    validate_identifier(artifact_id, label="artifact id")
     output_root = parent_dir.parent
+    require_contained_path(output_root, parent_dir / artifact_id)
     staging_root = output_root / "runs" / "_staging" / parent_dir.name
+    require_contained_path(output_root, staging_root)
     staging_root.mkdir(parents=True, exist_ok=True)
     return Path(tempfile.mkdtemp(prefix=f"{artifact_id}_", dir=staging_root))
 

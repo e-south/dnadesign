@@ -12,6 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 from ..contracts.notebook import WorkspaceNotebookCandidateSet, WorkspaceNotebookCandidateView
+from ..io.artifact_dirs import artifact_path
 from ..presentation.labels import humanize_candidate
 from .view_shape_cache import ViewShapeCache
 
@@ -65,7 +66,7 @@ def _view_shape(view_id: str, *, shape_cache: ViewShapeCache) -> tuple[int | Non
 
 
 def _is_materialized(context, view_id: str) -> bool:
-    view_dir = context.output_root / "views" / view_id
+    view_dir = artifact_path(context.output_root, "views", view_id)
     return (view_dir / "matrix.npy").is_file() and (view_dir / "rows.parquet").is_file()
 
 

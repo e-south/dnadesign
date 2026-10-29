@@ -17,7 +17,7 @@ from pathlib import Path
 from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
 from ..distances.score import score_distance_artifact
-from ..io.artifact_dirs import staged_artifact
+from ..io.artifact_dirs import artifact_path, staged_artifact
 from ..io.hashing import sha256_file
 from ..io.manifest_io import write_manifest
 from ..runs.recorder import record_audit
@@ -36,7 +36,7 @@ def score_distance(
     force: bool = False,
 ) -> CommandResult:
     context = load_workspace_config(workspace)
-    distance_dir = context.output_root / "distances" / distance_id
+    distance_dir = artifact_path(context.output_root, "distances", distance_id)
     with staged_artifact(distance_dir, force=force) as staging_dir:
         metric_value = metric or context.config.defaults.metric
         artifact_dir, rows, columns, representation_modes, member_counts = score_distance_artifact(
@@ -59,7 +59,7 @@ def score_distance(
                 ArtifactInput(
                     kind="view_matrix",
                     id=view_id,
-                    digest=sha256_file(context.output_root / "views" / view_id / "matrix.npy"),
+                    digest=sha256_file(artifact_path(context.output_root, "views", view_id) / "matrix.npy"),
                 )
             ],
             params={

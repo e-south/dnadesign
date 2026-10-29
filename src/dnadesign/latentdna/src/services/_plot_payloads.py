@@ -16,6 +16,7 @@ from pathlib import Path
 from ..contracts.errors import ContractViolationError
 from ..contracts.manifest import ArtifactInput
 from ..contracts.plot import ResolvedPlotSpec
+from ..io.artifact_dirs import artifact_path
 from ..workspaces.loader import WorkspaceContext
 from ._artifact_inputs import dependency_artifact_input
 
@@ -31,7 +32,7 @@ def plot_artifact_inputs(context: WorkspaceContext, spec: ResolvedPlotSpec) -> l
                 context,
                 "projection",
                 projection_id,
-                context.output_root / "projections" / projection_id / "coords.parquet",
+                artifact_path(context.output_root, "projections", projection_id) / "coords.parquet",
             )
             for projection_id in spec.projection_ids
         ]
@@ -51,7 +52,7 @@ def plot_artifact_inputs(context: WorkspaceContext, spec: ResolvedPlotSpec) -> l
                 context,
                 "scalar_table",
                 scalar_id,
-                context.output_root / "scalars" / scalar_id / "table.parquet",
+                artifact_path(context.output_root, "scalars", scalar_id) / "table.parquet",
             )
             for scalar_id in spec.scalar_ids
         ]
@@ -99,7 +100,7 @@ def plot_artifact_inputs(context: WorkspaceContext, spec: ResolvedPlotSpec) -> l
                 context,
                 "scalar_table",
                 scalar_id,
-                context.output_root / "scalars" / scalar_id / "table.parquet",
+                artifact_path(context.output_root, "scalars", scalar_id) / "table.parquet",
             )
             for scalar_id in spec.scalar_ids
         ]
@@ -158,7 +159,7 @@ def plot_artifact_inputs(context: WorkspaceContext, spec: ResolvedPlotSpec) -> l
                 context,
                 "scalar_table",
                 scalar_id,
-                context.output_root / "scalars" / scalar_id / "table.parquet",
+                artifact_path(context.output_root, "scalars", scalar_id) / "table.parquet",
             )
             for scalar_id in spec.scalar_ids
         ]
@@ -178,7 +179,7 @@ def plot_artifact_inputs(context: WorkspaceContext, spec: ResolvedPlotSpec) -> l
                 context,
                 "reducer",
                 reducer_id,
-                context.output_root / "reducers" / reducer_id / "summary.json",
+                artifact_path(context.output_root, "reducers", reducer_id) / "summary.json",
             )
             for reducer_id in spec.reducer_ids
         ]
@@ -204,7 +205,7 @@ def plot_artifact_inputs(context: WorkspaceContext, spec: ResolvedPlotSpec) -> l
                 context,
                 "agreement_set",
                 agreement_id,
-                context.output_root / "agreements" / agreement_id / "summary.json",
+                artifact_path(context.output_root, "agreements", agreement_id) / "summary.json",
             )
             for agreement_id in spec.agreement_ids
         ]

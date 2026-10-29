@@ -32,6 +32,7 @@ from ..contracts.workspace_snapshot import (
     WorkspaceSnapshotExport,
     WorkspaceSnapshotSource,
 )
+from ..io.artifact_dirs import artifact_path
 from ..io.json_io import write_json
 from ..services.candidate_inventory_service import build_candidate_inventory
 from ..services.deliverable_service import deliverable_status_from_context
@@ -169,7 +170,7 @@ def decision_ladder(context) -> list[str]:
 def _export_snapshots(context) -> dict[str, WorkspaceSnapshotExport]:
     snapshots: dict[str, WorkspaceSnapshotExport] = {}
     for export_id in context.config.exports:
-        export_dir = context.output_root / "exports" / export_id
+        export_dir = artifact_path(context.output_root, "exports", export_id)
         manifest_path = export_dir / "manifest.json"
         if manifest_path.is_file():
             manifest = context.read_manifest(manifest_path)

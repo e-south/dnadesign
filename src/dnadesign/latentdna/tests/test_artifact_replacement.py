@@ -109,3 +109,44 @@ def test_failed_forced_computation_preserves_previous_artifact(
     with pytest.raises(RuntimeError, match="injected computation failure"):
         getattr(service, operation)(tmp_path, "result", force=True, **kwargs)
     assert marker.read_bytes() == b"prior successful output"
+
+
+@pytest.mark.parametrize("owner,operation,builder,directory,kwargs", CASES, ids=[case[1] for case in CASES])
+@pytest.mark.parametrize("invalid_id", ["absolute", "../escaped_artifact", "bad\n"])
+def test_services_reject_unsafe_ids_before_creating_artifacts(
+    tmp_path, monkeypatch, owner, operation, builder, directory, kwargs, invalid_id
+):
+    from dnadesign.latentdna.src.contracts.errors import WorkspaceValidationError
+
+    service = importlib.import_module(f"dnadesign.latentdna.src.services.{owner}_service")
+    root = tmp_path / "outputs"
+    context = SimpleNamespace(output_root=root)
+    for name in ("alignment", "scalar", "export"):
+        setattr(context, f"require_{name}", lambda _id: SimpleNamespace())
+    monkeypatch.setattr(service, "load_workspace_config", lambda _: context)
+    if invalid_id == "absolute":
+        invalid_id = str(tmp_path / "outside" / "escaped")
+    with pytest.raises(WorkspaceValidationError):
+        getattr(service, operation)(tmp_path, invalid_id, **kwargs)
+    assert not root.exists()
+
+
+@pytest.mark.parametrize("owner,operation,builder,directory,kwargs", CASES, ids=[case[1] for case in CASES])
+def test_services_reject_symlinked_artifact_parents(
+    tmp_path, monkeypatch, owner, operation, builder, directory, kwargs
+):
+    from dnadesign.latentdna.src.contracts.errors import WorkspaceValidationError
+
+    service = importlib.import_module(f"dnadesign.latentdna.src.services.{owner}_service")
+    root = tmp_path / "outputs"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / directory).symlink_to(outside, target_is_directory=True)
+    context = SimpleNamespace(output_root=root)
+    for name in ("alignment", "scalar", "export"):
+        setattr(context, f"require_{name}", lambda _id: SimpleNamespace())
+    monkeypatch.setattr(service, "load_workspace_config", lambda _: context)
+    with pytest.raises(WorkspaceValidationError):
+        getattr(service, operation)(tmp_path, "safe_id", **kwargs)
+    assert not list(outside.iterdir())

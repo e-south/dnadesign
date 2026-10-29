@@ -19,7 +19,7 @@ from ..contracts.result import CommandResult
 from ..exports.anndata import build_export_anndata_artifact
 from ..exports.matrix import build_export_matrix_artifact
 from ..exports.table import build_export_table_artifact
-from ..io.artifact_dirs import staged_artifact
+from ..io.artifact_dirs import artifact_path, staged_artifact
 from ..io.hashing import sha256_file
 from ..io.manifest_io import write_manifest
 from ..runs.recorder import record_audit
@@ -96,7 +96,7 @@ def export_matrix(
 ) -> CommandResult:
     context = load_workspace_config(workspace)
     export = context.require_export(export_id)
-    final_dir = context.output_root / "exports" / export_id
+    final_dir = artifact_path(context.output_root, "exports", export_id)
     with staged_artifact(final_dir, force=force) as staging_dir:
         preflight = evaluate_export_preflight(context, export_id=export_id, export_kind="matrix")
         status, warnings = apply_memory_preflight(preflight, allow_memory_overage=allow_memory_overage)
@@ -162,7 +162,7 @@ def export_table(
 ) -> CommandResult:
     context = load_workspace_config(workspace)
     export = context.require_export(export_id)
-    final_dir = context.output_root / "exports" / export_id
+    final_dir = artifact_path(context.output_root, "exports", export_id)
     with staged_artifact(final_dir, force=force) as staging_dir:
         preflight = evaluate_export_preflight(context, export_id=export_id, export_kind="table")
         status, warnings = apply_memory_preflight(preflight, allow_memory_overage=allow_memory_overage)
@@ -230,7 +230,7 @@ def export_anndata(
 ) -> CommandResult:
     context = load_workspace_config(workspace)
     export = context.require_export(export_id)
-    final_dir = context.output_root / "exports" / export_id
+    final_dir = artifact_path(context.output_root, "exports", export_id)
     with staged_artifact(final_dir, force=force) as staging_dir:
         preflight = evaluate_export_preflight(context, export_id=export_id, export_kind="anndata")
         status, warnings = apply_memory_preflight(preflight, allow_memory_overage=allow_memory_overage)

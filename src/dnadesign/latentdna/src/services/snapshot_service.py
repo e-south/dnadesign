@@ -16,7 +16,7 @@ from pathlib import Path
 
 from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
-from ..io.artifact_dirs import staged_artifact
+from ..io.artifact_dirs import artifact_path, staged_artifact
 from ..io.manifest_io import write_manifest
 from ..runs.recorder import record_audit
 from ..snapshots.build import build_snapshot_artifact
@@ -27,7 +27,7 @@ from ..workspaces.loader import load_workspace_config
 
 def build_snapshot(workspace: str | Path, snapshot_id: str, *, source_id: str, force: bool = False) -> CommandResult:
     context = load_workspace_config(workspace)
-    snapshot_dir = context.output_root / "snapshots" / snapshot_id
+    snapshot_dir = artifact_path(context.output_root, "snapshots", snapshot_id)
     with staged_artifact(snapshot_dir, force=force) as staging_dir:
         artifact_dir, source_path, rows, row_columns, metadata_columns = build_snapshot_artifact(
             context, snapshot_id=snapshot_id, source_id=source_id, artifact_dir=staging_dir

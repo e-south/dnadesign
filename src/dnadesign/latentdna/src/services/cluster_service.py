@@ -17,7 +17,7 @@ from pathlib import Path
 from ..clusters.fit import fit_cluster_artifact
 from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
-from ..io.artifact_dirs import staged_artifact
+from ..io.artifact_dirs import artifact_path, staged_artifact
 from ..io.hashing import sha256_file
 from ..io.manifest_io import write_manifest
 from ..runs.recorder import record_audit
@@ -47,7 +47,7 @@ def fit_cluster(
     force: bool = False,
 ) -> CommandResult:
     context = load_workspace_config(workspace)
-    cluster_dir = context.output_root / "clusters" / cluster_id
+    cluster_dir = artifact_path(context.output_root, "clusters", cluster_id)
     with staged_artifact(cluster_dir, force=force) as staging_dir:
         seed_value = seed if seed is not None else context.config.defaults.random_seed
         metric_value = metric or context.config.defaults.metric

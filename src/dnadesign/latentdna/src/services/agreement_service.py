@@ -17,7 +17,7 @@ from pathlib import Path
 from ..agreements.compare import compare_agreement_artifact
 from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
-from ..io.artifact_dirs import staged_artifact
+from ..io.artifact_dirs import artifact_path, staged_artifact
 from ..io.manifest_io import write_manifest
 from ..runs.recorder import record_audit
 from ..sources.resolver import resolve_source
@@ -38,7 +38,7 @@ def compare_agreement(
     force: bool = False,
 ) -> CommandResult:
     context = load_workspace_config(workspace)
-    agreement_dir = context.output_root / "agreements" / agreement_id
+    agreement_dir = artifact_path(context.output_root, "agreements", agreement_id)
     with staged_artifact(agreement_dir, force=force) as staging_dir:
         artifact_dir, rows, summary = compare_agreement_artifact(
             context,
@@ -64,25 +64,25 @@ def compare_agreement(
                         context,
                         kind="neighbor_set",
                         artifact_id=left_neighbors_id,
-                        path=context.output_root / "neighbors" / left_neighbors_id / "indices.npy",
+                        path=artifact_path(context.output_root, "neighbors", left_neighbors_id) / "indices.npy",
                     ),
                     dependency_artifact_input(
                         context,
                         kind="neighbor_rows",
                         artifact_id=left_neighbors_id,
-                        path=context.output_root / "neighbors" / left_neighbors_id / "rows.parquet",
+                        path=artifact_path(context.output_root, "neighbors", left_neighbors_id) / "rows.parquet",
                     ),
                     dependency_artifact_input(
                         context,
                         kind="neighbor_set",
                         artifact_id=right_neighbors_id,
-                        path=context.output_root / "neighbors" / right_neighbors_id / "indices.npy",
+                        path=artifact_path(context.output_root, "neighbors", right_neighbors_id) / "indices.npy",
                     ),
                     dependency_artifact_input(
                         context,
                         kind="neighbor_rows",
                         artifact_id=right_neighbors_id,
-                        path=context.output_root / "neighbors" / right_neighbors_id / "rows.parquet",
+                        path=artifact_path(context.output_root, "neighbors", right_neighbors_id) / "rows.parquet",
                     ),
                 ]
             )
@@ -99,13 +99,13 @@ def compare_agreement(
                         context,
                         kind="cluster_set",
                         artifact_id=left_cluster_id,
-                        path=context.output_root / "clusters" / left_cluster_id / "assignments.parquet",
+                        path=artifact_path(context.output_root, "clusters", left_cluster_id) / "assignments.parquet",
                     ),
                     dependency_artifact_input(
                         context,
                         kind="cluster_set",
                         artifact_id=right_cluster_id,
-                        path=context.output_root / "clusters" / right_cluster_id / "assignments.parquet",
+                        path=artifact_path(context.output_root, "clusters", right_cluster_id) / "assignments.parquet",
                     ),
                 ]
             )

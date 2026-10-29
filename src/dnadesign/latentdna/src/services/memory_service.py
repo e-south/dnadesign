@@ -28,6 +28,7 @@ from ..contracts.workspace import (
     ReducedViewExportBlockConfig,
     TableColumnsExportBlockConfig,
 )
+from ..io.artifact_dirs import artifact_path
 from ..io.matrix_io import read_matrix
 from ..io.parquet_io import read_row_count
 from ..neighbors.backends.approximate import approximate_backend_available
@@ -275,10 +276,10 @@ def evaluate_projection_preflight(
     sample_id: str,
 ) -> MemoryPreflight:
     rows, dims, dtype, itemsize = _view_metadata(context, view_id=view_id)
-    sample_manifest = context.read_manifest(context.output_root / "samples" / sample_id / "manifest.json")
+    sample_manifest = context.read_manifest(artifact_path(context.output_root, "samples", sample_id) / "manifest.json")
     sample_params = sample_manifest.get("params", {}) if isinstance(sample_manifest.get("params"), dict) else {}
     sample_strategy = str(sample_params.get("strategy", "unknown"))
-    sample_rows = _row_count(context.output_root / "samples" / sample_id / "rows.parquet")
+    sample_rows = _row_count(artifact_path(context.output_root, "samples", sample_id) / "rows.parquet")
     n_neighbors = max(2, min(15, sample_rows - 1))
     base_bytes = _matrix_bytes(rows, dims, itemsize)
     subset_bytes = _matrix_bytes(sample_rows, dims, itemsize)
@@ -554,11 +555,13 @@ def _resolved_neighbor_backend(requested_backend: str) -> str:
 
 
 def _view_metadata(context: WorkspaceContext, *, view_id: str) -> tuple[int, int, str, int]:
-    return _artifact_matrix_metadata(context.output_root / "views" / view_id / "matrix.npy")
+    return _artifact_matrix_metadata(artifact_path(context.output_root, "views", view_id) / "matrix.npy")
 
 
 def _reduced_view_metadata(context: WorkspaceContext, *, reduced_view_id: str) -> tuple[int, int, str, int]:
-    return _artifact_matrix_metadata(context.output_root / "reduced_views" / reduced_view_id / "matrix.npy")
+    return _artifact_matrix_metadata(
+        artifact_path(context.output_root, "reduced_views", reduced_view_id) / "matrix.npy"
+    )
 
 
 def _matrix_source_metadata(
@@ -679,7 +682,7 @@ def _row_count(path: Path) -> int:
 def _aligned_row_count(context: WorkspaceContext, *, alignment_id: str | None) -> int:
     if alignment_id is None:
         raise MemoryPreflightError("alignment id is required for aligned row count")
-    return _row_count(context.output_root / "alignments" / alignment_id / "rows.parquet")
+    return _row_count(artifact_path(context.output_root, "alignments", alignment_id) / "rows.parquet")
 
 
 def _scope_rows(
@@ -705,9 +708,9 @@ def _scope_rows(
     if sample_id and alignment_id:
         raise MemoryPreflightError("memory preflight accepts at most one scope of sample or alignment")
     if alignment_id is not None:
-        return _row_count(context.output_root / "alignments" / alignment_id / "rows.parquet"), notes
+        return _row_count(artifact_path(context.output_root, "alignments", alignment_id) / "rows.parquet"), notes
     if sample_id is not None:
-        return _row_count(context.output_root / "samples" / sample_id / "rows.parquet"), notes
+        return _row_count(artifact_path(context.output_root, "samples", sample_id) / "rows.parquet"), notes
     rows, _, _, _ = _view_metadata(context, view_id=str(view_id))
     return rows, notes
 
@@ -730,12 +733,12 @@ def _scoped_matrix_bytes(
 
 def _resolve_rows_artifact_count(context: WorkspaceContext, artifact_id: str) -> int:
     candidates = [
-        context.output_root / "alignments" / artifact_id / "rows.parquet",
-        context.output_root / "samples" / artifact_id / "rows.parquet",
-        context.output_root / "reduced_views" / artifact_id / "rows.parquet",
-        context.output_root / "views" / artifact_id / "rows.parquet",
-        context.output_root / "scalars" / artifact_id / "table.parquet",
-        context.output_root / "distances" / artifact_id / "table.parquet",
+        artifact_path(context.output_root, "alignments", artifact_id) / "rows.parquet",
+        artifact_path(context.output_root, "samples", artifact_id) / "rows.parquet",
+        artifact_path(context.output_root, "reduced_views", artifact_id) / "rows.parquet",
+        artifact_path(context.output_root, "views", artifact_id) / "rows.parquet",
+        artifact_path(context.output_root, "scalars", artifact_id) / "table.parquet",
+        artifact_path(context.output_root, "distances", artifact_id) / "table.parquet",
     ]
     for path in candidates:
         if path.is_file():

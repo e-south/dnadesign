@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -18,7 +19,7 @@ from ..contracts.errors import ArtifactConflictError, ContractViolationError
 from ..contracts.manifest import ArtifactInput, ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
 from ..contracts.workspace import DerivedViewConfig
-from ..io.artifact_dirs import commit_staged_artifact_dirs, stage_artifact_dir
+from ..io.artifact_dirs import artifact_path, commit_staged_artifact_dirs, stage_artifact_dir
 from ..io.manifest_io import write_manifest
 from ..io.parquet_io import read_table
 from ..runs.recorder import record_audit
@@ -47,7 +48,7 @@ def materialize_view(
         operation="view_materialize",
         owner_id=view_id,
     ):
-        view_dir = context.output_root / "views" / view_id
+        view_dir = artifact_path(context.output_root, "views", view_id)
         if view_dir.exists() and not force:
             raise ArtifactConflictError(f"view artifact already exists: {view_dir}")
         preflight = evaluate_materialize_preflight(context, view_id=view_id)
@@ -139,7 +140,7 @@ def _write_materialized_view_manifest_and_result(
         warnings=warnings,
     )
     write_manifest(staging_dir / "manifest.json", manifest.model_dump(mode="json"))
-    final_dir = context.output_root / "views" / view_id
+    final_dir = artifact_path(context.output_root, "views", view_id)
     return CommandResult(
         command="view materialize",
         workspace_id=context.workspace_id,
@@ -171,7 +172,7 @@ def materialize_views(
         owner_id="+".join(view_ids[:3]),
     ):
         for view_id in view_ids:
-            view_dir = context.output_root / "views" / view_id
+            view_dir = artifact_path(context.output_root, "views", view_id)
             if view_dir.exists() and not force:
                 raise ArtifactConflictError(f"view artifact already exists: {view_dir}")
         preflights = {view_id: evaluate_materialize_preflight(context, view_id=view_id) for view_id in view_ids}
@@ -205,7 +206,7 @@ def materialize_views(
                 shutil.rmtree(staging_dir, ignore_errors=True)
             raise
         commit_staged_artifact_dirs(
-            [(staging_dirs[view_id], context.output_root / "views" / view_id) for view_id in view_ids],
+            [(staging_dirs[view_id], artifact_path(context.output_root, "views", view_id)) for view_id in view_ids],
             force=force,
         )
         for view_id, result in results.items():
@@ -224,7 +225,7 @@ def derive_view(workspace: str | Path, view_id: str, *, force: bool = False) -> 
     if not isinstance(view, DerivedViewConfig):
         raise ContractViolationError(f"view {view_id} is not a derived view declaration")
 
-    view_dir = context.output_root / "views" / view_id
+    view_dir = artifact_path(context.output_root, "views", view_id)
     if view_dir.exists() and not force:
         raise ArtifactConflictError(f"view artifact already exists: {view_dir}")
     staging_dir = stage_artifact_dir(context.output_root / "views", view_id)
@@ -406,17 +407,15 @@ def reduce_view(
     force: bool = False,
 ) -> CommandResult:
     context = load_workspace_config(workspace)
-    reducer_dir = context.output_root / "reducers" / reducer_id
+    reducer_dir = artifact_path(context.output_root, "reducers", reducer_id)
     if reducer_dir.exists() and not force:
         raise ArtifactConflictError(f"reducer artifact already exists: {reducer_dir}")
 
-    reduced_view_dir = None if reduced_view_id is None else context.output_root / "reduced_views" / reduced_view_id
+    reduced_view_dir = (
+        None if reduced_view_id is None else artifact_path(context.output_root, "reduced_views", reduced_view_id)
+    )
     if reduced_view_dir is not None and reduced_view_dir.exists() and not force:
         raise ArtifactConflictError(f"reduced view artifact already exists: {reduced_view_dir}")
-    reducer_staging_dir = stage_artifact_dir(context.output_root / "reducers", reducer_id)
-    reduced_view_staging_dir = (
-        None if reduced_view_id is None else stage_artifact_dir(context.output_root / "reduced_views", reduced_view_id)
-    )
     preflight = evaluate_reduce_preflight(
         context,
         view_id=view_id,
@@ -427,7 +426,15 @@ def reduce_view(
     )
     status, warnings = apply_memory_preflight(preflight, allow_memory_overage=allow_memory_overage)
 
+    reducer_staging_dir = None
+    reduced_view_staging_dir = None
     try:
+        reducer_staging_dir = stage_artifact_dir(context.output_root / "reducers", reducer_id)
+        reduced_view_staging_dir = (
+            None
+            if reduced_view_id is None
+            else stage_artifact_dir(context.output_root / "reduced_views", reduced_view_id)
+        )
         (
             staged_reducer_dir,
             staged_reduced_view_dir,
@@ -449,96 +456,93 @@ def reduce_view(
         )
         assert staged_reducer_dir == reducer_staging_dir
         assert staged_reduced_view_dir == reduced_view_staging_dir
-    except Exception:
-        import shutil
-
-        shutil.rmtree(reducer_staging_dir, ignore_errors=True)
-        if reduced_view_staging_dir is not None:
-            shutil.rmtree(reduced_view_staging_dir, ignore_errors=True)
-        raise
-
-    reducer_manifest = ArtifactManifest(
-        artifact_kind="reducer",
-        artifact_id=reducer_id,
-        workspace_id=context.workspace_id,
-        created_at=datetime.now(UTC).isoformat(),
-        tool_version=__version__,
-        command="view reduce",
-        status=status,
-        inputs=[
-            dependency_artifact_input(
-                context,
-                kind="view_matrix",
-                artifact_id=view_id,
-                path=context.output_root / "views" / view_id / "matrix.npy",
-            )
-        ],
-        params={
-            "method": "pca",
-            "pca_method": pca_method,
-            "view_id": view_id,
-            "fit_scope_kind": scope_kind,
-            "fit_scope_id": scope_id,
-            "output_dims": output_dims,
-            "memory_preflight": preflight.as_payload(),
-        },
-        outputs=[
-            ArtifactOutput(path="state.npz", media_type="application/x-npz"),
-            ArtifactOutput(path="summary.json", media_type="application/json"),
-        ],
-        stats={"rows": fit_rows, "dims": output_dims},
-        warnings=warnings,
-    )
-    write_manifest(reducer_staging_dir / "manifest.json", reducer_manifest.model_dump(mode="json"))
-
-    outputs = [reducer_dir.as_posix()]
-    metrics: dict[str, int | str | None] = {"fit_rows": fit_rows, "dims": output_dims}
-    staged_pairs: list[tuple[Path, Path]] = [(reducer_staging_dir, reducer_dir)]
-    if reduced_view_staging_dir is not None and reduced_view_dir is not None and reduced_view_id is not None:
-        reduced_rows = read_table(reduced_view_staging_dir / "rows.parquet").num_rows
-        reduced_manifest = ArtifactManifest(
-            artifact_kind="reduced_view",
-            artifact_id=reduced_view_id,
+        reducer_manifest = ArtifactManifest(
+            artifact_kind="reducer",
+            artifact_id=reducer_id,
             workspace_id=context.workspace_id,
             created_at=datetime.now(UTC).isoformat(),
             tool_version=__version__,
             command="view reduce",
+            status=status,
             inputs=[
-                artifact_input_from_manifest(
-                    kind="reducer",
-                    artifact_id=reducer_id,
-                    digest_path=reducer_staging_dir / "manifest.json",
-                    recorded_path=reducer_dir / "manifest.json",
-                ),
                 dependency_artifact_input(
                     context,
                     kind="view_matrix",
                     artifact_id=view_id,
-                    path=context.output_root / "views" / view_id / "matrix.npy",
-                ),
+                    path=artifact_path(context.output_root, "views", view_id) / "matrix.npy",
+                )
             ],
             params={
-                "source_view_id": view_id,
-                "reducer_id": reducer_id,
-                "coordinate_space_id": f"pca_{reducer_id}",
+                "method": "pca",
+                "pca_method": pca_method,
+                "view_id": view_id,
                 "fit_scope_kind": scope_kind,
                 "fit_scope_id": scope_id,
+                "output_dims": output_dims,
                 "memory_preflight": preflight.as_payload(),
             },
             outputs=[
-                ArtifactOutput(path="matrix.npy", media_type="application/x-npy"),
-                ArtifactOutput(path="rows.parquet", media_type="application/x-parquet"),
+                ArtifactOutput(path="state.npz", media_type="application/x-npz"),
+                ArtifactOutput(path="summary.json", media_type="application/json"),
             ],
-            stats={"rows": reduced_rows, "dims": output_dims},
-            status=status,
+            stats={"rows": fit_rows, "dims": output_dims},
             warnings=warnings,
         )
-        write_manifest(reduced_view_staging_dir / "manifest.json", reduced_manifest.model_dump(mode="json"))
-        staged_pairs.append((reduced_view_staging_dir, reduced_view_dir))
-        outputs.append(reduced_view_dir.as_posix())
-        metrics["reduced_view_rows"] = reduced_rows
+        write_manifest(reducer_staging_dir / "manifest.json", reducer_manifest.model_dump(mode="json"))
 
-    commit_staged_artifact_dirs(staged_pairs, force=force)
+        outputs = [reducer_dir.as_posix()]
+        metrics: dict[str, int | str | None] = {"fit_rows": fit_rows, "dims": output_dims}
+        staged_pairs: list[tuple[Path, Path]] = [(reducer_staging_dir, reducer_dir)]
+        if reduced_view_staging_dir is not None and reduced_view_dir is not None and reduced_view_id is not None:
+            reduced_rows = read_table(reduced_view_staging_dir / "rows.parquet").num_rows
+            reduced_manifest = ArtifactManifest(
+                artifact_kind="reduced_view",
+                artifact_id=reduced_view_id,
+                workspace_id=context.workspace_id,
+                created_at=datetime.now(UTC).isoformat(),
+                tool_version=__version__,
+                command="view reduce",
+                inputs=[
+                    artifact_input_from_manifest(
+                        kind="reducer",
+                        artifact_id=reducer_id,
+                        digest_path=reducer_staging_dir / "manifest.json",
+                        recorded_path=reducer_dir / "manifest.json",
+                    ),
+                    dependency_artifact_input(
+                        context,
+                        kind="view_matrix",
+                        artifact_id=view_id,
+                        path=artifact_path(context.output_root, "views", view_id) / "matrix.npy",
+                    ),
+                ],
+                params={
+                    "source_view_id": view_id,
+                    "reducer_id": reducer_id,
+                    "coordinate_space_id": f"pca_{reducer_id}",
+                    "fit_scope_kind": scope_kind,
+                    "fit_scope_id": scope_id,
+                    "memory_preflight": preflight.as_payload(),
+                },
+                outputs=[
+                    ArtifactOutput(path="matrix.npy", media_type="application/x-npy"),
+                    ArtifactOutput(path="rows.parquet", media_type="application/x-parquet"),
+                ],
+                stats={"rows": reduced_rows, "dims": output_dims},
+                status=status,
+                warnings=warnings,
+            )
+            write_manifest(reduced_view_staging_dir / "manifest.json", reduced_manifest.model_dump(mode="json"))
+            staged_pairs.append((reduced_view_staging_dir, reduced_view_dir))
+            outputs.append(reduced_view_dir.as_posix())
+            metrics["reduced_view_rows"] = reduced_rows
+
+        commit_staged_artifact_dirs(staged_pairs, force=force)
+
+    finally:
+        for staging in (reducer_staging_dir, reduced_view_staging_dir):
+            if staging is not None and staging.exists():
+                shutil.rmtree(staging)
 
     result = CommandResult(
         command="view reduce",

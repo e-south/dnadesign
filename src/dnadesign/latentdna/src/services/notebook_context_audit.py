@@ -17,6 +17,7 @@ import numpy as np
 from pyarrow import Array
 
 from ..contracts.notebook import WorkspaceNotebookContextAudit
+from ..io.artifact_dirs import artifact_path
 from ..io.parquet_io import read_schema, read_table
 
 
@@ -66,7 +67,7 @@ def build_workspace_notebook_context_audit(context) -> WorkspaceNotebookContextA
     missing_scalar_ids: list[str] = []
     invalid_scalar_ids: list[str] = []
     for scalar_id in scalar_ids:
-        table_path = context.output_root / "scalars" / scalar_id / "table.parquet"
+        table_path = artifact_path(context.output_root, "scalars", scalar_id) / "table.parquet"
         if not table_path.is_file():
             missing_scalar_ids.append(scalar_id)
             continue

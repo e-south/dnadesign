@@ -17,6 +17,7 @@ from typing import Any
 
 from ..contracts.errors import ContractViolationError
 from ..contracts.workspace import DerivedViewConfig, SourceBackedViewConfig
+from ..io.artifact_dirs import artifact_path
 from ..io.implementation import execution_identity
 from ..io.json_io import read_json
 from ..io.parquet_io import read_table
@@ -302,7 +303,7 @@ def _notebook_health_freshness_reasons(
     *,
     artifact_id: str,
 ) -> tuple[list[str], bool]:
-    health_path = context.output_root / "notebooks" / artifact_id / "health.json"
+    health_path = artifact_path(context.output_root, "notebooks", artifact_id) / "health.json"
     if not health_path.is_file():
         return [f"notebook health artifact is missing for notebook:{artifact_id}"], True
     try:

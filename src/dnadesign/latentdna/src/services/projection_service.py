@@ -17,7 +17,7 @@ from pathlib import Path
 from ..contracts.errors import ArtifactConflictError
 from ..contracts.manifest import ArtifactManifest, ArtifactOutput
 from ..contracts.result import CommandResult
-from ..io.artifact_dirs import commit_staged_artifact_dirs, stage_artifact_dir
+from ..io.artifact_dirs import artifact_path, commit_staged_artifact_dirs, stage_artifact_dir
 from ..io.manifest_io import write_manifest
 from ..projections.fit import _fit_projection_artifact
 from ..runs.recorder import record_audit
@@ -45,17 +45,21 @@ def fit_projection(
         operation="projection_fit",
         owner_id=projection_id,
     ):
-        projection_dir = context.output_root / "projections" / projection_id
+        projection_dir = artifact_path(context.output_root, "projections", projection_id)
         if projection_dir.exists() and not force:
             raise ArtifactConflictError(f"projection artifact already exists: {projection_dir}")
 
         metric_value = metric or context.config.defaults.metric
         preflight = evaluate_projection_preflight(context, view_id=view_id, sample_id=sample_id)
         status, warnings = apply_memory_preflight(preflight, allow_memory_overage=allow_memory_overage)
-        sample_manifest = context.read_manifest(context.output_root / "samples" / sample_id / "manifest.json")
+        sample_manifest = context.read_manifest(
+            artifact_path(context.output_root, "samples", sample_id) / "manifest.json"
+        )
         sample_params = sample_manifest.get("params", {}) if isinstance(sample_manifest.get("params"), dict) else {}
         population_rows = int(
-            context.read_manifest(context.output_root / "views" / view_id / "manifest.json")["stats"]["rows"]
+            context.read_manifest(artifact_path(context.output_root, "views", view_id) / "manifest.json")["stats"][
+                "rows"
+            ]
         )
         staging_dir = stage_artifact_dir(context.output_root / "projections", projection_id)
         try:
@@ -87,13 +91,13 @@ def fit_projection(
                     context,
                     kind="view_matrix",
                     artifact_id=view_id,
-                    path=context.output_root / "views" / view_id / "matrix.npy",
+                    path=artifact_path(context.output_root, "views", view_id) / "matrix.npy",
                 ),
                 dependency_artifact_input(
                     context,
                     kind="sample_set",
                     artifact_id=sample_id,
-                    path=context.output_root / "samples" / sample_id / "rows.parquet",
+                    path=artifact_path(context.output_root, "samples", sample_id) / "rows.parquet",
                 ),
             ],
             params={

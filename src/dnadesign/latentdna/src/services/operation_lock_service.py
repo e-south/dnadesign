@@ -123,6 +123,6 @@ def acquire_workspace_operation_lock(
             except Exception:
                 pass
             handle.close()
-            lock_path.unlink(missing_ok=True)
+            # Keep the inode: a successor may already hold a lock on this file.
         else:
             handle.close()
