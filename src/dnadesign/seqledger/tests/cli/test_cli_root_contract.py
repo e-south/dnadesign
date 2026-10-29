@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from pathlib import Path
 
+from typer import BadParameter
 from typer.testing import CliRunner
 
 import dnadesign.seqledger.src.cli as cli_module
@@ -77,10 +78,11 @@ def test_cli_uses_external_usr_root_from_environment(tmp_path: Path, monkeypatch
 def test_cli_defaults_to_project_datasets_without_creating_directories(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("DNADESIGN_SEQLEDGER_ROOT", raising=False)
-    result = CliRunner().invoke(cli_module.app, ["ls"])
-    assert result.exit_code != 0
-    assert "seqledger_datasets" in result.output
-    assert "Create" in result.output
+    # Inspect the path contract before terminal formatting can wrap it across lines.
+    result = CliRunner().invoke(cli_module.app, ["ls"], standalone_mode=False)
+    assert isinstance(result.exception, BadParameter)
+    assert str(tmp_path / "seqledger_datasets") in str(result.exception)
+    assert "Create" in str(result.exception)
     assert not (tmp_path / "seqledger_datasets").exists()
 
     ensure_registry(tmp_path / "seqledger_datasets")
