@@ -95,7 +95,8 @@ jobs:
             --output build/release-evidence/build-dependency-audit.json
       - name: Smoke-test ordinary registry installation
         run: |
-          python -m venv build/wheel-smoke
+          # uv installs the packages; this environment does not need a bundled pip.
+          python -m venv --without-pip build/wheel-smoke
           uv pip install --python build/wheel-smoke/bin/python dist/*.whl
           build/wheel-smoke/bin/python -I - <<'PY'
           import importlib.util

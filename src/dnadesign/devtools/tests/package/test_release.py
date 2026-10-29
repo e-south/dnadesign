@@ -150,3 +150,32 @@ def test_workflow_checks_built_readme_banner(tmp_path, monkeypatch, valid_banner
     else:
         with pytest.raises(AssertionError, match="Published banner differs"):
             exec(compile(program, "release-banner-check", "exec"), {})
+
+
+def test_release_smoke_environment_has_no_unused_bootstrap_installer(tmp_path):
+    import shlex
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    import yaml
+
+    root = Path(__file__).resolve().parents[5]
+    workflow = yaml.safe_load((root / ".github/workflows/release.yaml").read_text())
+    step = next(
+        item
+        for item in workflow["jobs"]["build"]["steps"]
+        if item.get("name") == "Smoke-test ordinary registry installation"
+    )
+    command = next(shlex.split(line) for line in step["run"].splitlines() if line.startswith("python -m venv "))
+    subprocess.run([sys.executable, *command[1:]], cwd=tmp_path, check=True)
+    subprocess.run(
+        [
+            str(tmp_path / command[-1] / "bin/python"),
+            "-I",
+            "-c",
+            "import importlib.util; assert importlib.util.find_spec('pip') is None",
+        ],
+        cwd=tmp_path,
+        check=True,
+    )
