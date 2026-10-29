@@ -3,6 +3,8 @@
 **Last verified:** 2026-10-28
 -->
 
+[OPAL](../README.md)
+
 # OPAL documentation
 
 OPAL combines numerical descriptions of candidate sequences with measurements
@@ -14,8 +16,10 @@ see the complete loop, then use the campaign guide with your own data.
 From the DNADesign checkout, install the OPAL runtime and activate it:
 
 ```bash
+# Install the focused runtime and activate its commands.
 uv sync --locked --no-default-groups --extra opal
 source .venv/bin/activate
+# Run the examples and retain their outputs for inspection.
 opal demo-matrix --rounds 0 --keep
 ```
 
@@ -29,6 +33,7 @@ To inspect the random-forest selection, replace `/path/to/tmp_root` below with
 that printed directory:
 
 ```bash
+# Inspect the candidates selected by the random-forest example.
 opal selection-set show \
   -c /path/to/tmp_root/demo_rf_topn/configs/campaign.yaml \
   --view primary --round latest
@@ -54,7 +59,7 @@ setup, then follow the same selection loop.
 The [example campaigns](../campaigns/README.md) provide complete configurations.
 A campaign keeps the candidate pool, measurements and learning history together.
 Selection views let you apply different objectives to the same predictions.
-See [campaigns, rounds and views](./reference/configuration.md#ontology) before
+See [campaigns, rounds and views](./reference/configuration.md#campaigns-rounds-and-views) before
 configuring multiple targets.
 
 ## Choose prediction and selection methods

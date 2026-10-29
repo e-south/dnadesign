@@ -1,4 +1,11 @@
 <!--
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-10-28
+-->
+
+[OPAL docs](../index.md)
+
+<!--
 **Type:** workflow
 **Plane:** downstream-tool
 **Owner-boundary:** opal
@@ -9,8 +16,6 @@
 **Execution-kind:** round-loop
 **Status-kind:** opal-campaign-state
 
-**Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
 -->
 
 # Use SeqLedger features in an OPAL campaign

@@ -1,18 +1,24 @@
+<!--
 ---
 id: opal-objective-plugins
 title: OPAL objective plugins
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-10-28
 ---
 
-# OPAL objective plugins
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-10-28
+-->
 
-Objective plugins convert shared model predictions into named score and
-uncertainty channels. Objective-specific pages define the equations.
+[OPAL docs](../../index.md) / [Prediction and selection](../README.md)
 
-An objective name is part of the Y contract. Matching array width does not make
-two objectives semantically interchangeable.
+# Choose an objective
+
+An objective turns predicted outcomes (Y) into scores that express your
+selection goal. Choose it from the meaning, units and order of your outcome
+columns. The linked pages define its equations and configuration. A
+[selection rule](../selection/README.md) then uses those scores to choose candidates.
 
 `sfxi_v1`, `response_magnitude_feasibility_v1`, and
 `multistate_response_behavior_v1` are independent objective plugins. The two
@@ -23,7 +29,7 @@ boundaries; the behavior objective ranks threshold-free desired behavior.
 one objective to one selector; an objective does not choose candidates, and a
 selector does not infer objective identity from Y.
 
-### Channel reference format
+## Channel reference format
 
 Each objective plugin declares local channel names. A selection view references
 those local names:
@@ -35,16 +41,16 @@ those local names:
 OPAL namespaces persisted channels by selection view ID, so repeated instances
 of the same objective plugin cannot collide.
 
-### Built-in objective plugins
+## Built-in objective plugins
 
-| Objective | Required Y meaning | Selected score | Uncertainty | Main preference encoded |
-| --- | --- | --- | --- | --- |
-| [`multistate_response_behavior_v1`](multistate-response-behavior.md) | Ordered response and aligned reference-relative signal states | `behavior_score` | None | Threshold-free binary ON/OFF behavior with bounded compensation |
-| [`response_magnitude_feasibility_v1`](response-magnitude-feasibility.md) | Ordered response and aligned reference-relative magnitude states | `feasibility_margin` | None | Worst clearance from explicit response, ON, and OFF requirements |
-| [`sfxi_v1`](sfxi.md) | SFXI-specific logic and intensity vec8 | `sfxi` | `sfxi` SD | Setpoint fidelity multiplied by scaled intensity |
-| `vector_target_similarity_v1` | Generic vector in one declared coordinate system | `negative_mse` | None | Unweighted distance to an absolute target |
-| `vector_channel_v1` | Generic vector | Configured channel | None | One selected channel only |
-| `scalar_identity_v1` | One scalar that already is the objective | `scalar` | `scalar` when the model emits predictive standard deviation | Passthrough |
+| Objective | Goal and required outcomes | Score and uncertainty |
+| --- | --- | --- |
+| [Multistate Response Behavior (MSRB)](multistate-response-behavior.md) | Binary ON/OFF behavior from ordered response and reference-relative signal values; allows bounded compensation | `behavior_score`; no uncertainty |
+| [Response-magnitude feasibility (RMF)](response-magnitude-feasibility.md) | Worst clearance from explicit response, ON and OFF requirements | `feasibility_margin`; no uncertainty |
+| [Setpoint fidelity × intensity (SFXI)](sfxi.md) | Setpoint match and intensity from an SFXI logic/intensity eight-vector | `sfxi`; optional `sfxi` standard deviation |
+| `vector_target_similarity_v1` | Closeness to a target vector in the same units and coordinate order | `negative_mse`; no uncertainty |
+| `vector_channel_v1` | One selected outcome from a vector | Configured channel; no uncertainty |
+| `scalar_identity_v1` | One scalar outcome used directly as the score | `scalar`; optional `scalar` standard deviation |
 
 Do not register a study-named alias for `scalar_identity_v1` merely to rename
 its channel. Preserve the scalar's scientific identity in the study-owned label
@@ -52,17 +58,15 @@ publication, `y_space`, content digests, and a meaningful selection-view id.
 Add a new objective only when OPAL must enforce different input semantics,
 compute different scores, or encode a distinct selection preference.
 
-No row in this table is preference-free. Target vectors, selected channels,
-thresholds, scales, family priors, and setpoints all express different design
-intent. A campaign must choose an objective from the meaning of Y and the
-scientific preference, not from shape compatibility alone. For MSRB, read
+The objective's parameters express your priorities: target vectors, thresholds,
+scales and setpoints can change candidate rankings. For MSRB, read
 [the soft minimum and
 scale](multistate-response-behavior.md#why-msrb-uses-a-soft-minimum), [the three
 families](multistate-response-behavior.md#three-behavior-families),
 [compensation](multistate-response-behavior.md#the-central-compensation-example),
 and [claim limits](multistate-response-behavior.md#what-the-score-does-not-establish).
 
-### Common selection wiring examples
+## Common selection wiring examples
 
 Top-N:
 
@@ -80,13 +84,13 @@ Pool-relative weighted acquisition (`expected_improvement` registry ID):
 ```yaml
 selection_views:
   - id: primary
-    objective: {name: <objective-plugin>, params: {...}}
+    objective: {name: scalar_identity_v1, params: {}}
     selection:
       name: expected_improvement
       params:
         top_k: 12
-        score_ref: <score-channel>
-        uncertainty_ref: <uncertainty-channel>
+        score_ref: scalar
+        uncertainty_ref: scalar
         objective_mode: maximize
         tie_handling: competition_rank
         alpha: 1.0
@@ -95,3 +99,5 @@ selection_views:
 
 This selector is available only when the objective publishes a standard
 deviation channel. Objective-specific pages document their channel names.
+The [GP acquisition demo](../../../campaigns/demo_gp_ei/README.md) runs this
+configuration with a predictor that supplies standard deviations.

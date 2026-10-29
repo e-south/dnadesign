@@ -1,9 +1,11 @@
-# OPAL Architecture and Data Flow
-
 <!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
 -->
+
+[OPAL docs](../index.md)
+
+# OPAL Architecture and Data Flow
 
 OPAL executes each round through the stages below.
 

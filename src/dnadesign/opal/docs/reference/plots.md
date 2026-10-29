@@ -1,97 +1,77 @@
-## OPAL Plots
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-02
+**Last verified:** 2026-10-28
+-->
 
+[OPAL docs](../index.md)
 
-Plot plugins own their rendering, but their public contract is shape-first metadata: required sources, required columns, tidy output schema, failure modes, and artifact manifests.
+# Plot campaign results
 
-### How it works
+OPAL plots read saved predictions, measurements and selections. Choose a plot
+that answers your question, configure it in `plots.yaml`, and run it for a named
+selection view. Plotting does not fit the predictive model again.
 
-- Prefer a separate plots config file (e.g., `plots.yaml`) and reference it from `campaign.yaml` via `plot_config`.
-- Run plots with:
+## Generate a plot
 
-```bash
-uv run opal plot --config /path/to/campaign.yaml \
-  [--view selection-view-id] \
-  [--plot-config /path/to/plots.yaml] \
-  [--round latest|all|3|1,3,7|2-5] \
-  [--name my_plot] \
-  [--tag my_tag]
-```
-
-- Discover available plot kinds:
+With the OPAL environment activated, run these commands from a completed campaign:
 
 ```bash
-uv run opal plot --list
-uv run opal plot --list-config --config /path/to/campaign.yaml
-uv run opal plot --describe scatter_score_vs_rank
-uv run opal plot --list --json
-uv run opal plot --describe metric_over_rounds --json
+# Show the plot kinds supported by the installed version.
+opal plot --list
+# Inspect the inputs and settings for a score-versus-rank plot.
+opal plot --describe scatter_score_vs_rank
+# Draw the configured plots for the latest round of the primary view.
+opal plot -c configs/campaign.yaml --view primary --round latest
 ```
 
-### Minimal YAML schema
+Replace `primary` with your selection-view ID. Use `--name` to run one configured
+plot, `--tag` to select a group, or `--round all` to include recorded rounds.
+If a round has multiple runs, use `--run-id` to select the intended result.
+The [CLI reference](cli.md#plot) lists the other options.
 
-**campaign.yaml**
+## Minimal YAML schema
+
+In `configs/campaign.yaml`, point to a plot configuration in the same directory:
 
 ```yaml
+# Plot paths resolve from the campaign configuration directory.
 plot_config: plots.yaml
 ```
 
-**plots.yaml**
+In `configs/plots.yaml`, start with a score-versus-rank plot:
 
 ```yaml
+# Save an image and the table used to draw it.
 plot_defaults:
   output:
-    format: "png"
-    dpi: 600
-
-plot_presets:
-  fold_change_base:
-    kind: fold_change_vs_logic_fidelity
-    params:
-      intensity_log2_offset_delta: 0.0
-      y_axis: score
+    format: png
+    dpi: 160
+    save_data: true
 
 plots:
-  - name: score_vs_rank_latest        # unique instance label
-    kind: scatter_score_vs_rank       # plugin id registered in plots registry
-    round_selector: latest            # optional plot-local override for --round
-    round_variants: [latest, each]    # optional manifest fan-out for dropdown scopes
-
-    # Optional extra sources (built-ins auto-injected: records, outputs)
-    data:
-      - name: extra_csv
-        path: ./extras/scores.csv
-
-    # Opaque, plugin-specific params (required for plot knobs)
+  - name: score_vs_rank_latest
+    kind: scatter_score_vs_rank
     params:
-      score_field: "view__selection_score" # selected view projected from run_pred
-      surface_label: "Selected objective score: Score = -MSE(y_hat, target)"
-      metric_label: "Score = -MSE(y_hat, target)"  # optional objective-scale axis/notebook label
-      legend_metric_label: "negative MSE score"    # optional compact legend label
-      metric_expression: "score = -MSE(y_hat, target); MSE = d^-1 sum_c((y_hat_c - target_c)^2)"
-      y_axis:
-        scale_class: densegen_plan_logic4_negative_mse
-        limits: [-0.25, 0.0]
-        include_zero_tick: true
-      hue: null                       # or "round"
-      highlight_selected: false
-
-    # Optional output tuning
-    output:
-      dir: "{campaign}/plots/{kind}/{name}"  # {campaign|workdir|kind|name|round_suffix}
-      filename: "{name}{round_suffix}.png"
-      dpi: 600
-      format: "png"                   # png|svg|pdf (png default)
-      save_data: false                # save tidy CSV next to the image
-
-  - name: fold_change_numeric
-    preset: fold_change_base
-    params:
-      hue: view__selection_score
-      cbar: true
+      rank_mode: competition
+      alpha: 0.65
 ```
+
+This shows the selected view's ranking score for each candidate and outlines
+selected candidates. It helps inspect score ordering and ties; it does not
+measure predictive accuracy. OPAL reports the generated paths, and the plot
+manifest records its data, selection view and run. Use `format: svg` or
+`format: pdf` when you need a vector export.
+
+Example success message, with the campaign path shortened:
+
+```text
+[ok] score_vs_rank_latest (scatter_score_vs_rank) → …/outputs/plots/score_vs_rank_latest_rlatest.png
+```
+
+Use `opal plot --list-config -c configs/campaign.yaml` to inspect your configured
+plots. Each plot's `--describe` output documents its required inputs and optional
+parameters. Keep rendering parameters under `params` and file settings under
+`output`.
 
 **Notes:**
 - Plotting knobs must live under `params:`. Top‑level plotting keys are rejected.
@@ -129,7 +109,7 @@ Ledger sinks always live under `context.workspace.outputs_dir` (e.g., `outputs/l
 
 ---
 
-### Artifact manifests
+## Artifact manifests
 
 Configured plots are manifest-backed artifacts. Each plot attempt writes:
 
@@ -144,7 +124,7 @@ The per-plot manifest uses schema `opal.plot_artifact.v1` and records:
 | field | purpose |
 | --- | --- |
 | `name`, `kind` | configured plot instance and registered plot primitive |
-| `status` | `written` or `failed` for current plot attempts; future schemas may add explicit `skipped` or `stale` states |
+| `status` | `written` or `failed` for the plot attempt |
 | `selection_view_id`, `run_id`, `rounds` | explicit view/run/round scope used for input resolution |
 | `params` | merged plot parameters after defaults and presets |
 | `inputs` | resolved built-in and custom data paths with file size and mtime |
@@ -158,7 +138,7 @@ The per-plot manifest uses schema `opal.plot_artifact.v1` and records:
 | `alt_text`, `non_claim_boundary`, `tier` | accessible visual description, explicit claim limit, and review hierarchy |
 | `warnings`, `error` | structured nonfatal and fatal plot outcomes |
 
-Review and generated notebook surfaces should read manifests first. Extra files
+Review tools and generated notebooks should read manifests first. Extra files
 on disk are advisory only; they can trigger stale-file warnings, but they are
 not current evidence unless referenced by the active manifest.
 
@@ -170,8 +150,8 @@ notebook load time.
 
 When `round_variants` expands one configured plot into multiple artifacts, the
 aggregate index contains multiple `opal.plot_artifact.v1` manifests with the
-same `name` and different `rounds` / filename suffixes. Notebook visual
-surfaces group those rows under one plot-level dropdown and expose a second
+same `name` and different `rounds` / filename suffixes. Notebooks
+group those rows under one plot-level dropdown and expose a second
 manifest-backed plot-scope dropdown only when multiple scopes exist.
 
 Multi-view plot indexes are written under
@@ -185,9 +165,9 @@ generated-current, generated-stale, and stale-unmanifested surfaces.
 
 ---
 
-### Response-Magnitude Feasibility decision plots
+## Response-Magnitude Feasibility decision plots
 
-These plots are operative QA surfaces for campaigns using
+These plots show scores and their component requirements for campaigns using
 `response_magnitude_feasibility_v1`. They read one unambiguous prediction-ledger
 run and recompute the persisted feasibility score with the canonical public
 math API. A mismatch fails plot generation. They do not read Reader trajectories
@@ -217,9 +197,9 @@ ranking.
 
 ---
 
-### Multistate Response Behavior decision plots
+## Multistate Response Behavior decision plots
 
-These plots are operative review surfaces for campaigns using
+These plots show scores and their component requirements for campaigns using
 `multistate_response_behavior_v1`. They resolve one exact selection view and
 run, replay `pred__y_hat_model` through the public behavior mathematics, and
 fail if the replayed `behavior_score` differs from the persisted score. Measured
@@ -245,18 +225,18 @@ reference-relative signal; a study-owned plot configuration may name that
 signal more specifically when its assay contract supports the claim.
 
 The built-in `scatter_score_vs_rank`, `observed_objective_over_rounds`,
-`metric_over_rounds`, `vector_summary_heatmap`, feature-importance surfaces,
+`metric_over_rounds`, `vector_summary_heatmap`, feature-importance plots,
 selection-batch review, and BaseRender panel remain reusable. They should not
 be copied under behavior-specific names.
 
 ---
 
-### SFXI diagnostics plots
+## SFXI diagnostics plots
 
 These objective-specific plots reuse shared SFXI math and are safe to run without retraining.
 Diagnostic plots always render the full dataset; sampling parameters are not supported.
 
-### Plot kinds + params
+## Plot kinds + params
 
 - **`feature_importance_bars`**: overlays per-round model feature importances from
   `outputs/rounds/round_<k>/model/feature_importance.csv`.
@@ -265,7 +245,7 @@ Diagnostic plots always render the full dataset; sampling parameters are not sup
 - **`feature_importance_heatmap`**: matrix heatmap of feature importance over rounds.
   - rows are stable feature IDs, columns are rounds, values are importances;
     default `order_policy: sort_index` preserves the full ordinal feature axis
-    for dense X surfaces such as the 8192-D LatentDNA/Evo2 candidate table
+    even when candidates have thousands of features
   - params: `order_policy` (`preserve|sort_index|max_importance`),
     optional debugging `top_n`, `figsize_in`, `cmap`, `rasterized`
   - writes tidy CSV columns `round`, `feature_id`, `importance`, `rank`,
@@ -422,7 +402,7 @@ points on the full history without changing data selection. Use this for the
 "whole population, highlight current round" case. Use plot-level
 `round_selector: latest` only when the primitive itself requires a single round.
 
-### SFXI reference-overlay contract
+## SFXI reference-overlay contract
 
 SFXI overlay records that need to cross package boundaries should use the public
 `dnadesign.opal.api.sfxi.to_sfxi_reference_overlay_records` helper. It emits
@@ -439,7 +419,7 @@ plotting. OPAL's built-in `fold_change_vs_logic_fidelity` reference overlay
 path does this automatically and fails fast when a reference row was scored with
 a different SFXI API version, objective, state order, or setpoint vector.
 
-### Example YAML
+## Example YAML
 
 ```yaml
 plots:
@@ -476,7 +456,7 @@ plots:
 ```
 
 
-### Writing a new plot
+## Writing a new plot
 
 1. Create a module in `dnadesign/opal/src/plots/` and register it:
 
@@ -525,7 +505,7 @@ plot ontology unless a genuinely new data shape is required.
 
 Study-owned plot plugins must use the same API. Register the plot with
 `@register_plot(...)`, declare `PlotMeta`, read only from `PlotContext`
-`data_paths` / workspace surfaces, write media to `context.output_dir /
+`data_paths` and workspace properties, write media to `context.output_dir /
 context.filename`, and let OPAL write the artifact manifest. A study report may
 keep separate aggregate EDA figures, but those figures are not OPAL notebook
 evidence unless they are produced through this plot API and appear in

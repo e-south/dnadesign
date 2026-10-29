@@ -1,25 +1,25 @@
+<!--
 ---
 id: opal-objective-response-magnitude-feasibility-v1
 title: Response-Magnitude Feasibility objective
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-09
+last_verified: 2026-10-28
 ---
 
-# Response-Magnitude Feasibility `response_magnitude_feasibility_v1`
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-10-28
+-->
 
-**Short name:** RMF
+[OPAL docs](../../index.md) / [Objectives](README.md)
 
-`response_magnitude_feasibility_v1` is a built-in objective plugin, not a
-selector or label contract. The plugin does not declare whether a particular
-study has labels, a completed round, model support, or synthesis authority;
-those states belong to the owning study and campaign records.
+# Response-magnitude feasibility (RMF)
 
-These equations are the source of truth for the objective mathematics. Reader or
-another assay service owns the measurements that enter the objective. A study
-owns state meanings, target masks, calibration, and activation.
+`response_magnitude_feasibility_v1` scores measured or predicted outcomes
+against explicit response, ON-output and OFF-output requirements. A campaign
+supplies the state meanings, ON/OFF target, thresholds and scales.
 
-### Premise
+## Premise
 
 RMF ranks a candidate by its weakest declared requirement: target-ON responses
 must separate from target-OFF responses, target-ON output magnitude must clear
@@ -28,7 +28,7 @@ a floor, and target-OFF output magnitude must remain below a ceiling.
 The three requirements stay visible. They are not multiplied, so one strong
 component cannot compensate for one failed component.
 
-### Ordered input contract
+## Ordered input contract
 
 For `K >= 2` explicitly named states, the input has exactly `2K` columns:
 
@@ -47,27 +47,18 @@ The objective does not choose a time window, infer an intervention, aggregate
 replicates, resolve a reference, or attach biological treatment names. It also
 does not reinterpret canonical SFXI vec8 values. Those are upstream contracts.
 
-For the stress study, Reader instantiates the generic values as:
+For example, a dual-reporter assay can define:
 
 ```text
 r_i = window-reduced log2(YFP / CFP) response
 m_i = window-reduced log2(YFP / OD600) for the design
-      minus the same-state value for pDual-10
+      minus the same-state value for a reference promoter
 ```
 
-Thus the generic word `magnitude` means pDual-10-relative fluorescence in that
-assay. It does not mean luminance or fluorophore molecular brightness.
+Here, `magnitude` means reference-relative fluorescence. The assay defines the
+reference and reduction procedure; the objective consumes the resulting values.
 
-The stress-study eight-component response-window vector is OPAL Y in
-`reader_response_window_vector_v1`. It is not an RMF vec8. RMF is the objective
-applied to that Y under a selection view's target mask; `top_n` is the current
-selector. The campaign config records the prespecified zero boundaries and
-positive review scales derived from measured assay variation. They become
-executable only with the typed, manifest-pinned observed-label sidecar. Their
-presence is not evidence that the model or selection policy has succeeded
-prospectively.
-
-### Raw components
+## Raw components
 
 For binary target mask `p`, define the target-ON and target-OFF sets:
 
@@ -99,7 +90,7 @@ Interpretation:
 
 These values remain in upstream measurement units and are always reported.
 
-### Calibrated feasibility
+## Calibrated feasibility
 
 The campaign supplies three thresholds and three strictly positive scales:
 
@@ -132,7 +123,7 @@ variation, reference behavior, and its decision requirements. Before that
 calibration is promoted, inspect the three-component Pareto surface rather than
 using `S_RMF` for production selection.
 
-### How a target mask changes the score
+## How a target mask changes the score
 
 The measured vector stays fixed. Only the ON/OFF partition changes.
 
@@ -152,10 +143,8 @@ state_ids = [00, 10, 01, 11]
 | OR | `[0,1,1,1]` | 1.0 | 0.2 | -1.0 |
 
 The same candidate can therefore be useful for one target and fail another.
-This is the intended setpoint direction that canonical SFXI did not express
-strongly enough in the current stress-study rankings.
 
-### Monotonic top-K selection within one target
+## Monotonic top-K selection within one target
 
 For one fixed target mask and calibration, every signed margin has the same
 direction: larger values indicate greater clearance from the configured
@@ -185,7 +174,7 @@ Changing the target mask changes the ON/OFF partition and therefore changes
 the objective. RMF values from different masks are not commensurate, even when
 they were calculated from the same measured vector.
 
-### Generality and limits
+## Generality and limits
 
 The equations support any finite ordered state panel with a binary target and
 complete aligned response/magnitude values. They do not require two factors or
@@ -205,7 +194,7 @@ RMF is monotone in the desired component directions, but it has plateaus:
 improving a non-limiting component does not change the minimum. It is a
 feasibility hill-climbing score, not a smooth utility function.
 
-### Hill-climbing claim boundary
+## Hill-climbing claim boundary
 
 Positive exemplars are not required to define a signed direction. A negative
 score still orders candidates by movement toward the declared feasible region.
@@ -218,7 +207,7 @@ applicability strengthen confidence but do not change RMF mathematics. A
 prospective hill climb exists only after selected candidates are measured and
 improve the prespecified RMF components relative to the prior corpus.
 
-### Configuration
+## Configuration
 
 ```yaml
 transforms_y:
@@ -263,7 +252,7 @@ an ordinal selector order. `top_n` resolves an exact score tie deterministically
 by candidate ID; the allocation trace retains the score, rank, and any skipped
 cross-view overlap instead of silently changing the requested batch size.
 
-### Uncertainty and fail-fast behavior
+## Uncertainty and fail-fast behavior
 
 The plugin emits no uncertainty channel. Expected improvement is not supported.
 Assay uncertainty belongs upstream and model stability belongs in grouped
@@ -281,7 +270,7 @@ The objective rejects:
 It does not infer missing state identity, thresholds, or assay semantics and
 does not fall back to SFXI.
 
-### Source map
+## Source map
 
 - Public math API: `src/dnadesign/opal/api/response_magnitude_feasibility.py`
 - Objective implementation:

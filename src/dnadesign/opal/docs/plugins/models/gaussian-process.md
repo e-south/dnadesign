@@ -1,21 +1,24 @@
-## Gaussian Process Plugin (`gaussian_process`)
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-10-28
+-->
 
+[OPAL docs](../../index.md) / [Prediction models](README.md)
 
-`gaussian_process` follows the equations and runtime invariants below.
-Registry-level contracts and model inventory are listed under
-[Models](README.md).
+# Gaussian-process prediction
 
-### Purpose
+The `gaussian_process` model predicts an outcome and its predictive standard
+deviation for each candidate. A selection rule can use that uncertainty when
+the configured objective provides a corresponding score-uncertainty channel.
+
+## Purpose
 
 `gaussian_process` is OPAL's uncertainty-aware regressor. It predicts:
 
 - objective inputs (`y_pred`), and
 - predictive standard deviation (`y_pred_std`) used by uncertainty-aware objectives/selection.
 
-### Runtime contract
+## Runtime contract
 
 - Input: `X` as `float` matrix `(N, F)`.
 - Output mean: always 2D `(N, D)` in OPAL runtime.
@@ -26,7 +29,7 @@ Registry-level contracts and model inventory are listed under
 
 If `std=False` is requested by caller paths, the plugin returns only mean predictions and does not emit std chunks.
 
-### Core math
+## Core math
 
 Given training data `(X, Y)`, GP regression defines:
 
@@ -35,7 +38,7 @@ Given training data `(X, Y)`, GP regression defines:
 
 OPAL consumes `mu(x)` as model predictions and `sigma(x)` as uncertainty carrier (not variance).
 
-### Config surface
+## Configuration
 
 `model.name: gaussian_process` with strict typed params in `campaign.yaml`:
 
@@ -45,9 +48,10 @@ OPAL consumes `mu(x)` as model predictions and `sigma(x)` as uncertainty carrier
   - kernel-specific shape/scale params and bounds
   - optional white-noise settings
 
-See [Configuration](../../reference/configuration.md) for full schema.
+See [model parameters](README.md#gaussian-process-params-v2) for kernel settings
+and the [campaign configuration](../../reference/configuration.md) for their placement.
 
-### Units invariant with `training.y_ops`
+## Units invariant with `training.y_ops`
 
 When `training.y_ops` is configured, OPAL inverse-transforms:
 
@@ -58,13 +62,13 @@ before objective evaluation. This keeps score channels and uncertainty channels 
 
 If a model emits standard deviation and a configured y-op lacks `inverse_std`, OPAL fails fast.
 
-### Error cases
+## Error cases
 
 - non-finite or negative predicted standard deviation
 - shape mismatch between `y_pred` and `y_pred_std` in runtime path
 - invalid kernel/config shape resolved by strict schema/loader checks
 
-### Use in a campaign
+## Use in a campaign
 
 The model participates in the same [campaign round](../../workflows/campaign-round.md)
 as every other model. `top_n` needs a score channel. `expected_improvement`
@@ -73,5 +77,6 @@ also needs a standard-deviation channel emitted by the configured objective.
 To confirm uncertainty is present in a completed round:
 
 ```bash
-uv run opal ctx audit -c configs/campaign.yaml --round latest
+# Inspect the runtime values recorded by the model and objective.
+opal ctx audit -c configs/campaign.yaml --round latest
 ```

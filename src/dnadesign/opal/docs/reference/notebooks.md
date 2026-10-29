@@ -1,9 +1,10 @@
+<!--
 ---
 id: opal-reference-notebooks
 title: OPAL notebooks
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-16
+last_verified: 2026-10-28
 audience:
   - operator
   - maintainer
@@ -14,80 +15,86 @@ entrypoints:
 ---
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-16
+**Last verified:** 2026-10-28
+-->
 
-## OPAL Notebooks
+[OPAL docs](../index.md)
 
+# Review campaigns in notebooks
 
-OPAL notebooks are generated marimo campaign analysis surfaces. They summarize
-campaign state, progress, ledgers, and visual artifacts for inspection; mutation
-and long-running execution remain in the CLI.
-Checked-in operator notebooks and generated campaign notebooks use the public
-`dnadesign.opal.notebooks.api.generated` adapter for notebook-specific helpers;
-generated notebooks should import only that notebook API plus general
-third-party packages.
+OPAL generates marimo notebooks for browsing saved predictions, selections,
+plots and campaign progress. Use the CLI to import measurements and run a
+selection round; use the notebook to inspect the results.
 
-Generate one with:
+## Open a completed campaign
+
+Install the [notebook dependencies](../index.md#try-a-complete-selection-round),
+activate that environment, and complete at least one
+[campaign round](../workflows/campaign-round.md). From your campaign directory:
 
 ```bash
-uv run opal notebook generate --config /path/to/campaign --round latest --force --json
+# Create a notebook from the latest saved round.
+opal notebook generate -c configs/campaign.yaml \
+  --round latest --out notebooks/campaign.py --json
+# Open it in read-only app mode.
+opal notebook run -c configs/campaign.yaml --path notebooks/campaign.py
 ```
 
-Use `--round all` to review one campaign history across all recorded rounds.
-The generated surface keeps one campaign identity and exposes round-scoped
-progress and plot deliverables; it does not model rounds as separate campaigns.
+The generation command reports the notebook path and follow-up commands. In the
+app, choose a selection view and a review section to inspect its saved results.
+Shared model diagnostics appear once; view-specific plots and selections retain
+their view identity. Close the server with Ctrl+C in the terminal when finished.
 
-Open a generated notebook in read-only app mode:
+The generation response includes these fields (excerpt):
 
-```bash
-uv run opal notebook run --config /path/to/campaign --path /path/to/notebook.py
+```json
+{
+  "ok": true,
+  "notebook_path": "notebooks/campaign.py",
+  "round_selector": "latest",
+  "overwritten": false
+}
 ```
 
-Open the same notebook in editable marimo mode only when changing notebook code:
+Use `--round all` during generation to include the campaign's recorded history.
+When a round has several runs, inspect `opal runs list` and pass `--run-id` to
+pin the notebook to the intended run. Add `--force` only when you want to
+replace an existing generated notebook.
+
+To change the notebook code, open editable marimo mode:
 
 ```bash
-uv run opal notebook edit --config /path/to/campaign --path /path/to/notebook.py
+# Edit the generated notebook rather than opening the read-only app.
+opal notebook edit -c configs/campaign.yaml --path notebooks/campaign.py
 ```
 
-Pin a single-campaign notebook to a specific rerun when a round has multiple
-`run_id` values:
+## Compare campaigns
+
+Pass each campaign explicitly to review them together:
 
 ```bash
-uv run opal notebook generate --config /path/to/campaign --round latest --run-id <run-id> --force --json
-```
-
-Generate a campaign-set review notebook with repeated `--campaign` options:
-
-```bash
-uv run opal notebook generate \
+# Replace these paths with the campaign directories you want to inspect.
+opal notebook generate \
   --campaign /path/to/campaign-a \
   --campaign /path/to/campaign-b \
-  --out /path/to/opal_campaign_set_analysis.py
+  --out notebooks/campaign-comparison.py
 ```
 
-Generate a semantic campaign-set notebook with declared comparison views:
+For grouped comparisons, add `--collection /path/to/campaign_collection.yaml`.
+The collection manifest declares which campaigns can be compared and how their
+results are grouped; its schema is `opal.campaign_collection.v2`. By default,
+generation writes comparison CSV, PNG and manifest files under
+`collection_visuals/` beside the notebook. The notebook reads these saved
+results through `opal.collection_visual_manifest_index.v1`.
 
-```bash
-uv run opal notebook generate \
-  --campaign /path/to/positive-campaign \
-  --campaign /path/to/null-campaign \
-  --collection /path/to/campaign_collection.yaml \
-  --out /path/to/opal_campaign_set_analysis.py
-```
+Use `--no-materialize-collection-visuals` only when testing a template without
+rebuilding its comparison outputs.
 
-`--collection` must point to a strict `opal.campaign_collection.v2` manifest.
-By default the CLI materializes collection comparison CSV, PNG, and manifest
-artifacts under `collection_visuals/` beside the notebook. Use
-`--no-materialize-collection-visuals` only for template-only diagnostics; a
-production notebook should consume materialized collection visuals through
-`opal.collection_visual_manifest_index.v1`.
-
-### Notebook View Model
+## Notebook data and integration reference
 
 Generated notebooks import public helpers from
-`dnadesign.opal.notebooks.api.generated`. The canonical generated surface is the
-campaign-set template, and a single-campaign notebook is the same template with
-one campaign config. Generated notebooks embed
+`dnadesign.opal.notebooks.api.generated`. Single-campaign and multi-campaign notebooks use the same template;
+a single-campaign notebook supplies one configuration. Generated notebooks embed
 `__opal_notebook_template_schema__ = "opal.generated_campaign_review_notebook.v6"` so
 non-current local notebooks can be distinguished from current templates during review.
 `opal notebook generate --json` emits schema `opal.notebook_generate.v1` with the
@@ -98,7 +105,7 @@ check` commands. App review uses `opal notebook run`, which delegates to
 `marimo run`. Editable authoring uses the separate `opal notebook edit` command.
 
 Each campaign entry is a manifest-backed `NotebookViewModel` with schema
-`opal.notebook_view_model.v1`; the enclosing campaign surface uses
+`opal.notebook_view_model.v1`; the enclosing campaign set uses
 `opal.notebook_campaign_set_view_model.v1`.
 
 | field | purpose |
@@ -112,17 +119,15 @@ Each campaign entry is a manifest-backed `NotebookViewModel` with schema
 | `stale_artifacts` | stale review or plot files not referenced by active manifests |
 | `warnings` | missing manifests, stale files, or other nonfatal states |
 
-Campaign surfaces import `build_campaign_set_notebook_view_model(...)`. The
+Generated notebooks import `build_campaign_set_notebook_view_model(...)`. The
 payload contains one `NotebookViewModel` per campaign plus aggregate warnings,
 an optional `collection`, and optional materialized
 `collection_visuals`. The builder accepts one or more distinct campaign configs
-and fails fast on duplicates. `--run-id` pinning is supported only when the
-surface has exactly one campaign, because a single run ID is not portable across
-a campaign set. Collection manifests and collection visual indexes require at
-least two explicit campaign configs; a selection view is never promoted into a
-pseudo-campaign to create a comparison surface.
+and rejects duplicates. `--run-id` pinning requires exactly one campaign,
+because run IDs identify executions within a campaign. Collection manifests and
+collection visual indexes require at least two explicit campaign configs.
 
-The generated notebook renders the view model as an app-mode review surface:
+The generated notebook presents:
 
 - campaign state as a compact table;
 - validity state for progress, review, plot, warning, and artifact-garden
@@ -134,7 +139,7 @@ The generated notebook renders the view model as an app-mode review surface:
 - round selector for progress and manifest-backed plot scope;
 - one human-readable campaign title. The campaign description, observed-label
   evidence status and claim boundary, and active objective target stay in a
-  closed `Campaign context` accordion immediately below the navigation surface;
+  closed `Campaign context` accordion immediately below the navigation controls;
 - a top-level `Review scope` control only when there is a real campaign versus
   cross-campaign choice: `Campaign` for one selected campaign's plot
   deliverables, and `Cross-campaign comparison` for manifest-backed comparisons
@@ -223,34 +228,20 @@ campaign repeated across seed roots, OPAL disambiguates members with
 seed-replicate comparisons from cross-joining rows that happen to share a
 slug.
 
-The canonical generated notebook no longer has a separate single-campaign
-record/table drilldown path. Records, labels, predictions, and selected-record
-inspection remain CLI/API concerns unless they are promoted through a
-manifest-backed OPAL plot or another public notebook component. This keeps the
-single-campaign and multi-campaign surfaces from drifting.
+## Extend a generated notebook
 
-Heavy secondary sections should use a small number of marimo accordions for
-progressive disclosure, but review and deliverable controls belong in the top
-control surface, followed by one selected deliverable viewport above those
-sections. The campaign-set notebook keeps secondary content to campaign
-status and data/evidence records rather than separate accordions for every
-table. Use lazy loading only for static sections; do not wrap nested widgets or
-media previews in lazy accordions when their values must update in app mode.
-Reusable generated-cell builders and public component primitives live in
-`src/analysis/notebook_components/`. Current reusable primitives cover
-campaign summary rows, at-a-glance rows, validity lines, change summary lines
-and rows, distrust/limitations lines, warning and stale-artifact evidence rows,
-metric definition rows, artifact garden rows, manifest-backed visual-surface
-models, layered-scatter controls, centralized review control surfaces, compact
-path labels, plot detail
-rows, plot method rows, and optional BaseRender record-render contracts. Keep
-the generated source renderer in `src/analysis/notebook_template/` as thin
-composition over small semantic cell fragment modules. The reusable component
-surface lives in the `src/analysis/notebook_components/` package; add new
-notebook UX as small semantic modules there instead of growing a single
-component file.
-Define marimo UI controls in one cell and read their `.value` in a downstream
-cell; generated notebooks include a regression guard for this rule.
+Use [`opal record-show`](cli.md#record-show) to inspect an individual record's
+measurements, predictions and ranks. Notebook displays read saved plot manifests
+and the public `dnadesign.opal.notebooks.api.generated` helpers.
+
+The generator composes cells from `src/analysis/notebook_template/` and shared
+components in `src/analysis/notebook_components/`. Add reusable display
+components there. Keep review controls and the selected plot visible near the
+top; use accordions for secondary status and evidence tables. Interactive
+controls must remain reactive when their values change.
+
+Define marimo controls in one cell and read their `.value` in a downstream cell.
+Generated notebooks include a regression check for this rule.
 
 For a multi-view campaign, the top hierarchy is `Campaign | Selection view |
 Review section | Deliverable | optional plot scope and layer controls`. View-specific plots live under
@@ -265,17 +256,9 @@ controls from that concrete manifest scope rather than pairing independently
 rendered variants. This keeps one deliverable identity while allowing prediction,
 selection, observed-batch, and annotation visibility to change independently.
 
-Campaign surfaces are intentionally overview-first: they provide campaign and
-visual controls, manifest-backed plot-scope controls, status and provenance
-summary, visible manifest-backed plot surfaces, validity panels, change rows,
-metric definitions, artifact garden rows, warnings, and stale-artifact evidence.
-Project-wide review uses the same generator with an explicit collection manifest.
-OPAL does not maintain a second checked-in campaign browser with a separate UI
-contract.
+## External evidence and plots
 
-### Boundaries
-
-Canonical OPAL notebooks assemble OPAL campaign evidence and explicitly staged
+OPAL notebooks combine saved campaign results with explicitly supplied
 external evidence manifests: records contracts, configured X provenance,
 ledgers, progress, review manifests, selection behavior, labels, predictions,
 plot artifacts, Reader evidence artifacts, and limitations. Reader artifacts
@@ -296,7 +279,7 @@ metadata, configured plot entries, written media/tidy outputs, and
 `opal.plot_artifact.v1` manifests. Arbitrary study report images remain a
 separate report layer unless they are produced through that API.
 
-### Smoke Checks
+## Check notebook changes
 
 Use `smoke_check_notebook(path)` for lightweight generated-file checks. When
 marimo is available, run `marimo check` as part of the validation gate for

@@ -1,22 +1,26 @@
+<!--
 ---
 id: opal-objective-sfxi-v1
 title: SFXI objective
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-14
+last_verified: 2026-10-28
 ---
 
-## setpoint_fidelity_x_intensity `sfxi`
-
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-28
+-->
+
+[OPAL docs](../../index.md) / [Objectives](README.md)
+
+# Setpoint fidelity × intensity (SFXI)
 
 `sfxi_v1` converts vec8 model outputs into score and uncertainty channels using
 the equations below. It is an objective plugin, not a selector. A selection
 view may pair its channels with `top_n` or, when the uncertainty contract is
 satisfied, `expected_improvement`.
 
-### At a glance (plugin contract)
+## At a glance (plugin contract)
 
 - Objective plugin: `sfxi_v1`
 - Input shape: `y_pred` vec8 = `[logic(4), log2_intensity(4)]` in state order `[00,10,01,11]`
@@ -41,13 +45,13 @@ satisfied, `expected_improvement`.
 
 ---
 
-### 1. What the model predicts
+## 1. What the model predicts
 
 The model predicts an **8-vector (Ŷ)** per input sequence (kept as `pred__y_hat_model`). The first four entries describe the **shape** of a two-factor logic response (bounded from 0 to 1). The last four capture **reference-relative fluorescent intensity** per state, stored in **log2 space** for modeling stability.
 
 $$
 \underbrace{v_{00}, v_{10}, v_{01}, v_{11}}_{\text{logic in }[0,1]^4}\,\
-\underbrace{y^{\star}_{00}, y^{\star}_{10}, y^{\star}_{01}, y^{\star}_{11}}_{\text{log2(abs. fluorescent intensity)}}
+\underbrace{y^{\star}_{00}, y^{\star}_{10}, y^{\star}_{01}, y^{\star}_{11}}_{\text{log2(reference-relative intensity)}}
 $$
 
 * $v \in [0,1]^4$: **observed logic profile** in state order $[00,10,01,11]$.
@@ -66,7 +70,7 @@ $$
 A_{\mathrm{experiment},i} := \mathrm{mean}\{\text{references' } Y^{\mathrm{RFU}}_i\}
 $$
 
-### (a) Logic (fluorophore ratio → log2 → per-design min–max)
+#### (a) Logic (fluorophore ratio → log2 → per-design min–max)
 
 A dual fluorescent reporter helps [separate intrinsic from extrinsic noise](https://pmc.ncbi.nlm.nih.gov/articles/PMC3141918/).
 The YFP/CFP ratio controls shared cellular and measurement variation, log2
@@ -89,7 +93,7 @@ $$
 
 If $u_{\max}\approx u_{\min}$ (flat logic), set $v_i=\tfrac{1}{4}$ for all $i$ and **warn**. ($\varepsilon,\eta>0$ are small stabilizers and are recorded in metadata.)
 
-### (b) Reference-relative fluorescent intensity (reference-normalized → log2)
+#### (b) Reference-relative fluorescent intensity (reference-normalized → log2)
 
 Reference-relative intensity carries the **effect size** or **scale** signal
 while raw RFUs can drift by experiment and time. Division by the experiment's
@@ -112,10 +116,10 @@ $$
 Y = [v_{00}, v_{10}, v_{01}, v_{11}, y^\star_{00}, y^\star_{10}, y^\star_{01}, y^\star_{11}]
 $$
 
-### 1.1c Time reduction is an upstream label contract
+#### (c) Time reduction
 
 `sfxi_v1` scores a vec8 and does not choose an assay time or integration
-window. The producing Reader record must declare how each per-state value was
+window. The measurement record must declare how each per-state value was
 reduced from its time series. Changing that reduction creates a different
 label version; it must not silently overwrite an existing observed-label
 ledger.
@@ -130,17 +134,14 @@ they keep the two axes separate:
 For an AUC-based summary, use one prespecified window, interpolate its
 boundaries, and divide area by window duration before comparing experiments.
 Raw AUC values from different durations are not commensurate. The reference
-anchor must use the same window and state as the sample. Snapshot and window
-summaries remain distinct provenance-bearing label artifacts until a
-prospective assay comparison promotes one contract.
+anchor must use the same window and state as the sample. Record the reduction
+method with the labels so that snapshot and window summaries remain distinguishable.
 
-The Reader response-window handoff
-`[r00, r10, r01, r11, b00, b10, b01, b11]` is not that SFXI window label.
-Its `r` values are reduced log2 response values rather than declared `v`
-values, and its `b` values belong to the response-metric fluorescence contract.
-Do not normalize or rename that handoff into an SFXI vec8.
+An eight-column vector is compatible only when it has the meanings defined
+above. Raw log2 response values cannot substitute for the min–max-scaled logic
+coordinates merely because their array shapes match.
 
-### 1.2 Modeling note (median–IQR robust scaling):
+### 1.2 Modeling note (median–IQR robust scaling)
 
 Random forests can fit the mixed vec8 target, but low-sample per-state
 log-intensities can differ in variance and influence split decisions unevenly.
@@ -172,7 +173,7 @@ $$
 
 ---
 
-### 2. Inputs to the objective (selection time)
+## 2. Inputs to the objective (selection time)
 
 * **Predictions:** $\widehat{v}\in[0,1]^4$ and $\widehat{y}^{\star}\in\mathbb{R}^{4}$ (log2 intensity block from the vec8 model output).
 * **Setpoint** (i.e., preference): $p\in[0,1]^4$. This can be binary setpoints (e.g., AND: $[0,0,0,1]$) or nuanced continuous ones (e.g., $[0.3,0.4,0.7,0.2]$).
@@ -181,7 +182,7 @@ Each candidate is scored with $p$, $\widehat{v}$, and $\widehat{y}^{\star}$; OPA
 
 ---
 
-### 3. Logic fidelity
+## 3. Logic fidelity
 
 Root-mean-square error compares the predicted logic vector
 $\widehat{v}\in[0,1]^4$ with setpoint $p\in[0,1]^4$. Normalization maps the
@@ -216,7 +217,7 @@ For valid $\widehat{v}\in[0,1]^4$, $\lVert \widehat{v}-p\rVert_2\!\le\! D$ so $F
 
 ---
 
-### 4. Evaluating fluorescent intensity in target conditions
+## 4. Evaluating fluorescent intensity in target conditions
 
 The effect term is a setpoint-weighted average of predicted per-state
 intensity. It is rescaled with the labeled data for the fitted round to map the
@@ -270,7 +271,7 @@ Using the **same-round** labeled set makes the scale **self-calibrating** to tha
 
 ---
 
-### 5. Final scoring metric
+## 5. Final scoring metric
 
 $$
 \boxed{\;\text{score} = \big(F_{\text{logic}}\big)^{\beta}\cdot \big(E_{\text{scaled}}\big)^{\gamma}\;}
@@ -284,7 +285,7 @@ $$
 
 ---
 
-### 6. Metric properties
+## 6. Metric properties
 
 * **Batch robustness.** Logic uses YFP/CFP ratios; intensity uses a **reference-strain anchor**; and selection scales the effect by a **within-round percentile** over labels.
 * **Setpoint flexibility.** A changed $p$ defines another selection view over
@@ -295,7 +296,7 @@ $$
 
 ### 6.1 Selection limitations
 
-Canonical `sfxi_v1` remains a reporting baseline. Its product score allows
+The `sfxi_v1` product score allows
 target-state intensity to compensate for weak setpoint fidelity whenever both
 components are nonzero. Its logic term uses per-design min-max scaling, so a
 small response span can appear shape-perfect, while `r_logic` remains a
@@ -314,7 +315,7 @@ is a distinct objective with its own input contract.
 
 ---
 
-### 7. Concrete examples (state order $[00,10,01,11]$)
+## 7. Concrete examples (state order $[00,10,01,11]$)
 
 ### (a) AND-like setpoint
 
@@ -339,7 +340,7 @@ Only proximity of $\widehat{v}$ to $p$ (being OFF everywhere) is rewarded.
 
 ---
 
-### 8. Edge cases and guards
+## 8. Edge cases and guards
 * **Tiny CFP or anchor:** add $\varepsilon,\alpha$.
 * **Flat logic:** if $u_{\max}\approx u_{\min}$, set $v=\tfrac{1}{4}\mathbf{1}$.
 * **Non-finite:** reject at ingestion.
@@ -352,7 +353,7 @@ Only proximity of $\widehat{v}$ to $p$ (being OFF everywhere) is rewarded.
 
 ---
 
-### 9. Emissions
+## 9. Emissions
 
 All outputs are written to **ledger sinks** under `outputs/ledger/`:
 
@@ -397,7 +398,7 @@ Public analysis readers project a chosen view to `view__selection_score`,
 
 ---
 
-### Appendix
+## Appendix
 
 **Why an 8-vector and not a 4-vector?**
 

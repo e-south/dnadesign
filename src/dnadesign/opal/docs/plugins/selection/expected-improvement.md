@@ -1,8 +1,11 @@
-## Pool-relative weighted acquisition (`expected_improvement`)
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-10-28
+-->
 
+[OPAL docs](../../index.md) / [Selection rules](README.md)
+
+# Pool-relative weighted acquisition (`expected_improvement`)
 
 `expected_improvement` is the stable registry identifier. The implementation is
 a pool-relative weighted acquisition heuristic, not classical expected
@@ -11,14 +14,14 @@ failure conditions below.
 Registry-level contracts and required fields are listed under
 [Selection](README.md).
 
-### Purpose
+## Purpose
 
 The plugin ranks candidates by balancing:
 
 - exploitation (high predicted score), and
 - exploration (high predictive uncertainty standard deviation).
 
-### Inputs and channel refs
+## Inputs and channel refs
 
 Configured in `selection_views[].selection.params`:
 
@@ -29,11 +32,10 @@ Configured in `selection_views[].selection.params`:
 
 `uncertainty_ref` must resolve to standard deviation values in the same objective units as `score_ref`.
 
-### Wiring patterns (important)
+## Configure a selection view
 
 Refs identify channel keys emitted by the objective in the same named view.
-Persisted refs are namespaced by view ID. Score and uncertainty are separate
-surfaces:
+Persisted refs are namespaced by view ID. Each reference has a distinct role:
 
 * `score_ref` pulls the **score values** for that channel key.
 * `uncertainty_ref` pulls the **standard deviation values** for that channel key.
@@ -41,18 +43,19 @@ surfaces:
 An objective may publish score and uncertainty under the same channel key. In
 that case, `score_ref` and `uncertainty_ref` may be identical.
 
-Minimal wiring example:
+For a scalar outcome, use `scalar_identity_v1` with a predictor that supplies
+standard deviations, as in the [GP acquisition demo](../../../campaigns/demo_gp_ei/README.md):
 
 ```yaml
 selection_views:
   - id: primary
-    objective: {name: <objective-plugin>, params: {...}}
+    objective: {name: scalar_identity_v1, params: {}}
     selection:
       name: expected_improvement
       params:
         top_k: 5
-        score_ref: <score-channel>
-        uncertainty_ref: <uncertainty-channel>
+        score_ref: scalar
+        uncertainty_ref: scalar
         objective_mode: maximize
         tie_handling: competition_rank
         alpha: 1.0
@@ -61,7 +64,7 @@ selection_views:
 
 Common pitfall: setting `uncertainty_ref` to a channel key that **does not** publish uncertainty (or running EI with a model/objective path that produces no uncertainty). OPAL fails fast and does not fall back to `top_n`.
 
-### Acquisition math
+## Acquisition math
 
 Let:
 
@@ -113,7 +116,7 @@ Ranking source:
   - `minimize`: lower predicted score first
 - If both `A_norm` and predicted score tie, ranking is resolved deterministically by candidate `id`.
 
-### Sigma contract
+## Sigma contract
 
 EI requires strict positive standard deviation for every candidate:
 
@@ -121,7 +124,7 @@ EI requires strict positive standard deviation for every candidate:
 
 Any non-positive value (`sigma <= 0`) is an error; there is no epsilon-tolerance override.
 
-### Error cases
+## Error cases
 
 `expected_improvement` errors on:
 

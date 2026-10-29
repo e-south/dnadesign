@@ -3,6 +3,8 @@
 **Last verified:** 2026-10-28
 -->
 
+[OPAL docs](../index.md)
+
 # Candidate data, measurements and saved results
 
 ## Candidate records
@@ -69,8 +71,16 @@ pool and actual feature matrix for a campaign.
 
 ## Observed measurements
 
-Observed Y may come from campaign label history or a typed dataset-local
-sidecar. For `usr_sidecar`, required columns are:
+For the local-file workflow, import measured outcomes from CSV with
+[`opal ingest-y`](../workflows/campaign-round.md#2-import-the-first-measurements).
+OPAL matches those observations to candidate IDs and records their round in
+the campaign's label history. Candidates without measurements remain eligible
+for prediction and selection under the example's training policy.
+
+### Measurements supplied through SeqLedger
+
+A SeqLedger integration can instead read a typed dataset-local sidecar. For
+`labels.source.kind: usr_sidecar`, required columns are:
 
 - `id`: candidate ID
 - `observed_round`: integer label round

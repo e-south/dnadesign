@@ -1,8 +1,11 @@
-## OPAL Review Manifests
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-28
+-->
 
+[OPAL docs](../index.md)
+
+# OPAL Review Manifests
 
 `opal review --view <selection_view_id>` writes one view-scoped review bundle
 under `outputs/review/selection_views/<selection_view_id>/`:
@@ -16,7 +19,7 @@ The manifest is the authority for the bundle. Review consumers should render
 paths referenced by `manifest.json` and treat extra files on disk as stale
 advisory evidence, not current review output.
 
-### Contract
+## Contract
 
 Current review manifests use schema `opal.campaign_review.v1`.
 
@@ -33,7 +36,7 @@ Current review manifests use schema `opal.campaign_review.v1`.
 | `warnings` | machine-readable nonfatal review warnings |
 | `artifacts` | manifest, Markdown, HTML, and review output paths |
 
-### Stale Artifacts
+## Stale Artifacts
 
 Stale artifacts are files present in a view's review directory that are not
 referenced by the active manifest. This commonly happens after a review is
@@ -48,7 +51,7 @@ manifests, stale plot/review siblings, byte counts, and local-only `.var`
 campaign roots. `opal artifacts prune` is dry-run by default and requires
 `--apply` before deleting stale manifest-absent files.
 
-### Validation Behavior
+## Validation Behavior
 
 `opal review` validates the configured X column before writing review evidence.
 Missing X columns, noncanonical vector schema, null values, nonfinite values, or

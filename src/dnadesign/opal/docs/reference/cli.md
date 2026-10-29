@@ -3,6 +3,8 @@
 **Last verified:** 2026-10-28
 -->
 
+[OPAL docs](../index.md)
+
 # OPAL command reference
 
 The OPAL CLI initializes campaigns, ingests labels, executes rounds, inspects

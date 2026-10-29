@@ -1,3 +1,4 @@
+<!--
 ---
 id: opal-objective-multistate-response-behavior-v1
 title: Multistate Response Behavior
@@ -7,6 +8,12 @@ owner: dnadesign-maintainers
 status: available
 last_verified: 2026-10-28
 ---
+
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-10-28
+-->
+
+[OPAL docs](../../index.md) / [Objectives](README.md)
 
 # Multistate Response Behavior (MSRB)
 
@@ -21,7 +28,7 @@ feasibility test, or evidence that a predictive model is accurate. Higher is
 better only when candidates use the same ordered states, target mask, input
 units, and soft-min scale.
 
-### At a glance
+## At a glance
 
 | Element | Contract |
 | --- | --- |
@@ -50,7 +57,7 @@ The assay or model supplies the phenotype. The study supplies the target mask
 and soft-min scale. MSRB computes `behavior_score`; a selector such as `top_n`
 ranks that score.
 
-### Phenotype and target
+## Phenotype and target
 
 For `K` measured states, the assay supplies two values per state. A state is
 one measured condition in the assay panel.
@@ -83,7 +90,7 @@ an objective that defines their favorable directions explicitly.
 OPAL does not infer state identity, response meaning, reference choice, or
 target membership. The assay and study define those inputs.
 
-### Reference-relative signal
+## Reference-relative signal
 
 Let $\widetilde{F}_{\mathrm{design},i}$ and
 $\widetilde{F}_{\mathrm{reference},i}$ denote assay-reduced signal for the
@@ -103,13 +110,13 @@ This coordinate supports a same-state relative-signal claim. It cannot
 establish reporter background, absolute non-expression, or a universal OFF
 state.
 
-### Three behavior families
+## Three behavior families
 
 MSRB rewrites every desired change so that larger is favorable. The equations
 call these favorable-direction values *clearances*. They are grouped by the
 biological question they answer.
 
-#### Response ordering
+### Response ordering
 
 Every intended-ON response is compared with every intended-OFF response:
 
@@ -124,7 +131,7 @@ ON-versus-OFF ordering.
 Adding the same constant to every $r_i$ leaves response ordering unchanged.
 Reference-relative signal is carried by the aligned $b_i$ values.
 
-#### Intended-ON signal
+### Intended-ON signal
 
 Every intended-ON state contributes
 
@@ -135,7 +142,7 @@ $$
 Higher intended-ON signal always helps. Positive values are above the
 same-state reference; negative values are below it.
 
-#### Intended-OFF suppression
+### Intended-OFF suppression
 
 Every intended-OFF state contributes
 
@@ -150,7 +157,7 @@ An additional scored ON-minus-OFF signal family would count much of the same
 signal evidence twice. It may be useful as a diagnostic, but it is not a
 fourth scored family in MSRB v1.
 
-### Family weights balance unequal counts
+## Family weights balance unequal counts
 
 Target masks can generate different numbers of values in each family. A view
 with two intended-ON and two intended-OFF states, for example, has four
@@ -181,7 +188,7 @@ for one third even when the sections contain different numbers of questions.
 The weights decide how much each section counts; the soft-min scale introduced
 next decides how readily strong answers compensate for a weak one.
 
-### Why MSRB uses a soft minimum
+## Why MSRB uses a soft minimum
 
 MSRB needs one scalar that remains sensitive to every favorable change without
 allowing strong values to hide a weak value without limit.
@@ -225,7 +232,7 @@ Natural logarithms are used inside the soft minimum. Multiplying by $\tau$
 returns the score to the phenotype's input unit; it does not turn a log2 assay
 coordinate into a natural-log measurement.
 
-#### What $\tau$ controls
+### What $\tau$ controls
 
 $\tau$ is one positive scale in the same unit as the clearances. It answers:
 
@@ -248,11 +255,10 @@ parameter only by changing the objective's behavior.
 
 A study may derive $\tau$ from assay evidence or declare another prospective
 convention. Whatever its source, it must be fixed before allocation and tested
-for rank sensitivity because it can change candidate order. Well-resampling
-or other assay evidence used to choose the shared ruler does not become a
-ninth phenotype value or a candidate-specific term in the score.
+for rank sensitivity because it can change candidate order. The chosen scale
+applies to every candidate; it does not encode candidate-specific uncertainty.
 
-#### The central compensation example
+### The central compensation example
 
 Suppose each family has one listed value and $\tau=1$:
 
@@ -271,7 +277,7 @@ balanced candidate ranks first. With $\tau=1$, they score about `0.86` and
 `0.50`, so the strong values compensate enough for the first candidate to
 rank first.
 
-### Outputs and interpretation
+## Outputs and interpretation
 
 `behavior_score` is the only selectable score channel. Higher is better under
 one fixed protocol. The remaining outputs explain that scalar:
@@ -290,7 +296,7 @@ negative hard bottleneck because compensation is allowed. Inspect the score,
 three family scores, hard bottleneck, limiting coordinate, and direction-met
 status together.
 
-#### Reading the family landscape
+### Reading the family landscape
 
 The standard landscape uses:
 
@@ -309,7 +315,7 @@ The selector ranks the soft-min scalar, not Euclidean distance to a plot
 corner. The three axes also need not be statistically independent. They come
 from the same phenotype and may share measurement channels.
 
-### Worked four-state example
+## Worked four-state example
 
 Let states `A` and `C` be intended OFF and `B` and `D` intended ON. With
 $\tau=1$, use
@@ -341,7 +347,7 @@ The hard bottleneck is `1`. The remaining stronger values raise the soft
 score above that minimum. `1.491` is a ranking value in the phenotype's input
 unit, not a pass grade.
 
-### Mathematical properties
+## Mathematical properties
 
 For finite values away from floating-point saturation, every favorable
 coordinate change strictly improves the score. The derivative is
@@ -369,7 +375,7 @@ $w_m=1/(3|G|)$, the largest possible gap grows as a family gains coordinates.
 As state count grows, inspect the bottleneck, limiting coordinate, prior
 weight, and compensation gap.
 
-### Example assay binding
+## Example assay binding
 
 One four-state dual-reporter promoter assay publishes
 
@@ -386,7 +392,7 @@ The assay window, replicate handling, reference identity, target patterns,
 soft-min-scale recipe, and campaign evidence belong to the external study
 workspace. This page defines only the reusable score contract.
 
-### What the score does not establish
+## What the score does not establish
 
 MSRB does not establish:
 
@@ -400,13 +406,12 @@ MSRB does not establish:
 - between-experiment uncertainty;
 - calibrated model uncertainty or out-of-distribution safety;
 - graded setpoints, don't-care states, causal effects, or biochemical synergy;
-- candidate diversity; or
-- synthesis authorization.
+- candidate diversity.
 
 These may be necessary evidence or decision dimensions, but they remain
 outside this ranking score.
 
-### When to use MSRB
+## When to use MSRB
 
 Use MSRB when all of the following are intended:
 
@@ -416,7 +421,7 @@ Use MSRB when all of the following are intended:
 - bounded tradeoffs are acceptable; and
 - no biological acceptance threshold should be embedded in the selector.
 
-### Lifecycle and OPAL contract
+## Lifecycle and OPAL contract
 
 The objective sits between phenotype prediction and selection:
 
@@ -460,7 +465,7 @@ The score consumes a point phenotype and emits no uncertainty channel.
 Bootstrap draws, event-time bounds, repeated observations, censoring, and
 model refits remain separate evidence.
 
-### Python scoring without a campaign
+## Python scoring without a campaign
 
 The public scorer requires NumPy. It does not load campaign plugins, fit a model,
 read a dataset or select sequences. The base DNADesign installation provides this
@@ -505,7 +510,7 @@ the suppression values so that larger always means more favorable. The score
 summarizes these requirements for ranking. Inspect the individual values
 against zero to see which requirements a candidate meets.
 
-### Responsibility and sources
+## Responsibility and sources
 
 - The assay producer defines the measurements, reduction, replicate evidence,
   censoring, and meanings of $r_i$ and $b_i$.

@@ -1,16 +1,18 @@
-# OPAL Campaign Configuration v3
-
 <!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
 -->
+
+[OPAL docs](../index.md)
+
+# OPAL Campaign Configuration v3
 
 `campaign.yaml` defines the candidate data, measured outcomes, predictor and
 selection rules using schema `opal.campaign.v3`. A campaign shares one learning
 loop across its selection views; each view applies its own objective, and the
 selection batch combines their proposed candidates.
 
-## Ontology
+## Campaigns, rounds and views
 
 - **Campaign:** candidate universe, X, Y, labels, transforms, model, and round
   history shared by one learning loop.
@@ -118,8 +120,7 @@ Missing priority entries, ambiguous deduplication keys, exhausted unique pools,
 and incoherent CLI top-k overrides fail before selection artifacts or ledgers
 are published.
 
-Study-owned shadow evidence can preview the same decision without activating or
-mutating a campaign through
+To preview an allocation without changing a campaign, use
 `dnadesign.opal.api.preview_round_robin_next_best_unallocated`. The read-only
 API accepts one candidate table with exact `id` and `dedup_key` columns, one
 complete per-view table with `selection_view_id`, `id`, `score`, ordinal `rank`,
@@ -128,6 +129,12 @@ allocator and returns the allocated rows, complete trace, and summary. IDs and
 deduplication keys are identity fields: whitespace is rejected, not normalized.
 
 ## Multi-view example
+
+This example reads candidates and their feature vectors from `records.parquet`.
+Import measurements with `opal ingest-y` using the eight columns listed under
+`transforms_y`. The two views score the same predictions against different ON/OFF
+targets. The calibration values illustrate the format; choose thresholds and
+scales appropriate to your measurements.
 
 ```yaml
 schema_version: opal.campaign.v3
@@ -144,22 +151,10 @@ campaign:
   workdir: "."
 
 data:
-  location: {kind: usr, path: src/dnadesign/seqledger/datasets, dataset: candidates}
+  location: {kind: local, path: records.parquet}
   x_column_name: sequence_features
   y_column_name: response_window_y
   y_expected_length: 8
-
-labels:
-  source:
-    kind: usr_sidecar
-    dataset: candidates
-    path: _opal/observed_labels_v1/observed_labels.parquet
-    manifest_path: _opal/observed_labels_v1/promotion.manifest.json
-  y_space: reader_response_window_vector_v1
-  id_column: id
-  round_column: observed_round
-  batch_column: batch_id
-  dedup_policy: error_on_duplicate
 
 writeback:
   prediction_records: ledger_only

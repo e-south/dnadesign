@@ -3,6 +3,8 @@
 **Last verified:** 2026-10-28
 -->
 
+[OPAL docs](../index.md)
+
 # Run a campaign round
 
 Use OPAL to choose the next candidates to measure from a pool of sequences with

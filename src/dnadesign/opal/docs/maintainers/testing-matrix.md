@@ -3,6 +3,8 @@
 **Last verified:** 2026-10-28
 -->
 
+[OPAL docs](../index.md)
+
 # Test OPAL workflows
 
 Use the demo matrix to check the complete selection loop in isolated campaign

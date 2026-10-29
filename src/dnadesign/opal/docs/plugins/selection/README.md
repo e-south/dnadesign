@@ -1,21 +1,25 @@
+<!--
 ---
 id: opal-selection-plugins
 title: OPAL selection plugins
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-07-20
+last_verified: 2026-10-28
 ---
 
-## OPAL Selection Strategies
-
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-08-08
+**Last verified:** 2026-10-28
+-->
 
+[OPAL docs](../../index.md) / [Prediction and selection](../README.md)
 
-Selection plugins consume named objective channels and emit ranked candidate
-sets under the contracts below.
+# Selection rules
 
-### Built-in strategies
+Selection rules rank candidates using an objective's scores and, when required,
+its uncertainty estimates. Each selection view applies one rule to the shared
+predictions and proposes a set of candidates.
+
+## Built-in strategies
 
 | Strategy | Inputs | Behavior | Typical pairing |
 | --- | --- | --- | --- |
@@ -27,11 +31,13 @@ Source modules:
 - `src/dnadesign/opal/src/selection/top_n.py`
 - `src/dnadesign/opal/src/selection/expected_improvement.py`
 
-### Selection detail pages
+## Selection detail pages
 
-- [Expected Improvement behavior and math](expected-improvement.md)
+- [Pool-relative weighted acquisition](expected-improvement.md)
 
-### Runtime contract
+## Implement a selection rule
+
+Plugin implementations follow this interface:
 
 ```python
 def selection_fn(
@@ -44,7 +50,8 @@ def selection_fn(
     scalar_uncertainty: np.ndarray | None = None,
     ctx: PluginCtx | None = None,
     **plugin_params,
-) -> dict
+) -> dict:
+    ...
 ```
 
 Required outputs:
@@ -57,7 +64,7 @@ Tie expansion (`top_k` with `competition_rank` or `dense_rank`) is computed from
 Selection plugins do not inspect assay vectors or objective parameters; they
 consume only the configured score and uncertainty channels.
 
-### Config contract (v3)
+## Config contract (v3)
 
 Every `selection_views[].selection` config must include:
 
@@ -83,7 +90,7 @@ again.
 - `uncertainty_ref`
 - The referenced uncertainty channel must be a standard deviation (not variance).
 
-### Built-ins
+## Built-ins
 
 ### `top_n`
 
@@ -103,7 +110,7 @@ Changing score units or pool membership can therefore change the ranking.
 - does not degrade to score-only behavior
 - Acquisition details: [Expected Improvement behavior and math](expected-improvement.md)
 
-### Example configs
+## Example configs
 
 Top-N:
 
@@ -142,7 +149,7 @@ selection_views:
 The chosen objective must publish both referenced channels. OPAL does not
 assume a particular scientific objective from the selector.
 
-### See also
+## See also
 
 - [Model plugins](../models/README.md)
 - [Gaussian Process behavior and math](../models/gaussian-process.md)

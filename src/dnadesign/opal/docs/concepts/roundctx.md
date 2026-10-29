@@ -1,8 +1,11 @@
-## RoundCtx and Contract Auditing
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-13
+**Last verified:** 2026-10-28
+-->
 
+[OPAL docs](../index.md)
+
+# Round context and contract checks
 
 `campaign.yaml` declares the plugin graph. `RoundCtx` records what each runtime
 stage computes and what downstream components consume, with explicit contract
@@ -13,9 +16,11 @@ The runner persists:
 - `round.log.jsonl`: stage events and batch progress
 - `round_ctx.json`: full runtime carrier snapshot for audit
 
-### Plugin-scoped usage
+## Plugin-scoped usage
 
 The runner injects a plugin-scoped `ctx` that expands `"<self>"` to the plugin name and enforces contracts.
+This signature sketch belongs inside an objective plugin module; its body must
+compute the declared values and return an `ObjectiveResultV2`.
 
 ```python
 # Inside OPAL plugin modules, use the internal runtime contract decorator.
@@ -26,7 +31,9 @@ from ...core.round_context import roundctx_contract
   requires=["core/labels_as_of_round"],
   produces=["objective/<self>/foo"],
 )
-def my_objective_plugin(..., ctx=None, train_view=None): ...
+def my_objective_plugin(*, y_pred, params, ctx, train_view, y_pred_std):
+    # Compute the objective and record its declared diagnostics here.
+    ...
 ```
 
 Rules:
@@ -40,7 +47,7 @@ Audit fields in `round_ctx.json`:
 - `core/contracts/<category>/<plugin>/consumed`
 - `core/contracts/<category>/<plugin>/produced`
 
-### Batched predict stage behavior
+## Batched predict stage behavior
 
 For contracts using `produces_by_stage` (for example model `predict` summaries):
 
@@ -52,7 +59,7 @@ For contracts using `produces_by_stage` (for example model `predict` summaries):
 
 This preserves persisted RoundCtx immutability while allowing batch-by-batch accumulation.
 
-### Predict-stage accumulation pattern
+## Predict-stage accumulation pattern
 
 Use `ctx.get(...)` + `ctx.set(...)` on a stage-scoped key to update summaries across batches:
 
@@ -67,7 +74,7 @@ ctx.set("model/<self>/predict_summary", next_summary)
 
 Within the active predict stage, `ctx.get` reads staged values first. At stage end, OPAL commits the final staged value once.
 
-### Validation lifecycle
+## Validation lifecycle
 
 1. Runner builds `RoundCtx` with core keys and plugin names.
 2. Runner creates plugin-scoped contexts and checks `requires`.
