@@ -1,43 +1,34 @@
-## infer docs index
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-Use [docs/README.md](README.md) as the workflow-first entrypoint. This page is a compact by-type index.
+[Infer guide](README.md)
 
-### Getting started
+# Documentation index
 
-- [Getting started index](getting-started/README.md)
-- [CLI quickstart](getting-started/cli-quickstart.md)
+## Learn the workflow
 
-### Tutorials
+- [Validate your first job](getting-started/cli-quickstart.md)
+- [Workspaces and input formats](../workspaces/README.md)
+- [How a SeqLedger job works](tutorials/demo_pressure_test_usr_ops_notify.md)
 
-- [End-to-end pressure-test demo (infer + usr + ops + notify)](tutorials/demo_pressure_test_usr_ops_notify.md)
+## Run a task
 
-### Cross-tool handoff routes
+- [Extract Evo2 feature bundles](operations/evo2-sequence-features.md)
+- [Save extraction results in SeqLedger](operations/pressure-test-agnostic-models.md)
+- [Set up Evo2 on SCC](operations/scc-evo2-gpu-uv-runbook.md)
 
-- [Multi-source shared dataset assembly](../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md)
-- [Construct -> SeqLedger -> Infer shared dataset runbook](../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md)
-- [Promoter characterization feature matrix](../../seqledger/docs/operations/promoter/characterization-feature-matrix.md)
-- [cluster exploratory workflow](../../cluster/docs/workflows/exploratory-clustering.md)
-- [SeqLedger dataset with infer-derived X -> OPAL active learning](../../opal/docs/workflows/seqledger-infer-x-active-learning.md)
+## Look up a contract
 
-### Operations
+- [CLI commands](reference/command-contracts.md)
+- [Evo2 models and selectors](reference/evo2-provider.md)
+- [Feature schema and storage](reference/feature-schema.md)
 
-- [Operations index](operations/README.md)
-- [SCC Evo2 GPU environment runbook (UV + infer)](operations/scc-evo2-gpu-uv-runbook.md)
-- [Evo2 feature-bundle runbook](operations/evo2-sequence-features.md)
-- [Agnostic-model pressure-test runbook](operations/pressure-test-agnostic-models.md)
-- [Workspaces guide](../workspaces/README.md)
+## Contribute
 
-### Reference
-
-- [Reference index](reference/README.md)
-- [Evo2 provider reference](reference/evo2-provider.md)
-- [Feature schema and selector contract](reference/feature-schema.md)
-
-### Developer notes
-
-- [Architecture map](architecture/README.md)
+- [Development and public APIs](dev/README.md)
+- [Architecture](architecture/README.md)
 - [Source-tree map](../src/README.md)
-- [Dev index](dev/README.md)
+
+Cross-tool input and output routes are in the [Infer guide](README.md#connect-inputs-and-outputs).

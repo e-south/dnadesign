@@ -1,59 +1,68 @@
-## infer workspaces
+[Infer guide](../docs/README.md)
 
-Infer ships packaged workspace templates and public smoke inputs here. New workspaces created with `infer workspace init` default to `./workspaces/<id>` in the current working directory so the scaffold works both inside and outside a source checkout.
+# Workspaces and inputs
 
-List the packaged workspaces and their current output state with `uv run infer workspace list`.
-
-### Quick start
+A workspace keeps a job's configuration, input files and output directories together. You can create one anywhere you have write access.
 
 ```bash
-uv run infer workspace list # Inspect packaged infer workspaces before choosing one.
-uv run infer workspace init --id demo_local_workspace # Create a default infer workspace scaffold under ./workspaces/.
+# Inspect available packaged workspaces.
+infer workspace list
+
+# Create a workspace with one local JSONL input.
+infer workspace init --id my_inference --profile local
 ```
 
-This creates:
+The default destination is `./workspaces/my_inference`. Set `--root` to choose another location, or set `INFER_WORKSPACE_ROOT` as your default. An existing workspace is never overwritten.
 
-- `workspaces/<id>/config.yaml`
-- `workspaces/<id>/inputs/`
-- `workspaces/<id>/outputs/logs/ops/audit/`
-- `workspaces/<id>/outputs/usr_datasets/` when `--profile usr-pressure` is used
+## What is created
 
-### Packaged feature-bundle smoke path
+```text
+workspaces/my_inference/
+├── config.yaml
+├── inputs/
+│   └── records.jsonl
+└── outputs/
+    └── logs/ops/audit/
+```
 
-- [evo2_feature_bundle_smoke](evo2_feature_bundle_smoke/README.md): small anchor-only plus templated records for the Evo2 feature-bundle contract.
+The `local` profile supplies a small input and an extraction configuration for validation. Follow the [quickstart](../docs/getting-started/cli-quickstart.md) before configuring a model runtime.
 
-### Contract
+The `usr-pressure` profile instead prepares a SeqLedger extraction configuration and an `outputs/usr_datasets/` directory. It does **not** create or populate the dataset. The [SeqLedger procedure](../docs/operations/pressure-test-agnostic-models.md) covers that step.
 
-- Workspace names must be directory names, not paths.
-- Existing workspace directories are never overwritten.
-- Config template defaults to:
-  - `src/dnadesign/infer/docs/operations/examples/workspace_local_records_config.yaml` (`--profile local`)
-- Pressure-test SeqLedger template profile:
-  - `uv run infer workspace init --id demo_usr_pressure --profile usr-pressure`
-  - `src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml`
-  - `ingest.root: outputs/usr_datasets` resolves relative to the workspace `config.yaml`
+## Supply your input
 
-`outputs/usr_datasets` inside an infer workspace is a workspace-local SeqLedger export
-root. Use it for self-contained pressure tests or local ownership. Point infer
-at an explicit shared SeqLedger root when an external workspace owns the cross-tool
-dataset.
+Each job declares an `ingest` section in `config.yaml`:
 
-### Local data path option (non-SeqLedger)
+| `ingest.source` | Input | Required location |
+| --- | --- | --- |
+| `sequences` | One sequence per nonempty text line | `path`, such as `inputs/sequences.txt` |
+| `records` | One JSON object per line, with a sequence field | `path` and `field` |
+| `pt_file` | A supported PyTorch data file | Optional `path`, otherwise `<job_id>.pt` |
+| `usr` | A SeqLedger dataset | `dataset` and a dataset root |
 
-For config-driven local files, set `ingest.source` and `ingest.path` in `config.yaml`:
+Relative paths resolve from the configuration file's directory. The schema uses `source: usr` for SeqLedger, while CLI options use `--seqledger`.
 
-- `ingest.source: sequences` with `ingest.path: inputs/sequences.txt`
-- `ingest.source: records` with `ingest.path: inputs/records.jsonl`
-- `ingest.source: pt_file` with optional `ingest.path: inputs/batch.pt`
+For example, to read your JSONL records:
 
-Relative `ingest.path` values are resolved from the directory that contains `config.yaml`.
+```yaml
+# Read the sequence field from each JSONL record.
+ingest:
+  source: records
+  path: inputs/records.jsonl
+  field: sequence
+```
 
-### SeqLedger reset scope
+For SeqLedger writes, set `ingest.root` explicitly. Use a workspace-local root for a self-contained job, or the shared root that owns the dataset. See the [command reference](../docs/reference/command-contracts.md) for read-only root resolution and PyTorch input requirements.
 
-For SeqLedger-backed workspaces, reset only infer outputs with:
+## Feature-bundle example
+
+The [Evo2 bundle example](evo2_feature_bundle_smoke/README.md) includes short sequences with and without flanking context. It is a separate packaged example, not a `workspace init` profile.
+
+## Reset stored extraction outputs
 
 ```bash
-uv run infer prune --seqledger <dataset-id> --seqledger-root <seqledger-root> # Archive infer output namespace for one dataset.
+# Archive the infer overlay for one dataset before recomputing its columns.
+infer prune --seqledger <dataset-id> --seqledger-root <dataset-root>
 ```
 
-This archives the `infer` overlay namespace only. It does not delete the workspace or the base SeqLedger records table.
+This affects the `infer` overlay only. It preserves the base records, workspace files and sequence-view feature sidecars. See [feature storage](../docs/reference/feature-schema.md) for sidecar inspection and compaction.

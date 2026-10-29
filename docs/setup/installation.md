@@ -167,7 +167,7 @@ Current lock behavior note:
 - flash-attn is currently sdist-only in `uv.lock`. The SCC runbook sets
   `FLASH_ATTENTION_FORCE_BUILD=TRUE` to compile that source rather than letting
   its build script download a precompiled wheel.
-- infer currently supports `evo2_7b`, `evo2_20b`, and `evo2_40b`; 400B is not a supported `model.id`.
+- Use `infer adapters list` to inspect registered models. Evo2 feature bundles support `evo2_7b` and `evo2_20b`; see the [provider reference](../../src/dnadesign/infer/docs/reference/evo2-provider.md).
 
 ### Troubleshooting quick checks
 Use these checks before deeper debugging:

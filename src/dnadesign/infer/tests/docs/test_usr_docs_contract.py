@@ -24,7 +24,8 @@ def _repo_root() -> Path:
 
 def test_infer_docs_document_usr_column_name_contract() -> None:
     for relative_path in (
-        "src/dnadesign/infer/README.md",
+        "src/dnadesign/infer/docs/reference/evo2-provider.md",
+        "src/dnadesign/infer/docs/operations/pressure-test-agnostic-models.md",
         "src/dnadesign/infer/AGENTS.md",
     ):
         text = (_repo_root() / relative_path).read_text(encoding="utf-8")

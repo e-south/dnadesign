@@ -26,146 +26,81 @@ def _read(rel_path: str) -> str:
     return (_repo_root() / rel_path).read_text(encoding="utf-8")
 
 
-def _assert_token_order(text: str, tokens: list[str], *, label: str) -> None:
-    cursor = -1
-    for token in tokens:
-        idx = text.find(token, cursor + 1)
-        assert idx >= 0, f"{label}: missing token: {token!r}"
-        assert idx > cursor, f"{label}: out-of-order token: {token!r}"
-        cursor = idx
+def _markdown_targets(text: str) -> list[str]:
+    import re
+
+    return re.findall(r"(?<!!)\[[^\]]+\]\(([^)]+)\)", text)
 
 
-def test_infer_top_readme_is_lightweight_router() -> None:
+def test_infer_top_readme_routes_to_guide_and_first_job() -> None:
     readme = _read("src/dnadesign/infer/README.md")
-
-    _assert_token_order(
-        readme,
-        [
-            "## Documentation",
-        ],
-        label="src/dnadesign/infer/README.md",
-    )
-    assert "docs/README.md" in readme
-    assert "docs/index.md" in readme
-    assert "docs/getting-started/cli-quickstart.md" in readme
-    assert "workspaces/README.md" in readme
-    assert "docs/operations/evo2-sequence-features.md" in readme
-    assert "docs/operations/pressure-test-agnostic-models.md" in readme
-    assert "docs/reference/README.md" in readme
-    assert "../../../docs/README.md" in readme
-    assert "## Choose a task" not in readme
-    assert "## Shared handoffs before infer runs" not in readme
-    assert "## Entrypoint contract" not in readme
-    assert "## Boundary reminder" not in readme
+    links = _markdown_targets(readme)
+    assert links[0] == "docs/README.md"
+    assert "docs/getting-started/cli-quickstart.md" in links
+    assert "docs/reference/README.md" in links
+    assert "../../../docs/README.md" in links
 
 
-def test_infer_docs_readme_keeps_workflow_then_type_progressive_disclosure() -> None:
-    docs_readme = _read("src/dnadesign/infer/docs/README.md")
-
-    _assert_token_order(
-        docs_readme,
-        [
-            "### Read order",
-            "### Documentation by workflow",
-            "### Shared dataset handoffs into infer",
-            "### Documentation by type",
-        ],
-        label="src/dnadesign/infer/docs/README.md",
-    )
-    assert "getting-started/README.md" in docs_readme
-    assert "getting-started/cli-quickstart.md" in docs_readme
-    assert "operations/README.md" in docs_readme
-    assert "../workspaces/README.md" in docs_readme
-    assert "operations/evo2-sequence-features.md" in docs_readme
-    assert "operations/pressure-test-agnostic-models.md" in docs_readme
-    assert "reference/evo2-provider.md" in docs_readme
-    assert "reference/feature-schema.md" in docs_readme
-    assert "../workspaces/evo2_feature_bundle_smoke/README.md" in docs_readme
-    assert "tutorials/demo_pressure_test_usr_ops_notify.md" in docs_readme
-    assert "../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md" in docs_readme
-    assert "../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in docs_readme
-    assert "../../seqledger/docs/operations/promoter/characterization-feature-matrix.md" in docs_readme
-    assert "../../opal/docs/workflows/seqledger-infer-x-active-learning.md" in docs_readme
-    assert "../../cluster/docs/workflows/exploratory-clustering.md" in docs_readme
-    assert "file or SeqLedger dataset" in docs_readme
-    assert "data.location.kind: usr" in docs_readme
-    assert "[Multi-source shared dataset assembly]" in docs_readme
-    assert "[Construct -> SeqLedger -> Infer shared dataset runbook]" in docs_readme
-    assert "[cluster exploratory clustering workflow]" in docs_readme
-    assert "reference/README.md" in docs_readme
-    assert "architecture/README.md" in docs_readme
-    assert "dev/README.md" in docs_readme
-    assert "dev/journal.md" not in docs_readme
-    pressure_test_section = docs_readme.split("#### Pressure-test agnostic model writes into SeqLedger", maxsplit=1)[1]
-    pressure_test_section = pressure_test_section.split("#### Continue after infer-derived `X` exists", maxsplit=1)[0]
-    assert "../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md" not in pressure_test_section
-    assert (
-        "../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md"
-        not in pressure_test_section
-    )
-    assert "../../seqledger/docs/operations/promoter/characterization-feature-matrix.md" not in pressure_test_section
-    shared_handoff_section = docs_readme.split("### Shared dataset handoffs into infer", maxsplit=1)[1]
-    shared_handoff_section = shared_handoff_section.split("### Documentation by type", maxsplit=1)[0]
-    assert "../../cluster/docs/workflows/exploratory-clustering.md" not in shared_handoff_section
-    assert "../../opal/docs/workflows/seqledger-infer-x-active-learning.md" not in shared_handoff_section
-    by_type = docs_readme.split("### Documentation by type", maxsplit=1)[1]
-    assert "../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md" not in by_type
-    assert "../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" not in by_type
-    assert "../../seqledger/docs/operations/promoter/characterization-feature-matrix.md" not in by_type
-    assert "../../opal/docs/workflows/seqledger-infer-x-active-learning.md" not in by_type
-    assert "../../cluster/docs/workflows/exploratory-clustering.md" not in by_type
-    assert "[Section index](index.md)" in docs_readme
+def test_infer_guide_prioritizes_first_job_before_runtime_and_maintenance() -> None:
+    guide = _read("src/dnadesign/infer/docs/README.md")
+    links = _markdown_targets(guide)
+    quickstart = "getting-started/cli-quickstart.md"
+    for destination in (
+        "operations/evo2-sequence-features.md",
+        "operations/pressure-test-agnostic-models.md",
+        "operations/scc-evo2-gpu-uv-runbook.md",
+        "dev/README.md",
+        "architecture/README.md",
+    ):
+        assert links.index(quickstart) < links.index(destination)
+    assert "../workspaces/README.md" in links
+    assert "reference/command-contracts.md" in links
+    assert "reference/feature-schema.md" in links
+    assert "../../cluster/docs/workflows/exploratory-clustering.md" in links
+    assert "../../opal/docs/workflows/seqledger-infer-x-active-learning.md" in links
+    assert "dev/journal.md" not in guide
 
 
-def test_infer_docs_index_exists_and_points_back_to_docs_readme() -> None:
-    docs_index = _read("src/dnadesign/infer/docs/index.md")
-
-    assert "docs/README.md" in docs_index or "README.md" in docs_index
-    assert "### Getting started" in docs_index
-    assert "### Tutorials" in docs_index
-    assert "### Cross-tool handoff routes" in docs_index
-    assert "### Operations" in docs_index
-    assert "### Reference" in docs_index
-    assert "### Developer notes" in docs_index
-    assert "../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md" in docs_index
-    assert "../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in docs_index
-    assert "../../seqledger/docs/operations/promoter/characterization-feature-matrix.md" in docs_index
-    assert "../../cluster/docs/workflows/exploratory-clustering.md" in docs_index
-    assert "cluster exploratory workflow" in docs_index
-    assert "../../opal/docs/workflows/seqledger-infer-x-active-learning.md" in docs_index
-    assert "operations/evo2-sequence-features.md" in docs_index
-    assert "reference/evo2-provider.md" in docs_index
-    assert "reference/feature-schema.md" in docs_index
+def test_infer_section_indexes_offer_return_routes() -> None:
+    for relative in (
+        "index.md",
+        "getting-started/README.md",
+        "operations/README.md",
+        "reference/README.md",
+        "tutorials/README.md",
+        "dev/README.md",
+        "architecture/README.md",
+    ):
+        path = _repo_root() / "src/dnadesign/infer/docs" / relative
+        targets = _markdown_targets(path.read_text())
+        guide = _repo_root() / "src/dnadesign/infer/docs/README.md"
+        assert any((path.parent / target.split("#")[0]).resolve() == guide for target in targets)
 
 
-def test_infer_operations_index_links_pressure_test_demo_and_runbook() -> None:
-    ops_index = _read("src/dnadesign/infer/docs/operations/README.md")
-    assert "evo2-sequence-features.md" in ops_index
-    assert "pressure-test-agnostic-models.md" in ops_index
-    assert "../tutorials/demo_pressure_test_usr_ops_notify.md" in ops_index
-    assert "scc-evo2-gpu-uv-runbook.md" in ops_index
-    assert "../../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md" in ops_index
-
-
-def test_infer_pressure_test_tutorial_covers_local_and_ops_paths() -> None:
+def test_infer_tutorial_routes_execution_to_one_procedure() -> None:
     tutorial = _read("src/dnadesign/infer/docs/tutorials/demo_pressure_test_usr_ops_notify.md")
-    assert "uv run infer validate config --config" in tutorial
-    assert "uv run infer workspace init --id demo_usr_pressure --profile usr-pressure" in tutorial
-    assert 'export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets"' in tutorial
-    assert "uv run infer run --config" in tutorial
-    assert 'uv run infer prune --seqledger "$DATASET_ID" --seqledger-root "$USR_ROOT"' in tutorial
-    assert "layer` values `mid` and `final`" in tutorial
-    assert "uv run ops runbook init" in tutorial
-    assert "uv run ops runbook execute" in tutorial
-    assert 'export OPS_RUNBOOK="$WORKSPACE_ROOT/outputs/logs/ops/runbooks/infer-pressure.runbook.yaml"' in tutorial
+    assert "../operations/pressure-test-agnostic-models.md" in _markdown_targets(tutorial)
     assert "--no-submit" in tutorial
     assert "--submit" in tutorial
-    assert "uv run seqledger --root" in tutorial
+    # Keep executable setup in the procedure rather than two drifting copies.
+    assert "infer workspace init" not in tutorial
+    assert "ops runbook execute" not in tutorial
 
 
-def test_infer_workspaces_readme_mentions_workspace_inventory_command() -> None:
+def test_infer_workspace_guide_links_validation_and_lists_inventory_command() -> None:
     workspaces = _read("src/dnadesign/infer/workspaces/README.md")
-    assert "uv run infer workspace list" in workspaces
+    assert "infer workspace list" in workspaces
+    assert "../docs/getting-started/cli-quickstart.md" in _markdown_targets(workspaces)
+
+
+def test_infer_command_reference_uses_supported_ingest_discriminators() -> None:
+    from dnadesign.infer.src.config import IngestConfig
+
+    reference = _read("src/dnadesign/infer/docs/reference/command-contracts.md")
+    sources = IngestConfig.model_json_schema()["properties"]["source"]["enum"]
+    for source in sources:
+        assert f"| `{source}` |" in reference
+    assert "| `seqledger` |" not in reference
 
 
 def test_infer_feature_schema_documents_causal_pooling_semantics() -> None:

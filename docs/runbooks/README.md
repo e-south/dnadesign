@@ -62,7 +62,7 @@ This table is generated from `*.tool-source.yaml` sidecars. Edit those files ins
 | `densegen` | [DenseGen documentation](../../src/dnadesign/densegen/docs/README.md) | Tool-owned tutorials, HPC runbooks, and event-producing demo flows. |
 | `construct` | [Construct documentation](../../src/dnadesign/construct/docs/README.md) | Tool-owned workspace demos, sequence realization docs, and named-part placement contracts. |
 | `seqledger` | [SeqLedger docs](../../src/dnadesign/seqledger/docs/README.md) | Tool-owned dataset lifecycle docs, dataset handoffs, sync routes, and promoter feature assembly. |
-| `infer` | [infer docs](../../src/dnadesign/infer/docs/README.md) | Tool-owned feature extraction runbooks, Evo2 docs, feature-schema contracts, and pressure-test flows. |
+| `infer` | [Infer guide](../../src/dnadesign/infer/docs/README.md) | Tool-owned feature extraction runbooks, Evo2 docs, feature-schema contracts, and pressure-test flows. |
 | `cluster` | [Cluster docs](../../src/dnadesign/cluster/docs/README.md) | Tool-owned exploratory analysis workflow plus CLI, results, and artifact contracts. |
 | `opal` | [OPAL documentation](../../src/dnadesign/opal/docs/index.md) | Active-learning campaigns, configuration and candidate-selection workflows. |
 | `latentdna` | [LatentDNA Docs](../../src/dnadesign/latentdna/docs/README.md) | Representation-comparison workflows, workspace contracts, plots, snapshots, and notebook routes. |

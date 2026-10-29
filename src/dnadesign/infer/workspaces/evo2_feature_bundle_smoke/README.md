@@ -1,25 +1,28 @@
-## evo2_feature_bundle_smoke
+[Infer guide](../../docs/README.md) / [Workspaces](../README.md)
 
-Small packaged smoke path for the Evo2 feature-bundle contract.
+# Evo2 feature-bundle example
 
-This workspace keeps the repo-aligned boundaries explicit:
+This example compares isolated sequences with sequences surrounded by flanks. Its records are short toy inputs for checking configuration and pooling, not experimental data.
 
-- `anchor_only_records.jsonl` contains direct anchor records, including control-style and candidate-style rows
-- `template_1kb_records.jsonl` contains already-resolved template-backed contexts plus `construct__*` anchor metadata
-- `config.yaml` runs one anchor-only job and one templated job through `feature_bundle`
+- `inputs/anchor_only_records.jsonl` supplies the isolated sequences.
+- `inputs/template_1kb_records.jsonl` supplies resolved flanked sequences and anchor coordinates. Despite the filename, these toy inputs are shorter than 1 kb.
+- `config.yaml` declares one job for each input set.
 
-Use it as the canonical contributor smoke path:
+From the repository root in an activated Infer environment:
 
 ```bash
-uv run infer validate config --config src/dnadesign/infer/workspaces/evo2_feature_bundle_smoke/config.yaml
-uv run infer run --config src/dnadesign/infer/workspaces/evo2_feature_bundle_smoke/config.yaml --dry-run
+infer validate config --config src/dnadesign/infer/workspaces/evo2_feature_bundle_smoke/config.yaml
+infer run --config src/dnadesign/infer/workspaces/evo2_feature_bundle_smoke/config.yaml --dry-run
 ```
 
-To switch models, edit one line in `config.yaml`:
+For an installed package outside the checkout, copy the packaged example into your current directory first:
 
-```yaml
-model:
-  id: evo2_20b
+```python
+from importlib.resources import files
+from shutil import copytree
+
+source = files("dnadesign.infer").joinpath("workspaces/evo2_feature_bundle_smoke")
+copytree(str(source), "evo2_feature_bundle_example")
 ```
 
-The packaged records are intentionally short toy sequences so the workspace stays readable and versionable. The contract being exercised is the anchor/template metadata handoff and selector/pooling bundle semantics, not final biological scale or one specific assay domain.
+Then validate `evo2_feature_bundle_example/config.yaml`. These commands do not load a model. Before removing `--dry-run`, configure the runtime, device and precision described in the [feature-bundle guide](../../docs/operations/evo2-sequence-features.md).

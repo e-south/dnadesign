@@ -40,7 +40,7 @@ def test_infer_scc_gpu_env_runbook_exists_and_covers_uv_stack_contract() -> None
     assert "uv run infer adapters list" in doc
     assert "uv run infer validate config --config" in doc
     assert "ops runbook plan" in doc
-    assert "### Capacity and build profile gate" in doc
+    assert "## Capacity and build profile gate" in doc
     assert "TARGET_MODEL_ID" in doc
     assert "TARGET_PRECISION" in doc
     assert "RUN_CAPACITY_FAIL" in doc

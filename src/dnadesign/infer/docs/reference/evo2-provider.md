@@ -1,22 +1,25 @@
-## Evo2 Provider Reference
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-Use this page for the repo-aligned Evo2 sequence-feature contract inside `infer`.
+[Infer guide](../README.md) / [Reference](README.md)
 
-### Supported Evo2 lanes
+# Evo2 provider
+
+This page describes Evo2 feature bundles. For available model IDs across all extraction and generation functions, run `infer adapters list`. Registration does not imply that model weights or runtime dependencies are installed.
+
+## Feature-bundle models
 
 - `evo2_7b`
 - `evo2_20b`
 
-`evo2_7b` is the default tracer-bullet lane. `evo2_20b` is the higher-capacity comparison lane once the 7B path is green.
+Feature bundles support these two model IDs. Other registered Evo2 checkpoints do not necessarily support the bundle selectors.
 
-### Project default intermediate selector
+## Default intermediate selector
 
-`infer` uses a model-aware project default for sequence-feature extraction.
+The default intermediate selector depends on the model.
 
-- this is a repo default, not a universal scientific claim
 - `evo2_7b` uses block `26` because public Evo 2 interpretability work examined layer 26 and reported biologically meaningful features there; see [Interpreting Evo 2](https://www.goodfire.ai/research/interpreting-evo-2)
 - `evo2_20b` uses block `23` because the upstream 20B surface exposes blocks `0..23`
 
@@ -32,7 +35,7 @@ The bundle resolves that to a model-aware canonical selector:
 - `evo2_7b`: `block26_mlp_out` -> `blocks.26.mlp.l3`
 - `evo2_20b`: `block23_mlp_out` -> `blocks.23.mlp.l3`
 
-### Feature groups
+## Feature groups
 
 Default feature bundles collect all three groups:
 
@@ -47,9 +50,9 @@ Interpret these names as feature families, not persisted tensor shapes:
   requested token-position pooling operation
 - `intermediate_embedding` refers to the selected internal-layer embedding family
 
-`output_embedding` is accepted as a config/docs alias for continuity, but stored schema and new docs should prefer `output_layer_mean`.
+`output_embedding` is an accepted alias. Stored outputs use `output_layer_mean`.
 
-### Pooling modes
+## Pooling modes
 
 For feature bundles, `infer` uses row-level pooling over the sequence-position
 axis of the tokenwise tensor:
@@ -65,7 +68,7 @@ Rules:
 - `anchor_only` contexts emit `seq_mean` only
 - templated contexts emit both `seq_mean` and `anchor_mean`
 - sequence-view bundles emit the union of the row-level pooling operations requested by `sequence_view_inputs[]`
-- tokenwise tensors are pooled in memory and discarded; tokenwise persistence is not part of the v1 repo-aligned contract
+- tokenwise tensors are pooled in memory and discarded; the v1 bundle stores pooled summaries only
 - for causal Evo2 outputs, each token vector is prefix-conditioned in the
   emitted orientation; pooling a span does not make earlier token states aware
   of downstream bases
@@ -79,7 +82,7 @@ sequences can still share one Evo2 forward pass through the `forward_pass_key`.
 A natively 60 bp `construct_insert` should stay an anchor insert in SeqLedger, while a
 true `analysis_window` row means Construct derived a 60 bp analysis-only view.
 
-### Context ownership
+## Context ownership
 
 - `construct` owns anchor/template resolution and `construct__*` coordinate metadata
 - `infer` reads that metadata and computes feature pooling
@@ -92,7 +95,7 @@ Templated context bundles require these construct columns alongside the resolved
 - `construct__anchor_start`
 - `construct__anchor_end`
 
-### Stored outputs
+## Stored outputs
 
 The generic SeqLedger persistence contract remains:
 
@@ -126,7 +129,7 @@ Structured bundle metadata is persisted as additional infer out ids such as:
 - `metadata__sequence_case_policy`
 - `metadata__feature_request_digest`
 
-### Resume and digest behavior
+## Resume and digest behavior
 
 Feature-bundle resume does not trust column presence alone.
 
@@ -137,10 +140,8 @@ Feature-bundle resume does not trust column presence alone.
 - reruns can still backfill metadata fields when stored values are null; treat
   that as idempotent metadata completion rather than duplicated feature work
 
-### Hardware and performance posture
+## Runtime requirements
 
-- `evo2_7b` is the default local and SCC smoke lane
-- `evo2_20b` requires GPUs at compute capability `>= 9.0` in the current upstream contract; on SCC that usually means H200, but newer higher-capability lanes also qualify when memory is sufficient
-- first-run latency is dominated by upstream Evo2 backend startup, not the bundle wrapper; for `evo2_20b`, expect a cold-start phase of `fetch -> hydration -> GPU residency -> first attach events`
+Configuration checks and dry runs work with the `infer` installation profile. Actual Evo2 execution requires the `infer-evo2` dependencies, model weights and sufficient device memory. Infer's capacity gate requires compute capability `9.0` or higher for `evo2_20b`; passing that gate does not guarantee enough memory for every sequence length or batch size.
 
-Use [SCC Evo2 GPU environment runbook](../operations/scc-evo2-gpu-uv-runbook.md) for GPU environment setup and failure-mode handling.
+Use the [GPU installation guide](../../../../../docs/setup/installation.md#gpu-extra-infer-evo2) to prepare the runtime. The [SCC runbook](../operations/scc-evo2-gpu-uv-runbook.md) adds BU cluster setup and device checks. Validate the chosen model on the target hardware before scaling up a job.

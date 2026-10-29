@@ -27,17 +27,17 @@ def test_pressure_runbook_docs_include_standalone_and_ops_paths() -> None:
         encoding="utf-8"
     )
 
-    assert "uv run infer workspace init --id demo_usr_pressure --profile usr-pressure" in doc
-    assert "uv run infer validate config --config" in doc
-    assert "uv run infer validate seqledger-registry --config" in doc
-    assert "uv run infer run --config" in doc
-    assert "uv run ops runbook init" in doc
-    assert "uv run ops runbook execute" in doc
+    assert "infer workspace init --id demo_usr_pressure --profile usr-pressure" in doc
+    assert "infer validate config --config" in doc
+    assert "infer validate seqledger-registry --config" in doc
+    assert "infer run --config" in doc
+    assert "ops runbook init" in doc
+    assert "ops runbook execute" in doc
     assert "--no-submit" in doc
     assert "--submit" in doc
     assert "--no-notify" in doc
     assert "--with-notify" in doc
-    assert 'uv run infer prune --seqledger "$DATASET_ID" --seqledger-root "$USR_ROOT"' in doc
+    assert 'infer prune --seqledger "$DATASET_ID" --seqledger-root "$USR_ROOT"' in doc
     assert "layer: mid" in doc
     assert "layer: final" in doc
     assert "list<float64>" in doc

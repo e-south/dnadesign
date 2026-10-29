@@ -1,9 +1,13 @@
-## Infer Architecture
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-### Package shape
+[Infer guide](../README.md) / [Development](../dev/README.md)
+
+# Architecture
+
+## Package shape
 
 - Top-level package surface:
   - `README.md`, `docs/`, `src/`, `tests/`
@@ -21,7 +25,7 @@
   - boundary subpackages: `src/ingest/*`, `src/writers/*`
   - extensions: `src/adapters/*`, `src/presets/*`
 
-### Runtime execution contracts
+## Runtime execution contracts
 
 - Adapter extract execution is padding-free and deterministic by token-length buckets:
   - inputs are grouped by token length before Evo2 forward calls for logits and embedding extraction.
@@ -34,7 +38,7 @@
   - `infer/src/features/*` owns Evo2-specific selector resolution, anchor-aware pooling, feature digests, and OPAL-ready export.
   - `opal` consumes stable flattened matrices or explicit `X` columns and does not learn Evo2 layer-path details.
 
-### Cross-Tool Boundaries
+## Cross-Tool Boundaries
 
 - `seqledger`: dataset ingest + write-back columns/overlay interactions.
 - `notify`: infer events source resolution via the public infer contract surface (`dnadesign.infer.contracts`).

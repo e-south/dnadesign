@@ -1,57 +1,80 @@
-## infer command contracts
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-### infer run
+[Infer guide](../README.md) / [Reference](README.md)
 
-- Accepts `--config` for YAML-driven runs or `--preset` for single preset-driven runs.
-- Config workflows support `ingest.source` values `seqledger`, `sequences`, `records`, and `pt_file`.
-- For `sequences` and `records`, set `ingest.path` in the job config (path is resolved relative to config directory when not absolute).
-- For `pt_file`, `ingest.path` is optional; when omitted, infer uses `<config-dir>/<job_id>.pt`.
-- For `seqledger`, `ingest.path` is invalid and fails validation.
-- For `seqledger`, runtime ingest requires either explicit `ingest.root` or `DNADESIGN_SEQLEDGER_ROOT`; it no longer falls back to packaged datasets implicitly.
-- SeqLedger write-back jobs remain stricter: they must set `ingest.root` explicitly even if `DNADESIGN_SEQLEDGER_ROOT` is set.
-- `--dry-run` validates and prints summary without model execution.
-- For config-mode `ingest.source: usr` jobs, `--dry-run` also preflights the resolved SeqLedger dataset path and required columns so mis-targeted roots or datasets fail before execution.
-- Unknown or missing selected jobs fail fast with non-zero exit.
+# Command reference
 
-### infer extract
+Use `infer <command> --help` for the full option list. The examples assume an activated [Infer environment](../getting-started/cli-quickstart.md#1-install-and-activate-infer).
 
-- Accepts single-output ad-hoc mode (`--fn`, `--format`) or `--preset`.
-- Supports ingest from sequences, records jsonl, pt file, and SeqLedger dataset.
-- `--write-back` only applies to compatible ingest sources and enforces strict write contracts.
+## Run jobs
 
-### infer generate
+`infer run` accepts a YAML configuration or a preset, but not both:
 
-- Requires prompt input and generation parameters.
-- Output payload must include `gen_seqs`; malformed payloads fail fast.
+```bash
+# Check a configured job and resolve its inputs without loading weights.
+infer run --config config.yaml --dry-run
 
-### infer adapters
+# Validate a preset against an existing SeqLedger dataset.
+infer run --preset evo2/extract_logits_ll \
+  --seqledger my_sequences --seqledger-root ./datasets --dry-run
+```
 
-- `list` returns registered model ids.
-- `fns` returns namespaced function contracts.
-- `cache-clear` clears adapter cache used by runtime loaders.
+In configuration mode, `--job <id>` selects jobs from the file. Selecting no matching jobs fails. Input selection and write-back settings belong in YAML; `--seqledger`, `--field`, `--ids`, `--seqledger-root` and `--write-back` are preset-mode options.
 
-### infer validate
+### Input configuration
 
-- `validate config` checks root model/job schema and command contract readiness.
-- `validate config` requires either `--config` or a `config.yaml` in the current working directory.
-- `validate config` rejects unknown schema keys and type mismatches with config exit code (`2`).
-- `validate seqledger` checks dataset/field accessibility for write-back/resume paths.
+| `ingest.source` | Location and behavior |
+| --- | --- |
+| `sequences` | `path` to a text file with one sequence per nonempty line |
+| `records` | `path` to JSONL objects and `field` naming the sequence field |
+| `pt_file` | Optional `path`, defaulting to `<config-dir>/<job_id>.pt` |
+| `usr` | SeqLedger `dataset`, `field` and root; `path` is not accepted |
 
-### infer workspace
+Relative paths resolve from the configuration file's directory. The SeqLedger schema value is **`usr`**, not `seqledger`.
 
-- `workspace where` resolves effective workspace root from `--root`, `INFER_WORKSPACE_ROOT`, or `./workspaces` under the current working directory.
-- `workspace where` resolves the template from `--profile` (`local` or `usr-pressure`) unless `--template` is provided.
-- `workspace init` creates `config.yaml`, `inputs/`, and `outputs/logs/ops/audit/` for a workspace id.
-- `workspace init` defaults to `--profile local` so the scaffold can run with workspace-local files.
-- `workspace init --profile usr-pressure` selects the SeqLedger pressure-test template.
-- `workspace init` rejects path-like ids and existing workspace directories.
+SeqLedger reads require `ingest.root` or `DNADESIGN_SEQLEDGER_ROOT`. Jobs that write back must set `ingest.root` explicitly. Configuration-mode dry runs check the resolved dataset and required columns as well as local file inputs.
 
-### no-silent-fallback contract
+The CLI requires `--i-know-this-is-pickle` or `INFER_ALLOW_PICKLE=1` for `pt_file` input. Loading still uses PyTorch's restricted `weights_only=True` mode; the flag does not enable arbitrary object deserialization. Prefer text or JSONL for new sequence inputs.
 
-- Output cardinality mismatches fail immediately.
-- Resume-scan parquet read errors fail immediately.
-- `overwrite=false` rejects writes that would replace existing infer overlay values for the same ids/columns.
-- Unsupported write-back source contracts fail immediately.
+## Extract or generate directly
+
+`infer extract` accepts a preset or an ad-hoc function and output format. It can read inline sequences, record files, PyTorch files or a SeqLedger dataset. `--write-back` requires a compatible storage destination.
+
+```bash
+infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run
+```
+
+`infer generate` accepts a prompt and generation settings. Successful runtime output contains `gen_seqs`; malformed adapter output is rejected. See the [quickstart generation example](../getting-started/cli-quickstart.md#4-try-an-ad-hoc-request).
+
+Local CLI extraction displays an output summary. To retain results, configure SeqLedger write-back or use the [Python API](../dev/README.md) to receive the returned values.
+
+## Inspect models and presets
+
+```bash
+infer adapters list
+infer adapters fns
+infer presets list
+infer presets show evo2/extract_logits_ll
+```
+
+`adapters list` reports registered model IDs, not proof that their dependencies or weights are installed. `adapters fns` lists function contracts. `adapters cache-clear` clears the runtime adapter cache.
+
+## Validate inputs and outputs
+
+- `validate config` checks the model/job schema and runtime configuration. Supply `--config`, or run beside a `config.yaml`. Unknown keys and invalid types produce exit code `2`.
+- `validate seqledger` checks access to a dataset and sequence field.
+- `validate seqledger-registry --config config.yaml` derives the output namespace and type registration required for write-back.
+- `validate sequence-view-completion --config config.yaml` checks reusable, missing and stale feature payloads. See [feature storage](feature-schema.md).
+
+## Workspaces and stored results
+
+`workspace where` resolves the workspace root in this order: `--root`, `INFER_WORKSPACE_ROOT`, then `./workspaces`. `workspace init` accepts `local` or `usr-pressure` profiles, or an explicit `--template`. IDs must be directory names; existing workspaces are never overwritten. The [workspace guide](../../workspaces/README.md) describes the files created.
+
+`prune` archives the Infer overlay by default. It preserves base records and sequence-view sidecars. `features migrate` and `features compact` maintain sidecar payload storage; their scope and integrity checks are in the [feature schema](feature-schema.md#payload-storage-and-maintenance).
+
+## Write and resume behavior
+
+Output cardinality mismatches, unreadable resume data and unsupported write-back destinations fail the operation. With `overwrite: false`, an existing Infer overlay value cannot be replaced for the same record and column. Feature bundles also use request metadata to determine whether stored results are reusable. See the [Evo2 resume contract](evo2-provider.md#resume-and-digest-behavior).

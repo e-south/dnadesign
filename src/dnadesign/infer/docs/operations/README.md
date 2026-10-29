@@ -1,36 +1,16 @@
-## infer operations
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-### Start path
+[Infer guide](../README.md)
 
-1. Validate command contracts locally:
-   - `uv run infer workspace init --id <workspace_id> --profile local`
-   - `uv run infer validate config --config <path>`
-   - `uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run`
-2. Run pressure-test path from this index.
-3. Verify dataset state with `uv run seqledger ...` before enabling scheduler submit.
+# Run inference
 
-### Runbooks
+Start with the [local validation quickstart](../getting-started/cli-quickstart.md) if you have not configured a job yet.
 
-- [Evo2 feature-bundle runbook](evo2-sequence-features.md): repo-aligned sequence feature-bundle path with anchor-only and templated contexts.
-- [Agnostic model + SeqLedger pressure test](pressure-test-agnostic-models.md): standalone and ops-runbook paths.
-- [SCC Evo2 GPU environment runbook (UV + infer)](scc-evo2-gpu-uv-runbook.md): deterministic environment build + infer capability checks.
-- [End-to-end pressure-test demo](../tutorials/demo_pressure_test_usr_ops_notify.md): infer + usr + ops + notify full walkthrough.
-- [Construct -> SeqLedger -> Infer shared dataset runbook](../../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md): construct-led data-plane handoff into infer.
+- [Extract Evo2 feature bundles](evo2-sequence-features.md): choose sequence context, pooling and output groups.
+- [Save extraction results in SeqLedger](pressure-test-agnostic-models.md): prepare a dataset, run inference, inspect outputs and resume.
+- [Set up Evo2 on SCC](scc-evo2-gpu-uv-runbook.md): build the GPU environment on BU's Shared Computing Cluster.
 
-### Integration boundary
-
-- Ops workflow contracts consumed by infer:
-  - `infer_batch_submit`
-  - `infer_batch_with_notify`
-- Shared producer contract path:
-  - `src/dnadesign/ops/contracts.py`
-
-### Related docs
-
-- [infer docs index](../README.md)
-- [Evo2 provider reference](../reference/evo2-provider.md)
-- [Feature schema and selector contract](../reference/feature-schema.md)
-- [repository operations index](../../../../../docs/operations/README.md)
+The [SeqLedger job walkthrough](../tutorials/demo_pressure_test_usr_ops_notify.md) explains how the local and scheduled steps fit together. For input assembly, use the [Construct-to-Infer workflow](../../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md).

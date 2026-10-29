@@ -1,151 +1,109 @@
-## Evo2 Sequence-Feature Runbook
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-Use this runbook when you want the infer-owned part of an Evo2 sequence-feature flow.
-The examples use anchor-only and template-context DNA records because those are
-the current promoter-study dogfood surfaces, but the contract is not
-promoter-specific.
+[Infer guide](../README.md) / [Operations](README.md)
 
-This page owns:
+# Extract Evo2 feature bundles
 
-- Evo2 model lane choice inside `infer`
-- feature-bundle config shape
-- validate/dry-run/run commands
-- OPAL-export handoff from infer outputs
+A feature bundle collects likelihood summaries, mean-pooled output logits and intermediate activations in one request. Use it to represent a sequence numerically, either on its own or within an explicit flanking context.
 
-This page does not own:
+## 1. Check the example configuration
 
-- multi-source study dataset assembly
-- template realization with `construct`
-- downstream OPAL round logic
-- Permuter variant generation or candidate-promotion semantics
+The [packaged bundle example](../../workspaces/evo2_feature_bundle_smoke/README.md) contains short toy records for two cases: an isolated sequence and a sequence placed between flanks. From an activated Infer environment in the repository root:
 
-### DNA case contract
+```bash
+# Check the bundle configuration.
+infer validate config \
+  --config src/dnadesign/infer/workspaces/evo2_feature_bundle_smoke/config.yaml
+# Resolve the toy inputs without loading weights.
+infer run \
+  --config src/dnadesign/infer/workspaces/evo2_feature_bundle_smoke/config.yaml \
+  --dry-run
+```
 
-Evo2 uses a character-level tokenizer where uppercase and lowercase DNA bases
-are different symbols. All A/C/G/T biological model inputs must be uppercase
-at Infer execution. Infer canonicalizes incoming DNA strings to uppercase before
-adapter calls and feature-key construction. Lowercase or mixed-case source
-products still invalidate old `_derived/infer` sidecars; regenerate those
-sidecars instead of reusing old vectors.
+These validate inputs and selectors without loading weights. The example's CPU setting is for validation; it is not a promise of practical CPU inference.
 
-Use the current cross-tool promoter-study workflow only when the task is about
-that specific checked-in study:
+## 2. Choose sequence context and pooling
 
-- [Promoter characterization feature matrix](../../../seqledger/docs/operations/promoter/characterization-feature-matrix.md)
-
-### Common path
-
-1. Start from the packaged smoke workspace:
-   - [evo2_feature_bundle_smoke workspace](../../workspaces/evo2_feature_bundle_smoke/README.md)
-2. Validate the config:
-   - `uv run infer validate config --config src/dnadesign/infer/workspaces/evo2_feature_bundle_smoke/config.yaml`
-3. Dry-run the jobs:
-   - `uv run infer run --config src/dnadesign/infer/workspaces/evo2_feature_bundle_smoke/config.yaml --dry-run`
-4. Run the selected model lane once dependencies are installed:
-   - `uv run infer run --config src/dnadesign/infer/workspaces/evo2_feature_bundle_smoke/config.yaml`
-
-### Config stance
-
-- keep one infer config per model lane
-- keep contexts explicit as separate jobs
-- let `construct` supply template-backed resolved sequences and anchor coordinates
-- let `feature_bundle` decide which feature groups and pooling modes are collected
-- accept Permuter-originated candidates only after they are materialized into a
-  SeqLedger/Construct-owned dataset with explicit sequence views
-
-Minimal example:
+For an isolated sequence, a minimal configuration is:
 
 ```yaml
-model: # Keep one model stanza per infer config.
-  id: evo2_7b # Use the 7B lane for the first green path.
-  device: cpu # Keep the smoke example CPU-safe.
-  precision: fp32 # Use fp32 for the portable smoke path.
-  alphabet: dna # Match Evo2's DNA alphabet contract.
+# Extract pooled features from an isolated DNA sequence on a configured GPU.
+model:
+  id: evo2_7b
+  device: cuda:0
+  precision: bf16
+  alphabet: dna
 
-jobs: # Keep contexts explicit as separate infer jobs.
-  - id: anchor_only_7b_bundle # Collect anchor-only bundle outputs.
-    operation: extract # Run the feature extraction surface.
-    ingest: # Read direct records for the anchor-only lane.
-      source: records # Load sequence records from a JSONL file.
-      path: inputs/anchor_only_records.jsonl # Point at the anchor-only input plane.
-      field: sequence # Read the sequence field from each input record.
-    feature_bundle: # Let the bundle surface choose the default feature groups.
-      intermediate_block: 26 # Use the stable config default; runtime resolves it model-aware.
-      context: # Record the explicit context metadata for this job.
-        kind: anchor_only # Mark this lane as the anchor-only context.
-
-  - id: template_1kb_7b_bundle # Collect construct-expanded bundle outputs.
-    operation: extract # Reuse the same extract operation for the templated lane.
-    ingest: # Read direct records for the 1 kb templated context.
-      source: records # Load sequence records from a JSONL file.
-      path: inputs/template_1kb_records.jsonl # Point at the construct-expanded input plane.
-      field: sequence # Read the sequence field from each input record.
-    feature_bundle: # Keep feature collection consistent across contexts.
-      intermediate_block: 26 # Keep the same config default; evo2_20b resolves it to block 23.
-      context: # Record the explicit context metadata for this job.
-        kind: template_1kb # Mark this lane as the default templated context.
+jobs:
+  - id: sequence_features
+    operation: extract
+    ingest:
+      source: records
+      path: inputs/sequences.jsonl
+      field: sequence
+    feature_bundle:
+      intermediate_block: 26
+      context:
+        kind: anchor_only
 ```
 
-### Choosing 7B vs 20B
+`anchor_only` averages token-position values across the entire input. For a flanked sequence, `template_custom` or `template_1kb` also pools over the inserted region, called the *anchor*. These jobs require the resolved sequence and `construct__context_id`, `construct__template_id`, `construct__anchor_start` and `construct__anchor_end` fields. [Construct](../../../construct/) can produce those records; Infer does not assemble the flanks.
 
-- use `evo2_7b` for the first green path and local smoke runs
-- switch to `evo2_20b` with a one-line config change: `model.id: evo2_20b`
-- keep the project-default intermediate selector unchanged unless repo-local
-  benchmarks justify another lane; the stable config default `26` resolves
-  model-aware, so `evo2_20b` uses block 23 at runtime
+The model receives the full sequence even when pooling only the anchor. Evo2 is causal, so a token's activation depends on the preceding DNA in the supplied orientation. A reverse-complement comparison requires a separate input with matching coordinates. See the [pooling contract](../reference/feature-schema.md#row-contract).
 
-### What the bundle writes
+Infer uppercases DNA before model calls and feature-key construction. Uppercase and lowercase are different tokenizer symbols, so features computed from unnormalized inputs are not interchangeable with these outputs.
 
-For each job, the bundle writes:
+## 3. Configure the runtime and execute
 
-- likelihood summaries
-- `output_layer_mean`
-- `intermediate_embedding`
-- metadata columns including context ids, anchor spans, selector, schema version, and request digest
+Feature bundles support `evo2_7b` and `evo2_20b`. The default intermediate selector resolves to block 26 for 7B and block 23 for 20B. Changing the model also requires checking device capacity and dependencies; see the [provider reference](../reference/evo2-provider.md).
 
-The persisted SeqLedger columns still follow the generic infer contract:
+Install the `infer-evo2` runtime using the [GPU installation instructions](../../../../../docs/setup/installation.md#gpu-extra-infer-evo2). On BU's Shared Computing Cluster, use the [SCC setup procedure](scc-evo2-gpu-uv-runbook.md). Once the environment, input and configuration are ready:
 
-- `infer__<model_id>__<job_id>__<out_id>`
+```bash
+# This executes the model and may download weights if they are not cached.
+infer run --config config.yaml
+```
 
-### Permuter handoff boundary
+The local CLI displays an output summary. For persistent dataset columns, configure [SeqLedger write-back](pressure-test-agnostic-models.md). For in-memory values, use the Python API below.
 
-Permuter may emit a non-executing feature request that points at a SeqLedger dataset
-and this Infer feature-bundle surface. Infer remains the execution and writeback
-owner: it validates selectors, executes the model, writes `_derived/infer`
-sidecars, and classifies reusable, stale, or missing vector/scalar payloads.
+## 4. Use the returned features
 
-For multi-view Construct outputs such as RT-lnRNA, handoff configs must select
-explicit `view_name` values or stable aliases. Do not rely on broad selectors
-such as `product_kind: realized_context` plus orientation when the dataset
-contains several semantically distinct views.
-
-### OPAL handoff
-
-When the downstream branch wants one flattened `X` matrix, do not explode vectors in storage. Export them explicitly:
+This example executes a model, then flattens its bundle for downstream analysis. Run it only in a configured GPU environment:
 
 ```python
-from dnadesign.infer import export_evo2_sequence_opal_matrix
+from dnadesign.infer import (
+    export_evo2_sequence_opal_matrix,
+    run_evo2_sequence_features,
+)
 
+sequences = ["ACGTACGT", "ACGTTCGT"]
+bundle = {"context": {"kind": "anchor_only"}}
+columnar = run_evo2_sequence_features(
+    sequences,
+    model_id="evo2_7b",
+    bundle=bundle,
+    device="cuda:0",
+    precision="bf16",
+)
+# Keep row IDs in the same order as the input sequences.
 payload = export_evo2_sequence_opal_matrix(
-    row_ids=row_ids,
+    row_ids=["sequence_1", "sequence_2"],
     columnar=columnar,
     model_id="evo2_7b",
-    bundle={"context": {"kind": "template_1kb"}},
+    bundle=bundle,
 )
+print(len(payload["x"]))  # 2 rows, one per sequence
+print(len(payload["feature_names"]))  # One name per matrix column
 ```
 
-`payload["x"]` is the deterministic matrix and `payload["feature_names"]` is the deterministic flattened feature order.
+Bundles return scalar summaries, pooled vectors and request metadata. SeqLedger row outputs use `infer__<model_id>__<job_id>__<out_id>` names. Explicit sequence-view jobs use aliases and payload sidecars instead; consult the [feature schema](../reference/feature-schema.md) before reading or exporting those results.
 
-### Failure modes
+## Troubleshooting
 
-- `feature_bundle` with templated contexts fails if `construct__anchor_start` / `construct__anchor_end` are missing
-- `pool.dim < 1` fails during config parsing
-- `evo2_20b` fails the capacity gate on GPUs below compute capability `9.0`
-- stale bundle outputs are recomputed when `metadata__feature_request_digest` does not match the current request
-
-For GPU environment setup and capacity gating, use:
-
-- [SCC Evo2 GPU environment runbook](scc-evo2-gpu-uv-runbook.md)
+- Missing anchor coordinates: supply the resolved Construct metadata before using a templated context.
+- Invalid pooling: pool over sequence positions, not the batch dimension; `pool.dim` must be at least `1`.
+- Unsupported device: check the provider's capacity gate, including compute capability `9.0` or higher for `evo2_20b`.
+- Changed request: resume checks request metadata. A selector or context change can require recomputation rather than reuse.

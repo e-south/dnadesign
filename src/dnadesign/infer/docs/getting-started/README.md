@@ -1,10 +1,12 @@
-## infer getting started
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-07-14
+**Last verified:** 2026-10-28
+-->
 
-Use this section for first-run command validation before moving to large pressure tests.
+[Infer guide](../README.md)
 
-- [CLI quickstart](cli-quickstart.md): local command sequence for `validate`, `extract`, and `generate`.
-- [SCC Evo2 GPU environment runbook](../operations/scc-evo2-gpu-uv-runbook.md): deterministic SCC GPU setup path for infer + Evo2.
-- [Operations index](../operations/README.md): move from local checks to pressure-test workflows.
+# Getting started
+
+[Validate your first job](cli-quickstart.md) creates a local workspace and checks a small input. It needs no GPU or model weights.
+
+Then use the [workspace guide](../../workspaces/README.md) to substitute your inputs, or choose an [inference task](../operations/README.md).

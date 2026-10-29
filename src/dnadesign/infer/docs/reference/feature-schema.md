@@ -1,37 +1,27 @@
-## Evo2 Sequence-View Feature Schema
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-Use this page when you need the stable bundle contract for Evo2 feature extraction from explicit sequence views.
-The repository supports two sibling surfaces:
+[Infer guide](../README.md) / [Reference](README.md)
 
-- context bundles driven by `context.kind` plus bundle-level pooling flags
-- explicit sequence-view bundles driven by `sequence_view_inputs[]`
+# Feature schema and storage
 
-### DNA case contract
+Feature bundles accept either resolved context records (`context.kind`) or explicit sequence views (`sequence_view_inputs[]`). Both use the `evo2_sequence_feature_v1` schema. Context-record outputs can be attached as SeqLedger columns; sequence-view outputs use aliases and payload sidecars described below.
 
-For Evo2 DNA inference, biological A/C/G/T inputs must be uppercase before
-tokenization. Lowercase and uppercase bases are distinct Evo2 tokenizer symbols;
-lowercase or mixed-case model inputs invalidate geometry and rank diagnostics
-and require feature regeneration. `infer` canonicalizes incoming DNA strings to
-uppercase before adapter calls and feature-key construction; existing sidecars
-generated from lowercase or mixed-case inputs must be regenerated.
+## DNA case
 
-The v1 schema literal is `evo2_sequence_feature_v1`. It describes the generic
-Evo2 sequence-feature contract used by both row-context and explicit
-sequence-view bundles; promoter studies are inputs to that contract, not a
-separate Infer primitive.
+Infer uppercases DNA before tokenization and feature-key construction. Uppercase and lowercase are distinct Evo2 tokenizer symbols. Features computed from unnormalized inputs should be regenerated before comparison with outputs under this policy.
 
-### Row contract
+## Row contract
 
-The semantic bundle is one resolved context per row:
+The semantic bundle is one resolved sequence context per row:
 
 - one `(sequence_id, context_id, model_name)` combination
 - scalar metadata beside scalar summaries and vector outputs
 - vectors stay list-valued in storage; flattening happens only at export time
 
-### Default bundle shape
+## Default bundle shape
 
 ```yaml
 feature_bundle:
@@ -60,14 +50,14 @@ feature_bundle:
   kind: evo2_sequence_feature_v1
   collect_log_likelihood: false
   sequence_view_inputs:
-    - dataset: construct_prom_eth_cip_reference_core60
-      root: src/dnadesign/seqledger/datasets
+    - dataset: analysis_windows
+      root: outputs/usr_datasets
       view_selector:
         product_kind: analysis_window
       pooling:
         operation: core60_mean
-    - dataset: construct_prom_eth_cip_reference_contexts
-      root: src/dnadesign/seqledger/datasets
+    - dataset: flanked_sequences
+      root: outputs/usr_datasets
       view_selector:
         product_kind: realized_context
         orientation: reverse_complement
@@ -78,9 +68,8 @@ feature_bundle:
 
 Sequence-view rules:
 
-- each resolved row is one explicit semantic view id, not one implicit study lane
-- `construct_insert` views map to `context_kind=anchor_only`; they are the
-  merged construct-ready anchor handoff rows, not derived core60 rows
+- each resolved row is one explicit semantic view id, not an inferred dataset-wide view
+- `construct_insert` views map to `context_kind=anchor_only`; they are anchor inserts rather than derived analysis windows
 - `seq_mean`, `anchor_mean`, and `core60_mean` are row-level pooling operations
   over token-position vectors, not over embedding dimensions.
 - Evo2 outputs are causal. A token vector at position `t` is
@@ -113,8 +102,7 @@ Sequence-view rules:
   `analysis_window` or `realized_context` rows
 - missing required product kinds are a Construct/SeqLedger completion problem; the
   completion planner reports them as `missing_products` before model execution
-- Before large backfills, run `uv run infer validate sequence-view-completion
-  --config <config.yaml> --format json` to classify vectors and scalars as
+- Before large backfills, run `infer validate sequence-view-completion --config <config.yaml> --format json` to classify vectors and scalars as
   reusable, stale, missing, or product-missing without loading the model.
   Use `--mode inventory` for host preflight/status loops that must stay bounded:
   it counts expected sequence-view products plus alias/payload sidecar
@@ -124,12 +112,12 @@ Sequence-view rules:
   Sequence-view `root` values resolve relative to the config file directory.
   SeqLedger row-overlay payload columns are not counted as sequence-view feature
   coverage.
-- Batch preflight can add `--max-missing-products 0 --max-stale-vectors 0
-  --max-stale-scalars 0` to fail before submit when required sequence products
+- Batch preflight can add `--max-missing-products 0 --max-stale-vectors 0 --max-stale-scalars 0` to fail before submit when required sequence products
   are absent or existing vector/scalar sidecars are stale. Do not set
   `--max-missing-vectors 0` or `--max-missing-scalars 0` for a lane whose
   purpose is to generate missing features.
-### Payload storage and maintenance
+
+## Payload storage and maintenance
 
 Each shard publishes its new payload parts through an atomic manifest update.
 Readers use only listed parts; files left by an interrupted commit are invisible.
@@ -156,7 +144,7 @@ already holding the live store's lock.
 Before appending to single-file payloads, explicitly migrate them:
 
 ```bash
-uv run infer features migrate --root /path/to/datasets --dataset demo
+infer features migrate --root /path/to/datasets --dataset demo
 ```
 
 Migration verifies the copied bytes and schema before publishing a manifest and
@@ -164,14 +152,14 @@ removing the single-file copy. Routine commits do not rewrite prior payloads.
 To combine parts and remove uncommitted orphan parts, run:
 
 ```bash
-uv run infer features compact --root /path/to/datasets --dataset demo
+infer features compact --root /path/to/datasets --dataset demo
 ```
 
 Compaction retains all committed keys by default. Add `--prune-unreferenced` only
 to remove payloads without current aliases. Neither operation runs automatically
 at job completion. Both require the dataset to be writable.
 
-### Default output ids
+## Default output ids
 
 - `log_likelihood__total`
 - `log_likelihood__mean_per_token`
@@ -185,7 +173,7 @@ at job completion. Both require the dataset to be writable.
 - `intermediate_embedding__block23_mlp_out__anchor_mean` for templated `evo2_20b` contexts
 - `intermediate_embedding__block23_mlp_out__core60_mean` for explicit 60 bp `evo2_20b` sequence-view bundles
 
-### Metadata out ids
+## Metadata out ids
 
 The v1 bundle persists these metadata out ids:
 
@@ -222,7 +210,7 @@ The v1 bundle persists these metadata out ids:
 - `metadata__timestamp`
 - `metadata__feature_request_digest`
 
-### Selector contract
+## Selector contract
 
 Users configure:
 
@@ -235,10 +223,10 @@ Users configure:
 
 The canonical selector is the stable contract. Provider-layer strings are adapter internals.
 
-### Export contract for OPAL
+## Export contract for OPAL
 
 Use `dnadesign.infer.export_evo2_sequence_opal_matrix(...)` when OPAL needs a deterministic flattened matrix.
-The exported rows are keyed by feature metadata, not by a promoter-only primitive.
+The returned payload contains `row_ids`, a list of feature-vector rows in `x`, and their ordered `feature_names`.
 
 Export guarantees:
 
@@ -254,7 +242,7 @@ Example exported feature names:
 - `infer.evo2.evo2_7b.analysis_window.intermediate_embedding.block26_mlp_out.core60_mean[17]`
 - `infer.evo2.evo2_20b.template_1kb.intermediate_embedding.block23_mlp_out.anchor_mean[17]`
 
-### Fail-fast rules
+## Fail-fast rules
 
 - `feature_bundle` and `outputs` are mutually exclusive on one extract job
 - at least one feature group must be enabled
@@ -262,4 +250,4 @@ Example exported feature names:
 - templated contexts without required `construct__*` metadata fail before model execution
 - sequence-view bundles with missing required views, missing anchor bounds, or invalid pooling spans fail before model execution
 - unsupported model ids for this bundle fail before adapter execution
-- tokenwise persistence is intentionally unsupported in the repo-aligned v1 bundle
+- the v1 bundle persists pooled summaries, not tokenwise tensors

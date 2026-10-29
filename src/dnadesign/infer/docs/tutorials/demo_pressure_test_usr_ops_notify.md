@@ -1,132 +1,36 @@
-## infer end-to-end pressure-test demo (usr + ops + notify)
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-This demo executes infer in an end-to-end pressure-test loop that can run standalone or via ops orchestration.
+[Infer guide](../README.md)
 
-### Objective
+# How a SeqLedger extraction job works
 
-1. Validate infer config and dry-run contracts.
-2. Execute infer extraction pressure path.
-3. Verify SeqLedger dataset state after write-back.
-4. Execute ops runbook in no-submit and submit modes.
-5. Optionally enable notify phases for delivery smoke checks.
+A stored inference result connects a sequence record to a model, job and requested output. This lets you inspect predictions alongside the input and resume processing without repeating completed work.
 
-### 1) Prepare workspace and config
+The [SeqLedger extraction procedure](../operations/pressure-test-agnostic-models.md) contains the runnable commands. This walkthrough explains what each stage establishes.
 
-```bash
-uv run infer workspace init --id demo_usr_pressure --profile usr-pressure # Create pressure-test workspace and config.
-export WORKSPACE_ROOT="$PWD/workspaces/demo_usr_pressure" # Reuse workspace root across steps.
-export INFER_CONFIG="$WORKSPACE_ROOT/config.yaml" # Pin infer config path.
-export USR_ROOT="$WORKSPACE_ROOT/outputs/usr_datasets" # Point SeqLedger tools at workspace-local datasets.
-export DATASET_ID="infer_pressure_demo" # Set dataset id for repeatable commands.
-```
+## Prepare records and output types
 
+A workspace holds `config.yaml`; a SeqLedger dataset holds the sequence records. Creating a workspace does not populate the dataset. Import your sequences, then register the output names and types required by the job.
 
-The scaffold creates directories and a config, but no input dataset. First
-prepare the SeqLedger registry from the configured output types:
+For example, the supplied extraction job requests a pooled logits vector and a mean log-likelihood. SeqLedger stores them as `list<float64>` and `float64`, respectively, under names of the form `infer__<model_id>__<job_id>__<out_id>`. The job's output id is a label; its function and parameters determine the calculation.
 
-```bash
-# Print the namespace registration command for this config.
-uv run infer validate seqledger-registry --config "$INFER_CONFIG"
-```
+## Validate, then execute
 
-Run the command printed after `register:` to create the registry. Then create
-the dataset and import the included sequences:
+Configuration validation checks the request. A dry run also resolves the input dataset and required field. Neither step loads model weights. Actual extraction requires the model runtime and hardware described in the [Evo2 reference](../reference/evo2-provider.md).
 
-```bash
-# Create the dataset under the registered SeqLedger root.
-uv run seqledger --root "$USR_ROOT" init "$DATASET_ID" --source "infer demo"
-# Import the included DNA sequences.
-uv run seqledger --root "$USR_ROOT" import "$DATASET_ID" --from csv \
-  --path src/dnadesign/seqledger/assets/demo_material/demo_sequences.csv \
-  --bio-type dna --alphabet dna_4
-```
+When extraction succeeds with write-back enabled, the values are attached to record IDs. Inspect both the resulting columns and dataset events before using them downstream.
 
-### 2) Validate infer contract surface
+## Resume deliberately
 
-```bash
-uv run infer validate config --config "$INFER_CONFIG" # Validate infer config contract.
-uv run infer validate seqledger-registry --config "$INFER_CONFIG" # Derive the exact infer namespace registration command for this config.
-uv run infer run --config "$INFER_CONFIG" --dry-run # Exercise run path without mutation.
-```
+Running the same job again can skip completed outputs. Feature bundles also compare request metadata before reusing values. Changing a model, selector or pooling request can require recomputation; an existing column alone does not establish compatibility.
 
-If output definitions change, rerun namespace registration before inference.
+The procedure includes an optional `infer prune` step for archiving the Infer overlay before a fresh extraction. It is a reset operation, not part of a routine resume, and it does not remove sequence-view sidecars.
 
-### 3) Execute infer pressure job locally
+## Schedule the same job when needed
 
-```bash
-uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr # Execute local pressure job.
-```
+OPS can plan a scheduled run from the workspace configuration. Its `--no-submit` path checks the planned commands before `--submit` sends work to the scheduler. Notifications are optional. Local extraction does not require either OPS or Notify.
 
-### 4) Verify SeqLedger write-back and events
-
-```bash
-uv run seqledger --root "$USR_ROOT" head "$DATASET_ID" -n 5 # Inspect top rows after write-back.
-uv run seqledger --root "$USR_ROOT" events tail "$DATASET_ID" -n 20 # Confirm infer event stream updates.
-```
-
-### 5) Resume and prune infer output state
-
-```bash
-uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr # Confirm resume behavior.
-uv run infer prune --seqledger "$DATASET_ID" --seqledger-root "$USR_ROOT" # Archive infer namespace for reset.
-uv run infer run --config "$INFER_CONFIG" --job pressure_evo2_logits_llr # Re-run after prune reset.
-```
-
-### 6) Build ops runbook and inspect plan
-
-```bash
-# Initialize infer ops runbook for this workspace.
-# Keep the runbook path under the workspace-scoped Ops logs tree.
-export OPS_RUNBOOK="$WORKSPACE_ROOT/outputs/logs/ops/runbooks/infer-pressure.runbook.yaml" # Reuse one stable workspace-scoped Ops runbook path.
-# Generate the infer workflow runbook at that workspace-scoped path.
-uv run ops runbook init \
-  --runbook "$OPS_RUNBOOK" \
-  --workflow infer \
-  --workspace-root "$WORKSPACE_ROOT" \
-  --id infer_pressure_test \
-  --no-notify
-
-uv run ops runbook presets # Review workflow presets before execution.
-uv run ops runbook plan --runbook "$OPS_RUNBOOK" # Generate execution plan.
-```
-
-### 7) Execute no-submit and submit paths
-
-```bash
-# Execute runbook in no-submit mode first.
-uv run ops runbook execute \
-  --runbook "$OPS_RUNBOOK" \
-  --audit-json "$WORKSPACE_ROOT/outputs/logs/ops/audit/infer-pressure.audit.json" \
-  --no-submit
-
-qstat -u "$USER" # Inspect queue state before submit path.
-
-# Execute runbook submit path after checks.
-uv run ops runbook execute \
-  --runbook "$OPS_RUNBOOK" \
-  --audit-json "$WORKSPACE_ROOT/outputs/logs/ops/audit/infer-pressure-submit.audit.json" \
-  --submit
-```
-
-### 8) Optional notify-enabled runbook variant
-
-```bash
-# Re-initialize runbook with notify stages enabled.
-uv run ops runbook init \
-  --runbook "$OPS_RUNBOOK" \
-  --workflow infer \
-  --workspace-root "$WORKSPACE_ROOT" \
-  --id infer_pressure_test \
-  --with-notify \
-  --force
-```
-
-### 9) Contract reminder
-
-- SeqLedger write-back column pattern is `infer__<model_id>__<job_id>__<out_id>`.
-- Invalid or unreadable SeqLedger `records.parquet` fails fast during resume scan.
-- Fresh SeqLedger test datasets must register exact infer output types before write-back.
-- `evo2.embedding` accepts semantic `layer` values `mid` and `final` for the common pooled embedding checks.
+After extracting features, choose the output needed for [clustering](../../../cluster/docs/workflows/exploratory-clustering.md) or an [OPAL campaign](../../../opal/docs/workflows/seqledger-infer-x-active-learning.md). For sequence-view features, use the [documented reader or matrix export](../reference/feature-schema.md) instead of reading storage fragments directly.

@@ -1,28 +1,67 @@
-## infer CLI quickstart
-
+<!--
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-25
+**Last verified:** 2026-10-28
+-->
 
-These checks validate configuration and output requests without loading a model
-or producing predictions. Run them from the repository root after
-[installation](../../../../../docs/setup/installation.md).
+[Infer guide](../README.md)
 
-### 1) Validate a config contract
+# Validate your first Infer job
+
+Create a workspace, inspect its sequence input and check an extraction job. These commands do not download weights or produce predictions, so you can run them without a GPU.
+
+## 1. Install and activate Infer
+
+From a DNADesign checkout, install the configuration and dry-run profile:
 
 ```bash
-uv run infer validate config --config src/dnadesign/infer/docs/operations/examples/pressure_test_infer_config.yaml
+uv sync --locked --no-default-groups --extra infer
+source .venv/bin/activate
 ```
 
-### 2) Run extract in dry-run mode
+If Infer is already installed, activate that environment instead. The commands below use its `infer` executable and can run outside the checkout. See [installation](../../../../../docs/setup/installation.md) for other profiles.
+
+## 2. Create a workspace
+
+Run this in a directory where you want to keep your work:
 
 ```bash
-uv run infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run
+infer workspace init --id first_infer --profile local
+cd workspaces/first_infer
+cat inputs/records.jsonl
 ```
 
-### 3) Run generate in dry-run mode
+The starter input contains one record:
+
+```json
+{"id":"example_record","sequence":"ACGTACGT"}
+```
+
+Open `config.yaml` to inspect the job. It reads `inputs/records.jsonl`, requests Evo2 logits and averages them over nucleotide positions. The input path is relative to the configuration file, so moving the whole workspace preserves that relationship.
+
+## 3. Validate before inference
 
 ```bash
-uv run infer generate \
+# Check the model, job settings and requested output.
+infer validate config --config config.yaml
+
+# Also resolve the input and display the planned job.
+infer run --config config.yaml --dry-run
+```
+
+The commands finish with `Config validated.` and `Config validated (dry run).`, respectively. A dry run checks the request and input availability; it does not establish that the model can execute on this machine.
+
+## 4. Try an ad-hoc request
+
+Use a preset to validate extraction directly from a DNA string:
+
+```bash
+infer extract --preset evo2/extract_logits_ll --seq ACGT --dry-run
+```
+
+For a generation request, specify a prompt and output length:
+
+```bash
+infer generate \
   --model-id evo2_7b \
   --device cpu \
   --precision bf16 \
@@ -32,10 +71,12 @@ uv run infer generate \
   --dry-run
 ```
 
-Success prints `Config validated.`, `Extract validated (dry run).`, and
-`Generate validated (dry run).`. These checks do not download model weights or
-verify that inference can run on this machine.
+These finish with `Extract validated (dry run).` and `Generate validated (dry run).`. Use `infer presets list` and `infer adapters list` to inspect available presets and registered models.
 
-### 4) Next route
+## Continue with your data
 
-- Move to [operations pressure-test runbook](../operations/pressure-test-agnostic-models.md) for end-to-end usage.
+- [Workspaces](../../workspaces/README.md) explains file formats and dataset paths.
+- [Evo2 feature bundles](../operations/evo2-sequence-features.md) explains context, pooling and the runtime needed for actual inference.
+- [SeqLedger extraction](../operations/pressure-test-agnostic-models.md) adds persistent outputs and resumable processing.
+
+For a configuration error, compare the reported field with the [command reference](../reference/command-contracts.md). Changing the model or input does not require starting a new workspace.

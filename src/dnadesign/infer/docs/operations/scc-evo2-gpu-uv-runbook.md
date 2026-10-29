@@ -1,28 +1,27 @@
-## SCC Evo2 GPU Environment Runbook (UV + infer)
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-Use this page when you need a deterministic SCC GPU environment build for infer.
+[Infer guide](../README.md) / [Operations](README.md)
+
+# Set up Evo2 on BU SCC
+
+Use this procedure on BU's Shared Computing Cluster to build the Evo2 GPU runtime and verify it on the allocated device. It is not required for local configuration checks; start with the [quickstart](../getting-started/cli-quickstart.md) for those.
 
 For BU SCC platform details and scheduler policy, see [BU SCC install bootstrap](../../../../../docs/bu-scc/setup/install.md).
 
-### DNA input contract
+## DNA input
 
-Before running Evo2 lanes, verify that every persisted biological DNA source
-product intended for model input is uppercase A/C/G/T. Evo2 tokenizes uppercase
-and lowercase bases as different symbols. Infer canonicalizes incoming DNA
-strings to uppercase before adapter calls, but sidecars generated before this
-contract from lowercase or mixed-case source records can contain collapsed
-geometry and invalid rank diagnostics. Regenerate those sidecars.
+Infer uppercases DNA before tokenization. Features previously computed from unnormalized inputs are not interchangeable with these results. See the [feature schema](../reference/feature-schema.md#dna-case).
 
-### Assumptions
+## Assumptions
 
 - Linux `x86_64` host with CUDA modules available.
 - You are on an SCC interactive GPU node or equivalent GPU-capable shell.
 - You want infer Evo2 support (`infer-evo2` extra) and deterministic build behavior.
 
-### Path policy
+## Path policy
 
 Set portable operator roots once before running the command blocks:
 
@@ -46,7 +45,7 @@ Pragmatic portability note:
 - Treat a working `.venv` as family-bound until a real `infer extract` smoke
   proves otherwise on the target family.
 
-### Lockfile preflight
+## Lockfile preflight
 
 flash-attn is sdist-only in `uv.lock`. Its build script can download a precompiled
 wheel, so the build profile below sets `FLASH_ATTENTION_FORCE_BUILD=TRUE` to
@@ -63,7 +62,7 @@ print(next(package for package in lock["package"] if package["name"] == "flash-a
 PY
 ```
 
-### Capacity and build profile gate
+## Capacity and build profile gate
 
 Run this once per interactive session. It sets build knobs from `NSLOTS`, sets `FLASH_ATTN_CUDA_ARCHS` from detected GPU capability, and fails fast when the requested model/precision is not a safe fit for the detected GPU memory.
 
@@ -126,7 +125,7 @@ if model_id == "evo2_20b" and gpu_cc_tuple < (9, 0):
         file=sys.stderr,
     )
     print(
-        "Use gpu_c=9.0 as the generic evo2_20b model floor on SCC. For the current Blackwell-pinned dnadesign environment, request gpu_t=RTXP6000 and gpu_c=12.0.",
+        "Use gpu_c=9.0 as the generic evo2_20b model floor on SCC. For Blackwell hardware, request matching resources such as gpu_t=RTXP6000 and gpu_c=12.0.",
         file=sys.stderr,
     )
     raise SystemExit(2)
@@ -170,21 +169,20 @@ PY
 )"
 ```
 
-This SCC runbook documents the promoted Evo2 lane set for `infer`: `evo2_7b` and `evo2_20b`. A 400B model is out of scope for this stack and is not a supported `model.id`.
+This procedure covers feature-bundle models `evo2_7b` and `evo2_20b`. A 400B model is out of scope for this stack and is not a supported `model.id`.
 
-Use `evo2_7b` as the default SCC smoke and pressure-test lane. Use `evo2_20b`
+Start with a small `evo2_7b` extraction to verify the runtime. Use `evo2_20b`
 only on GPU lanes that satisfy `gpu_c >= 9.0`; H200 is common on SCC, but
-newer higher-capability lanes also qualify when memory is sufficient. When the
-current `.venv` is family-pinned, add an exact selector; on the current SCC
-probe surface, the visible Blackwell lane is `gpu_t=RTXP6000` with
-`gpu_c=12.0`.
+newer higher-capability lanes also qualify when memory is sufficient. Match the scheduler request to the GPU family used to build the environment.
+For example, a Blackwell environment needs matching resources such as
+`gpu_t=RTXP6000` and `gpu_c=12.0`.
 
 Model fit and environment portability are separate. Passing the capacity gate
 does not prove that the current `.venv` can execute there. If this environment
 was built on a different GPU family, require a real `infer extract` smoke on
 the landed family before trusting batch portability.
 
-### Setup and verification steps
+## Setup and verification steps
 
 ```bash
 cd "$DNADESIGN_REPO" # Enter repo root used for SCC setup.
@@ -305,29 +303,20 @@ Do not replace the real extract smoke above with `infer validate config` or
 `infer run --dry-run`. Those are necessary config checks, but they do not prove
 that the compiled CUDA extension stack is portable to the current GPU family.
 
-### First real write-back gate
+## Prepare dataset write-back
 
-Treat live study collection as four explicit gates:
-
-1. the checked-in study snapshot is current
-2. the study preflight is green on the current host
-3. Evo2 actually imports and loads on the live GPU host
-4. the canonical SeqLedger `infer` namespace is registered before first write-back
-
-For study-owned SeqLedger write-back lanes, run:
+After a successful real extraction, register the exact output types for your SeqLedger dataset before writing results:
 
 ```bash
-uv run ops catalog list --simple # Discover routes supplied by the installed study package.
-uv run ops progress show <study-status-registry-id> --json # Confirm the checked-in study snapshot is current.
-NOTIFY_WEBHOOK_FILE=<...> SSL_CERT_FILE=<...> uv run ops progress show <study-preflight-registry-id> --scope next --json # Confirm the current host is execution-ready.
-uv run infer validate seqledger-registry --config <lane-config> # Derive the canonical infer namespace registration contract.
-uv run seqledger --root src/dnadesign/seqledger/datasets namespace show infer # Confirm the shared SeqLedger root already knows the infer namespace.
+# Replace these paths with the job config and its declared dataset root.
+uv run --no-sync infer validate seqledger-registry --config /path/to/config.yaml
+# Inspect registration in the same dataset root.
+uv run --no-sync seqledger --root /path/to/datasets namespace show infer
 ```
 
-If `namespace show infer` fails, use the register command emitted by
-`infer validate seqledger-registry` before the first real write-back.
+If registration is missing, use the command emitted by `validate seqledger-registry`. Follow the [SeqLedger extraction procedure](pressure-test-agnostic-models.md) for input import, dry-run checks and output inspection.
 
-### First live signals on a GPU node
+## First live signals on a GPU node
 
 For `evo2_20b`, a healthy cold start can sit for a short window in
 `fetch -> weight hydration -> GPU residency -> first attach events` before the
@@ -340,11 +329,11 @@ Before declaring the run hung, check:
 - the watcher cursor advances if Notify is following the same stream
 - the watcher spool remains empty
 
-For study-owned interactive watchers on an existing event stream, seed the
+For interactive watchers on an existing event stream, seed the
 cursor to the current `.events.log` size before `notify seqledger-events watch
 --follow` unless replay is intentional.
 
-### API pressure checks (forward, embeddings, generation)
+## API pressure checks (forward, embeddings, generation)
 
 Use these checks to verify Evo2 usage contracts in infer:
 
@@ -428,7 +417,7 @@ PY
 
 `infer validate config` checks capacity when local GPUs are visible. On GPU-less hosts it validates schema/contracts and reports that capacity checks were skipped; use `ops runbook plan` with declared GPU resources for deterministic scheduler-side preflight.
 
-### Recovery after interrupted or partial installs
+## Recovery after interrupted or partial installs
 
 If the verification block prints `MISSING_REQUIRED`, rebuild the two compiled extensions explicitly:
 
@@ -455,7 +444,7 @@ export CMAKE_BUILD_PARALLEL_LEVEL=1 # Limit CMake parallelism.
 export OMP_NUM_THREADS=1 # Limit OpenMP thread usage.
 ```
 
-### Why this setup works
+## Why this setup works
 
 - UV default groups:
   - `pyproject.toml` enables the `tools` group by default, so baseline `uv sync --locked` installs the complete tool runtime without development tooling.
@@ -477,7 +466,7 @@ export OMP_NUM_THREADS=1 # Limit OpenMP thread usage.
   - on `NSLOTS=4` with `MAX_JOBS=2`, one full flash-attn source build took about 70 minutes in validation runs.
   - this is expected when the lock contains sdist-only flash-attn and no reusable wheel is already in the UV cache.
 
-### Follow-on path
+## Follow-on path
 
 - For scheduler-managed pressure tests, continue with:
   - [Agnostic model + SeqLedger pressure test](pressure-test-agnostic-models.md)

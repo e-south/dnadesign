@@ -1,63 +1,37 @@
-## infer docs
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-### Read order
+[Infer](../README.md)
 
-1. [Top README](../README.md): package boundary and quick links.
-2. [Getting started index](getting-started/README.md): first local command flow.
-3. [Workspaces guide](../workspaces/README.md): deterministic workspace scaffold and template contract.
-4. [Operations index](operations/README.md): pressure-test paths for local and scheduler workflows.
-5. [Reference index](reference/README.md): stable command and runtime contracts.
-6. [Source-tree map](../src/README.md): internal implementation layout under `infer/src/`.
-7. [Architecture map](architecture/README.md): package boundary map and extension seams.
-8. [Dev index](dev/README.md): maintainer workflow.
+# Infer guide
 
-### Documentation by workflow
+Infer turns DNA sequences into model outputs such as likelihood scores, pooled feature vectors and generated sequences. You choose the input, model and requested outputs in a job configuration.
 
-#### Validate local command path
-- [CLI quickstart](getting-started/cli-quickstart.md): run `validate`, ad-hoc `extract`, and ad-hoc `generate`.
-- [Reference index](reference/README.md): command and contract lookups before automation.
+**Start with [Validate your first job](getting-started/cli-quickstart.md).** This creates a small workspace and checks its configuration and input without loading a model. Running inference also requires the model's dependencies and suitable hardware.
 
-#### Run an Evo2 sequence-feature bundle
-- [Evo2 sequence-feature runbook](operations/evo2-sequence-features.md): repo-aligned feature-bundle flow with explicit anchor-only, templated-context, and sequence-view examples.
-- [Evo2 provider reference](reference/evo2-provider.md): supported checkpoints, default block 26 selector, and storage/debug defaults.
-- [Feature schema and selector contract](reference/feature-schema.md): output ids, metadata out ids, digests, and OPAL export ordering.
-- [evo2_feature_bundle_smoke workspace](../workspaces/evo2_feature_bundle_smoke/README.md): packaged feature-bundle smoke path with generic anchor and templated records.
+## Choose your next task
 
-#### Pressure-test agnostic model writes into SeqLedger
-- [Agnostic-model pressure-test runbook](operations/pressure-test-agnostic-models.md): standalone CLI and ops-runbook paths.
-- [End-to-end pressure-test demo](tutorials/demo_pressure_test_usr_ops_notify.md): reproducible infer -> usr -> ops -> notify walkthrough.
-- [Workspaces guide](../workspaces/README.md): initialize workspace roots with `infer workspace init`.
+| I want to… | Guide |
+| --- | --- |
+| Use my own sequence files | [Workspaces and input formats](../workspaces/README.md) |
+| Extract Evo2 likelihoods and pooled features | [Evo2 feature bundles](operations/evo2-sequence-features.md) |
+| Save model outputs alongside sequence records | [SeqLedger extraction](operations/pressure-test-agnostic-models.md) |
+| Understand validation, storage and resuming | [How a SeqLedger job works](tutorials/demo_pressure_test_usr_ops_notify.md) |
+| Configure Evo2 on BU's Shared Computing Cluster | [SCC GPU setup](operations/scc-evo2-gpu-uv-runbook.md) |
 
-#### Continue after infer-derived `X` exists
-- If infer writes a bundle of `infer__...` columns, choose the one feature column or exported matrix you want to carry forward from a file or SeqLedger dataset before moving to Cluster or OPAL.
-- [cluster exploratory clustering workflow](../../cluster/docs/workflows/exploratory-clustering.md): Leiden, UMAP, and exploratory analysis once the chosen feature column or exported matrix exists.
-- [SeqLedger dataset with infer-derived X -> OPAL active learning](../../opal/docs/workflows/seqledger-infer-x-active-learning.md): start the label/train/select loop only after infer has written the chosen `infer__...` column into a SeqLedger dataset and OPAL `campaign.yaml` uses `data.location.kind: usr`.
+## Connect inputs and outputs
 
-#### Run scheduler-oriented infer flows
-- [Operations index](operations/README.md): run no-submit preflight, then submit.
-- [SCC Evo2 GPU environment runbook (UV + infer)](operations/scc-evo2-gpu-uv-runbook.md): deterministic GPU environment bootstrap and infer capability verification.
-- [Agnostic-model pressure-test runbook](operations/pressure-test-agnostic-models.md): contract-first ops workflow.
+[Construct](../../construct/) can assemble input sequences and supply coordinates for pooling over an inserted region. When several producers contribute to one dataset, follow the [shared dataset workflow](../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md).
 
-#### Extend and maintain infer internals
-- [Architecture map](architecture/README.md): runtime module boundaries.
-- [Source-tree map](../src/README.md): internal module locations.
-- [Dev index](dev/README.md): maintainer loop and evidence logging.
+For downstream analysis, select a feature column or export a matrix from the bundle. [Cluster](../../cluster/docs/workflows/exploratory-clustering.md) uses features for exploratory analysis. [OPAL](../../opal/docs/workflows/seqledger-infer-x-active-learning.md) uses a declared feature column to learn from measurements and select candidates. Sequence-view payloads have a separate storage layout and must be read or exported through the [feature schema interfaces](reference/feature-schema.md).
 
-### Shared dataset handoffs into infer
+## Look up details
 
-- [Multi-source shared dataset assembly](../../seqledger/docs/operations/assembly/multi-source-shared-dataset.md): shared multi-source consolidation route before construct and infer share one downstream dataset.
-- [Construct -> SeqLedger -> Infer shared dataset runbook](../../seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md): shared construct-led consolidation route once construct owns the current handoff.
-- [Promoter characterization feature matrix](../../seqledger/docs/operations/promoter/characterization-feature-matrix.md): study-specific feature-dataset assembly before downstream cluster or OPAL use.
+- [Commands](reference/command-contracts.md): modes, input formats, validation and write behavior.
+- [Evo2 settings](reference/evo2-provider.md): supported feature-bundle models and layer selectors.
+- [Feature schema](reference/feature-schema.md): pooling, stored values, identities and integrity checks.
+- [All documentation](index.md): pages grouped by purpose.
 
-### Documentation by type
-
-- [Section index](index.md)
-- [getting-started/](getting-started/): first-run commands and prerequisites.
-- [tutorials/](tutorials/): full end-to-end walkthroughs.
-- [operations/](operations/): operational runbooks and pressure-test routes.
-- [reference/](reference/): command and contract documentation.
-- [architecture/](architecture/): package boundary map.
-- [dev/](dev/): maintainer workflow.
+For contributors, the [development guide](dev/README.md) covers public APIs and checks. The [architecture map](architecture/README.md) locates the implementation.
