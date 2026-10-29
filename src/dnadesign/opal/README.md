@@ -16,8 +16,11 @@ features, plus batches of measured outcomes. SeqLedger is an optional data integ
 From the DNADesign checkout, install only the OPAL runtime and try a round:
 
 ```bash
+# Install the focused OPAL runtime from the locked checkout.
 uv sync --locked --no-default-groups --extra opal
+# Keep the command available when you leave the checkout.
 source .venv/bin/activate
+# Run the synthetic examples and retain their outputs for inspection.
 opal demo-matrix --rounds 0 --keep
 ```
 

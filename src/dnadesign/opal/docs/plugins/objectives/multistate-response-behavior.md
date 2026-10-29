@@ -5,7 +5,7 @@ short_name: MSRB
 objective_id: multistate_response_behavior_v1
 owner: dnadesign-maintainers
 status: available
-last_verified: 2026-10-06
+last_verified: 2026-10-28
 ---
 
 # Multistate Response Behavior (MSRB)
@@ -463,14 +463,20 @@ model refits remain separate evidence.
 ### Python scoring without a campaign
 
 The public scorer requires NumPy. It does not load campaign plugins, fit a model,
-read a dataset or select sequences. A base DNADesign wheel provides this API; the
-`full` extra provides the campaign and other tool dependencies.
+read a dataset or select sequences. The base DNADesign installation provides this
+API; use the [OPAL installation](../../index.md#try-a-complete-selection-round)
+for campaign workflows.
+
+This example scores one candidate across four states. Its eight input values
+contain four responses followed by four reference-relative signals, both in the
+declared state order. The target requests OFF in `00` and `10`, and ON in `01`
+and `11`.
 
 ```python
 import numpy as np
 from dnadesign.opal import score_multistate_response_behavior
 
-# Four response values, followed by four reference-relative signal values.
+# One row per candidate: responses first, then reference-relative signals.
 phenotype = np.array([[-1., 0., 2., 3., -2., -1., 1., 2.]])
 result = score_multistate_response_behavior(
     phenotype,
@@ -478,13 +484,26 @@ result = score_multistate_response_behavior(
     target_mask=(0, 0, 1, 1),
     softmin_scale=0.3,
 )
-print(result.behavior_score)
-print(result.clearances.coordinate_clearances)
+
+# Inspect the score and the three groups of requirements it summarizes.
+print("Score:", np.round(result.behavior_score, 3))
+print("ON/OFF response gaps:", result.clearances.response)
+print("ON signals:", result.clearances.on_signal)
+print("OFF suppression:", result.clearances.off_signal_suppression)
 ```
 
-Keep the state order, measurement definitions and target explicit. Compare the
-individual clearances with zero when assessing directional attainment; the
-smooth score is a ranking, not a substitute for that inspection.
+```text
+Score: [1.316]
+ON/OFF response gaps: [[3. 2. 4. 3.]]
+ON signals: [[1. 2.]]
+OFF suppression: [[2. 1.]]
+```
+
+Here, all four ON-versus-OFF response gaps are positive. Both ON signals exceed
+the reference, and both OFF signals fall below it; their signs are reversed in
+the suppression values so that larger always means more favorable. The score
+summarizes these requirements for ranking. Inspect the individual values
+against zero to see which requirements a candidate meets.
 
 ### Responsibility and sources
 
