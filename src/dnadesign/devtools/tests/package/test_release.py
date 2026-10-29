@@ -112,3 +112,41 @@ def test_passed_label_cannot_hide_missing_or_failed_execution(key: str, value: o
     evidence["capabilities"]["video_output"][key] = value
     with pytest.raises(ValueError, match="video_output"):
         require_capabilities(evidence, revision="abc123", run=_run())
+
+
+@pytest.mark.parametrize("valid_banner", [True, False])
+def test_workflow_checks_built_readme_banner(tmp_path, monkeypatch, valid_banner):
+    """A branch-relative README is valid; the published metadata must be version-bound."""
+    import io
+    import urllib.request
+    from pathlib import Path
+    from zipfile import ZipFile
+
+    import yaml
+
+    root = Path(__file__).resolve().parents[5]
+    workflow = yaml.safe_load((root / ".github/workflows/release.yaml").read_text())
+    steps = workflow["jobs"]["build"]["steps"]
+    step = next(item for item in steps if item.get("name") == "Verify immutable package-page banner")
+    program = step["run"].split("<<'PYBANNER'\n", 1)[1].rsplit("PYBANNER", 1)[0]
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "pyproject.toml").write_text('[project]\nversion = "9.0.0"\n')
+    (tmp_path / "README.md").write_text("![toolkit](assets/dnadesign-banner.png)\n")
+    (tmp_path / "assets").mkdir()
+    banner = b"\x89PNG\r\n\x1a\nexample"
+    (tmp_path / "assets/dnadesign-banner.png").write_bytes(banner)
+    (tmp_path / "dist").mkdir()
+    url = "https://raw.githubusercontent.com/e-south/dnadesign/v9.0.0/assets/dnadesign-banner.png"
+    with ZipFile(tmp_path / "dist/example.whl", "w") as archive:
+        archive.writestr("example.dist-info/METADATA", f"Metadata-Version: 2.4\nVersion: 9.0.0\n\n![toolkit]({url})\n")
+
+    def fetch(requested, *, timeout):
+        assert requested == url
+        return io.BytesIO(banner if valid_banner else b"wrong-content")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fetch)
+    if valid_banner:
+        exec(compile(program, "release-banner-check", "exec"), {})
+    else:
+        with pytest.raises(AssertionError, match="Published banner differs"):
+            exec(compile(program, "release-banner-check", "exec"), {})

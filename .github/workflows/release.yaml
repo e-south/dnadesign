@@ -60,20 +60,6 @@ jobs:
       - name: Audit all release dependency profiles
         run: |
           uv audit --locked --output-format json > build/release-evidence/dependency-audit.json
-      - name: Verify immutable package-page banner
-        run: |
-          python - <<'PYBANNER'
-          import pathlib, re, tomllib, urllib.request
-          root = pathlib.Path('.')
-          project = tomllib.loads((root / 'pyproject.toml').read_text())['project']
-          url = re.findall(r'!\[[^\]]*\]\(([^)]+)\)', (root / 'README.md').read_text())[0]
-          expected = f"https://raw.githubusercontent.com/e-south/dnadesign/v{project['version']}/assets/dnadesign-banner.png"
-          assert url == expected, 'Banner must be bound to the released version'
-          with urllib.request.urlopen(url, timeout=30) as response:
-              published = response.read(10_000_001)
-          assert published == (root / 'assets/dnadesign-banner.png').read_bytes(), 'Published banner differs from source'
-          assert len(published) < 10_000_000 and published.startswith(b'\x89PNG\r\n\x1a\n')
-          PYBANNER
       - name: Build reproducible distribution
         run: |
           PYTHONPATH=src python -m dnadesign.devtools.package.build \
@@ -81,6 +67,27 @@ jobs:
           mkdir -p dist
           cp "$RUNNER_TEMP/dnadesign-release/"*.whl dist/
           cp "$RUNNER_TEMP/dnadesign-release/"*.tar.gz dist/
+      - name: Verify immutable package-page banner
+        run: |
+          python - <<'PYBANNER'
+          import pathlib, re, tomllib, urllib.request
+          from email.parser import BytesParser
+          from zipfile import ZipFile
+          root = pathlib.Path('.')
+          project = tomllib.loads((root / 'pyproject.toml').read_text())['project']
+          [wheel] = list((root / 'dist').glob('*.whl'))
+          with ZipFile(wheel) as archive:
+              [metadata_path] = [name for name in archive.namelist() if name.endswith('.dist-info/METADATA')]
+              metadata = BytesParser().parsebytes(archive.read(metadata_path))
+          assert metadata['Version'] == project['version'], 'Wheel version differs from source'
+          url = re.findall(r'!\[[^\]]*\]\(([^)]+)\)', metadata.get_payload())[0]
+          expected = f"https://raw.githubusercontent.com/e-south/dnadesign/v{project['version']}/assets/dnadesign-banner.png"
+          assert url == expected, 'Banner must be bound to the released version'
+          with urllib.request.urlopen(url, timeout=30) as response:
+              published = response.read(10_000_001)
+          assert published == (root / 'assets/dnadesign-banner.png').read_bytes(), 'Published banner differs from source'
+          assert len(published) < 10_000_000 and published.startswith(b'\x89PNG\r\n\x1a\n')
+          PYBANNER
       - name: Audit resolved build dependencies
         run: |
           uvx --from pip-audit==2.10.1 pip-audit --strict --no-deps --disable-pip --vulnerability-service osv \
