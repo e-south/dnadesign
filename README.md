@@ -4,20 +4,13 @@
 [![Codecov](https://codecov.io/gh/e-south/dnadesign/graph/badge.svg)](https://codecov.io/gh/e-south/dnadesign)
 [![MIT license](https://img.shields.io/badge/license-MIT-3D8068.svg)](https://github.com/e-south/dnadesign/blob/main/LICENSE)
 
-`dnadesign` is a modular bioinformatics toolkit for designing sequence libraries,
-assembling DNA constructs, running sequence models and analyzing their outputs.
-
-## Get started
-
-[Choose an installation](docs/setup/installation.md) for the scoring API, OPAL
-or the full toolkit, then choose a
-[tool](#available-tools) for its examples, inputs and outputs. The
-[workflow index](docs/README.md) connects tools for tasks that span the monorepo.
+`dnadesign` brings together tools for sequence design, modeling, and analysis in
+one Python monorepo. Use each tool independently or combine them through public
+APIs, command-line interfaces, and shared data formats.
 
 ## Available tools
 
-Pick the tool that matches the work you need to do. Each link opens the tool
-README for commands, inputs, and outputs.
+Each tool's documentation covers its setup, examples, inputs, and outputs.
 
 ### Design, modeling, and analysis
 
@@ -58,6 +51,7 @@ README for commands, inputs, and outputs.
 
 ## Contributing and reference
 
+- [Installation](docs/setup/installation.md): runtime dependencies and installation profiles.
 - [Docs index](docs/README.md): workflow and tool documentation.
 - [Architecture](ARCHITECTURE.md), [Design](DESIGN.md) and [Reliability](RELIABILITY.md): boundaries and operating principles.
 - [Developer docs](docs/dev/README.md): contribute changes and run validation checks.
