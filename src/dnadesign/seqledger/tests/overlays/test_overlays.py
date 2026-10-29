@@ -1042,3 +1042,28 @@ def test_create_overlay_view_avoids_path_resolve_calls(tmp_path: Path) -> None:
             con, view_name="overlay_no_resolve", path=overlay_path, key="id"
         )
     assert str(source)
+
+
+@pytest.mark.parametrize("layout", ["compact", "parts"])
+def test_materialize_preserves_fixed_vector_types(tmp_path, layout):
+    root = tmp_path / "data"
+    register_test_namespace(root, namespace="infer", columns_spec="infer__X:fixed_size_list<float64>[2]")
+    ds = Dataset(root, "candidates")
+    ds.init(source="fixture")
+    ids = ds.add_sequences(["ACGT", "GGGG"], bio_type="dna", alphabet="dna_4").ids
+    vectors = pa.array([[0.25, 0.5], [0.75, 1.0]], type=pa.list_(pa.float64(), 2))
+    writer = ds.write_overlay if layout == "compact" else ds.write_overlay_part
+    writer("infer", pa.table({"id": ids, "infer__X": vectors}))
+    with ds.maintenance(reason="candidate feature preparation"):
+        ds.materialize(keep_overlays=False)
+    materialized = pq.read_table(ds.records_path)
+    assert materialized.schema.field("infer__X").type == vectors.type
+    assert dict(zip(materialized["id"].to_pylist(), materialized["infer__X"].to_pylist())) == dict(
+        zip(ids, vectors.to_pylist())
+    )
+    # Materializing another namespace must also preserve vectors already in base records.
+    register_test_namespace(root, namespace="mock", columns_spec="mock__score:float64")
+    ds.write_overlay("mock", pa.table({"id": ids, "mock__score": [1.0, 2.0]}))
+    with ds.maintenance(reason="add scalar metadata"):
+        ds.materialize()
+    assert pq.read_schema(ds.records_path).field("infer__X").type == vectors.type

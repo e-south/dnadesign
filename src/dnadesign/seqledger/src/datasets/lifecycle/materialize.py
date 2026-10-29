@@ -15,6 +15,7 @@ import shutil
 from pathlib import Path
 from typing import Any, List, Optional, Sequence
 
+import pyarrow as pa
 import pyarrow.parquet as pq
 
 from ...contracts import REQUIRED_COLUMNS, Fingerprint, NamespaceError, SchemaError
@@ -68,6 +69,7 @@ def materialize_dataset(
 
         base_pf = pq.ParquetFile(str(dataset.records_path))
         base_cols = list(base_pf.schema_arrow.names)
+        fields = {field.name: field for field in base_pf.schema_arrow}
         essential = {k for k, _ in REQUIRED_COLUMNS}
 
         tmp_path = dataset.records_path.with_suffix(".materialize.parquet")
@@ -153,6 +155,7 @@ def materialize_dataset(
                 overlay_key_expr = _key_expr(f"o{idx}.{dataset._sql_ident(key)}", key=key)
                 join_clauses.append(f"LEFT JOIN {overlay_source} o{idx} ON {base_key_expr} = {overlay_key_expr}")
                 for col in derived_cols:
+                    fields[col] = schema.field(col)
                     col_ident = dataset._sql_ident(col)
                     overlay_expr = f"o{idx}.{col_ident}"
                     existing_expr = select_expr_by_col.get(col)
@@ -170,13 +173,14 @@ def materialize_dataset(
         finally:
             con.close()
 
-        pf_tmp = pq.ParquetFile(str(tmp_path))
-        schema = pf_tmp.schema_arrow
+        # DuckDB's Parquet export maps fixed-size Arrow lists to variable lists.
+        # Restore the declared base/overlay types before committing the dataset.
+        schema = pa.schema([fields[col] for col in select_order])
         metadata = dataset._base_metadata(created_at=now_utc())
 
         def _batches():
             for batch in iter_parquet_batches(tmp_path, columns=None):
-                yield batch
+                yield batch.cast(schema)
 
         write_parquet_atomic_batches(
             _batches(),
