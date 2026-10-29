@@ -55,7 +55,8 @@ class CommandSpec:
             raise ValueError("command spec requires exactly one of argv or shell")
 
     def render_shell(self) -> str:
-        env_prefix = " ".join(f"{name}={shlex.quote(value)}" for name, value in sorted(self.env.items()))
+        """Render a diagnostic command with environment values omitted."""
+        env_prefix = " ".join(f"{name}='<provided>'" for name in sorted(self.env))
         if self.argv is not None:
             command_text = " ".join(shlex.quote(part) for part in self.argv)
         else:
@@ -67,7 +68,7 @@ class CommandSpec:
         return {
             "argv": list(self.argv) if self.argv is not None else None,
             "shell": self.shell,
-            "env": dict(sorted(self.env.items())),
+            "env_names": sorted(self.env),
             "rendered": self.render_shell(),
         }
 

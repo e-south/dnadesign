@@ -11,7 +11,6 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-import json
 import os
 import re
 import subprocess
@@ -20,6 +19,7 @@ from pathlib import Path
 from typing import Callable
 
 from . import gates as gates_module
+from .audit import ExecutionAudit
 from .orchestration_notify import build_orchestration_notify_argv
 from .plan import BatchPlan, CommandSpec
 
@@ -34,6 +34,7 @@ class CommandExecution:
     returncode: int
     stdout: str
     stderr: str
+    outcome: str = "finished"
 
 
 @dataclass(frozen=True)
@@ -56,13 +57,14 @@ def _output_text(value: str | bytes | None) -> str:
     return value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value or ""
 
 
-def _default_command_runner(command: CommandSpec, *, timeout_seconds: float | None) -> tuple[int, str, str]:
+def _default_command_runner(command: CommandSpec, *, timeout_seconds: float | None) -> tuple[int, str, str, str]:
     env = os.environ.copy()
     env.update(command.env)
+    native = command.argv is not None and gates_module.is_native_gate_command(command.argv)
     try:
         if command.argv is not None:
-            if gates_module.is_native_gate_command(command.argv):
-                return gates_module.run_native_gate_command(command.argv, env=command.env)
+            if native:
+                return (*gates_module.run_native_gate_command(command.argv, env=command.env), "finished")
             result = subprocess.run(
                 list(command.argv),
                 check=False,
@@ -86,10 +88,15 @@ def _default_command_runner(command: CommandSpec, *, timeout_seconds: float | No
         stderr = _output_text(exc.stderr).strip()
         timeout_message = f"command timed out after {timeout_seconds} seconds"
         stderr = f"{stderr}\n{timeout_message}".strip() if stderr else timeout_message
-        return 124, stdout, stderr
+        return 124, stdout, stderr, "unknown"
     except OSError as exc:
-        return (127 if isinstance(exc, FileNotFoundError) else 126), "", f"Command could not run: {exc}"
-    return int(result.returncode), result.stdout, result.stderr
+        return (
+            127 if isinstance(exc, FileNotFoundError) else 126,
+            "",
+            f"Command could not run: {exc}",
+            "unknown" if native else "not_started",
+        )
+    return int(result.returncode), result.stdout, result.stderr, "finished"
 
 
 def _run_command(
@@ -99,11 +106,14 @@ def _run_command(
     command_timeout_seconds: float | None,
     command_runner: CommandRunner | None,
     commands: list[CommandExecution],
+    audit: ExecutionAudit,
 ) -> int:
+    audit.begin_command(phase=phase, command=command.render_shell(), index=len(commands))
     if command_runner is None:
-        returncode, stdout, stderr = _default_command_runner(command, timeout_seconds=command_timeout_seconds)
+        returncode, stdout, stderr, outcome = _default_command_runner(command, timeout_seconds=command_timeout_seconds)
     else:
         returncode, stdout, stderr = command_runner(command)
+        outcome = "finished"
     commands.append(
         CommandExecution(
             phase=phase,
@@ -111,8 +121,10 @@ def _run_command(
             returncode=returncode,
             stdout=stdout,
             stderr=stderr,
+            outcome=outcome,
         )
     )
+    audit.record_command(asdict(commands[-1]))
     return returncode
 
 
@@ -153,13 +165,14 @@ def _plan_uses_allow_missing_qstat(plan: BatchPlan) -> bool:
     return False
 
 
-def execute_batch_plan(
+def _execute_batch_plan(
     *,
     plan: BatchPlan,
     audit_json_path: Path,
     submit: bool,
     command_timeout_seconds: float | None = None,
     command_runner: CommandRunner | None = None,
+    audit: ExecutionAudit,
 ) -> BatchExecutionResult:
     if command_timeout_seconds is not None and command_timeout_seconds <= 0:
         raise ValueError("command_timeout_seconds must be positive when provided")
@@ -196,6 +209,7 @@ def execute_batch_plan(
                 command_timeout_seconds=command_timeout_seconds,
                 command_runner=command_runner,
                 commands=commands,
+                audit=audit,
             )
             if returncode != 0:
                 failed_phase = "orchestration_notify"
@@ -208,6 +222,7 @@ def execute_batch_plan(
                 command_timeout_seconds=command_timeout_seconds,
                 command_runner=command_runner,
                 commands=commands,
+                audit=audit,
             )
             if returncode != 0:
                 failed_phase = phase
@@ -241,21 +256,13 @@ def execute_batch_plan(
             command_timeout_seconds=command_timeout_seconds,
             command_runner=command_runner,
             commands=commands,
+            audit=audit,
         )
         if final_notify_returncode != 0 and ok:
             failed_phase = "orchestration_notify"
             ok = False
 
-    audit_json_path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "plan": plan.as_dict(),
-        "execution": {
-            "ok": ok,
-            "failed_phase": failed_phase,
-            "commands": [asdict(entry) for entry in commands],
-        },
-    }
-    audit_json_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    audit.finish(ok=ok, failed_phase=failed_phase)
 
     return BatchExecutionResult(
         ok=ok,
@@ -263,3 +270,25 @@ def execute_batch_plan(
         commands=commands,
         audit_json_path=audit_json_path,
     )
+
+
+def execute_batch_plan(
+    *,
+    plan: BatchPlan,
+    audit_json_path: Path,
+    submit: bool,
+    command_timeout_seconds: float | None = None,
+    command_runner: CommandRunner | None = None,
+) -> BatchExecutionResult:
+    """Execute after reserving audit storage, recording progress around every command."""
+    if command_timeout_seconds is not None and command_timeout_seconds <= 0:
+        raise ValueError("command_timeout_seconds must be positive when provided")
+    with ExecutionAudit(audit_json_path, plan.as_dict()) as audit:
+        return _execute_batch_plan(
+            plan=plan,
+            audit_json_path=audit_json_path,
+            submit=submit,
+            command_timeout_seconds=command_timeout_seconds,
+            command_runner=command_runner,
+            audit=audit,
+        )

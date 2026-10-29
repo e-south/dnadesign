@@ -21,6 +21,9 @@ It is a policy map with links to operator runbooks and implementation details.
 - Prefer secret backends and file-backed secret references for runtime secrets.
 - Runtime tooling must keep secret material out of logs, command history, and generated configs where possible.
 - Batch workflows should prefer file-backed secret references (`*_FILE` / `file://`) so secret values are not embedded in scheduler submit metadata.
+- OPS omits supplied environment values from rendered plans and execution audits.
+  Command arguments and captured output remain visible; commands must not embed
+  or print credentials. Audit files use owner-only permissions.
 
 ## Dependency and supply-chain controls
 - Python dependencies are pinned via `uv.lock` and installed with `uv sync --locked`.

@@ -140,6 +140,20 @@ uv run ops runbook execute \
 ```
 
 Only workspace-scoped audit paths are accepted; `--audit-json` must stay under `<workspace-root>/outputs/logs/ops/audit/`.
+OPS reserves this path before executing commands and atomically records progress
+before and after each command. Audit files are readable and writable only by
+their owner. Command environment values remain in memory for execution; rendered
+plans use `<provided>` placeholders and JSON lists only the variable names.
+Arguments and captured output remain visible, so commands must not embed or print secrets.
+
+An audit records command outcomes as `finished`, `not_started` for launch failures,
+or `unknown` for timeouts. An interruption can leave `active_command` set even if
+the command took effect. When `retry_requires_review` is true, reconcile the
+recorded effects before executing again with a new audit path; OPS does not
+automatically replay those commands. Successful attempts and failures with no
+started commands permit reuse of the path, preserving the previous record under
+`<audit-name>.attempts/`.
+
 On workstations without `qstat`, add `--allow-missing-qstat` to keep the queue probe explicit but non-fatal for dry-run/demo use. The resulting audit remains readable, and `ops progress show ops.control-plane.orchestration` will report attention when queue readiness is degraded.
 
 Result expectations:
@@ -272,7 +286,7 @@ For repeated attempts on one study workspace, keep paths stable to avoid fan-out
 
 1. Keep one stable `workspace_root` and `densegen.config` (`<workspace-root>/config.yaml`).
 2. Keep one stable runbook id and one stable runbook file path per study at `<workspace-root>/outputs/logs/ops/runbooks/<runbook-id>.yaml`.
-3. Keep one stable `audit-json` path and overwrite it each run (for example: `<workspace-root>/outputs/logs/ops/audit/latest.json`).
+3. Use one stable `audit-json` path for completed attempts (for example: `<workspace-root>/outputs/logs/ops/audit/latest.json`). OPS preserves prior records in `latest.attempts/`; unresolved attempts require review before another execution.
 4. Use `--mode auto` for normal loops so ops resolves `fresh` vs `resume` deterministically.
 5. Keep `logging.retention.keep_last` and `logging.retention.max_age_days` explicit in the runbook so stale logs are pruned before each submit attempt.
 6. Use `uv run dense campaign-reset -c <workspace-root>/config.yaml --yes` before an intentional full fresh campaign reset; this clears run artifacts while preserving notify/log scaffolding and preserves SeqLedger registry unless `--purge-seqledger-registry` is set.

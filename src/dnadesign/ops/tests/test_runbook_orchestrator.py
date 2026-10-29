@@ -1698,7 +1698,7 @@ def test_batch_plan_submit_commands_include_explicit_job_identity_tags(tmp_path:
     assert payload["job_identity"]["run_group_id"] == identity.run_group_id
     assert payload["job_identity"]["workspace_id"] == identity.workspace_id
     assert payload["job_identity"]["workflow_id"] == runbook.workflow_id
-    assert f"OPS_RUN_GROUP_ID={identity.run_group_id}" in submit_block
+    assert all(command.env["OPS_RUN_GROUP_ID"] == identity.run_group_id for command in plan.submit_commands)
     assert f"ops_run_group_id={identity.run_group_id}" in submit_block
     assert f"ops.{identity.job_name_slug}.notify" in submit_block
     assert f"ops.{identity.job_name_slug}.densegen_cpu" in submit_block
@@ -1868,8 +1868,11 @@ def test_densegen_batch_submit_plan_skips_notify_smoke_and_watcher_submit(tmp_pa
     assert plan.notify_smoke_commands == []
     assert "NOTIFY_PROFILE" not in submit_block
     assert "DENSEGEN_CONFIG" in submit_block
-    assert "DENSEGEN_RUN_ARGS='--fresh --no-plot'" in submit_block
-    assert f"DENSEGEN_TRACE_DIR={runbook.workspace_root}/outputs/logs/ops/runtime" in submit_block
+    assert any(command.env.get("DENSEGEN_RUN_ARGS") == "--fresh --no-plot" for command in plan.submit_commands)
+    assert any(
+        command.env.get("DENSEGEN_TRACE_DIR") == f"{runbook.workspace_root}/outputs/logs/ops/runtime"
+        for command in plan.submit_commands
+    )
     assert "docs/bu-scc/jobs/densegen-analysis.qsub" in submit_block
     assert f"-hold_jid {densegen_job_name}" in submit_block
     assert "-v DENSEGEN_CONFIG,DENSEGEN_RUN_ARGS,DENSEGEN_TRACE_DIR" in submit_block
@@ -1960,8 +1963,8 @@ def test_notify_submit_uses_webhook_file_without_embedding_secret(
     submit_block = _render_block(plan.submit_commands)
 
     assert "NOTIFY_PROFILE=" in submit_block
-    assert "WEBHOOK_ENV=NOTIFY_WEBHOOK" in submit_block
-    assert f"WEBHOOK_FILE={Path(os.environ['NOTIFY_WEBHOOK_FILE']).resolve()}" in submit_block
+    assert plan.submit_commands[0].env["WEBHOOK_ENV"] == "NOTIFY_WEBHOOK"
+    assert plan.submit_commands[0].env["WEBHOOK_FILE"] == str(Path(os.environ["NOTIFY_WEBHOOK_FILE"]).resolve())
     assert "https://hooks.slack.com/services/" not in submit_block
 
 
@@ -1979,8 +1982,9 @@ def test_notify_submit_includes_webhook_file_when_present(
     plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
     submit_block = _render_block(plan.submit_commands)
 
-    assert f"WEBHOOK_FILE={webhook_file}" in submit_block
-    assert "WEBHOOK_ENV=NOTIFY_WEBHOOK" in submit_block
+    assert plan.submit_commands[0].env["WEBHOOK_FILE"] == str(webhook_file)
+    assert "WEBHOOK_FILE='<provided>'" in submit_block
+    assert plan.submit_commands[0].env["WEBHOOK_ENV"] == "NOTIFY_WEBHOOK"
 
 
 def test_densegen_and_notify_qsub_commands_export_comma_bearing_values_via_env(tmp_path: Path) -> None:
@@ -2036,8 +2040,8 @@ def test_notify_submit_aligns_runtime_and_idle_timeout_with_runbook(
 
     notify_submit = plan.submit_commands[0].render_shell()
     assert "-l h_rt=08:00:00" in notify_submit
-    assert "NOTIFY_IDLE_TIMEOUT_SECONDS=28800" in notify_submit
-    assert "NOTIFY_ENFORCE_TERMINAL_ON_IDLE=1" in notify_submit
+    assert plan.submit_commands[0].env["NOTIFY_IDLE_TIMEOUT_SECONDS"] == "28800"
+    assert plan.submit_commands[0].env["NOTIFY_ENFORCE_TERMINAL_ON_IDLE"] == "1"
 
 
 def test_notify_submit_inherits_hold_jid_when_active_jobs_are_detected(tmp_path: Path) -> None:
@@ -2087,7 +2091,8 @@ def test_notify_submit_includes_tls_ca_bundle_for_watcher(
     plan = build_batch_plan(runbook=runbook, requested_mode=None, requested_smoke=None, active_job_ids=())
     notify_submit = plan.submit_commands[0].render_shell()
 
-    assert f"NOTIFY_TLS_CA_BUNDLE={ca_bundle}" in notify_submit
+    assert plan.submit_commands[0].env["NOTIFY_TLS_CA_BUNDLE"] == str(ca_bundle)
+    assert "NOTIFY_TLS_CA_BUNDLE='<provided>'" in notify_submit
 
 
 def test_batch_plan_uses_single_notify_profile_smoke_command(tmp_path: Path) -> None:
@@ -2137,7 +2142,8 @@ def test_batch_plan_uses_profile_secret_ref_when_webhook_file_env_is_missing(
 
     assert plan.orchestration_notify is not None
     assert plan.orchestration_notify.secret_ref == webhook_file.as_uri()
-    assert f"WEBHOOK_FILE={webhook_file}" in submit_block
+    assert plan.submit_commands[0].env["WEBHOOK_FILE"] == str(webhook_file)
+    assert "WEBHOOK_FILE='<provided>'" in submit_block
 
 
 def test_batch_plan_rejects_non_file_profile_secret_ref_when_webhook_file_env_is_missing(
@@ -2510,8 +2516,8 @@ jobs: []
     assert "evo2-gpu-infer.qsub" in submit_block
     assert "gpus=1" in submit_block
     assert "gpu_c=8.9" in submit_block
-    assert "INFER_RUN_ARGS=--overwrite" in preflight_block
-    assert "INFER_RUN_ARGS=--overwrite" in submit_block
+    assert any(command.env.get("INFER_RUN_ARGS") == "--overwrite" for command in plan.preflight_commands)
+    assert any(command.env.get("INFER_RUN_ARGS") == "--overwrite" for command in plan.submit_commands)
     assert "NOTIFY_PROFILE" in submit_block
     assert "notify profile smoke --profile" in smoke_block
     assert "--tool infer " in smoke_block
@@ -2693,7 +2699,7 @@ jobs: []
     assert plan.notify_smoke_commands == []
     assert "NOTIFY_PROFILE" not in submit_block
     assert "INFER_CONFIG=" in submit_block
-    assert "INFER_RUN_ARGS=--overwrite" in submit_block
+    assert any(command.env.get("INFER_RUN_ARGS") == "--overwrite" for command in plan.submit_commands)
 
 
 def test_infer_qsub_commands_export_comma_bearing_values_via_env(tmp_path: Path) -> None:

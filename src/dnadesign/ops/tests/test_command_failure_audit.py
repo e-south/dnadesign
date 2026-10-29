@@ -12,7 +12,6 @@ Module Author(s): Eric J. South
 import json
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
@@ -90,7 +89,7 @@ def test_audit_write_error_is_not_reported_as_success(tmp_path, monkeypatch):
     def fail(*args, **kwargs):
         raise PermissionError("audit destination denied")
 
-    monkeypatch.setattr(Path, "write_text", fail)
+    monkeypatch.setattr("dnadesign.ops.orchestrator.audit.os.replace", fail)
     with pytest.raises(PermissionError, match="audit destination denied"):
         execute.execute_batch_plan(
             plan=_plan(CommandSpec(argv=("example",))),
@@ -98,3 +97,22 @@ def test_audit_write_error_is_not_reported_as_success(tmp_path, monkeypatch):
             submit=False,
             command_runner=lambda command: (1, "", "original failure"),
         )
+
+
+@pytest.mark.parametrize("name", ["API_TOKEN", "CUSTOM_SETTING"])
+def test_environment_values_reach_child_but_not_audit(tmp_path, name):
+    canary = "synthetic-runtime-canary-for-audit-regression"
+    command = CommandSpec(
+        argv=(sys.executable, "-c", f"import os; assert os.environ[{name!r}].startswith('synthetic-runtime-')"),
+        env={name: canary},
+    )
+    plan = _plan(command)
+    assert canary not in command.render_shell()
+    assert canary not in json.dumps(plan.as_dict())
+    audit = tmp_path / "audit.json"
+    result = execute.execute_batch_plan(plan=plan, audit_json_path=audit, submit=False)
+    assert result.ok
+    assert canary not in audit.read_text()
+    assert canary not in json.dumps(result.as_dict())
+    assert command.env[name] == canary
+    assert name in audit.read_text()
