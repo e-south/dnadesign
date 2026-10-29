@@ -52,7 +52,11 @@ Failure posture:
 `run` realizes sequences and writes them into the configured output dataset.
 
 - default policy is append-only with `output.on_conflict=error`
-- `output.on_conflict=ignore` keeps runs idempotent by skipping already-present output ids
+- `output.on_conflict=ignore` reuses existing sequences and completes missing
+  lineage, derived metadata, labels, and requested sequence views on retry.
+  Conflicting metadata is rejected rather than overwritten. Distinct sequence
+  views may record another derivation without replacing the sequence row's
+  original provenance.
 - `--dry-run` performs the same planning path without writing data
 
 Run output reports:
@@ -66,6 +70,9 @@ Run output reports:
 
 `--format json` emits the run summary as a machine-readable payload, including
 the dry-run flag, output root, and spec id.
+Reused sequence IDs count as skipped even when their missing metadata is repaired.
+Success means all requested metadata and views have been persisted; a failed
+run may have committed some stages and can be retried with `ignore`.
 
 ### `compose`
 

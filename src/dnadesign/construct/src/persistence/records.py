@@ -32,6 +32,7 @@ class BuiltRecord:
     created_at: str
     derived_metadata: Dict[str, object] | None = None
     sequence_view: SequenceViewRecord | None = None
+    retry_spec_id: str | None = None
 
 
 def validate_duplicate_output_aliases(records: list[BuiltRecord]) -> None:
@@ -119,14 +120,3 @@ def require_output_conflict_policy(
             "Choose a different output dataset, change the construct spec, or set output.on_conflict='ignore'."
         )
     return collision_count
-
-
-def records_to_write(
-    records: list[BuiltRecord],
-    *,
-    output_root: Path,
-    output_dataset: str,
-    on_conflict: str,
-) -> list[BuiltRecord]:
-    existing_ids = _existing_output_ids(output_root, output_dataset)
-    return [record for record in records if on_conflict != "ignore" or record.output_id not in existing_ids]

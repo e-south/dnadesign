@@ -20,7 +20,6 @@ from dnadesign.construct.src.persistence import records as records_module
 from dnadesign.construct.src.persistence.records import (
     BuiltRecord,
     output_records_for_overlay,
-    records_to_write,
     require_output_conflict_policy,
     unique_records_by_output_id,
     validate_duplicate_output_aliases,
@@ -117,19 +116,6 @@ def test_require_output_conflict_policy_reports_unique_existing_collisions(monke
             output_dataset="constructs",
             on_conflict="error",
         )
-
-
-def test_records_to_write_honors_ignore_conflict_policy(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(records_module, "_existing_output_ids", lambda _root, _dataset: {"existing"})
-
-    records = records_to_write(
-        [_record("existing"), _record("new")],
-        output_root=Path("/usr"),
-        output_dataset="constructs",
-        on_conflict="ignore",
-    )
-
-    assert [record.output_id for record in records] == ["new"]
 
 
 def test_sequence_views_to_append_fails_fast_on_mutable_metadata_drift() -> None:

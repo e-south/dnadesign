@@ -27,9 +27,6 @@ from ..persistence.records import (
     BuiltRecord as _BuiltRecord,
 )
 from ..persistence.records import (
-    records_to_write as _records_to_write,
-)
-from ..persistence.records import (
     require_output_conflict_policy as _require_output_conflict_policy,
 )
 from ..persistence.records import (
@@ -225,6 +222,17 @@ def _plan_classic_loaded_config(
     else:
         built = forward_records
 
+    if cfg.job.output.on_conflict == "ignore":
+        retry_spec_id = _build_classic_spec_id(
+            cfg,
+            template=template,
+            template_sha256=template_sha256,
+            input_root=input_root,
+            output_root=output_root,
+            on_conflict="error",
+        )
+        for record in built:
+            record.retry_spec_id = retry_spec_id
     _validate_duplicate_output_aliases(built)
     collision_count = _require_output_conflict_policy(
         built,
@@ -323,6 +331,15 @@ def _plan_normalize_loaded_config(
         )
         for row in rows
     ]
+    if cfg.job.output.on_conflict == "ignore":
+        retry_spec_id = _build_normalize_spec_id(
+            cfg=cfg,
+            input_root=input_root,
+            output_root=output_root,
+            on_conflict="error",
+        )
+        for record in built:
+            record.retry_spec_id = retry_spec_id
     _validate_duplicate_output_aliases(built)
     collision_count = _require_output_conflict_policy(
         built,
@@ -444,27 +461,22 @@ def _persist_construct_run(planned: _PlannedRun) -> RunResult:
         output_root=preflight.output_root,
         output_dataset=cfg.job.output.target.dataset,
     )
-    built_to_write = _records_to_write(
-        planned.built,
-        output_root=preflight.output_root,
-        output_dataset=cfg.job.output.target.dataset,
-        on_conflict=cfg.job.output.on_conflict,
-    )
-    _write_output_records(
+    records_written, persisted_records = _write_output_records(
         output_ds,
         job_id=cfg.job.id,
         record_source=cfg.job.output.record_source,
-        records=built_to_write,
+        records=planned.built,
+        on_conflict=cfg.job.output.on_conflict,
     )
-    _write_planned_sequence_views(output_ds, job_id=cfg.job.id, records=planned.built)
+    _write_planned_sequence_views(output_ds, job_id=cfg.job.id, records=persisted_records)
     return RunResult(
         job_id=cfg.job.id,
         input_dataset=cfg.job.input.source.dataset,
         output_dataset=cfg.job.output.target.dataset,
         output_root=preflight.output_root,
         records_total=preflight.records_total,
-        records_written=len(built_to_write),
-        records_skipped_existing=preflight.records_total - len(built_to_write),
+        records_written=records_written,
+        records_skipped_existing=preflight.records_total - records_written,
         spec_id=preflight.spec_id,
         dry_run=False,
     )

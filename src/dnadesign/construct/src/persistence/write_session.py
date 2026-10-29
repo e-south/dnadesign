@@ -19,12 +19,10 @@ from typing import Mapping
 from dnadesign.seqledger import Dataset, SequenceViewRecord, load_sequence_view_index, write_sequence_views
 
 from ..contracts.errors import ValidationError
-from .records import BuiltRecord, output_records_for_overlay, unique_records_by_output_id
+from .completion import existing_output_rows, missing_metadata, preserve_retry_provenance
+from .records import BuiltRecord, unique_records_by_output_id
 from .usr_registry import (
-    _construct_metadata_table,
-    _derived_metadata_table,
     _ensure_construct_registry,
-    _usr_label_table,
 )
 
 
@@ -49,69 +47,47 @@ def write_output_records(
     job_id: str,
     record_source: str | None,
     records: list[BuiltRecord],
-) -> None:
+    on_conflict: str = "error",
+) -> tuple[int, list[BuiltRecord]]:
     actor = construct_actor(job_id)
     unique_records = unique_records_by_output_id(records)
-    overlay_records = output_records_for_overlay(records)
     with output_ds.write_session() as session:
         session.init_if_missing(
             source="construct",
             notes=f"Initialized by construct job {job_id}.",
             actor=actor,
         )
-        if not unique_records:
-            return
-        source = record_source or f"construct run {job_id}"
-        session.import_rows(
-            [
-                {
-                    "sequence": record.sequence,
-                    "bio_type": "dna",
-                    "alphabet": record.alphabet,
-                    "source": source,
-                }
-                for record in unique_records
-            ],
-            default_bio_type="dna",
-            source=source,
-            actor=actor,
+        existing = existing_output_rows(output_ds, unique_records)
+        if existing and on_conflict == "error":
+            raise ValidationError(f"{len(existing)} planned output id(s) already exist in dataset '{output_ds.name}'.")
+        records = preserve_retry_provenance(records, existing)
+        pending = missing_metadata(records, existing)
+        sequence_views_to_append(
+            [record.sequence_view for record in records if record.sequence_view is not None],
+            existing_by_id=load_sequence_view_index(output_ds),
         )
-        if overlay_records:
+        new_records = [record for record in unique_records if record.output_id not in existing]
+        if new_records:
+            source = record_source or f"construct run {job_id}"
+            session.import_rows(
+                [
+                    {"sequence": record.sequence, "bio_type": "dna", "alphabet": record.alphabet, "source": source}
+                    for record in new_records
+                ],
+                default_bio_type="dna",
+                source=source,
+                actor=actor,
+            )
+        for namespace, table in pending:
             session.write_overlay(
-                "construct",
-                _construct_metadata_table([record.metadata for record in overlay_records]),
+                namespace,
+                table,
                 key="id",
                 overwrite=True,
-                note="dnadesign.construct lineage attach",
+                note=f"dnadesign.construct {namespace} completion",
                 actor=actor,
             )
-        derived_rows = [record.derived_metadata for record in overlay_records if record.derived_metadata is not None]
-        if derived_rows:
-            session.write_overlay(
-                "derived",
-                _derived_metadata_table(derived_rows),
-                key="id",
-                overwrite=True,
-                note="dnadesign.construct derived-product attach",
-                actor=actor,
-            )
-        label_rows = [
-            {
-                "id": record.output_id,
-                "usr_label__primary": record.label_primary,
-                "usr_label__aliases": record.label_aliases,
-            }
-            for record in overlay_records
-            if record.label_primary is not None or record.label_aliases
-        ]
-        if label_rows:
-            session.write_overlay(
-                "usr_label",
-                _usr_label_table(label_rows),
-                overwrite=True,
-                note="dnadesign.construct upstream label carry-through",
-                actor=actor,
-            )
+        return sum(record.output_id not in existing for record in records), records
 
 
 def sequence_views_to_append(

@@ -37,6 +37,7 @@ def build_classic_spec_id(
     template_sha256: str,
     input_root: Path,
     output_root: Path,
+    on_conflict: str | None = None,
 ) -> str:
     if cfg.job.template is None or cfg.job.realize is None:
         raise ValidationError("job.template and job.realize are required when building a realized-template spec id.")
@@ -113,7 +114,7 @@ def build_classic_spec_id(
                 "root": str(output_root),
             },
             "record_source": cfg.job.output.record_source,
-            "on_conflict": cfg.job.output.on_conflict,
+            "on_conflict": on_conflict or cfg.job.output.on_conflict,
             "allow_same_as_input": cfg.job.output.allow_same_as_input,
         },
     }
@@ -126,6 +127,7 @@ def build_normalize_spec_id(
     cfg: JobConfig,
     input_root: object,
     output_root: object,
+    on_conflict: str | None = None,
 ) -> str:
     if cfg.job.normalize_anchor is None:
         raise ValidationError("job.normalize_anchor is required when building a normalize-anchor spec id.")
@@ -143,7 +145,7 @@ def build_normalize_spec_id(
             "output": {
                 "dataset": cfg.job.output.target.dataset,
                 "root": str(output_root),
-                "on_conflict": cfg.job.output.on_conflict,
+                "on_conflict": on_conflict or cfg.job.output.on_conflict,
             },
         }
     }
