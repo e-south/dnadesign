@@ -1,14 +1,73 @@
-## OPAL Data and Artifact Contracts v3
-
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-### Candidate records
+# Candidate data, measurements and saved results
 
-`records.parquet` requires unique string `id`, `sequence`, `bio_type`, and
-`alphabet` columns. The configured X column must be a non-null, finite Arrow
+## Candidate records
+
+`records.parquet` requires string `id`, `sequence`, `bio_type`, and `alphabet`
+columns. Candidate IDs must be unique. The configured X column must be a non-null, finite Arrow
 `fixed_size_list<float32|float64>[x_dim]`. Ragged lists and serialized arrays
 are import formats, not runtime formats.
+
+### Prepare a candidate table
+
+Start with a CSV identifying every candidate, including those not yet measured:
+
+```csv
+id,sequence,bio_type,alphabet
+p01,ACGTACGT,dna,dna_4
+p02,TGCATGCA,dna,dna_4
+```
+
+For DNA containing only A, C, G and T, use `bio_type: dna` and `alphabet: dna_4`.
+Prepare a NumPy feature matrix in `features.npy` with one row per CSV row, in the
+same order, and one column per feature. Compute these features consistently for
+all candidates before using OPAL; they may come from sequence descriptors or a
+sequence model. Measurements are supplied separately.
+
+This example writes the fixed-length Arrow column required by OPAL:
+
+```python
+import numpy as np
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+
+# Keep feature rows in the same order as candidate rows.
+candidates = pd.read_csv("candidates.csv", dtype={"id": str})
+features = np.load("features.npy", allow_pickle=False)
+if features.ndim != 2 or features.shape[0] != len(candidates):
+    raise ValueError("Features must have one row per candidate")
+if features.shape[1] == 0 or not np.isfinite(features).all():
+    raise ValueError("Each candidate needs a nonempty, finite feature vector")
+
+# Store each candidate vector as a fixed-length Arrow list.
+vectors = pa.FixedSizeListArray.from_arrays(
+    pa.array(features.ravel(), type=pa.float32()), features.shape[1]
+)
+records = pa.Table.from_pandas(candidates, preserve_index=False)
+records = records.append_column("X", vectors)
+pq.write_table(records, "records.parquet")
+
+# Confirm the feature type before configuring the campaign.
+print(records.schema.field("X"))
+```
+
+With two features per candidate, the printed field is:
+
+```text
+pyarrow.Field<X: fixed_size_list<item: float>[2]>
+```
+
+Set `data.x_column_name: X` in the campaign configuration, then run
+`opal validate -c configs/campaign.yaml` to check the table and configuration
+together. The two-row CSV illustrates the format; use your complete candidate
+pool and actual feature matrix for a campaign.
+
+## Observed measurements
 
 Observed Y may come from campaign label history or a typed dataset-local
 sidecar. For `usr_sidecar`, required columns are:
@@ -40,7 +99,7 @@ study publishes the label table, provenance manifest, and promotion manifest
 together. Any later candidate ID, sequence, X, schema, or row change invalidates
 the promotion until the study publishes a new versioned snapshot.
 
-### Shared prediction ledger
+## Shared prediction ledger
 
 `outputs/ledger/predictions/` stores one row per scored candidate and run:
 
@@ -62,7 +121,7 @@ the analysis fields `view__score`, `view__selection_score`,
 `view__rank_competition`, `view__is_selected`, and related metadata. Raw ledger
 consumers must not invent a default view.
 
-### Run ledger
+## Run ledger
 
 `outputs/ledger/runs.parquet` stores one row per shared model fit. Each fit has a
 collision-resistant `run_id`; committed run IDs are create-only across both the
@@ -76,7 +135,7 @@ run and prediction ledgers:
 - artifact paths and digests
 - ledger and OPAL schema versions
 
-### Round artifacts
+## Round artifacts
 
 Each `outputs/rounds/round_<k>/` contains mutable latest-run mirrors for command
 compatibility plus immutable evidence for every retained run:
@@ -129,7 +188,7 @@ upgrade missing provenance. An explicit batch-path audit override bypasses only
 the batch-file digest and must still reconcile to the digest-bound selection
 artifact.
 
-### Public inspection contracts
+## Public inspection contracts
 
 - `opal selection-set show/export --view <id>` projects and verifies one view.
 - `opal selection-batch show/export` reads the final deduplicated batch.
@@ -140,7 +199,7 @@ artifact.
 When a campaign has multiple views, view-specific commands require `--view`.
 They never choose the first configured view silently.
 
-### Plot and notebook artifacts
+## Plot and notebook artifacts
 
 View-specific plot manifests require `selection_view_id`. In multi-view
 campaigns, outputs are namespaced under
@@ -180,7 +239,7 @@ renderer. OPAL's registry is empty by default and rejects strict lookup of an
 unregistered kind; ordinary generic media can still use the projection-only
 path without inventing producer semantics.
 
-### Validation
+## Validation
 
 Ledger schemas are strict. Unknown columns, duplicate or previously committed
 run IDs, duplicate prediction IDs within a run, unresolved selection rows,

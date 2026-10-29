@@ -1,11 +1,13 @@
-## OPAL Architecture and Data Flow
+# OPAL Architecture and Data Flow
 
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
 OPAL executes each round through the stages below.
 
-### Round lifecycle
+## Round lifecycle
 
 1. Load `configs/campaign.yaml` and validate schema + plugin names.
 2. Resolve one label snapshot from the configured `labels` source.
@@ -25,7 +27,7 @@ OPAL executes each round through the stages below.
 10. Persist final per-view allocations, the batch deduplicated by its configured key, and the
     allocation trace before appending the run ledger.
 
-### Runtime surfaces
+## Runtime surfaces
 
 - Source records: `records.parquet`
 - Label source: `labels.source.kind`, either `campaign_history` or
@@ -37,7 +39,7 @@ OPAL executes each round through the stages below.
   - `outputs/ledger/predictions/`
   - `outputs/ledger/runs.parquet`
 
-### Config to stage mapping
+## Config to stage mapping
 
 - `campaign`, `data`: workspace and dataset resolution.
 - `labels`: training-label source resolution and batch/round label semantics.
@@ -56,7 +58,7 @@ OPAL executes each round through the stages below.
 - `scoring`: prediction batch size.
 - `safety`: preflight guards before writes.
 
-### Channel contract
+## Channel contract
 
 - Each view objective emits score channels and optional uncertainty channels.
 - A view selector reads unqualified plugin channels such as
@@ -68,7 +70,7 @@ A campaign owns learning, a selection view owns a target, and a selection
 batch owns the final deduplicated proposal. Different setpoints over the same
 X, Y, labels, and model are selection views, not separate campaigns.
 
-### Failure model
+## Failure model
 
 OPAL is fail-fast by design:
 - unknown plugins fail at config load/validation

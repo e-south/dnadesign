@@ -26,6 +26,9 @@ OPAL_SOURCE_ROOT = OPAL_ROOT / "src"
 
 def _read_frontmatter(path: Path) -> dict[str, object]:
     text = path.read_text(encoding="utf-8")
+    if text.startswith("<!--\n"):
+        assert "\n-->" in text, f"unclosed metadata comment: {path}"
+        text = text.removeprefix("<!--\n").split("\n-->", 1)[0]
     assert text.startswith("---\n"), f"missing YAML frontmatter: {path}"
     payload = yaml.safe_load(text.split("---", 2)[1])
     assert isinstance(payload, dict), f"frontmatter must be a mapping: {path}"

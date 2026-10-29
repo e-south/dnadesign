@@ -6,7 +6,7 @@ plane: downstream-tool
 owner_boundary: opal
 entry_artifact: SeqLedger dataset plus one explicit infer-derived X column
 exit_artifact: initialized OPAL campaign state plus round outputs and selection ledgers
-summary: Start the label, train, and select loop once one OPAL-ready candidate table with an explicit infer-derived X column exists.
+summary: Train on measured outcomes and select candidates using features stored in SeqLedger.
 execution_kind: round-loop
 status_kind: opal-campaign-state
 related_tools:

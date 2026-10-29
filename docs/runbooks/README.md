@@ -51,7 +51,7 @@ This table is generated from `*.registry.yaml` sidecars. Edit those files instea
 | `seqledger.data-plane.permuter-construct-infer-handoff` | [Permuter -> Construct -> Infer Shared Dataset Runbook](../../src/dnadesign/seqledger/docs/operations/assembly/permuter-construct-infer-shared-dataset.md) | `runbook` | `data-plane` | `staged` | `seqledger-dataset-state` | Route Permuter-originated RT-lnRNA (rt_lnrna) variants through study-owned construct-subject promotion, Construct context realization, and Infer-owned sidecars without coupling tool internals. |
 | `seqledger.data-plane.promoter-feature-matrix` | [Promoter Characterization Feature Matrix](../../src/dnadesign/seqledger/docs/operations/promoter/characterization-feature-matrix.md) | `runbook` | `data-plane` | `staged` | `seqledger-dataset-state` | Build one infer-annotated feature matrix from mixed promoter sources before branching into Cluster or OPAL. |
 | `cluster.downstream.exploratory-clustering` | [Exploratory clustering workflow](../../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) | `workflow` | `downstream-tool` | `exploratory` | `cluster-run-index` | Explore one chosen feature column or exported matrix through clustering, UMAP, and downstream summaries. |
-| `opal.downstream.seqledger-infer-x-active-learning` | [SeqLedger Dataset With Infer-Derived X -> OPAL Active Learning](../../src/dnadesign/opal/docs/workflows/seqledger-infer-x-active-learning.md) | `workflow` | `downstream-tool` | `round-loop` | `opal-campaign-state` | Start the label, train, and select loop once one OPAL-ready candidate table with an explicit infer-derived X column exists. |
+| `opal.downstream.seqledger-infer-x-active-learning` | [Use SeqLedger features in an OPAL campaign](../../src/dnadesign/opal/docs/workflows/seqledger-infer-x-active-learning.md) | `workflow` | `downstream-tool` | `round-loop` | `opal-campaign-state` | Train on measured outcomes and select candidates using features stored in SeqLedger. |
 
 ### Tool docs
 
@@ -64,7 +64,7 @@ This table is generated from `*.tool-source.yaml` sidecars. Edit those files ins
 | `seqledger` | [SeqLedger docs](../../src/dnadesign/seqledger/docs/README.md) | Tool-owned dataset lifecycle docs, dataset handoffs, sync routes, and promoter feature assembly. |
 | `infer` | [infer docs](../../src/dnadesign/infer/docs/README.md) | Tool-owned feature extraction runbooks, Evo2 docs, feature-schema contracts, and pressure-test flows. |
 | `cluster` | [Cluster docs](../../src/dnadesign/cluster/docs/README.md) | Tool-owned exploratory analysis workflow plus CLI, results, and artifact contracts. |
-| `opal` | [OPAL documentation](../../src/dnadesign/opal/docs/index.md) | Tool-owned active-learning workflows, campaign configuration references, and downstream infer-to-OPAL routes. |
+| `opal` | [OPAL documentation](../../src/dnadesign/opal/docs/index.md) | Active-learning campaigns, configuration and candidate-selection workflows. |
 | `latentdna` | [LatentDNA Docs](../../src/dnadesign/latentdna/docs/README.md) | Representation-comparison workflows, workspace contracts, plots, snapshots, and notebook routes. |
 | `notify` | [Notify Operations](../notify/README.md) | Tool-owned operator routes for watcher setup, delivery validation, recovery, and scheduler-adjacent notification flows. |
 | `cruncher` | [Cruncher documentation](../../src/dnadesign/cruncher/docs/README.md) | Tool-owned design-family docs for optimization, cassettes, YIU, studies, and portfolios. |

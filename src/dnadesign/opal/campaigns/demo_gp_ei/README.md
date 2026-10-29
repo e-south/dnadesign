@@ -1,3 +1,4 @@
+<!--
 ---
 id: opal-campaign-demo-gp-ei
 title: Gaussian process uncertainty demo
@@ -9,8 +10,9 @@ campaign_slug: demo_gp_ei
 campaign_kind: demo
 runtime_status: runnable
 ---
+-->
 
-## Gaussian process with uncertainty-aware selection
+# Gaussian process with uncertainty-aware selection
 
 This portable demo fits one synthetic scalar response and passes the Gaussian
 process predictive standard deviation through the scalar objective. The

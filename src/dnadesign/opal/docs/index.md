@@ -1,18 +1,15 @@
----
-doc_id: opal-docs
-title: OPAL documentation
-owner: dnadesign-maintainers
-status: active
-last_verified: 2026-10-28
----
+<!--
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-10-28
+-->
 
 # OPAL documentation
 
-Start with the [runnable demo](#try-a-complete-selection-round) to see
-measured labels become a selected batch. Then follow the campaign round to use
-your own data. Objective pages explain the scoring choices within that workflow.
+OPAL combines numerical descriptions of candidate sequences with measurements
+from tested candidates to choose the next batch to test. Start with the demo to
+see the complete loop, then use the campaign guide with your own data.
 
-### Try a complete selection round
+## Try a complete selection round
 
 From the DNADesign checkout, install the OPAL runtime and activate it:
 
@@ -22,17 +19,14 @@ source .venv/bin/activate
 opal demo-matrix --rounds 0 --keep
 ```
 
-This installation supports local Parquet candidate tables without a SeqLedger dataset.
-Add `--extra opal-notebook` when using interactive notebooks. See
-[installation choices](../../../../docs/setup/installation.md) for other tools.
-
-This uses included synthetic data in fresh temporary campaign copies. It runs
-random-forest and Gaussian-process examples, selects five candidates per example,
+The demo uses synthetic data in fresh temporary directories. It runs
+random-forest and Gaussian-process examples, selects five candidates in each,
 and checks the selections against the saved predictions. Success ends with
 `overall_ok: True` and zero mismatches for each example. The printed `tmp_root`
-contains the retained runs and their `outputs/` folders.
+contains the retained campaigns and their `outputs/` directories.
 
-To inspect the random-forest selection, substitute that printed directory below:
+To inspect the random-forest selection, replace `/path/to/tmp_root` below with
+that printed directory:
 
 ```bash
 opal selection-set show \
@@ -40,54 +34,48 @@ opal selection-set show \
   --view primary --round latest
 ```
 
-For your own campaign, prepare a Parquet candidate table with unique string IDs,
-DNA sequences, `bio_type`, `alphabet` and a fixed-length numeric feature column.
-Measurements arrive separately as label batches. The
-[candidate-record contract](./reference/data-contracts.md#candidate-records)
-defines the required Arrow types; the [campaign round](./workflows/campaign-round.md)
-starts from a complete configuration example and takes you through batch export.
+The activated `opal` command also works outside the checkout. This installation
+supports local Parquet inputs; SeqLedger is optional. Add `--extra opal-notebook`
+when installing the interactive notebook dependencies. See
+[installation choices](../../../../docs/setup/installation.md) for details.
 
-### Start here
+## Use your own data
 
-1. Start with the [campaign round](./workflows/campaign-round.md) for the canonical validate, initialize, label, run, and verify loop.
-2. If Infer has already written the chosen feature column into SeqLedger, use the [SeqLedger-to-OPAL route](./workflows/seqledger-infer-x-active-learning.md).
-3. For configuration or CLI lookup, use [Configuration (`campaign.yaml`)](./reference/configuration.md) or [CLI commands](./reference/cli.md).
-4. If a downstream study needs physically valid selected sequences, check the
-   generic [candidate and label contracts](./reference/configuration.md#candidate-and-label-contracts)
-   and the public [`selection-set`](./reference/cli.md#selection-set) surface
-   before adding study-owned logistics.
-5. For maintained examples and external campaign placement rules, use the
-   [campaign route index](../campaigns/README.md).
+1. [Prepare a candidate table](./reference/data-contracts.md#prepare-a-candidate-table)
+   containing sequence IDs, DNA and numeric features.
+2. [Run a campaign round](./workflows/campaign-round.md) to import measurements,
+   fit a predictor, select candidates and export their DNA. The guide includes
+   the next round and recovery after an interrupted run.
 
-### Workflows
+If your features are already stored in SeqLedger, use the
+[SeqLedger integration](./workflows/seqledger-infer-x-active-learning.md) for input
+setup, then follow the same selection loop.
 
-- [Campaign round](./workflows/campaign-round.md): the one OPAL lifecycle, independent of model, objective, and selector choices.
-- [SeqLedger dataset with infer-derived X -> OPAL active learning](./workflows/seqledger-infer-x-active-learning.md): use a feature column already written into a SeqLedger dataset.
+The [example campaigns](../campaigns/README.md) provide complete configurations.
+A campaign keeps the candidate pool, measurements and learning history together.
+Selection views let you apply different objectives to the same predictions.
+See [campaigns, rounds and views](./reference/configuration.md#ontology) before
+configuring multiple targets.
 
-### Plugin contracts
+## Choose prediction and selection methods
 
-- [Models](./plugins/models/README.md): model plugin contracts and configuration surface.
-- [Gaussian Process behavior and math](./plugins/models/gaussian-process.md): GP assumptions, fitting behavior, and outputs.
-- [Selection](./plugins/selection/README.md): selection-plugin contracts and channel requirements.
-- [Expected Improvement behavior and math](./plugins/selection/expected-improvement.md): EI formulation and selection semantics.
-- [Objectives and channel refs](./plugins/objectives/README.md): the generic objective contract, channel naming rules, and the registry of available implementations. Objective meaning and readiness remain with the caller that selects a plugin.
-- [X transforms](./plugins/transforms/x.md): input transform contracts for feature generation.
-- [Y transforms and Y-ops](./plugins/transforms/y.md): target transform contracts and label operations.
+- [Models](./plugins/models/README.md): available predictors and their settings.
+- [Gaussian processes](./plugins/models/gaussian-process.md): prediction and uncertainty assumptions.
+- [Objectives](./plugins/objectives/README.md): convert predicted outcomes into scores for your goal.
+- [Selection rules](./plugins/selection/README.md): rank candidates using scores and, when required, uncertainty.
+- [Pool-relative weighted acquisition](./plugins/selection/expected-improvement.md): the rule named `expected_improvement` and its mathematical definition.
+- [Feature transforms](./plugins/transforms/x.md) and [measurement transforms](./plugins/transforms/y.md): prepare inputs and training targets.
 
-### Concepts
+## Look up a setting or output
 
-- [Architecture and data flow](./concepts/architecture.md): end-to-end runtime structure and component boundaries.
-- [RoundCtx and contract auditing](./concepts/roundctx.md): round-state contract and audit semantics.
+- [Configuration](./reference/configuration.md): fields in `campaign.yaml`.
+- [CLI commands](./reference/cli.md): inspection, recovery and export options.
+- [Data and saved results](./reference/data-contracts.md): candidate types, labels and prediction records.
+- [Plots](./reference/plots.md) and [notebooks](./reference/notebooks.md): inspect campaign results.
+- [Review manifests](./reference/review-manifests.md): identify and verify a saved review bundle.
 
-### Reference
+## Maintain or extend OPAL
 
-- [Configuration (`campaign.yaml`)](./reference/configuration.md): campaign schema and field meanings.
-- [Data contracts and ledgers](./reference/data-contracts.md): artifact schemas, ledgers, and persistence surfaces.
-- [CLI commands](./reference/cli.md): command interfaces and argument contracts, including `selection-set` inspection/export for downstream handoffs.
-- [Plots](./reference/plots.md): plotting outputs, expectations, and usage.
-- [Review manifests](./reference/review-manifests.md): campaign review bundle schema and stale-artifact behavior.
-- [Notebooks](./reference/notebooks.md): generated marimo notebook contract and public view-model surface.
-
-### Maintainers
-
-- [Workflow pressure-test matrix](./maintainers/testing-matrix.md): repeatable validation matrix for workflow hardening.
+- [Architecture and data flow](./concepts/architecture.md): how configuration reaches fitting, scoring and selection.
+- [Round context](./concepts/roundctx.md): runtime state and contract checks.
+- [Testing guide](./maintainers/testing-matrix.md): demo coverage, focused tests and repository checks.

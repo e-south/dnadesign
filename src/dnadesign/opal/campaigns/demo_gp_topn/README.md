@@ -1,3 +1,4 @@
+<!--
 ---
 id: opal-campaign-demo-gp-topn
 title: Gaussian process top N demo
@@ -9,8 +10,9 @@ campaign_slug: demo_gp_topn
 campaign_kind: demo
 runtime_status: runnable
 ---
+-->
 
-## Gaussian process with top-N selection
+# Gaussian process with top-N selection
 
 This portable demo fits one synthetic scalar response with a Gaussian process
 and ranks candidates by the predicted value. It uses the same fixture as the
@@ -28,5 +30,3 @@ The printed `tmp_root` contains this example under `demo_gp_topn`. Use its confi
 to inspect the [selection batch](../../docs/reference/cli.md#selection-batch).
 For your own data, adapt the [configuration](configs/campaign.yaml) using the
 [campaign round guide](../../docs/workflows/campaign-round.md).
-
-See the [campaign round guide](../../docs/workflows/campaign-round.md).

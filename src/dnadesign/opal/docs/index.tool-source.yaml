@@ -1,13 +1,13 @@
 schema_version: 1
 catalog_order: 6
 tool: opal
-summary: Tool-owned active-learning workflows, campaign configuration references, and downstream infer-to-OPAL routes.
+summary: Active-learning campaigns, configuration and candidate-selection workflows.
 keywords:
   - active learning
-  - promoter
+  - sequence design
   - infer
   - feature matrix
 routes:
   - id: seqledger-infer-x-active-learning
     path: workflows/seqledger-infer-x-active-learning.md
-    summary: OPAL-owned active-learning route once one candidate table with an explicit infer-derived X column exists.
+    summary: Use features stored in SeqLedger for iterative candidate selection.

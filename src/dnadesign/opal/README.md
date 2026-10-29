@@ -1,5 +1,7 @@
 ![OPAL banner](assets/opal-banner.svg)
 
+# OPAL
+
 OPAL (Optimization with Active Learning) uses measured outcomes and sequence
 features to choose which designs to test next. It fits a predictive model, ranks
 candidates against your objective and selects a batch. Add new measurements to

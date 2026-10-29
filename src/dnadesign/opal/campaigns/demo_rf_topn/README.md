@@ -1,3 +1,4 @@
+<!--
 ---
 id: opal-campaign-demo-rf-topn
 title: Random forest top N demo
@@ -9,8 +10,9 @@ campaign_slug: demo_rf_topn
 campaign_kind: demo
 runtime_status: runnable
 ---
+-->
 
-## Random forest with top-N selection
+# Random forest with top-N selection
 
 This portable demo fits one synthetic scalar response with a random forest,
 ranks the remaining candidates, and selects five rows.

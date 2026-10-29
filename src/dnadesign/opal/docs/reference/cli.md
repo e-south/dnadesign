@@ -1,24 +1,16 @@
----
-id: opal-reference-cli
-title: OPAL Command Line Interface
-owner: dnadesign-maintainers
-status: active
-last_verified: 2026-10-28
-audience:
-  - operator
-  - maintainer
-  - agent
-entrypoints:
-  cli: uv run opal
----
+<!--
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-10-28
+-->
 
-# OPAL Command Line Interface
-
+# OPAL command reference
 
 The OPAL CLI initializes campaigns, ingests labels, executes rounds, inspects
 records and models, validates data contracts, and generates plots.
 
-Commands are registry-driven and plugin‑agnostic: they operate on the configured plugin names and enforce only declared contracts.
+For a complete first run, follow the [campaign guide](../workflows/campaign-round.md).
+The commands below use the predictors, objectives and selection rules declared
+in your campaign configuration.
 
 For operator-managed datasets, use one explicit coordinate for the complete
 command lifecycle:
@@ -31,18 +23,7 @@ The root must name an absolute, existing directory that is not a symbolic link.
 Use the same coordinate for validation and round execution so candidate, label,
 and writeback paths cannot drift between commands.
 
-Campaign snapshots that predate embedded X/Y column identities require an
-explicit, digest-receipted migration contract during `history import`:
-
-```bash
-opal history import --config <campaign-yaml> --source-workdir <prior-runtime> \
-  --column-contract <history-column-contract.json>
-```
-
-The contract binds the campaign, X/Y columns, and exact immutable round-context
-digests. OPAL does not infer these identities from mutable logs.
-
-### Command overview
+## Command overview
 
 Each command has one operational purpose. Usage blocks show required arguments;
 optional flags appear in brackets.
@@ -58,7 +39,7 @@ Guided hints:
 - Human output for `init`, `validate`, `ingest-y`, `run`, `explain`, and `verify-outputs` prints next-step hints by default.
 - Use `--no-hints` to disable hint lines.
 
-### `guide`
+## `guide`
 
 Generate a guided runbook from the current campaign config.
 
@@ -79,7 +60,7 @@ opal guide next --config <yaml> [--round <r>] [--json]
 
 ---
 
-### `demo-matrix`
+## `demo-matrix`
 
 Run canonical demo workflows end-to-end in isolated temp copies.
 
@@ -96,7 +77,7 @@ opal demo-matrix [--tmp-root <dir>] [--rounds 0|0,1] [--json] [--keep] [--fail-f
 * Exits non-zero when any flow fails or verify mismatches occur.
 * Intended for demo pressure testing and CI-style validation.
 
-### `init`
+## `init`
 
 Initialize/validate a campaign workspace and write `state.json`.
 
@@ -120,7 +101,7 @@ opal init --config <yaml> [--json]
 
 ---
 
-### `history rebind-state`
+## `history rebind-state`
 
 After moving an entire campaign directory, preview an explicit rebinding of
 the retained state paths, then apply it:
@@ -144,7 +125,7 @@ operation. Its receipt and original state are saved under
 `outputs/history/state-path-rebindings/`. This command does not complete an
 aborted run; use the normal explicit `run --resume` route afterward if needed.
 
-### `history import`
+## `history import`
 
 Consolidate disjoint prior rounds into the configured campaign workdir without
 retraining or rescoring.
@@ -177,7 +158,18 @@ opal history import --config <target-yaml> \
 
 ---
 
-### `ingest-y`
+Campaign snapshots that predate embedded X/Y column identities require an
+explicit, digest-receipted migration contract during `history import`:
+
+```bash
+opal history import --config <campaign-yaml> --source-workdir <prior-runtime> \
+  --column-contract <history-column-contract.json>
+```
+
+The contract binds the campaign, X/Y columns, and exact immutable round-context
+digests. OPAL does not infer these identities from mutable logs.
+
+## `ingest-y`
 
 Transform a tidy CSV/Parquet/XLSX to model-ready **Y**, preview, confirm, and
 append to the configured label source.
@@ -246,7 +238,7 @@ opal ingest-y --config <yaml> --round <r> --csv <path> \
 
 ---
 
-### `run`
+## `run`
 
 Train on labels with **`observed_round <= R`**, score the candidate universe,
 evaluate every selection view, and write campaign artifacts and ledgers.
@@ -339,7 +331,7 @@ does not mutate `records.parquet`.
 
 ---
 
-### `predict`
+## `predict`
 
 Run **ephemeral** predictions from a frozen model. No writes to `records.parquet`.
 
@@ -376,7 +368,7 @@ opal predict --config <yaml> \
 
 ---
 
-### `record-show`
+## `record-show`
 
 Per-record history report (ground truth + per-round predictions/rank/selected).
 
@@ -409,7 +401,7 @@ opal record-show --config <yaml> \
 * If reruns exist for a round, pass `--run-id` to avoid mixing predictions.
 * If the requested record does not exist, the command exits non-zero.
 
-### `model-show`
+## `model-show`
 
 Inspect a saved model; optionally dump full feature importances.
 
@@ -436,7 +428,7 @@ opal model-show \
 * When resolving from `state.json`, OPAL requires a recorded `model.artifact_path` for the selected round.
 * OPAL fails fast if `model.artifact_path` is missing, relative, missing on disk, or points to a directory.
 
-### `objective-meta`
+## `objective-meta`
 
 List objective metadata and diagnostic keys for a round.
 
@@ -463,7 +455,7 @@ opal objective-meta --config <yaml-or-dir> --view <selection-view-id> \
 
 ---
 
-### `verify-outputs`
+## `verify-outputs`
 
 Compare selection artifacts against ledger predictions for a single run (run-aware, audit-grade).
 
@@ -491,7 +483,7 @@ opal verify-outputs --config <yaml> --view <selection-view-id> \
 
 ---
 
-### `selection-set`
+## `selection-set`
 
 Inspect or export the canonical selected-row contract for downstream consumers
 such as study-owned synthesis handoffs or probe analysis.
@@ -521,7 +513,7 @@ opal selection-set export --config <yaml> --view <selection-view-id> \
 
 ---
 
-### `selection-batch`
+## `selection-batch`
 
 Inspect or export the final deduplicated selection batch in a
 run. This is an OPAL decision artifact, not a physical synthesis authorization.
@@ -537,7 +529,7 @@ fails when the batch artifact is absent or its deduplication key is not unique.
 
 ---
 
-### `ctx`
+## `ctx`
 
 Inspect `round_ctx.json` carriers.
 
@@ -578,7 +570,7 @@ opal ctx diff -c <yaml> --round-a 0 --round-b 1 --keys objective/
 
 ---
 
-### `explain`
+## `explain`
 
 Dry-run planner for a round: counts, plan, warnings. **No writes.**
 
@@ -600,7 +592,7 @@ vector dimension, and any preflight warnings.
 
 ---
 
-### `status`
+## `status`
 
 Dashboard from config, `records.parquet`, label source, and `state.json`.
 Before initialization it still reports the records path, whether it exists, and
@@ -627,7 +619,7 @@ opal status --config <yaml> [--round <k> | --all] [--with-ledger] [--json]
 * `--with-ledger`: Include ledger run_meta summaries in output.
 * `--json`: Output as JSON.
 
-### `runs`
+## `runs`
 
 List or inspect `run_meta` entries from `outputs/ledger/runs.parquet`.
 
@@ -656,7 +648,7 @@ opal runs show --config <yaml> [--round <k|latest> | --run-id <rid>] [--json]
 
 ---
 
-### `log`
+## `log`
 
 Summarize `round.log.jsonl` for a round.
 
@@ -678,7 +670,7 @@ opal log --config <yaml> [--round <k|latest>] [--json]
 
 ---
 
-### `progress`
+## `progress`
 
 Summarize campaign progress from `state.json` and round logs.
 
@@ -709,7 +701,7 @@ opal progress --config <yaml-or-dir> [--round <k|latest|all>] [--run-id <id>] [-
 * Study probes and campaign dashboards should consume this primitive instead of
   parsing OPAL round-log paths directly.
 
-### `validate`
+## `validate`
 
 End-to-end table checks (essentials present; X non-null, finite, and fixed-length).
 
@@ -735,7 +727,7 @@ opal validate --config <yaml> [--json]
 
 ---
 
-### `label-hist`
+## `label-hist`
 
 Validate, repair, or explicitly attach-from-y into the label history column (no silent fixes).
 
@@ -759,7 +751,7 @@ opal label-hist <validate|repair|attach-from-y> --config <yaml> [--apply] [--rou
 * `attach-from-y` is a **manual** fix for datasets with a populated Y column but empty label history.
   It only attaches entries for rows where `label_hist` is empty and Y is finite.
 
-### Records label history
+## Records label history
 
 OPAL manages a primary per‑record label history column in `records.parquet`:
 
@@ -769,7 +761,7 @@ OPAL manages a primary per‑record label history column in `records.parquet`:
 
 ---
 
-### `plot`
+## `plot`
 
 Generate plots declared in the campaign’s `plots:` block. Plots are plugin-driven and campaign-scoped.
 
@@ -868,7 +860,7 @@ Built-ins injected for plots:
 
 ---
 
-### `notebook`
+## `notebook`
 
 Generate or run OPAL marimo artifact viewers.
 
@@ -923,7 +915,7 @@ uv run opal notebook edit --config <yaml-or-dir> [--path <notebook.py>] [--host 
 
 ---
 
-### `review`
+## `review`
 
 Persist a campaign-scoped review bundle from completed OPAL run artifacts.
 
@@ -949,7 +941,7 @@ opal review --config <yaml-or-dir> --view <selection-view-id> \
 
 ---
 
-### `artifacts`
+## `artifacts`
 
 Audit and prune generated OPAL artifacts using active manifests as the
 authority.
@@ -976,7 +968,7 @@ opal artifacts prune --config <yaml-or-dir> [--apply] [--json]
 
 ---
 
-### `campaign-reset` (advanced)
+## `campaign-reset` (advanced)
 
 Reset a campaign to a clean slate: prune OPAL-derived columns from `records.parquet`, remove `outputs/`, remove `notebooks/`, and clear `state.json`.
 
@@ -1000,7 +992,7 @@ opal campaign-reset --config <yaml> [--apply] [--backup|--no-backup] [--json]
 
 ---
 
-### `ledger-compact`
+## `ledger-compact`
 
 Compact ledger datasets after repeated append cycles.
 
@@ -1023,7 +1015,7 @@ opal ledger-compact --config <yaml> --runs [--apply] [--json]
 
 ---
 
-### `prune-source`
+## `prune-source`
 
 Remove OPAL-derived columns (`opal__*`) and the configured Y column from `records.parquet`.
 
@@ -1049,7 +1041,7 @@ opal prune-source --config <yaml> [--scope any|campaign] [--keep <col> ...] \
 
 ---
 
-### Config resolution
+## Config resolution
 
 Campaign-scoped commands require explicit config context:
 

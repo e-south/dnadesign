@@ -1,16 +1,16 @@
-## OPAL Campaign Configuration v3
+# OPAL Campaign Configuration v3
 
+<!--
 **Owner:** dnadesign-maintainers
 **Last verified:** 2026-10-28
+-->
 
-`campaign.yaml` uses the strict schema `opal.campaign.v3`. OPAL rejects v2
-keys. There is no compatibility parser.
+`campaign.yaml` defines the candidate data, measured outcomes, predictor and
+selection rules using schema `opal.campaign.v3`. A campaign shares one learning
+loop across its selection views; each view applies its own objective, and the
+selection batch combines their proposed candidates.
 
-The central invariant is:
-
-> A campaign owns learning; a selection view owns a target; a selection batch owns the final deduplicated proposal.
-
-### Ontology
+## Ontology
 
 - **Campaign:** candidate universe, X, Y, labels, transforms, model, and round
   history shared by one learning loop.
@@ -29,7 +29,7 @@ Use separate campaigns only when X, Y, labels, transforms, model, candidate
 universe, or round lifecycle differ. Different target masks or setpoints over
 the same predicted phenotype belong in selection views of one campaign.
 
-### Required blocks
+## Required blocks
 
 - `schema_version: opal.campaign.v3`
 - `ownership`: `opal_demo` or `study_campaign` with its required identifiers
@@ -57,7 +57,7 @@ not enforce a cardinality. Declare `expected_unique_count` only when exact
 logical-batch cardinality is part of the method. Without an `allocation` block,
 a mismatch is fatal and OPAL does not fill or discard rows.
 
-### Selection-view contract
+## Selection-view contract
 
 Every view requires a unique slug-like `id` and:
 
@@ -90,7 +90,7 @@ or fill the result.
 and objective path must emit predictive standard deviation; missing or invalid
 uncertainty is fatal.
 
-### Coordinated unique allocation
+## Coordinated unique allocation
 
 Use the generic allocator only when every view must contribute an exact quota
 to one deduplicated physical batch:
@@ -127,7 +127,7 @@ and `top_k`, plus the exact `view_priority`. It delegates to the production
 allocator and returns the allocated rows, complete trace, and summary. IDs and
 deduplication keys are identity fields: whitespace is rejected, not normalized.
 
-### Multi-view example
+## Multi-view example
 
 ```yaml
 schema_version: opal.campaign.v3
@@ -212,7 +212,7 @@ selection_batch:
     view_priority: [factor_a, factor_b]
 ```
 
-### Shared execution
+## Shared execution
 
 For each round OPAL:
 
@@ -229,7 +229,7 @@ Validation rejects duplicate view IDs, qualified or unresolved channel refs,
 plugin-output collisions, unsupported selectors, and view-specific drift in
 already-labeled exclusion policy.
 
-### Candidate and label contracts
+## Candidate and label contracts
 
 `data.candidate_scope` optionally restricts scoring to an ID table without
 copying the candidate table. `candidate_eligibility` applies generic,
@@ -304,7 +304,7 @@ OPAL verifies its digest without interpreting study fields. The study publisher
 stages the label, provenance, and promotion records as one publication. OPAL reads and verifies that
 promotion but does not publish or revise it.
 
-### Defaults and fail-fast behavior
+## Defaults and fail-fast behavior
 
 - `ingest.duplicate_policy`: `error`
 - `scoring.score_batch_size`: `10000`
