@@ -1,0 +1,47 @@
+schema_version: 1
+catalog_order: 60
+registry_id: seqledger.data-plane.promoter-feature-matrix
+type: runbook
+plane: data-plane
+owner_boundary: seqledger
+entry_artifact: one or more SeqLedger-backed promoter datasets plus optional construct-expanded context datasets
+exit_artifact: infer-annotated SeqLedger feature matrix ready for cluster or OPAL
+summary: Build one infer-annotated feature matrix from mixed promoter sources before branching into Cluster or OPAL.
+execution_kind: staged
+status_kind: seqledger-dataset-state
+keywords:
+  - evo2
+  - wildtype
+  - manual promoters
+  - anchor_only
+  - template_1kb
+  - feature bundle
+  - promoter
+  - active learning
+related_tools:
+  - construct
+  - infer
+  - cluster
+  - opal
+related_tool_routes:
+  - tool: construct
+    route: template-contexts
+  - tool: infer
+    route: architecture
+  - tool: infer
+    route: evo2-provider
+  - tool: infer
+    route: evo2-sequence-features
+  - tool: cluster
+    route: exploratory-clustering
+  - tool: opal
+    route: seqledger-infer-x-active-learning
+relations:
+  - type: depends-on
+    target: seqledger.data-plane.multi-source-source-of-truth
+  - type: depends-on
+    target: seqledger.data-plane.construct-infer-source-of-truth
+  - type: handoff-to
+    target: cluster.downstream.exploratory-clustering
+  - type: handoff-to
+    target: opal.downstream.seqledger-infer-x-active-learning

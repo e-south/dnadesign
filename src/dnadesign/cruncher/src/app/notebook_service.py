@@ -1,0 +1,636 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/src/app/notebook_service.py
+
+Application services for notebook service Cruncher app.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Optional
+
+from dnadesign.cruncher.analysis.layout import (
+    load_table_manifest,
+    plot_manifest_path,
+    resolve_analysis_dir,
+    resolve_required_table_paths,
+    summary_path,
+    table_manifest_path,
+)
+from dnadesign.cruncher.app.run_service import update_run_index_from_manifest
+from dnadesign.cruncher.artifacts.entries import (
+    append_artifacts,
+    artifact_entry,
+    normalize_artifacts,
+)
+from dnadesign.cruncher.artifacts.manifest import load_manifest, write_manifest
+
+
+def ensure_marimo() -> None:
+    try:
+        import marimo as _  # noqa: F401
+    except ModuleNotFoundError as exc:
+        if exc.name != "marimo":
+            raise
+        raise RuntimeError(
+            "Notebook generation requires dnadesign-tools[cruncher-notebook]. "
+            "Install that profile, or in a checkout run "
+            "uv sync --locked --no-default-groups --extra cruncher-notebook."
+        ) from exc
+
+
+def _read_json(path: Path, label: str) -> object:
+    try:
+        return json.loads(path.read_text())
+    except Exception as exc:
+        raise ValueError(f"{label} is not valid JSON: {exc}") from exc
+
+
+def _validate_notebook_inputs(analysis_dir: Path) -> None:
+    summary_file = summary_path(analysis_dir)
+    plot_manifest_file = plot_manifest_path(analysis_dir)
+    table_manifest_file = table_manifest_path(analysis_dir)
+    missing = [path for path in (summary_file, plot_manifest_file, table_manifest_file) if not path.exists()]
+    if missing:
+        missing_blob = ", ".join(str(path) for path in missing)
+        raise FileNotFoundError(
+            f"Missing analysis artifacts required for the notebook: {missing_blob}. "
+            "Run `cruncher analyze <config>` to regenerate."
+        )
+    summary = _read_json(summary_file, "summary.json")
+    if not isinstance(summary, dict):
+        raise ValueError("summary.json must be a JSON object.")
+    tf_names = summary.get("tf_names")
+    if not isinstance(tf_names, list) or not tf_names:
+        raise ValueError("summary.json must include a non-empty 'tf_names' list.")
+    plot_manifest = _read_json(plot_manifest_file, "plot_manifest.json")
+    if not isinstance(plot_manifest, dict):
+        raise ValueError("plot_manifest.json must be a JSON object.")
+    plots = plot_manifest.get("plots")
+    if not isinstance(plots, list):
+        raise ValueError("plot_manifest.json must include a 'plots' list.")
+    load_table_manifest(table_manifest_file, required=True)
+    resolve_required_table_paths(
+        analysis_dir,
+        keys=("scores_summary", "metrics_joint", "elites_topk"),
+    )
+
+
+def _record_notebook_artifact(
+    manifest: dict,
+    *,
+    run_dir: Path,
+    notebook_path: Path,
+    config_path_str: str | None,
+) -> None:
+    existing_count = len(normalize_artifacts(manifest.get("artifacts")))
+    append_artifacts(
+        manifest,
+        [
+            artifact_entry(
+                notebook_path,
+                run_dir,
+                kind="notebook",
+                label="Analysis overview notebook (marimo)",
+                stage="analysis",
+            )
+        ],
+    )
+    if len(manifest.get("artifacts", [])) == existing_count:
+        return
+    write_manifest(run_dir, manifest)
+    if config_path_str:
+        config_path = Path(config_path_str)
+        if config_path.exists():
+            update_run_index_from_manifest(config_path, run_dir, manifest)
+
+
+def generate_notebook(
+    run_dir: Path,
+    *,
+    analysis_id: Optional[str] = None,
+    latest: bool = False,
+    force: bool = False,
+) -> Path:
+    if analysis_id is not None and not str(analysis_id).strip():
+        raise ValueError("analysis_id must be a non-empty string.")
+    if analysis_id is not None and latest:
+        raise ValueError("Use either --analysis-id or --latest, not both.")
+    ensure_marimo()
+    run_dir = run_dir.resolve()
+    manifest = load_manifest(run_dir)
+    analysis_dir, resolved_id = resolve_analysis_dir(run_dir, analysis_id=analysis_id, latest=latest)
+    _validate_notebook_inputs(analysis_dir)
+
+    notebook_path = analysis_dir / "notebook__run_overview.py"
+    if notebook_path.exists() and not force:
+        _record_notebook_artifact(
+            manifest,
+            run_dir=run_dir,
+            notebook_path=notebook_path,
+            config_path_str=manifest.get("config_path"),
+        )
+        return notebook_path
+
+    template = _render_template(resolved_id)
+    notebook_path.write_text(template)
+
+    _record_notebook_artifact(
+        manifest,
+        run_dir=run_dir,
+        notebook_path=notebook_path,
+        config_path_str=manifest.get("config_path"),
+    )
+    return notebook_path
+
+
+def _render_template(default_analysis_id: str | None) -> str:
+    return (
+        _render_template_header(default_analysis_id)
+        + _render_template_controls_and_tables()
+        + _render_template_plots_and_artifacts()
+        + _render_template_layout_tabs()
+    )
+
+
+def _render_template_header(default_analysis_id: str | None) -> str:
+    return f"""import marimo
+
+__generated_with = "unknown"
+
+app = marimo.App(width="full")
+
+@app.cell
+def _():
+    import marimo as mo
+    import json
+    from pathlib import Path
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    return mo, json, Path, pd, plt
+
+
+@app.cell
+def _(Path, json, mo, refresh_button):
+    _ = refresh_button.value
+    notebook_path = Path(__file__).resolve()
+    current_analysis_dir = notebook_path.parent
+    if current_analysis_dir.name == "analysis":
+        run_dir = current_analysis_dir.parent
+    elif "_archive" in current_analysis_dir.parts:
+        parts = current_analysis_dir.parts
+        if "analysis" in parts:
+            analysis_idx = parts.index("analysis")
+            run_dir = Path(*parts[:analysis_idx])
+        else:
+            run_dir = current_analysis_dir
+    else:
+        run_dir = current_analysis_dir.parent
+    if not run_dir.exists():
+        mo.stop(True, mo.md(f"Run directory not found: {{run_dir}}"))
+    analysis_root = run_dir / "analysis"
+    from dnadesign.cruncher.analysis.layout import list_analysis_entries_verbose
+
+    analysis_entries = list_analysis_entries_verbose(run_dir)
+    analysis_labels = [entry["label"] for entry in analysis_entries]
+    latest_label = next((entry["label"] for entry in analysis_entries if entry.get("kind") == "latest"), None)
+    default_id_hint = {default_analysis_id!r}
+    default_label = None
+    if default_id_hint:
+        for analysis_entry in analysis_entries:
+            if analysis_entry.get("id") == default_id_hint:
+                default_label = analysis_entry.get("label")
+                break
+    if default_label is None:
+        default_label = latest_label
+    if default_label is None and analysis_labels:
+        default_label = analysis_labels[0]
+    return run_dir, analysis_root, analysis_entries, analysis_labels, default_label
+"""
+
+
+def _render_template_controls_and_tables() -> str:
+    noop = ""
+    return f"""{noop}
+@app.cell
+def _(mo):
+    refresh_button = mo.ui.button(label="Refresh analysis list", kind="neutral")
+    return refresh_button
+
+
+@app.cell
+def _(Path, json, mo):
+    def _load_json(path: Path, *, default: dict):
+        if not path.exists():
+            return default, f"Missing JSON at {{path}}"
+        try:
+            return json.loads(path.read_text()), None
+        except Exception as exc:  # pragma: no cover - notebook UX
+            return default, f"Failed to parse JSON at {{path}}: {{exc}}"
+    return _load_json
+
+
+@app.cell
+def _(analysis_labels, mo):
+    if not analysis_labels:
+        mo.stop(True, mo.md("No analysis runs found. Run `cruncher analyze <config>` first."))
+    return
+
+
+@app.cell
+def _(analysis_labels, default_label, mo):
+    analysis_picker = mo.ui.dropdown(options=analysis_labels, value=default_label, label="analysis")
+    return analysis_picker
+
+
+@app.cell
+def _(analysis_picker, mo, refresh_button):
+    analysis_controls = None
+    if analysis_picker is not None:
+        analysis_controls = mo.hstack([analysis_picker, refresh_button])
+    return analysis_controls
+
+
+@app.cell
+def _(analysis_entries, analysis_picker, _load_json, Path):
+    from dnadesign.cruncher.analysis.layout import summary_path as analysis_summary_path
+
+    selected_label = analysis_picker.value or ""
+    selected_entry = next((item for item in analysis_entries if item.get("label") == selected_label), None)
+    analysis_id = selected_entry.get("id") if selected_entry else ""
+    analysis_dir = Path(selected_entry.get("path")) if selected_entry else Path()
+    entry_warnings = selected_entry.get("warnings", []) if selected_entry else []
+    summary_file = analysis_summary_path(analysis_dir)
+    summary, summary_error = _load_json(summary_file, default={{}})
+    tf_names = summary.get("tf_names", []) if isinstance(summary, dict) else []
+    return analysis_id, analysis_dir, summary, summary_file, tf_names, summary_error, entry_warnings
+
+
+@app.cell
+def _(analysis_dir, _load_json, run_dir):
+    from dnadesign.cruncher.analysis.layout import plot_manifest_path as analysis_plot_manifest_path
+    from dnadesign.cruncher.analysis.layout import resolve_required_table_paths as analysis_resolve_required_table_paths
+    from dnadesign.cruncher.analysis.layout import table_manifest_path as analysis_table_manifest_path
+    from dnadesign.cruncher.artifacts.layout import manifest_path as run_manifest_path
+
+    manifest_path = run_manifest_path(run_dir)
+    manifest, manifest_error = _load_json(manifest_path, default={{}})
+    plot_manifest_file = analysis_plot_manifest_path(analysis_dir)
+    plot_manifest, plot_manifest_error = _load_json(plot_manifest_file, default={{"plots": []}})
+    # table_manifest.json defines table keys used by this notebook.
+    table_manifest_file = analysis_table_manifest_path(analysis_dir)
+    table_manifest, table_manifest_error = _load_json(table_manifest_file, default={{"tables": []}})
+    table_paths = {{}}
+    table_paths_error = None
+    try:
+        table_paths = analysis_resolve_required_table_paths(
+            analysis_dir,
+            keys=("scores_summary", "metrics_joint", "elites_topk"),
+        )
+    except Exception as exc:
+        table_paths_error = str(exc)
+    return (
+        manifest,
+        manifest_path,
+        plot_manifest,
+        plot_manifest_file,
+        table_manifest,
+        table_manifest_file,
+        table_paths,
+        manifest_error,
+        plot_manifest_error,
+        table_manifest_error,
+        table_paths_error,
+    )
+
+
+@app.cell
+def _(analysis_dir, mo, pd, table_paths, table_paths_error):
+    if table_paths_error:
+        mo.stop(True, mo.md(f"Table contract error: {{table_paths_error}}"))
+
+    def _read_table(path):
+        if not path.exists():
+            return pd.DataFrame()
+        if path.suffix == ".parquet":
+            return pd.read_parquet(path)
+        return pd.read_csv(path)
+
+    summary_table_path = table_paths["scores_summary"]
+    summary_df = _read_table(summary_table_path)
+    joint_metrics_path = table_paths["metrics_joint"]
+    joint_metrics_df = _read_table(joint_metrics_path)
+    topk_path = table_paths["elites_topk"]
+    topk_df = _read_table(topk_path)
+    return summary_df, summary_table_path, joint_metrics_df, joint_metrics_path, topk_df, topk_path
+
+
+@app.cell
+def _(mo, topk_df):
+    topk_slider = None
+    if not topk_df.empty:
+        max_k = max(1, min(len(topk_df), 50))
+        topk_slider = mo.ui.slider(1, max_k, value=min(10, max_k), label="Top-K")
+    return topk_slider
+
+
+@app.cell
+def _(topk_df, topk_slider):
+    if topk_slider is None:
+        topk_view = topk_df
+    else:
+        topk_view = topk_df.head(int(topk_slider.value))
+    return topk_view
+"""
+
+
+def _render_template_plots_and_artifacts() -> str:
+    return f"""
+@app.cell
+def _(analysis_dir, pd, plot_manifest, run_dir):
+    plot_entries = plot_manifest.get("plots", []) if isinstance(plot_manifest, dict) else []
+    rows = []
+    for plot_entry in plot_entries:
+        _outputs = []
+        for raw_output in plot_entry.get("outputs", []):
+            _path = raw_output.get("path", "") if isinstance(raw_output, dict) else ""
+            _full_path = analysis_dir / _path if _path else None
+            if _full_path is not None and not _full_path.exists():
+                _run_path = run_dir / _path
+                if _run_path.exists():
+                    _full_path = _run_path
+            _outputs.append(
+                {{
+                    "path": _path,
+                    "exists": bool(_full_path and _full_path.exists()),
+                }}
+            )
+        manifest_generated = bool(plot_entry.get("generated"))
+        manifest_skipped = bool(plot_entry.get("skipped"))
+        generated = bool(manifest_generated and any(output["exists"] for output in _outputs))
+        _missing_outputs = [
+            output["path"]
+            for output in _outputs
+            if manifest_generated and not output["exists"] and output.get("path")
+        ]
+        rows.append(
+            dict(
+                key=plot_entry.get("key"),
+                label=plot_entry.get("label"),
+                group=plot_entry.get("group"),
+                manifest_generated=manifest_generated,
+                skipped=manifest_skipped,
+                generated=generated,
+                skip_reason=plot_entry.get("skip_reason"),
+                missing_outputs="; ".join(_missing_outputs),
+                outputs="; ".join([output.get("path", "") for output in _outputs if output.get("path")]),
+            )
+        )
+        plot_entry["outputs"] = _outputs
+        plot_entry["missing_outputs"] = _missing_outputs
+        plot_entry["generated"] = generated
+    plot_df = pd.DataFrame(rows) if rows else pd.DataFrame()
+    plot_options = (
+        dict((f"{{e.get('label')}} ({{e.get('key')}})", e.get("key")) for e in plot_entries)
+        if plot_entries
+        else dict()
+    )
+    default_key = plot_entries[0].get("key") if plot_entries else None
+    return plot_entries, plot_df, plot_options, default_key
+
+
+@app.cell
+def _(default_key, mo, plot_options):
+    plot_picker = None
+    if plot_options:
+        plot_picker = mo.ui.dropdown(options=plot_options, value=default_key, label="plot")
+    return plot_picker
+
+
+@app.cell
+def _(analysis_dir, mo, plot_entries, plot_picker, run_dir):
+    plot_key = plot_picker.value if plot_picker else None
+    selected_plot = next((plot_entry for plot_entry in plot_entries if plot_entry.get("key") == plot_key), None)
+    plot_preview = mo.md("No plot metadata available.")
+    if selected_plot:
+        _plot_blocks = [
+            mo.md(
+                f"### {{selected_plot.get('label')}} (`{{selected_plot.get('key')}}`)\\n\\n"
+                f"{{selected_plot.get('description', '')}}"
+            )
+        ]
+        requires = selected_plot.get("requires", [])
+        if requires:
+            _plot_blocks.append(mo.md("Requires: " + ", ".join(requires)))
+        _outputs = selected_plot.get("outputs", [])
+        if _outputs:
+            lines = []
+            for output in _outputs:
+                _path = output.get("path", "")
+                _full_path = analysis_dir / _path if _path else None
+                if _full_path is not None and not _full_path.exists():
+                    _run_path = run_dir / _path
+                    if _run_path.exists():
+                        _full_path = _run_path
+                exists = bool(_full_path and _full_path.exists())
+                lines.append(f"- {{_path}} ({{'ok' if exists else 'missing'}})")
+            _plot_blocks.append(mo.md("Outputs:\\n" + "\\n".join(lines)))
+        _missing_outputs = selected_plot.get("missing_outputs", [])
+        if _missing_outputs:
+            _plot_blocks.append(mo.md("Missing outputs: " + ", ".join(_missing_outputs)))
+
+        for output in _outputs:
+            _path = output.get("path", "")
+            if not _path:
+                continue
+            _full_path = analysis_dir / _path
+            if not _full_path.exists():
+                _run_path = run_dir / _path
+                if _run_path.exists():
+                    _full_path = _run_path
+            if _full_path.exists() and _full_path.suffix.lower() in {".png", ".jpg", ".jpeg"}:
+                _plot_blocks.append(mo.image(_full_path))
+                continue
+            if _full_path.exists() and _full_path.suffix.lower() in {".txt", ".log"}:
+                try:
+                    text = _full_path.read_text()
+                except Exception as exc:
+                    _plot_blocks.append(mo.md(f"Failed to read {{_path}}: {{exc}}"))
+                else:
+                    max_chars = 4000
+                    preview = text
+                    truncated = False
+                    if len(preview) > max_chars:
+                        preview = preview[:max_chars]
+                        truncated = True
+                    _plot_blocks.append(mo.md(f"**Text output:** {{_path}}"))
+                    if truncated:
+                        _plot_blocks.append(mo.md("_preview truncated_"))
+                    _plot_blocks.append(mo.md("```\\n" + preview + "\\n```"))
+        plot_preview = mo.vstack(_plot_blocks)
+    return selected_plot, plot_preview
+
+
+@app.cell
+def _(analysis_dir, manifest, run_dir):
+    artifacts = manifest.get("artifacts", []) if isinstance(manifest, dict) else []
+    filtered_artifacts = artifacts
+    try:
+        prefix = str(analysis_dir.relative_to(run_dir)).rstrip("/") + "/"
+    except Exception:
+        pass
+    else:
+        filtered_artifacts = [
+            a for a in artifacts if isinstance(a, dict) and str(a.get("path", "")).startswith(prefix)
+        ]
+    return filtered_artifacts
+"""
+
+
+def _render_template_layout_tabs() -> str:
+    noop = ""
+    return f"""{noop}
+@app.cell
+def _(
+    analysis_id,
+    entry_warnings,
+    manifest,
+    manifest_error,
+    mo,
+    plot_manifest_error,
+    plot_manifest_path,
+    summary,
+    summary_error,
+    summary_path,
+    table_manifest_error,
+    table_manifest_path,
+    table_paths_error,
+    tf_names,
+):
+    motif_store = manifest.get("motif_store") or dict() if isinstance(manifest, dict) else dict()
+    motif_count = len(manifest.get("motifs", [])) if isinstance(manifest, dict) else 0
+    tf_blob = ", ".join(tf_names) if tf_names else "-"
+    warning_sources = (
+        summary_error,
+        manifest_error,
+        plot_manifest_error,
+        table_manifest_error,
+        table_paths_error,
+    )
+    warnings = [err for err in warning_sources if err]
+    if entry_warnings:
+        warnings.extend([str(warn) for warn in entry_warnings if warn])
+    md = [
+        "# Cruncher analysis overview",
+        "",
+    ]
+    if warnings:
+        md.append("Warnings:")
+        md.extend([f"- {{warn}}" for warn in warnings])
+        md.append("")
+    md.extend(
+        [
+            f"Run: {{summary.get('run', '-') }}",
+        f"Stage: {{manifest.get('stage', '-') }}",
+        f"Analysis ID: {{analysis_id}}",
+        f"Created at: {{summary.get('created_at', manifest.get('created_at', '-') )}}",
+        f"TFs: {{tf_blob}}",
+        f"Motifs: {{motif_count}}",
+        f"PWM source: {{motif_store.get('pwm_source', '-') }}",
+        f"Site kinds: {{motif_store.get('site_kinds', '-') }}",
+        f"Combine sites: {{motif_store.get('combine_sites', '-') }}",
+        "",
+        "Inputs:",
+        f"- Config used: {{summary.get('config_used', '-') }}",
+        f"- Analysis settings: {{summary.get('analysis_used', '-') }}",
+        f"- Plot manifest: {{plot_manifest_path}}",
+        f"- Table manifest: {{table_manifest_path}}",
+        f"- Summary JSON: {{summary_path}}",
+        ]
+    )
+    overview_md = mo.md("\\n".join(md))
+    return overview_md
+
+
+@app.cell
+def _(analysis_controls, mo, overview_md):
+    overview_blocks = []
+    if analysis_controls is not None:
+        overview_blocks.append(analysis_controls)
+    overview_blocks.append(overview_md)
+    overview_block = mo.vstack(overview_blocks)
+    return overview_block
+
+
+@app.cell
+def _(
+    joint_metrics_df,
+    joint_metrics_path,
+    mo,
+    summary_df,
+    summary_table_path,
+    topk_path,
+    topk_slider,
+    topk_view,
+):
+    tables_blocks = []
+    if summary_df.empty:
+        tables_blocks.append(mo.md("No summary table found."))
+    else:
+        tables_blocks.append(mo.ui.dataframe(summary_df))
+    if joint_metrics_df.empty:
+        tables_blocks.append(mo.md("No joint metrics table found."))
+    else:
+        tables_blocks.append(mo.ui.dataframe(joint_metrics_df))
+    if topk_slider is not None:
+        tables_blocks.append(topk_slider)
+    if not topk_view.empty:
+        tables_blocks.append(mo.ui.dataframe(topk_view))
+    tables_blocks.append(mo.md(f"Summary table: {{summary_table_path}}"))
+    tables_blocks.append(mo.md(f"Joint metrics table: {{joint_metrics_path}}"))
+    tables_blocks.append(mo.md(f"Top-K table: {{topk_path}}"))
+    tables_block = mo.vstack(tables_blocks)
+    return tables_block
+
+
+@app.cell
+def _(mo, plot_df, plot_preview):
+    plots_blocks = []
+    if not plot_df.empty:
+        plots_blocks.append(mo.ui.dataframe(plot_df))
+    plots_blocks.append(plot_preview)
+    plots_block = mo.vstack(plots_blocks)
+    return plots_block
+
+
+@app.cell
+def _(mo, artifacts):
+    if not artifacts:
+        artifacts_block = mo.md("No artifacts recorded for this analysis.")
+    else:
+        artifacts_block = mo.ui.dataframe(artifacts)
+    return artifacts_block
+
+
+@app.cell
+def _(mo, overview_block, tables_block, plots_block, artifacts_block):
+    tabs = mo.ui.tabs(
+        {{
+            "Overview": overview_block,
+            "Tables": tables_block,
+            "Plots": plots_block,
+            "Artifacts": artifacts_block,
+        }}
+    )
+    return tabs
+
+
+if __name__ == "__main__":
+    app.run()
+"""

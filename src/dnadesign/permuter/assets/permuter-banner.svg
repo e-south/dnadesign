@@ -1,0 +1,15 @@
+<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
+  xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-labelledby="permuter-banner-title permuter-banner-description" shape-rendering="geometricPrecision">
+  <title id="permuter-banner-title">permuter: Make and score variants</title>
+  <desc id="permuter-banner-description">Generate sequence variants and score them with chosen tools.</desc>
+  <rect width="1200" height="180" rx="16" fill="#F1F4F6"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="48" y="89" fill="#163047" font-size="56" font-weight="500" letter-spacing="-1.1">permuter</text>
+    <text x="50" y="126" fill="#526475" font-size="20">Make and score variants</text>
+  </g>
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
+    <rect x="7" y="12" width="11" height="8" rx="1" fill="#526475"/><rect x="24" y="12" width="11" height="8" rx="1" fill="#526475"/><rect x="41" y="12" width="11" height="8" rx="1" fill="#526475"/><rect x="58" y="12" width="11" height="8" rx="1" fill="#2F6EAD"/><rect x="75" y="12" width="11" height="8" rx="1" fill="#526475"/><rect x="92" y="12" width="11" height="8" rx="1" fill="#526475"/><rect x="109" y="12" width="11" height="8" rx="1" fill="#526475"/><rect x="7" y="29" width="11" height="8" rx="1" fill="#526475"/><rect x="24" y="29" width="11" height="8" rx="1" fill="#526475"/><rect x="41" y="29" width="11" height="8" rx="1" fill="#526475"/><rect x="58" y="29" width="11" height="8" rx="1" fill="#2F6EAD"/><rect x="75" y="29" width="11" height="8" rx="1" fill="#526475"/><rect x="92" y="29" width="11" height="8" rx="1" fill="#526475"/><rect x="109" y="29" width="11" height="8" rx="1" fill="#526475"/><rect x="7" y="46" width="11" height="8" rx="1" fill="#526475"/><rect x="24" y="46" width="11" height="8" rx="1" fill="#526475"/><rect x="41" y="46" width="11" height="8" rx="1" fill="#526475"/><rect x="58" y="46" width="11" height="8" rx="1" fill="#2F6EAD"/><rect x="75" y="46" width="11" height="8" rx="1" fill="#526475"/><rect x="92" y="46" width="11" height="8" rx="1" fill="#526475"/><rect x="109" y="46" width="11" height="8" rx="1" fill="#526475"/>
+  </g>
+</svg>

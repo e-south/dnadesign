@@ -1,0 +1,15 @@
+<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
+  xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-labelledby="opal-banner-title opal-banner-description" shape-rendering="geometricPrecision">
+  <title id="opal-banner-title">opal: Select next designs</title>
+  <desc id="opal-banner-description">Choose the next designs from measured sequence results.</desc>
+  <rect width="1200" height="180" rx="16" fill="#F1F4F6"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="48" y="89" fill="#163047" font-size="56" font-weight="500" letter-spacing="-1.1">opal</text>
+    <text x="50" y="126" fill="#526475" font-size="20">Select next designs</text>
+  </g>
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
+    <circle cx="9" cy="13" r="4" fill="#2F6EAD"/><circle cx="9" cy="31" r="4" fill="#A5B3BE"/><circle cx="9" cy="49" r="4" fill="#A5B3BE"/><circle cx="29" cy="13" r="4" fill="#A5B3BE"/><circle cx="29" cy="31" r="4" fill="#2F6EAD"/><circle cx="29" cy="49" r="4" fill="#A5B3BE"/><circle cx="49" cy="13" r="4" fill="#A5B3BE"/><circle cx="49" cy="31" r="4" fill="#A5B3BE"/><circle cx="49" cy="49" r="4" fill="#2F6EAD"/><path d="M67 31H91M85 25L91 31L85 37" stroke="#526475" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/><circle cx="113" cy="13" r="5" fill="#2F6EAD"/><circle cx="113" cy="31" r="5" fill="#2F6EAD"/><circle cx="113" cy="49" r="5" fill="#2F6EAD"/>
+  </g>
+</svg>

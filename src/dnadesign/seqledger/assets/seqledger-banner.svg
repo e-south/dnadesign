@@ -1,0 +1,15 @@
+<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
+  xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-labelledby="seqledger-banner-title seqledger-banner-description" shape-rendering="geometricPrecision">
+  <title id="seqledger-banner-title">seqledger: Manage sequence tables</title>
+  <desc id="seqledger-banner-description">Store, check, and sync tables of sequence records.</desc>
+  <rect width="1200" height="180" rx="16" fill="#F1F4F6"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="48" y="89" fill="#163047" font-size="56" font-weight="500" letter-spacing="-1.1">seqledger</text>
+    <text x="50" y="126" fill="#526475" font-size="20">Manage sequence tables</text>
+  </g>
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
+    <path d="M7 7H121V57H7ZM7 23H121M7 40H121M36 7V57" stroke="#526475" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/><rect x="45" y="12" width="44" height="6" rx="1" fill="#2F6EAD"/><rect x="45" y="29" width="63" height="6" rx="1" fill="#A5B3BE"/><rect x="45" y="46" width="53" height="6" rx="1" fill="#A5B3BE"/>
+  </g>
+</svg>

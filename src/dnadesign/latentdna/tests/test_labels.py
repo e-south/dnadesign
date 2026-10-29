@@ -1,0 +1,85 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/latentdna/tests/test_labels.py
+
+Label humanization coverage for notebook-facing text.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+import pytest
+
+from dnadesign.latentdna.src.presentation.labels import humanize_candidate, humanize_label, humanize_plot_title
+from dnadesign.latentdna.src.scalars.common import _candidate_descriptor_from_view
+
+
+def test_humanize_label_preserves_required_public_labels() -> None:
+    assert humanize_label("intermediate_embedding") == "Intermediate block mean"
+    assert humanize_label("output_layer_mean") == "Output-layer mean"
+    assert humanize_label("output_layer_mean_7b_anchor_60bp") == "Anchor-source insert output-layer mean"
+    assert humanize_label("anchor_60bp") == "Anchor-source insert"
+    assert humanize_label("merged_anchor_insert_seq_mean") == "Mixed-length anchor-source insert"
+    assert humanize_label("full_context_1kb") == "1 kb construct context"
+    assert humanize_label("sig35_variant") == "SIG35 Variant"
+    assert humanize_label("variant f") == "Variant F"
+
+
+def test_humanize_label_does_not_embed_rt_lnrna_study_labels() -> None:
+    assert humanize_label("crawford_eco1_lnrna_fixed_wt_rt") != "Crawford Eco1 lnRNA fixed WT RT"
+    assert humanize_label("khan_abundance_affiliated_rt_lnrna_reference") != "Khan RT-lnRNA abundance reference"
+    assert humanize_label("Khan RT-DNA abundance prior") != "Khan PAGE RT-DNA abundance"
+
+
+def test_humanize_plot_title_removes_public_appendix_language() -> None:
+    assert humanize_plot_title("appendix_umap_gallery") == "UMAP gallery"
+
+
+def test_humanize_candidate_preserves_anchor_mean_and_concat_labels() -> None:
+    assert (
+        humanize_candidate(
+            {
+                "candidate_model": "evo2_7b",
+                "candidate_scope": "full_context_anchor_mean",
+                "candidate_family": "intermediate_embedding",
+            }
+        )
+        == "Evo 2 7B · 1 kb context anchor mean · Intermediate block mean"
+    )
+    assert (
+        humanize_candidate(
+            {
+                "candidate_model": "evo2_7b",
+                "candidate_scope": "anchor_plus_anchor_mean_concat",
+                "candidate_family": "intermediate_embedding",
+            }
+        )
+        == "Evo 2 7B · Anchor + anchor-mean concat · Intermediate block mean"
+    )
+
+
+def test_humanize_label_keeps_distance_correlation_labels_consistent() -> None:
+    assert humanize_label("geometry_distance_correlation") == "Pairwise distance Spearman correlation"
+    assert humanize_label("pairwise distance correlation") == "Pairwise distance Spearman correlation"
+    assert humanize_label("pairwise distance spearman") == "Pairwise distance Spearman correlation"
+
+
+@pytest.mark.parametrize(
+    ("tags", "label"),
+    [
+        ({"encoder": "evo2", "model": "7b"}, "Evo 2 7B"),
+        ({"encoder": "evo2", "model": "evo2_7b"}, "Evo 2 7B"),
+        ({"model": "7b"}, "7B"),
+        ({"model": "esm2"}, "ESM2"),
+    ],
+)
+def test_candidate_label_uses_declared_encoder_without_guessing(tags, label) -> None:
+    context = SimpleNamespace(require_view=lambda view_id: SimpleNamespace(tags=tags))
+    descriptor = _candidate_descriptor_from_view(context, view_id="example")
+    assert descriptor["candidate_label"] == label
+    assert descriptor["candidate_model"] == tags["model"]

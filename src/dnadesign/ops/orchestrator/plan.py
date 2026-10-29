@@ -1,0 +1,470 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/ops/orchestrator/plan.py
+
+Deterministic preflight/smoke/submit command-plan rendering for batch workflows.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import shlex
+from dataclasses import dataclass, field
+from typing import Literal, Sequence
+
+from ..runbooks.path_policy import WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR
+from ..runbooks.schema import OrchestrationRunbookV1
+from .orchestration_notify import (
+    OrchestrationNotifySpec,
+    build_notify_setup_secret_contract,
+    build_orchestration_notify_argv,
+    build_orchestration_notify_spec,
+    resolve_notify_runtime_contract,
+)
+from .plan_tools import ToolCommandSpec, resolve_plan_tool_adapter
+from .state import (
+    ModeDecision,
+    OpsJobIdentity,
+    RuntimeVisibility,
+    build_ops_job_context,
+    build_ops_job_env,
+    default_runtime_visibility,
+    default_runtime_visibility_for_job_ids,
+    render_sge_context_value,
+    render_sge_job_name,
+    resolve_mode_decision,
+    resolve_ops_job_identity,
+)
+
+SmokeMode = Literal["dry", "live"]
+
+
+@dataclass(frozen=True)
+class CommandSpec:
+    argv: tuple[str, ...] | None = None
+    shell: str | None = None
+    env: dict[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        has_argv = bool(self.argv)
+        has_shell = bool((self.shell or "").strip())
+        if has_argv == has_shell:
+            raise ValueError("command spec requires exactly one of argv or shell")
+
+    def render_shell(self) -> str:
+        """Render a diagnostic command with environment values omitted."""
+        env_prefix = " ".join(f"{name}='<provided>'" for name in sorted(self.env))
+        if self.argv is not None:
+            command_text = " ".join(shlex.quote(part) for part in self.argv)
+        else:
+            assert self.shell is not None
+            command_text = f"bash -lc {shlex.quote(self.shell)}"
+        return f"{env_prefix} {command_text}".strip()
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "argv": list(self.argv) if self.argv is not None else None,
+            "shell": self.shell,
+            "env_names": sorted(self.env),
+            "rendered": self.render_shell(),
+        }
+
+
+def _argv_command(*parts: object, env: dict[str, str] | None = None) -> CommandSpec:
+    return CommandSpec(argv=tuple(str(part) for part in parts), env=env or {})
+
+
+def _shell_command(command_text: str, *, env: dict[str, str] | None = None) -> CommandSpec:
+    return CommandSpec(shell=command_text, env=env or {})
+
+
+def _ops_gate_command(*parts: object) -> CommandSpec:
+    command_parts = tuple(str(part) for part in parts)
+    if command_parts and command_parts[0] in {"session-counts", "submit-shape-advisor", "operator-brief"}:
+        return _argv_command("uv", "run", "ops", "runbook", "diagnostics", *command_parts)
+    return _argv_command("uv", "run", "python", "-m", "dnadesign.ops.orchestrator.gates", *command_parts)
+
+
+def _qsub_export_names(env_vars: dict[str, str]) -> str:
+    names = [str(name).strip() for name in env_vars.keys() if str(name).strip()]
+    if not names:
+        raise ValueError("qsub export list requires at least one environment variable")
+    return ",".join(names)
+
+
+def _render_tool_command(command: ToolCommandSpec) -> CommandSpec:
+    if command.kind == "ops_gate":
+        return _ops_gate_command(*command.parts)
+    return _argv_command(*command.parts, env=command.env)
+
+
+@dataclass(frozen=True)
+class BatchPlan:
+    runbook_id: str
+    workflow_id: str
+    project: str
+    workspace_root: str
+    job_identity: OpsJobIdentity
+    selected_mode: str
+    selected_smoke: SmokeMode | None
+    submit_behavior: str
+    hold_jid: str | None
+    preflight_commands: list[CommandSpec]
+    notify_smoke_commands: list[CommandSpec]
+    submit_commands: list[CommandSpec]
+    orchestration_notify: OrchestrationNotifySpec | None
+    decision_reason: str
+    runtime_visibility: RuntimeVisibility = field(default_factory=default_runtime_visibility)
+    warnings: tuple[str, ...] = ()
+    allow_unknown_active_jobs: bool = False
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "runbook_id": self.runbook_id,
+            "workflow_id": self.workflow_id,
+            "project": self.project,
+            "workspace_root": self.workspace_root,
+            "job_identity": self.job_identity.as_dict(),
+            "selected_mode": self.selected_mode,
+            "selected_smoke": self.selected_smoke,
+            "submit_behavior": self.submit_behavior,
+            "hold_jid": self.hold_jid,
+            "preflight_commands": [command.as_dict() for command in self.preflight_commands],
+            "notify_smoke_commands": [command.as_dict() for command in self.notify_smoke_commands],
+            "submit_commands": [command.as_dict() for command in self.submit_commands],
+            "orchestration_notify": (
+                self.orchestration_notify.as_dict() if self.orchestration_notify is not None else None
+            ),
+            "runtime_visibility": self.runtime_visibility.as_dict(),
+            "warnings": list(self.warnings),
+            "allow_unknown_active_jobs": self.allow_unknown_active_jobs,
+            "decision_reason": self.decision_reason,
+        }
+
+
+def _stdout_file_path(runbook: OrchestrationRunbookV1) -> str:
+    return f"{runbook.logging.stdout_dir}/$JOB_NAME.$JOB_ID.out"
+
+
+def _runtime_to_seconds(h_rt: str) -> int:
+    hours_str, minutes_str, seconds_str = h_rt.split(":", maxsplit=2)
+    return (int(hours_str) * 3600) + (int(minutes_str) * 60) + int(seconds_str)
+
+
+def _preflight_commands(
+    runbook: OrchestrationRunbookV1,
+    *,
+    mode_decision: ModeDecision,
+    planned_submits: int,
+    requires_order: bool,
+    allow_missing_qstat: bool,
+) -> list[CommandSpec]:
+    stdout_dir = str(runbook.logging.stdout_dir)
+    runtime_log_dir = str((runbook.workspace_root / WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR).resolve())
+    retention_manifest_path = str((runbook.logging.stdout_dir / "retention-manifest.json").resolve())
+    runtime_retention_manifest_path = str(
+        ((runbook.workspace_root / WORKSPACE_RUNTIME_LOGS_RELATIVE_DIR) / "retention-manifest.json").resolve()
+    )
+    stdout_file = _stdout_file_path(runbook)
+    shape_command_parts: list[str] = [
+        "submit-shape-advisor",
+        "--planned-submits",
+        str(planned_submits),
+        "--warn-over-running",
+        "3",
+    ]
+    if requires_order:
+        shape_command_parts.append("--requires-order")
+    if allow_missing_qstat:
+        shape_command_parts.append("--allow-missing-qstat")
+
+    shared = [
+        _ops_gate_command(
+            "ensure-dir-writable",
+            "--path",
+            stdout_dir,
+        ),
+        _ops_gate_command(
+            "ensure-dir-writable",
+            "--path",
+            runtime_log_dir,
+        ),
+        _ops_gate_command(
+            "prune-ops-logs",
+            "--stdout-dir",
+            stdout_dir,
+            "--log-kind",
+            "sge",
+            "--runbook-id",
+            runbook.id,
+            "--keep-last",
+            str(runbook.logging.retention.keep_last),
+            "--max-age-days",
+            str(runbook.logging.retention.max_age_days),
+            "--manifest-path",
+            retention_manifest_path,
+            "--json",
+        ),
+        _ops_gate_command(
+            "prune-ops-logs",
+            "--stdout-dir",
+            runtime_log_dir,
+            "--log-kind",
+            "runtime",
+            "--runbook-id",
+            runbook.id,
+            "--keep-last",
+            str(runbook.logging.retention.keep_last),
+            "--max-age-days",
+            str(runbook.logging.retention.max_age_days),
+            "--manifest-path",
+            runtime_retention_manifest_path,
+            "--json",
+        ),
+        _ops_gate_command("session-counts", *(("--allow-missing-qstat",) if allow_missing_qstat else ())),
+    ]
+    if runbook.notify is not None:
+        notify_template = str(runbook.notify.qsub_template)
+        shared.extend(
+            [
+                _argv_command(
+                    "qsub",
+                    "-verify",
+                    "-P",
+                    runbook.project,
+                    "-o",
+                    stdout_file,
+                    "-l",
+                    f"h_rt={runbook.resources.h_rt}",
+                    notify_template,
+                ),
+                _ops_gate_command("qa-submit-preflight", "--template", notify_template),
+            ]
+        )
+
+    tool_adapter = resolve_plan_tool_adapter(runbook)
+    tool_commands = [
+        _render_tool_command(command)
+        for command in tool_adapter.build_preflight_commands(runbook, mode_decision, stdout_file)
+    ]
+    return [
+        *shared,
+        *tool_commands,
+        _ops_gate_command(*shape_command_parts),
+        _ops_gate_command(
+            "operator-brief",
+            "--planned-submits",
+            str(planned_submits),
+            "--warn-over-running",
+            "3",
+            *(("--requires-order",) if requires_order else ()),
+            *(("--allow-missing-qstat",) if allow_missing_qstat else ()),
+        ),
+    ]
+
+
+def _notify_smoke_commands(
+    runbook: OrchestrationRunbookV1,
+    *,
+    smoke_mode: SmokeMode | None,
+) -> list[CommandSpec]:
+    if runbook.notify is None:
+        return []
+
+    tool_adapter = resolve_plan_tool_adapter(runbook)
+    config = str(tool_adapter.notify_config_path(runbook))
+    resolve_tool = tool_adapter.tool
+    notify_runtime = resolve_notify_runtime_contract(
+        runbook.notify.webhook_env,
+        profile_path=runbook.notify.profile,
+    )
+    secret_contract = build_notify_setup_secret_contract(notify_runtime.secret_ref)
+    commands = [
+        _argv_command(
+            "uv",
+            "run",
+            "notify",
+            "profile",
+            "smoke",
+            "--profile",
+            str(runbook.notify.profile),
+            "--tool",
+            resolve_tool,
+            "--config",
+            config,
+            "--cursor",
+            str(runbook.notify.cursor),
+            "--spool-dir",
+            str(runbook.notify.spool_dir),
+            "--policy",
+            runbook.notify.policy,
+            *secret_contract,
+            "--tls-ca-bundle",
+            notify_runtime.tls_ca_bundle,
+            "--only-tools",
+            runbook.notify.tool,
+            "--dry-run",
+            "--no-advance-cursor-on-dry-run",
+        ),
+    ]
+    if smoke_mode == "live":
+        commands.append(
+            _argv_command(
+                *build_orchestration_notify_argv(
+                    notify=OrchestrationNotifySpec(
+                        tool=runbook.notify.tool,
+                        provider="slack",
+                        webhook_env=runbook.notify.webhook_env,
+                        secret_ref=notify_runtime.secret_ref,
+                        run_id="notify-smoke-live",
+                        tls_ca_bundle=notify_runtime.tls_ca_bundle,
+                    ),
+                    status="started",
+                    message="notify live smoke canary",
+                )
+            )
+        )
+    return commands
+
+
+def _submit_commands(
+    runbook: OrchestrationRunbookV1,
+    *,
+    mode_decision: ModeDecision,
+    job_identity: OpsJobIdentity,
+) -> list[CommandSpec]:
+    if mode_decision.submit_behavior == "blocked":
+        return []
+
+    stdout_file = _stdout_file_path(runbook)
+    submit_commands: list[CommandSpec] = []
+    hold_fragment: list[str] = []
+    if mode_decision.submit_behavior == "hold_jid" and mode_decision.hold_jid:
+        hold_fragment = ["-hold_jid", mode_decision.hold_jid]
+    if runbook.notify is not None:
+        webhook_env_name = runbook.notify.webhook_env
+        notify_runtime = resolve_notify_runtime_contract(
+            webhook_env_name,
+            profile_path=runbook.notify.profile,
+        )
+        notify_idle_timeout_seconds = str(_runtime_to_seconds(runbook.resources.h_rt))
+        notify_submit_parts = [
+            ("NOTIFY_PROFILE", str(runbook.notify.profile)),
+            ("WEBHOOK_ENV", webhook_env_name),
+            ("NOTIFY_IDLE_TIMEOUT_SECONDS", notify_idle_timeout_seconds),
+            ("NOTIFY_ENFORCE_TERMINAL_ON_IDLE", "1"),
+            ("NOTIFY_TLS_CA_BUNDLE", notify_runtime.tls_ca_bundle),
+            ("WEBHOOK_FILE", notify_runtime.webhook_file),
+        ]
+        notify_submit_env = {name: value for name, value in notify_submit_parts} | build_ops_job_env(
+            job_identity, role="notify"
+        )
+        submit_commands.append(
+            _argv_command(
+                "qsub",
+                "-terse",
+                "-P",
+                runbook.project,
+                "-N",
+                render_sge_job_name(job_identity, role="notify"),
+                "-o",
+                stdout_file,
+                *hold_fragment,
+                "-l",
+                f"h_rt={runbook.resources.h_rt}",
+                "-ac",
+                render_sge_context_value(build_ops_job_context(job_identity, role="notify")),
+                "-v",
+                _qsub_export_names(notify_submit_env),
+                str(runbook.notify.qsub_template),
+                env=notify_submit_env,
+            )
+        )
+
+    tool_adapter = resolve_plan_tool_adapter(runbook)
+    submit_commands.extend(
+        _render_tool_command(command)
+        for command in tool_adapter.build_submit_commands(
+            runbook,
+            mode_decision,
+            job_identity,
+            stdout_file,
+            tuple(hold_fragment),
+        )
+    )
+    return submit_commands
+
+
+def build_batch_plan(
+    *,
+    runbook: OrchestrationRunbookV1,
+    requested_mode: Literal["auto", "fresh", "resume"] | None,
+    requested_smoke: SmokeMode | None,
+    active_job_ids: Sequence[str],
+    runtime_visibility: RuntimeVisibility | None = None,
+    allow_fresh_reset: bool = False,
+    allow_missing_qstat: bool = False,
+    allow_unknown_active_jobs: bool = False,
+) -> BatchPlan:
+    if runbook.notify is None and requested_smoke is not None:
+        raise ValueError("notify smoke override is not valid when runbook.notify is absent")
+    resolve_plan_tool_adapter(runbook).validate_resources(runbook)
+    selected_smoke: SmokeMode | None = requested_smoke or (runbook.notify.smoke if runbook.notify is not None else None)
+    job_identity = resolve_ops_job_identity(runbook)
+    selected_runtime_visibility = runtime_visibility or default_runtime_visibility_for_job_ids(active_job_ids)
+    mode_decision = resolve_mode_decision(
+        runbook=runbook,
+        requested_mode=requested_mode,
+        active_job_ids=active_job_ids,
+        runtime_visibility=selected_runtime_visibility,
+        allow_fresh_reset=allow_fresh_reset,
+        allow_unknown_active_jobs=allow_unknown_active_jobs,
+    )
+    submit_commands = _submit_commands(runbook, mode_decision=mode_decision, job_identity=job_identity)
+    fallback_submits = 2 if runbook.notify is not None else 1
+    planned_submits = len(submit_commands) or fallback_submits
+    requires_order = mode_decision.submit_behavior == "hold_jid"
+    orchestration_notify: OrchestrationNotifySpec | None = None
+    if runbook.notify is not None and runbook.notify.orchestration_events:
+        orchestration_notify = build_orchestration_notify_spec(
+            tool=runbook.notify.tool,
+            provider="slack",
+            webhook_env=runbook.notify.webhook_env,
+            run_id=runbook.id,
+            profile_path=runbook.notify.profile,
+        )
+    warnings: list[str] = []
+    if selected_runtime_visibility.degraded:
+        warnings.extend(selected_runtime_visibility.degraded_reasons)
+    if selected_runtime_visibility.active_job_resolution_state.value == "unknown" and not allow_unknown_active_jobs:
+        warnings.append("Active-job visibility unavailable; submit posture is blocked by default.")
+    if allow_unknown_active_jobs:
+        warnings.append("Proceeding with explicit --allow-unknown-active-jobs override.")
+    return BatchPlan(
+        runbook_id=runbook.id,
+        workflow_id=runbook.workflow_id,
+        project=runbook.project,
+        workspace_root=str(runbook.workspace_root),
+        job_identity=job_identity,
+        selected_mode=mode_decision.selected_mode,
+        selected_smoke=selected_smoke,
+        submit_behavior=mode_decision.submit_behavior,
+        hold_jid=mode_decision.hold_jid,
+        preflight_commands=_preflight_commands(
+            runbook,
+            mode_decision=mode_decision,
+            planned_submits=planned_submits,
+            requires_order=requires_order,
+            allow_missing_qstat=allow_missing_qstat,
+        ),
+        notify_smoke_commands=_notify_smoke_commands(runbook, smoke_mode=selected_smoke),
+        submit_commands=submit_commands,
+        orchestration_notify=orchestration_notify,
+        runtime_visibility=selected_runtime_visibility,
+        warnings=tuple(dict.fromkeys(warnings)),
+        allow_unknown_active_jobs=allow_unknown_active_jobs,
+        decision_reason=mode_decision.reason,
+    )

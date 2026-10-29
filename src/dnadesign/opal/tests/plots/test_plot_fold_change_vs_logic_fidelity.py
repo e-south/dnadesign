@@ -1,0 +1,183 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/plots/test_plot_fold_change_vs_logic_fidelity.py
+
+Regression tests for plot fold change vs logic fidelity OPAL plots.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+
+from dnadesign.opal.api.sfxi import SFXIScoringConfig, score_vec8, to_sfxi_reference_overlay_records
+from dnadesign.opal.src.plots import fold_change_vs_logic_fidelity as plot_mod
+from dnadesign.opal.src.plots._context import PlotContext
+
+
+class _DummyWorkspace:
+    def __init__(self, outputs_dir: Path):
+        self.outputs_dir = outputs_dir
+
+
+def test_fold_change_plot_does_not_request_setpoint_column(tmp_path, monkeypatch):
+    def _stub_load_events_with_setpoint(
+        outputs_dir, base_columns, round_selector=None, selection_view_id=None, run_id=None
+    ):
+        assert "obj__diag__setpoint" not in base_columns
+        return pd.DataFrame(
+            {
+                "as_of_round": [0],
+                "run_id": ["r0"],
+                "id": ["a"],
+                "pred__y_hat_model": [list(np.linspace(0.0, 1.0, 8))],
+                "view__is_selected": [True],
+                "view__selection_score": [0.5],
+                "obj__diag__setpoint": [[0.0, 0.0, 0.0, 1.0]],
+            }
+        )
+
+    monkeypatch.setattr(plot_mod, "load_events_with_setpoint", _stub_load_events_with_setpoint)
+
+    ctx = PlotContext(
+        campaign_dir=tmp_path,
+        workspace=_DummyWorkspace(tmp_path),
+        rounds="unspecified",
+        run_id=None,
+        selection_view_id="primary",
+        data_paths={},
+        output_dir=tmp_path / "plots",
+        filename="fold_change.png",
+        dpi=72,
+        format="png",
+        logger=logging.getLogger("opal.test.fold_change"),
+        save_data=False,
+    )
+
+    ctx.output_dir.mkdir(parents=True, exist_ok=True)
+    plot_mod.render(ctx, params={})
+
+    out = ctx.output_dir / ctx.filename
+    assert out.exists()
+
+
+def test_fold_change_plot_saves_namespaced_columns(tmp_path, monkeypatch):
+    def _stub_load_events_with_setpoint(
+        outputs_dir, base_columns, round_selector=None, selection_view_id=None, run_id=None
+    ):
+        assert "obj__effect_scaled" in base_columns
+        return pd.DataFrame(
+            {
+                "as_of_round": [0],
+                "run_id": ["r0"],
+                "id": ["a"],
+                "pred__y_hat_model": [list(np.linspace(0.0, 1.0, 8))],
+                "view__is_selected": [True],
+                "view__selection_score": [0.5],
+                "obj__effect_scaled": [0.9],
+                "obj__diag__setpoint": [[0.0, 0.0, 0.0, 1.0]],
+            }
+        )
+
+    monkeypatch.setattr(plot_mod, "load_events_with_setpoint", _stub_load_events_with_setpoint)
+
+    ctx = PlotContext(
+        campaign_dir=tmp_path,
+        workspace=_DummyWorkspace(tmp_path),
+        rounds="unspecified",
+        run_id=None,
+        selection_view_id="primary",
+        data_paths={},
+        output_dir=tmp_path / "plots",
+        filename="fold_change.png",
+        dpi=72,
+        format="png",
+        logger=logging.getLogger("opal.test.fold_change"),
+        save_data=True,
+    )
+
+    ctx.output_dir.mkdir(parents=True, exist_ok=True)
+    plot_mod.render(ctx, params={"y_axis": "effect_scaled"})
+
+    csv_path = ctx.output_dir / "fold_change.csv"
+    df = pd.read_csv(csv_path)
+    assert "obj__logic_fidelity" in df.columns
+    assert "obj__effect_scaled" in df.columns
+
+
+def test_fold_change_plot_can_overlay_validated_sfxi_reference_points(tmp_path, monkeypatch):
+    def _stub_load_events_with_setpoint(
+        outputs_dir, base_columns, round_selector=None, selection_view_id=None, run_id=None
+    ):
+        assert "obj__effect_scaled" in base_columns
+        return pd.DataFrame(
+            {
+                "as_of_round": [0],
+                "run_id": ["r0"],
+                "id": ["a"],
+                "pred__y_hat_model": [[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]],
+                "view__is_selected": [False],
+                "view__selection_score": [0.5],
+                "obj__effect_scaled": [0.8],
+                "obj__diag__setpoint": [[0.0, 0.0, 0.0, 1.0]],
+            }
+        )
+
+    monkeypatch.setattr(plot_mod, "load_events_with_setpoint", _stub_load_events_with_setpoint)
+
+    result = score_vec8(
+        np.array([[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]], dtype=float),
+        SFXIScoringConfig(setpoint_vector=(0.0, 0.0, 0.0, 1.0), scaling_min_n=1),
+    )
+    overlay_row = {
+        **to_sfxi_reference_overlay_records(
+            result,
+            setpoint_name="and",
+            collection_id="refs",
+            reference_instance_id=["ref-a"],
+        )[0],
+        "id": "ref-a",
+        "sequence": "AAA",
+    }
+    table = pa.Table.from_pylist([overlay_row])
+    records_path = tmp_path / "records.parquet"
+    pq.write_table(table, records_path)
+
+    ctx = PlotContext(
+        campaign_dir=tmp_path,
+        workspace=_DummyWorkspace(tmp_path),
+        rounds="unspecified",
+        run_id=None,
+        selection_view_id="primary",
+        data_paths={"records": records_path},
+        output_dir=tmp_path / "plots",
+        filename="fold_change.png",
+        dpi=72,
+        format="png",
+        logger=logging.getLogger("opal.test.fold_change"),
+        save_data=True,
+    )
+
+    ctx.output_dir.mkdir(parents=True, exist_ok=True)
+    plot_mod.render(
+        ctx,
+        params={
+            "y_axis": "effect_scaled",
+            "reference_overlay": True,
+            "reference_collection_id": "refs",
+        },
+    )
+
+    assert (ctx.output_dir / ctx.filename).exists()
+    tidy = pd.read_csv(ctx.output_dir / "fold_change.csv")
+    assert set(tidy["source"]) == {"predictions", "sfxi_ref"}
+    assert tidy.loc[tidy["source"] == "sfxi_ref", "obj__effect_scaled"].iloc[0] == 1.0

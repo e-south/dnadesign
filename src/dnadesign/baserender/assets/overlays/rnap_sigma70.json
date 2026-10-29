@@ -1,0 +1,21 @@
+{
+  "anchors": {
+    "downstream": {
+      "x_fraction": 0.49739,
+      "y_fraction_from_top": 0.80837
+    },
+    "upstream": {
+      "x_fraction": 0.27444,
+      "y_fraction_from_top": 0.85319
+    }
+  },
+  "asset_id": "rnap_sigma70",
+  "image": "rnap_sigma70.png",
+  "pixel_size": [
+    1400,
+    610
+  ],
+  "schema": "baserender.anchored_illustration_asset.v1",
+  "source": "phd/figures/blank copy.svg",
+  "source_svg": "rnap_sigma70.svg"
+}

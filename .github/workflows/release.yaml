@@ -1,0 +1,182 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - name: Verify release version
+        run: |
+          project_version="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          test "${GITHUB_REF_NAME}" = "v${project_version}"
+      - name: Verify release commit is on main
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "${GITHUB_SHA}" origin/main
+      - name: Verify successful main CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p build/release-evidence
+          gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yaml/runs" \
+            -f head_sha="$GITHUB_SHA" -f event=push -f per_page=100 \
+            > build/release-checks.json
+          PYTHONPATH=src python -m dnadesign.devtools.package.release \
+            --checks build/release-checks.json --revision "$GITHUB_SHA" --select-ci-only \
+            > build/release-evidence/checks.json
+      - name: Verify capability coverage
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id="$(python -c 'import json; print(json.load(open("build/release-evidence/checks.json"))["id"])')"
+          gh run download "$run_id" --name ci-capabilities --dir build/release-evidence/capabilities
+          PYTHONPATH=src python -m dnadesign.devtools.package.release \
+            --checks build/release-checks.json --revision "$GITHUB_SHA" \
+            --capabilities build/release-evidence/capabilities/ci-capabilities.json \
+            > build/release-evidence/qualification.json
+      - name: Verify lockfile
+        run: uv lock --check
+      - name: Audit all release dependency profiles
+        run: |
+          uv audit --locked --output-format json > build/release-evidence/dependency-audit.json
+      - name: Build reproducible distribution
+        run: |
+          PYTHONPATH=src python -m dnadesign.devtools.package.build \
+            --repo-root . --output "$RUNNER_TEMP/dnadesign-release"
+          mkdir -p dist
+          cp "$RUNNER_TEMP/dnadesign-release/"*.whl dist/
+          cp "$RUNNER_TEMP/dnadesign-release/"*.tar.gz dist/
+      - name: Verify immutable package-page banner
+        run: |
+          python - <<'PYBANNER'
+          import pathlib, re, tomllib, urllib.request
+          from email.parser import BytesParser
+          from zipfile import ZipFile
+          root = pathlib.Path('.')
+          project = tomllib.loads((root / 'pyproject.toml').read_text())['project']
+          [wheel] = list((root / 'dist').glob('*.whl'))
+          with ZipFile(wheel) as archive:
+              [metadata_path] = [name for name in archive.namelist() if name.endswith('.dist-info/METADATA')]
+              metadata = BytesParser().parsebytes(archive.read(metadata_path))
+          assert metadata['Version'] == project['version'], 'Wheel version differs from source'
+          url = re.findall(r'!\[[^\]]*\]\(([^)]+)\)', metadata.get_payload())[0]
+          expected = f"https://raw.githubusercontent.com/e-south/dnadesign/v{project['version']}/assets/dnadesign-banner.png"
+          assert url == expected, 'Banner must be bound to the released version'
+          with urllib.request.urlopen(url, timeout=30) as response:
+              published = response.read(10_000_001)
+          assert published == (root / 'assets/dnadesign-banner.png').read_bytes(), 'Published banner differs from source'
+          assert len(published) < 10_000_000 and published.startswith(b'\x89PNG\r\n\x1a\n')
+          PYBANNER
+      - name: Audit resolved build dependencies
+        run: |
+          uvx --from pip-audit==2.10.1 pip-audit --strict --no-deps --disable-pip --vulnerability-service osv \
+            -r "$RUNNER_TEMP/dnadesign-release/build-requirements.lock" --format json \
+            --output build/release-evidence/build-dependency-audit.json
+      - name: Smoke-test ordinary registry installation
+        run: |
+          python -m venv build/wheel-smoke
+          uv pip install --python build/wheel-smoke/bin/python dist/*.whl
+          build/wheel-smoke/bin/python -I - <<'PY'
+          import importlib.util
+          import numpy as np
+          from dnadesign.opal import score_multistate_response_behavior
+          assert importlib.util.find_spec('pandas') is None
+          score = score_multistate_response_behavior(
+              np.zeros((1, 8)), state_ids=('00', '10', '01', '11'),
+              target_mask=(0, 0, 1, 1), softmin_scale=0.3,
+          )
+          assert score.behavior_score.tolist() == [0.0]
+          PY
+          project_version="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          uv pip install --python build/wheel-smoke/bin/python "dnadesign-tools[full]==$project_version" --find-links dist
+          uv pip check --python build/wheel-smoke/bin/python
+          for command in opal construct seqledger infer notify latentdna cruncher; do
+            "build/wheel-smoke/bin/$command" --help > /dev/null
+          done
+          site_packages="$(build/wheel-smoke/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"
+          uvx --from pip-audit==2.10.1 pip-audit --strict --vulnerability-service osv \
+            --path "$site_packages" --format json \
+            --output build/release-evidence/installed-dependency-audit.json
+      - name: Verify distribution metadata
+        run: uvx --from twine==7.0.0 twine check dist/*
+      - name: Retain publication context
+        run: |
+          cp build/release-evidence/*.json "$RUNNER_TEMP/dnadesign-release/"
+          python - <<'PY'
+          import hashlib, json, os, pathlib
+          root = pathlib.Path('.')
+          sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+          record = {
+              'revision': os.environ['GITHUB_SHA'], 'tag': os.environ['GITHUB_REF_NAME'],
+              'readme_sha256': sha(root / 'README.md'),
+              'banner_sha256': sha(root / 'assets/dnadesign-banner.png'),
+              'checks_sha256': sha(root / 'build/release-evidence/checks.json'),
+              'qualification_sha256': sha(root / 'build/release-evidence/qualification.json'),
+              'dependency_audits': {p.name: sha(p) for p in (root / 'build/release-evidence').glob('*audit.json')},
+          }
+          output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'dnadesign-release'
+          (output / 'publication.json').write_text(json.dumps(record, indent=2) + '\n')
+          PY
+      - name: Upload dependency audit diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dependency-audit-diagnostics
+          path: build/release-evidence/*audit.json
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Upload release evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-evidence
+          path: ${{ runner.temp }}/dnadesign-release/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 90
+      - name: Upload distributions
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: distributions
+          path: dist/
+          if-no-files-found: error
+          retention-days: 90
+
+  publish:
+    name: Publish to PyPI
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: pypi
+      url: https://pypi.org/p/dnadesign-tools
+    permissions:
+      id-token: write
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: distributions
+          path: dist
+      - name: Publish distributions
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2

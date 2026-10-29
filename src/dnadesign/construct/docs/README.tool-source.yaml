@@ -1,0 +1,14 @@
+schema_version: 1
+catalog_order: 2
+tool: construct
+summary: Tool-owned workspace demos, sequence realization docs, and named-part placement contracts.
+keywords:
+  - parts
+  - slots
+  - templates
+  - contexts
+  - lineage
+routes:
+  - id: template-contexts
+    path: reference/template-contexts.md
+    summary: Construct-owned part placement, template realization, named-span lineage, and optional focal-span handoff.

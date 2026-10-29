@@ -1,0 +1,15 @@
+<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
+  xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-labelledby="notify-banner-title notify-banner-description" shape-rendering="geometricPrecision">
+  <title id="notify-banner-title">notify: Send run updates</title>
+  <desc id="notify-banner-description">Send notifications for local and scheduled jobs.</desc>
+  <rect width="1200" height="180" rx="16" fill="#F1F4F6"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="48" y="89" fill="#163047" font-size="56" font-weight="500" letter-spacing="-1.1">notify</text>
+    <text x="50" y="126" fill="#526475" font-size="20">Send run updates</text>
+  </g>
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
+    <path d="M7 12H99V43H30L17 54V43H7Z" stroke="#526475" stroke-width="2.5" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M20 24H71M20 33H56" stroke="#A5B3BE" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/><circle cx="108" cy="17" r="8" fill="#2F6EAD"/>
+  </g>
+</svg>

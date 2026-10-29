@@ -1,0 +1,57 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/seqledger/tests/cli/support/test_stderr_filter.py
+
+Decision logic tests for stderr filtering behavior.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+
+import pytest
+
+from dnadesign.seqledger.src.cli.support.presentation import stderr_filter
+
+
+@pytest.mark.parametrize("suffix", ["", "\n"])
+def test_filter_preserves_short_diagnostics_at_process_exit(suffix) -> None:
+    script = r"""
+import os
+from dnadesign.seqledger.src.cli.support.presentation.stderr_filter import _install_stderr_filter
+_install_stderr_filter(("arrow/util/cpu_info.cc", "sysctlbyname failed for"))
+os.write(2, b"arrow/util/cpu_info.cc: sysctlbyname failed for hw.cache\n")
+os.write(2, PAYLOAD)
+raise SystemExit(2)
+""".replace("PAYLOAD", repr(("missing dataset" + suffix).encode()))
+    result = subprocess.run([sys.executable, "-c", script], capture_output=True, timeout=20)
+    assert result.returncode == 2
+    assert result.stderr == ("missing dataset" + suffix).encode()
+
+
+@pytest.mark.parametrize(
+    ("platform", "suppress", "show", "expected"),
+    [
+        ("darwin", None, None, True),
+        ("darwin", "1", None, True),
+        ("darwin", "0", None, False),
+        ("darwin", None, "1", False),
+        ("darwin", None, "0", True),
+        ("linux", None, None, False),
+    ],
+)
+def test_should_filter_pyarrow_sysctl(platform, suppress, show, expected, monkeypatch) -> None:
+    monkeypatch.setattr(sys, "platform", platform)
+    monkeypatch.delenv("SEQLEDGER_SUPPRESS_PYARROW_SYSCTL", raising=False)
+    monkeypatch.delenv("SEQLEDGER_SHOW_PYARROW_SYSCTL", raising=False)
+    if suppress is not None:
+        monkeypatch.setenv("SEQLEDGER_SUPPRESS_PYARROW_SYSCTL", suppress)
+    if show is not None:
+        monkeypatch.setenv("SEQLEDGER_SHOW_PYARROW_SYSCTL", show)
+
+    assert stderr_filter.should_filter_pyarrow_sysctl() is expected

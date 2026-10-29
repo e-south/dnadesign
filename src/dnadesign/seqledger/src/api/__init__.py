@@ -1,0 +1,143 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/seqledger/src/api/__init__.py
+
+Public API surface for SeqLedger (library-first).
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from ..cli.support.resolution.roots import default_seqledger_root, normalize_seqledger_root
+from ..contracts import (
+    ARROW_SCHEMA,
+    ID_HASH_SPEC,
+    REQUIRED_COLUMNS,
+    SCHEMA_VERSION,
+    AddSequencesResult,
+    AlphabetError,
+    DatasetInfo,
+    DuplicateIDError,
+    EmbeddingDimensionError,
+    Fingerprint,
+    Manifest,
+    NamespaceError,
+    OverlayInfo,
+    SchemaError,
+    SequencesError,
+    ValidationError,
+    compute_id,
+    normalize_sequence,
+    validate_alphabet,
+    validate_bio_type,
+)
+from ..contracts.roots import require_explicit_seqledger_root
+from ..dataset import Dataset
+from ..events import SEQLEDGER_EVENT_VERSION
+from ..registry import (
+    DERIVED_COLUMNS,
+    DERIVED_NAMESPACE,
+    SEQ_ANNOT_NAMESPACE,
+    SEQLEDGER_LABEL_NAMESPACE,
+    ensure_registry_entries,
+    ensure_sequence_contract_namespaces,
+    parse_columns_spec,
+    register_namespace,
+)
+from ..sequence_views import (
+    SEQUENCE_VIEW_SIDECAR_RELATIVE_PATH,
+    VIEW_ID_SCHEMA_VERSION,
+    VIEW_SEMANTICS_SIDECAR_RELATIVE_PATH,
+    ContextKind,
+    Orientation,
+    PoolingOperation,
+    ProductKind,
+    SequenceViewConflictPolicy,
+    SequenceViewContractExpectation,
+    SequenceViewContractReport,
+    SequenceViewRecord,
+    SequenceViewSelector,
+    SequenceViewSemanticKey,
+    ViewSemanticsConflictPolicy,
+    ViewSemanticsRecord,
+    compute_sequence_view_id,
+    load_sequence_view_ids,
+    load_sequence_view_index,
+    load_sequence_views,
+    load_view_semantics,
+    load_view_semantics_index,
+    select_sequence_views,
+    sequence_views_path,
+    validate_sequence_view_contract,
+    view_semantics_path,
+    write_sequence_views,
+    write_view_semantics,
+)
+from ..version import __version__
+
+__all__ = [
+    "Dataset",
+    "SEQLEDGER_EVENT_VERSION",
+    "AlphabetError",
+    "DuplicateIDError",
+    "EmbeddingDimensionError",
+    "NamespaceError",
+    "SchemaError",
+    "SequencesError",
+    "ValidationError",
+    "compute_id",
+    "default_seqledger_root",
+    "normalize_sequence",
+    "normalize_seqledger_root",
+    "require_explicit_seqledger_root",
+    "validate_bio_type",
+    "validate_alphabet",
+    "ARROW_SCHEMA",
+    "REQUIRED_COLUMNS",
+    "SCHEMA_VERSION",
+    "ID_HASH_SPEC",
+    "Fingerprint",
+    "OverlayInfo",
+    "Manifest",
+    "DatasetInfo",
+    "AddSequencesResult",
+    "SEQLEDGER_LABEL_NAMESPACE",
+    "SEQ_ANNOT_NAMESPACE",
+    "DERIVED_NAMESPACE",
+    "DERIVED_COLUMNS",
+    "ProductKind",
+    "Orientation",
+    "ContextKind",
+    "PoolingOperation",
+    "SequenceViewConflictPolicy",
+    "SequenceViewContractExpectation",
+    "SequenceViewContractReport",
+    "SequenceViewSemanticKey",
+    "SequenceViewRecord",
+    "SequenceViewSelector",
+    "VIEW_ID_SCHEMA_VERSION",
+    "SEQUENCE_VIEW_SIDECAR_RELATIVE_PATH",
+    "VIEW_SEMANTICS_SIDECAR_RELATIVE_PATH",
+    "ViewSemanticsConflictPolicy",
+    "ViewSemanticsRecord",
+    "compute_sequence_view_id",
+    "sequence_views_path",
+    "view_semantics_path",
+    "load_sequence_view_index",
+    "load_sequence_views",
+    "load_sequence_view_ids",
+    "load_view_semantics",
+    "load_view_semantics_index",
+    "select_sequence_views",
+    "validate_sequence_view_contract",
+    "write_sequence_views",
+    "write_view_semantics",
+    "ensure_registry_entries",
+    "ensure_sequence_contract_namespaces",
+    "parse_columns_spec",
+    "register_namespace",
+    "__version__",
+]

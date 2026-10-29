@@ -1,0 +1,13 @@
+runbook:
+  schema_version: 1
+  name: portfolio_master_all_workspaces
+  steps:
+  - id: portfolio_run_master_all_workspaces
+    run:
+    - portfolio
+    - run
+    - --spec
+    - configs/master_all_workspaces.portfolio.yaml
+    - --prepare-ready
+    - skip
+    - --force-overwrite

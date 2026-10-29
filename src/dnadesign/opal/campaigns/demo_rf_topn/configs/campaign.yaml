@@ -1,0 +1,70 @@
+# Portable OPAL demo: random forest, scalar response, top-N selection.
+
+schema_version: opal.campaign.v3
+
+ownership:
+  owner_scope: opal_demo
+  portable: true
+
+campaign:
+  name: "Demo RF scalar top N"
+  slug: "demo_rf_topn"
+  description: "Synthetic scalar regression with deterministic top-N selection."
+  workdir: "."
+
+data:
+  location: {kind: local, path: "records.parquet"}
+  x_column_name: "X"
+  y_column_name: "Y"
+  y_expected_length: 1
+
+ingest:
+  duplicate_policy: "error"
+
+training:
+  policy:
+    cumulative_training: true
+    label_cross_round_deduplication_policy: "latest_only"
+    allow_resuggesting_candidates_until_labeled: true
+
+transforms_x: {name: identity, params: {}}
+transforms_y:
+  name: scalar_from_table_v1
+  params: {sequence_column: sequence, y_column: y}
+
+model:
+  name: random_forest
+  params:
+    n_estimators: 64
+    criterion: "squared_error"
+    bootstrap: true
+    oob_score: true
+    random_state: 7
+    n_jobs: -1
+    emit_feature_importance: true
+
+selection_views:
+  - id: primary
+    objective: {name: scalar_identity_v1, params: {}}
+    selection:
+      name: top_n
+      params:
+        top_k: 5
+        score_ref: scalar
+        tie_handling: competition_rank
+        objective_mode: maximize
+
+selection_batch:
+  deduplicate_by: id
+
+scoring:
+  score_batch_size: 128
+
+safety:
+  fail_on_mixed_biotype_or_alphabet: true
+  require_biotype_and_alphabet_on_init: true
+  conflict_policy_on_duplicate_ids: error
+  write_back_requires_columns_present: true
+  accept_x_mismatch: false
+
+plot_config: plots.yaml

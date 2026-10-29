@@ -1,0 +1,332 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/_cli_helpers.py
+
+Regression tests for CLI helpers OPAL.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+import yaml
+
+from dnadesign.opal.src import LEDGER_SCHEMA_VERSION
+from dnadesign.opal.src import __version__ as OPAL_VERSION
+from dnadesign.opal.src.storage.ledger import LedgerWriter
+from dnadesign.opal.src.storage.state import CampaignState, RoundEntry
+from dnadesign.opal.src.storage.workspace import CampaignWorkspace
+from dnadesign.opal.src.storage.writebacks import (
+    SelectionViewEmit,
+    build_run_meta_event,
+    build_run_pred_events,
+)
+
+
+def write_records(
+    path: Path,
+    *,
+    include_opal_cols: bool = False,
+    slug: str = "demo",
+) -> pd.DataFrame:
+    table_columns = {
+        "id": pa.array(["a", "b"], type=pa.string()),
+        "sequence": pa.array(["AAA", "BBB"], type=pa.string()),
+        "bio_type": pa.array(["dna", "dna"], type=pa.string()),
+        "alphabet": pa.array(["dna_4", "dna_4"], type=pa.string()),
+        "X": pa.FixedSizeListArray.from_arrays(
+            pa.array([0.1, 0.2, 0.2, 0.3], type=pa.float32()),
+            2,
+        ),
+    }
+    if include_opal_cols:
+        table_columns[f"opal__{slug}__label_hist"] = pa.array([[], []])
+        table_columns["Y"] = pa.array([None, None], type=pa.null())
+    table = pa.table(table_columns)
+    pq.write_table(table, path)
+    return pd.read_parquet(path)
+
+
+def write_records_with_x_values(
+    path: Path,
+    *,
+    values: list[list[float] | None],
+    ids: list[str] | None = None,
+    include_opal_cols: bool = True,
+    slug: str = "demo",
+) -> pd.DataFrame:
+    row_ids = ids or [chr(ord("a") + index) for index in range(len(values))]
+    table_columns = {
+        "id": pa.array(row_ids, type=pa.string()),
+        "sequence": pa.array(["AAA"] * len(row_ids), type=pa.string()),
+        "bio_type": pa.array(["dna"] * len(row_ids), type=pa.string()),
+        "alphabet": pa.array(["dna_4"] * len(row_ids), type=pa.string()),
+        "X": pa.array(values, type=pa.list_(pa.float32(), list_size=2)),
+    }
+    if include_opal_cols:
+        table_columns[f"opal__{slug}__label_hist"] = pa.array([[] for _ in row_ids])
+        table_columns["Y"] = pa.array([None for _ in row_ids], type=pa.null())
+    table = pa.table(table_columns)
+    pq.write_table(table, path)
+    return pd.DataFrame(
+        {
+            "id": row_ids,
+            "sequence": ["AAA"] * len(row_ids),
+            "bio_type": ["dna"] * len(row_ids),
+            "alphabet": ["dna_4"] * len(row_ids),
+            "X": values,
+        }
+    )
+
+
+def write_campaign_yaml(
+    path: Path,
+    *,
+    workdir: Path,
+    records_path: Path,
+    plots: Optional[List[Dict[str, Any]]] = None,
+    slug: str = "demo",
+    transforms_y_name: str = "sfxi_vec8_from_table_v1",
+    transforms_y_params: Optional[Dict[str, Any]] = None,
+    objective_name: str = "sfxi_v1",
+    objective_params: Optional[Dict[str, Any]] = None,
+    y_expected_length: int = 8,
+    model_name: str = "random_forest",
+    model_params: Optional[Dict[str, Any]] = None,
+    selection_name: str = "top_n",
+    selection_params: Optional[Dict[str, Any]] = None,
+    safety: Optional[Dict[str, Any]] = None,
+) -> None:
+    if transforms_y_params is None:
+        transforms_y_params = {}
+    if objective_params is None:
+        objective_params = {"setpoint_vector": [0, 0, 0, 1]}
+    if model_params is None:
+        model_params = {"n_estimators": 5, "random_state": 0, "oob_score": False}
+    score_channel = "sfxi" if objective_name == "sfxi_v1" else "scalar"
+    default_selection_params: Dict[str, Any] = {
+        "top_k": 1,
+        "score_ref": score_channel,
+        "objective_mode": "maximize",
+        "tie_handling": "competition_rank",
+    }
+    if selection_name == "expected_improvement":
+        default_selection_params["uncertainty_ref"] = default_selection_params["score_ref"]
+    merged_selection_params = dict(default_selection_params)
+    if selection_params is not None:
+        merged_selection_params.update(selection_params)
+    if selection_name == "expected_improvement" and "uncertainty_ref" not in merged_selection_params:
+        merged_selection_params["uncertainty_ref"] = str(merged_selection_params["score_ref"])
+    cfg: Dict[str, Any] = {
+        "schema_version": "opal.campaign.v3",
+        "ownership": {"owner_scope": "opal_demo", "portable": True},
+        "campaign": {"name": "Demo", "slug": slug, "workdir": str(workdir)},
+        "data": {
+            "location": {"kind": "local", "path": str(records_path)},
+            "x_column_name": "X",
+            "y_column_name": "Y",
+            "y_expected_length": int(y_expected_length),
+        },
+        "transforms_x": {"name": "identity", "params": {}},
+        "transforms_y": {"name": transforms_y_name, "params": transforms_y_params},
+        "model": {"name": model_name, "params": model_params},
+        "selection_views": [
+            {
+                "id": "primary",
+                "objective": {"name": objective_name, "params": objective_params},
+                "selection": {"name": selection_name, "params": merged_selection_params},
+            }
+        ],
+    }
+    if plots is not None:
+        plot_path = path.with_name("plots.yaml")
+        plot_path.write_text(yaml.safe_dump({"plots": plots}, sort_keys=False))
+        cfg["plot_config"] = plot_path.name
+    if safety is not None:
+        cfg["safety"] = safety
+    path.write_text(yaml.safe_dump(cfg, sort_keys=False))
+
+
+def write_round_log(path: Path, *, run_id: str | None = None, round_index: int | None = None) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        {"ts": "2025-01-01T00:00:00+00:00", "stage": "start"},
+        {"ts": "2025-01-01T00:00:05+00:00", "stage": "fit_start"},
+        {"ts": "2025-01-01T00:00:06+00:00", "stage": "fit"},
+        {"ts": "2025-01-01T00:00:07+00:00", "stage": "predict_batch", "rows": 2},
+        {"ts": "2025-01-01T00:00:08+00:00", "stage": "done"},
+    ]
+    for position, line in enumerate(lines):
+        line.update(
+            {
+                "schema_version": "opal.progress_event.v1",
+                "event_id": f"test-event-{position}",
+                "phase": "run",
+                "severity": "info",
+            }
+        )
+        if run_id is not None:
+            line["run_id"] = str(run_id)
+        if round_index is not None:
+            line["round"] = int(round_index)
+    path.write_text("\n".join([json.dumps(line) for line in lines]))
+
+
+def write_state(
+    workdir: Path,
+    *,
+    records_path: Path,
+    run_id: str,
+    round_index: int = 0,
+) -> None:
+    round_dir = workdir / "outputs" / "rounds" / f"round_{int(round_index)}"
+    round_dir.mkdir(parents=True, exist_ok=True)
+    round_log = round_dir / "logs" / "round.log.jsonl"
+    if not round_log.exists():
+        write_round_log(round_log, run_id=run_id, round_index=round_index)
+    st = CampaignState(
+        campaign_slug="demo",
+        campaign_name="Demo",
+        workdir=str(workdir),
+        data_location={
+            "kind": "local",
+            "path": str(records_path),
+            "records_path": str(records_path),
+        },
+        x_column_name="X",
+        y_column_name="Y",
+    )
+    st.add_round(
+        RoundEntry(
+            run_id=run_id,
+            round_index=int(round_index),
+            round_name=f"round_{int(round_index)}",
+            round_dir=str(round_dir),
+            labels_used_rounds=[int(round_index)],
+            number_of_training_examples_used_in_round=2,
+            number_of_candidates_scored_in_round=2,
+            selection_views={
+                "primary": {
+                    "objective_name": "sfxi_v1",
+                    "selection_name": "top_n",
+                    "score_ref": "primary/sfxi",
+                    "top_k_requested": 1,
+                    "top_k_effective_after_ties": 1,
+                }
+            },
+            selection_batch={"deduplicate_by": "id", "unique_count": 1, "expected_unique_count": None},
+            model={
+                "type": "random_forest",
+                "params": {},
+                "artifact_path": str(round_dir / "model" / "model.joblib"),
+            },
+            metrics={},
+            durations_sec={},
+            seeds={},
+            artifacts={"round_log_jsonl": str(round_log)},
+            writebacks={},
+            warnings=[],
+        )
+    )
+    st.save(workdir / "state.json")
+
+
+def write_ledger(
+    workdir: Path,
+    *,
+    run_id: str,
+    round_index: int = 0,
+    artifact_paths_and_hashes: Optional[Dict[str, tuple[str, str]]] = None,
+) -> None:
+    ws = CampaignWorkspace(config_path=workdir / "campaign.yaml", workdir=workdir)
+    writer = LedgerWriter(ws)
+
+    y_hat = np.array([[0.1], [0.2]])
+    y_obj = np.array([0.1, 0.2])
+    selection_view = SelectionViewEmit(
+        selection_view_id="primary",
+        objective_name="sfxi_v1",
+        selection_name="top_n",
+        score=y_obj,
+        score_ref="primary/sfxi",
+        selection_score=y_obj,
+        ranks_competition=np.array([1, 2]),
+        selected_bool=np.array([True, False]),
+        top_k=1,
+        diagnostics={"logic_fidelity": np.array([1.0, 0.5])},
+    )
+    run_pred = build_run_pred_events(
+        run_id=run_id,
+        as_of_round=int(round_index),
+        ids=["a", "b"],
+        sequences=["AAA", "BBB"],
+        y_hat_model=y_hat,
+        y_dim=1,
+        selection_views=[selection_view],
+    )
+
+    run_meta = build_run_meta_event(
+        run_id=run_id,
+        as_of_round=int(round_index),
+        model_name="random_forest",
+        model_params={},
+        y_ops=[],
+        x_transform_name="identity",
+        x_transform_params={},
+        y_ingest_transform_name="sfxi_vec8_from_table_v1",
+        y_ingest_transform_params={},
+        objective_defs=[
+            {
+                "selection_view_id": "primary",
+                "objective_name": "sfxi_v1",
+                "params": {"setpoint_vector": [0, 0, 0, 1]},
+                "score_channels": ["primary/sfxi"],
+                "uncertainty_channels": [],
+            }
+        ],
+        selection_view_defs=[
+            {
+                "selection_view_id": "primary",
+                "selection_name": "top_n",
+                "score_ref": "primary/sfxi",
+                "objective_mode": "maximize",
+                "tie_handling": "competition_rank",
+                "top_k": 1,
+            }
+        ],
+        stats_n_train=2,
+        stats_n_scored=2,
+        pred_rows_df=run_pred,
+        artifact_paths_and_hashes=artifact_paths_and_hashes or {},
+    )
+    # Ensure required schema/version fields are present (build_run_meta_event already includes them)
+    run_meta["schema__version"] = LEDGER_SCHEMA_VERSION
+    run_meta["opal__version"] = OPAL_VERSION
+
+    writer.append_run_pred(run_pred)
+    writer.append_run_meta(run_meta)
+
+
+def write_ledger_labels(workdir: Path, *, round_index: int = 0) -> None:
+    ws = CampaignWorkspace(config_path=workdir / "campaign.yaml", workdir=workdir)
+    writer = LedgerWriter(ws)
+    labels = pd.DataFrame(
+        {
+            "event": ["label"],
+            "observed_round": [int(round_index)],
+            "id": ["a"],
+            "y_obs": [[0.1]],
+            "src": ["test"],
+        }
+    )
+    writer.append_label(labels)

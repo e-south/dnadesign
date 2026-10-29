@@ -1,0 +1,45 @@
+yiu:
+  contract: split_yiu_payload_rendering_v4
+  schema_version: 1
+  name: tetr_teto2_wt_direct
+
+input:
+  kind: user_sequence
+  user_sequence:
+    sequence: TCCCTATCAGTGATAGAGA
+
+optimization:
+  junction:
+    mode: optimize
+    overhang_length: 4
+    max_payload_body_length: 12
+  mismatches:
+    count: 2
+    candidate_positions: [0, 1, 2, 3]
+    allowed_strands: [complement, payload]
+    strand_mode: per_position
+    default_strand_preference: complement
+    ligation_profile: t4
+    ligation_awareness_mode: secondary
+    ligation_selection_mode: hard_ligation_filter
+    max_worst_mismatch_class_tier: 0
+    max_middle_mismatch_count: 1
+    allow_double_middle: false
+    allow_tnna_like_overhangs: false
+    bad_pattern_heuristics: false
+  pwm:
+    mode: none
+    source:
+      kind: none
+    objective:
+      primary: maximin
+      secondary:
+        - total_loss
+        - ligation_awareness
+        - midpoint_proximity
+        - default_strand_preference
+        - lexical_stability
+
+output:
+  bundle_dir: outputs/plots/yiu__tetr_teto2_wt_direct
+  emit_render_jobs_debug: false

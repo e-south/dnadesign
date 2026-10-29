@@ -1,0 +1,15 @@
+<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
+  xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-labelledby="infer-banner-title infer-banner-description" shape-rendering="geometricPrecision">
+  <title id="infer-banner-title">infer: Add model results</title>
+  <desc id="infer-banner-description">Run sequence models and add their results to datasets.</desc>
+  <rect width="1200" height="180" rx="16" fill="#F1F4F6"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="48" y="89" fill="#163047" font-size="56" font-weight="500" letter-spacing="-1.1">infer</text>
+    <text x="50" y="126" fill="#526475" font-size="20">Add model results</text>
+  </g>
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
+    <rect x="11" y="7" width="13" height="11" rx="1" fill="#A5B3BE"/><rect x="30" y="7" width="13" height="11" rx="1" fill="#2F6EAD"/><rect x="49" y="7" width="13" height="11" rx="1" fill="#2F6EAD"/><rect x="68" y="7" width="13" height="11" rx="1" fill="#526475"/><rect x="87" y="7" width="13" height="11" rx="1" fill="#526475"/><rect x="106" y="7" width="13" height="11" rx="1" fill="#A5B3BE"/><rect x="11" y="24" width="13" height="11" rx="1" fill="#A5B3BE"/><rect x="30" y="24" width="13" height="11" rx="1" fill="#2F6EAD"/><rect x="49" y="24" width="13" height="11" rx="1" fill="#2F6EAD"/><rect x="68" y="24" width="13" height="11" rx="1" fill="#526475"/><rect x="87" y="24" width="13" height="11" rx="1" fill="#526475"/><rect x="106" y="24" width="13" height="11" rx="1" fill="#A5B3BE"/><rect x="11" y="41" width="13" height="11" rx="1" fill="#A5B3BE"/><rect x="30" y="41" width="13" height="11" rx="1" fill="#2F6EAD"/><rect x="49" y="41" width="13" height="11" rx="1" fill="#2F6EAD"/><rect x="68" y="41" width="13" height="11" rx="1" fill="#526475"/><rect x="87" y="41" width="13" height="11" rx="1" fill="#526475"/><rect x="106" y="41" width="13" height="11" rx="1" fill="#A5B3BE"/>
+  </g>
+</svg>

@@ -1,0 +1,253 @@
+<!--
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-10-28
+-->
+
+[Infer guide](../README.md) / [Reference](README.md)
+
+# Feature schema and storage
+
+Feature bundles accept either resolved context records (`context.kind`) or explicit sequence views (`sequence_view_inputs[]`). Both use the `evo2_sequence_feature_v1` schema. Context-record outputs can be attached as SeqLedger columns; sequence-view outputs use aliases and payload sidecars described below.
+
+## DNA case
+
+Infer uppercases DNA before tokenization and feature-key construction. Uppercase and lowercase are distinct Evo2 tokenizer symbols. Features computed from unnormalized inputs should be regenerated before comparison with outputs under this policy.
+
+## Row contract
+
+The semantic bundle is one resolved sequence context per row:
+
+- one `(sequence_id, context_id, model_name)` combination
+- scalar metadata beside scalar summaries and vector outputs
+- vectors stay list-valued in storage; flattening happens only at export time
+
+## Default bundle shape
+
+```yaml
+feature_bundle:
+  kind: evo2_sequence_feature_v1
+  intermediate_block: 26  # stable config default; evo2_20b resolves it to block 23
+  collect_log_likelihood: true
+  collect_output_layer_mean: true
+  collect_intermediate_embedding: true
+  context:
+    kind: anchor_only
+  pooling:
+    seq_mean: true
+    anchor_mean_for_templated: true
+```
+
+Supported context kinds:
+
+- `anchor_only`
+- `template_1kb`
+- `template_custom`
+
+Sequence-view bundles add an explicit view-selection surface:
+
+```yaml
+feature_bundle:
+  kind: evo2_sequence_feature_v1
+  collect_log_likelihood: false
+  sequence_view_inputs:
+    - dataset: analysis_windows
+      root: outputs/usr_datasets
+      view_selector:
+        product_kind: analysis_window
+      pooling:
+        operation: core60_mean
+    - dataset: flanked_sequences
+      root: outputs/usr_datasets
+      view_selector:
+        product_kind: realized_context
+        orientation: reverse_complement
+      pooling:
+        operation: anchor_mean
+        bounds_from: sequence_view
+```
+
+Sequence-view rules:
+
+- each resolved row is one explicit semantic view id, not an inferred dataset-wide view
+- `construct_insert` views map to `context_kind=anchor_only`; they are anchor inserts rather than derived analysis windows
+- `seq_mean`, `anchor_mean`, and `core60_mean` are row-level pooling operations
+  over token-position vectors, not over embedding dimensions.
+- Evo2 outputs are causal. A token vector at position `t` is
+  prefix-conditioned on the emitted sequence through `x_{<=t}` in that
+  orientation. Mean-pooling a span therefore averages progressively
+  prefix-conditioned token states; it does not make each token state
+  bidirectional or downstream-aware.
+- `anchor_mean` does not shorten the model input. Infer sends the full emitted sequence to the
+  provider, then mean-pools token features over the explicit emitted-orientation
+  `pooling_start_0:pooling_end_0` span.
+- Reverse-complement `anchor_mean` is a separate full-sequence Evo2 pass over
+  the reverse-complement emitted sequence. Concatenating forward and
+  reverse-complement anchor-mean vectors is an external two-orientation
+  summary, not a native bidirectional Evo2 hidden state.
+- reverse-complement context rows must already contain reverse-complement sequences and
+  reverse-complement-orientation pooling bounds; Infer must not apply a second `L-b, L-a`
+  transform.
+- `seq_mean`, `anchor_mean`, and `core60_mean` are distinct feature identities.
+  An exact repeated input sequence can share one Evo2 forward pass through the
+  `forward_pass_key`, but it still receives a distinct feature-vector key when
+  its pooling semantics differ.
+- view-aware bundles persist feature aliases under `_derived/infer/feature_aliases.parquet`
+- vector payloads are immutable Parquet parts in `_derived/infer/feature_vectors.parts/`,
+  selected by `feature_vectors.manifest.json` in the same directory as the aliases
+- view-aware bundles persist log-likelihood scalar aliases under
+  `_derived/infer/feature_scalar_aliases.parquet`
+- scalar payloads use `_derived/infer/feature_scalars.parts/` and
+  `_derived/infer/feature_scalars.manifest.json`
+- `infer` consumes sequence views; it does not manufacture missing
+  `analysis_window` or `realized_context` rows
+- missing required product kinds are a Construct/SeqLedger completion problem; the
+  completion planner reports them as `missing_products` before model execution
+- Before large backfills, run `infer validate sequence-view-completion --config <config.yaml> --format json` to classify vectors and scalars as
+  reusable, stale, missing, or product-missing without loading the model.
+  Use `--mode inventory` for host preflight/status loops that must stay bounded:
+  it counts expected sequence-view products plus alias/payload sidecar
+  inventory, catches stale alias-to-payload references, and avoids deriving
+  every missing feature key for very large partial datasets. Keep the default
+  exact mode for deeper batch planning when the runtime cost is acceptable.
+  Sequence-view `root` values resolve relative to the config file directory.
+  SeqLedger row-overlay payload columns are not counted as sequence-view feature
+  coverage.
+- Batch preflight can add `--max-missing-products 0 --max-stale-vectors 0 --max-stale-scalars 0` to fail before submit when required sequence products
+  are absent or existing vector/scalar sidecars are stale. Do not set
+  `--max-missing-vectors 0` or `--max-missing-scalars 0` for a lane whose
+  purpose is to generate missing features.
+
+## Payload storage and maintenance
+
+Each shard publishes its new payload parts through an atomic manifest update.
+Readers use only listed parts; files left by an interrupted commit are invisible.
+The shared `dnadesign.contracts.feature_payloads` reader supports both committed
+parts and single-file Parquet payloads. It coordinates with writers through the
+local `.sidecar.lock`; this lock is not data and can be recreated after transfer.
+Keys, values and alias schemas are unchanged by the storage layout.
+
+Readers verify each committed part's SHA-256, schema, and row count before use.
+Verification is cached within the process for unchanged files. The cache key
+includes the manifest expectations and file device, inode, size, modification
+time, and change time; changing a part or its declared digest triggers another
+verification. The first read therefore scans each part's bytes, while repeated
+reads avoid that cost. Single-file payloads have no manifest digest and require
+an external checksum when transferred.
+
+The shared readers default to `read_mode="live"`, which coordinates with writers.
+For an immutable transferred bundle, use `read_mode="snapshot"`. Snapshot reads
+verify committed parts without creating a lock or writing into the input
+directory, and reject changes detected during the read. Do not select snapshot
+mode for a store being updated or compacted. `lock=False` is reserved for callers
+already holding the live store's lock.
+
+Before appending to single-file payloads, explicitly migrate them:
+
+```bash
+infer features migrate --root /path/to/datasets --dataset demo
+```
+
+Migration verifies the copied bytes and schema before publishing a manifest and
+removing the single-file copy. Routine commits do not rewrite prior payloads.
+To combine parts and remove uncommitted orphan parts, run:
+
+```bash
+infer features compact --root /path/to/datasets --dataset demo
+```
+
+Compaction retains all committed keys by default. Add `--prune-unreferenced` only
+to remove payloads without current aliases. Neither operation runs automatically
+at job completion. Both require the dataset to be writable.
+
+## Default output ids
+
+- `log_likelihood__total`
+- `log_likelihood__mean_per_token`
+- `output_layer_mean__seq_mean`
+- `output_layer_mean__anchor_mean` for templated contexts
+- `output_layer_mean__core60_mean` for explicit 60 bp sequence-view bundles
+- `intermediate_embedding__block26_mlp_out__seq_mean` for `evo2_7b`
+- `intermediate_embedding__block26_mlp_out__anchor_mean` for templated `evo2_7b` contexts
+- `intermediate_embedding__block26_mlp_out__core60_mean` for explicit 60 bp `evo2_7b` sequence-view bundles
+- `intermediate_embedding__block23_mlp_out__seq_mean` for `evo2_20b`
+- `intermediate_embedding__block23_mlp_out__anchor_mean` for templated `evo2_20b` contexts
+- `intermediate_embedding__block23_mlp_out__core60_mean` for explicit 60 bp `evo2_20b` sequence-view bundles
+
+## Metadata out ids
+
+The v1 bundle persists these metadata out ids:
+
+- `metadata__sequence_id`
+- `metadata__anchor_id`
+- `metadata__is_wildtype`
+- `metadata__context_id`
+- `metadata__context_kind`
+- `metadata__view_id`
+- `metadata__view_name`
+- `metadata__product_kind`
+- `metadata__orientation`
+- `metadata__template_id`
+- `metadata__resolved_length`
+- `metadata__anchor_start`
+- `metadata__anchor_end`
+- `metadata__pooling_operation`
+- `metadata__pooling_start_0`
+- `metadata__pooling_end_0`
+- `metadata__model_name`
+- `metadata__provider_name`
+- `metadata__provider_version`
+- `metadata__intermediate_block`
+- `metadata__intermediate_selector`
+- `metadata__pooling_modes`
+- `metadata__forward_pass_key`
+- `metadata__runtime_fingerprint_key`
+- `metadata__sequence_case_policy`
+- `metadata__feature_vector_key`
+- `metadata__parent_sequence_id`
+- `metadata__derivation_id`
+- `metadata__feature_schema_version`
+- `metadata__construct_version`
+- `metadata__timestamp`
+- `metadata__feature_request_digest`
+
+## Selector contract
+
+Users configure:
+
+- `intermediate_block: 26` as the stable config default
+
+`infer` resolves that to:
+
+- `evo2_7b`: canonical selector `block26_mlp_out`, provider-layer path `blocks.26.mlp.l3`
+- `evo2_20b`: canonical selector `block23_mlp_out`, provider-layer path `blocks.23.mlp.l3`
+
+The canonical selector is the stable contract. Provider-layer strings are adapter internals.
+
+## Export contract for OPAL
+
+Use `dnadesign.infer.export_evo2_sequence_opal_matrix(...)` when OPAL needs a deterministic flattened matrix.
+The returned payload contains `row_ids`, a list of feature-vector rows in `x`, and their ordered `feature_names`.
+
+Export guarantees:
+
+- stable feature-group ordering
+- stable vector-dimension ordering
+- one feature name per flattened scalar dimension
+
+Example exported feature names:
+
+- `infer.evo2.evo2_7b.anchor_only.log_likelihood.total`
+- `infer.evo2.evo2_7b.anchor_only.output_layer_mean.seq_mean[0]`
+- `infer.evo2.evo2_7b.template_1kb.intermediate_embedding.block26_mlp_out.anchor_mean[17]`
+- `infer.evo2.evo2_7b.analysis_window.intermediate_embedding.block26_mlp_out.core60_mean[17]`
+- `infer.evo2.evo2_20b.template_1kb.intermediate_embedding.block23_mlp_out.anchor_mean[17]`
+
+## Fail-fast rules
+
+- `feature_bundle` and `outputs` are mutually exclusive on one extract job
+- at least one feature group must be enabled
+- `pool.dim < 1` is rejected during config parsing
+- templated contexts without required `construct__*` metadata fail before model execution
+- sequence-view bundles with missing required views, missing anchor bounds, or invalid pooling spans fail before model execution
+- unsupported model ids for this bundle fail before adapter execution
+- the v1 bundle persists pooled summaries, not tokenwise tensors

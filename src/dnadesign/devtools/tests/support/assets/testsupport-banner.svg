@@ -1,0 +1,15 @@
+<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
+  xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-labelledby="testsupport-banner-title testsupport-banner-description" shape-rendering="geometricPrecision">
+  <title id="testsupport-banner-title">testsupport: Share test fixtures</title>
+  <desc id="testsupport-banner-description">Share test-only fixtures across repository tools.</desc>
+  <rect width="1200" height="180" rx="16" fill="#F1F4F6"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="48" y="89" fill="#163047" font-size="56" font-weight="500" letter-spacing="-1.1">testsupport</text>
+    <text x="50" y="126" fill="#526475" font-size="20">Share test fixtures</text>
+  </g>
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
+    <path d="M8 7H51V57H8ZM77 7H120V57H77Z" stroke="#A5B3BE" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M18 33L27 42L42 23M87 33L96 42L111 23" stroke="#2F6EAD" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

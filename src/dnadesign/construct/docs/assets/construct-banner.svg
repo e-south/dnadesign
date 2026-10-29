@@ -1,0 +1,15 @@
+<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
+  xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-labelledby="construct-banner-title construct-banner-description" shape-rendering="geometricPrecision">
+  <title id="construct-banner-title">construct: Assemble constructs</title>
+  <desc id="construct-banner-description">Place named DNA parts into declared sequence contexts.</desc>
+  <rect width="1200" height="180" rx="16" fill="#F1F4F6"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="48" y="89" fill="#163047" font-size="56" font-weight="500" letter-spacing="-1.1">construct</text>
+    <text x="50" y="126" fill="#526475" font-size="20">Assemble constructs</text>
+  </g>
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
+    <rect x="4" y="23" width="29" height="18" rx="1" fill="#526475"/><rect x="39" y="23" width="49" height="18" rx="1" fill="#2F6EAD"/><rect x="94" y="23" width="30" height="18" rx="1" fill="#163047"/><path d="M33 32H39M88 32H94" stroke="#A5B3BE" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

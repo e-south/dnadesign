@@ -1,0 +1,431 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/opal/tests/notebooks/test_three_axis_scatter_notebook.py
+
+Test contracts for generic interactive three-axis notebook scatters.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+import pandas as pd
+import pytest
+
+
+def _contract() -> dict[str, object]:
+    return {
+        "adapter": "layered_scatter_v1",
+        "key": "layered_scatter_v1:fixture",
+        "view": {
+            "record_kind_column": "record_kind",
+            "prediction_value": "prediction",
+            "observed_value": "observed_label",
+            "selection_column": "selected",
+            "batch_column": "batch_key",
+            "label_column": "display_label",
+            "x_column": "response_family_score",
+            "y_column": "on_signal_family_score",
+            "color_column": "off_signal_suppression_family_score",
+        },
+        "runtime": {
+            "title": "Multistate response behavior · Example view",
+            "context": "Target ON: State B, State D | OFF: State A, State C",
+            "x_label": r"Response-ordering family score, $S_R$",
+            "y_label": r"Intended-ON signal family score, $S_{\mathrm{ON}}$",
+            "color_label": r"Intended-OFF suppression family score, $S_{\mathrm{OFF}}$",
+        },
+        "interactive": {
+            "adapter": "three_axis_scatter_v1",
+            "score_column": "behavior_score",
+            "score_label": r"Behavior score, $S_{\mathrm{MSRB}}$",
+            "prediction_sample_limit": 8_000,
+            "sampling_method": "sha256_id_v1",
+        },
+        "observed_batches": [{"id": "batch_0", "label": "Batch 0"}],
+        "active_selection_round": 1,
+        "selection_rounds": [1],
+        "rows": _rows(),
+    }
+
+
+def _rows() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "id": ["pool-a", "selected-b", "observed-c"],
+            "record_kind": ["prediction", "prediction", "observed_label"],
+            "selected": [False, True, False],
+            "__notebook_selection_round": [pd.NA, 1, pd.NA],
+            "batch_key": [None, None, "batch_0"],
+            "display_label": [None, "Selected B", "Observed C"],
+            "response_family_score": [0.2, 1.1, -0.4],
+            "on_signal_family_score": [0.4, 1.2, 0.5],
+            "off_signal_suppression_family_score": [-0.1, 0.9, 0.3],
+            "behavior_score": [0.1, 1.0, 0.0],
+        }
+    )
+
+
+def test_three_axis_figure_uses_exact_family_axes_and_campaign_layers() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    figure = build_notebook_three_axis_scatter_figure(_rows(), contract=_contract())
+
+    assert [trace.type for trace in figure.data] == ["scatter3d", "scatter3d", "scatter3d"]
+    assert [trace.name for trace in figure.data] == [
+        "Prediction sample (1 / 1)",
+        "Selected for Round 1 (n=1)",
+        "Observed · Batch 0 (n=1)",
+    ]
+    assert list(figure.data[0].x) == [0.2]
+    assert list(figure.data[0].y) == [0.4]
+    assert list(figure.data[0].z) == [-0.1]
+    assert figure.layout.scene.xaxis.title.text == "Response-ordering family score, <i>S</i><sub>R</sub>"
+    assert figure.layout.scene.yaxis.title.text == "Intended-ON signal family score, <i>S</i><sub>ON</sub>"
+    assert figure.layout.scene.zaxis.title.text == "Intended-OFF suppression family score, <i>S</i><sub>OFF</sub>"
+    assert figure.layout.title.text == "Multistate response behavior · Example view"
+    assert [annotation.text for annotation in figure.layout.annotations] == [
+        "Target ON: State B, State D | OFF: State A, State C"
+    ]
+    assert figure.layout.annotations[0].font.size >= 16
+    assert figure.layout.annotations[0].y == pytest.approx(1.035)
+    assert figure.layout.title.x == pytest.approx(0.5)
+    assert float(figure.layout.title.y) <= 0.96
+    assert figure.layout.paper_bgcolor == "white"
+    assert figure.layout.scene.bgcolor == "white"
+    assert figure.layout.height >= 800
+    assert figure.layout.font.size >= 15
+    assert figure.layout.title.font.size >= 23
+    assert figure.layout.legend.font.size >= 14
+    assert figure.layout.scene.xaxis.title.font.size >= 17
+    assert figure.layout.scene.yaxis.title.font.size >= 17
+    assert figure.layout.scene.zaxis.title.font.size >= 17
+    assert figure.layout.scene.xaxis.tickfont.size >= 14
+    assert figure.layout.scene.yaxis.tickfont.size >= 14
+    assert figure.layout.scene.zaxis.tickfont.size >= 14
+
+
+def test_three_axis_selected_overlay_hides_the_categorical_trace_without_dropping_the_pool() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    rows = _rows()
+    rows["__notebook_selection_round"] = pd.NA
+    rows.attrs["show_prediction_pool"] = True
+    rows.attrs["show_selected"] = False
+
+    figure = build_notebook_three_axis_scatter_figure(rows, contract=_contract())
+
+    assert [trace.name for trace in figure.data] == [
+        "Prediction sample (2 / 2)",
+        "Observed · Batch 0 (n=1)",
+    ]
+    assert list(figure.data[0].x) == [0.2, 1.1]
+
+
+def test_three_axis_selected_cohorts_are_separate_round_categories() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    rows = _rows()
+    round_zero = rows.loc[rows["id"].eq("selected-b")].copy()
+    round_zero["id"] = "selected-a"
+    round_zero["display_label"] = "Selected A"
+    round_zero["__notebook_selection_round"] = 0
+    rows = pd.concat([rows, round_zero], ignore_index=True)
+    contract = _contract()
+    contract["selection_rounds"] = [0, 1]
+
+    figure = build_notebook_three_axis_scatter_figure(rows, contract=contract)
+
+    assert [trace.name for trace in figure.data] == [
+        "Prediction sample (1 / 1)",
+        "Selected for Round 0 (n=1)",
+        "Selected for Round 1 (n=1)",
+        "Observed · Batch 0 (n=1)",
+    ]
+    assert figure.data[1].marker.symbol != figure.data[2].marker.symbol
+    assert figure.data[1].marker.color != figure.data[2].marker.color
+
+
+def test_three_axis_round_encoding_is_stable_when_an_earlier_round_is_hidden() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    rows = _rows()
+    round_zero = rows.loc[rows["id"].eq("selected-b")].copy()
+    round_zero["id"] = "selected-a"
+    round_zero["__notebook_selection_round"] = 0
+    both_rounds = pd.concat([rows, round_zero], ignore_index=True)
+    contract = _contract()
+    contract["selection_rounds"] = [0, 1]
+
+    combined = build_notebook_three_axis_scatter_figure(both_rounds, contract=contract)
+    round_one_only = build_notebook_three_axis_scatter_figure(rows, contract=contract)
+    combined_round_one = next(trace for trace in combined.data if trace.name.startswith("Selected for Round 1"))
+    visible_round_one = next(trace for trace in round_one_only.data if trace.name.startswith("Selected for Round 1"))
+
+    assert visible_round_one.marker.color == combined_round_one.marker.color
+    assert visible_round_one.marker.symbol == combined_round_one.marker.symbol
+
+
+def test_three_axis_round_encodings_remain_distinct_after_six_rounds() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    template = _rows().loc[_rows()["id"].eq("selected-b")]
+    round_zero = template.assign(id="selected-zero", __notebook_selection_round=0)
+    round_six = template.assign(id="selected-six", __notebook_selection_round=6)
+    rows = pd.concat([_rows().loc[_rows()["id"].ne("selected-b")], round_zero, round_six], ignore_index=True)
+    contract = _contract()
+    contract["selection_rounds"] = list(range(7))
+
+    figure = build_notebook_three_axis_scatter_figure(rows, contract=contract)
+    selected_traces = [trace for trace in figure.data if trace.name.startswith("Selected for Round")]
+
+    assert [trace.name for trace in selected_traces] == ["Selected for Round 0 (n=1)", "Selected for Round 6 (n=1)"]
+    assert (selected_traces[0].marker.color, selected_traces[0].marker.symbol) != (
+        selected_traces[1].marker.color,
+        selected_traces[1].marker.symbol,
+    )
+
+
+def test_three_axis_camera_orientation_is_stable_across_evidence_choices() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    round_zero = _contract()
+    round_zero["key"] = "layered_scatter_v1:round-zero"
+    round_one = _contract()
+    round_one["key"] = "layered_scatter_v1:round-one"
+
+    first = build_notebook_three_axis_scatter_figure(_rows(), contract=round_zero)
+    second = build_notebook_three_axis_scatter_figure(_rows(), contract=round_one)
+
+    assert first.layout.uirevision == second.layout.uirevision
+    assert first.layout.scene.uirevision == second.layout.scene.uirevision
+
+
+def test_three_axis_legend_keeps_a_fixed_viewport_across_scope_counts() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    round_zero = build_notebook_three_axis_scatter_figure(_rows(), contract=_contract())
+    rows = _rows()
+    later_observation = rows.loc[rows["id"].eq("observed-c")].copy()
+    later_observation["id"] = "observed-d"
+    later_observation["batch_key"] = "batch_1"
+    later_observation["display_label"] = "Observed D"
+    rows = pd.concat([rows, later_observation], ignore_index=True)
+    contract = _contract()
+    contract["observed_batches"] = [
+        {"id": "batch_0", "label": "Batch 0"},
+        {"id": "batch_1", "label": "Batch 1"},
+    ]
+    round_one = build_notebook_three_axis_scatter_figure(rows, contract=contract)
+
+    assert len(round_zero.data) == 3
+    assert len(round_one.data) == 4
+    assert round_zero.layout.margin == round_one.layout.margin
+    assert round_zero.layout.margin.autoexpand is False
+    assert round_zero.layout.legend.entrywidthmode == "fraction"
+    assert round_zero.layout.legend.entrywidth == pytest.approx(0.32)
+
+
+def test_three_axis_legend_reserves_rows_for_mature_campaigns_without_shrinking_the_scene() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    baseline = build_notebook_three_axis_scatter_figure(_rows(), contract=_contract())
+    observed_template = _rows().loc[_rows()["id"].eq("observed-c")]
+    observed = pd.concat(
+        [
+            observed_template.assign(
+                id=f"observed-{index}",
+                batch_key=f"batch_{index}",
+                display_label=f"Observed {index}",
+            )
+            for index in range(10)
+        ],
+        ignore_index=True,
+    )
+    rows = pd.concat([_rows().loc[_rows()["record_kind"].ne("observed_label")], observed], ignore_index=True)
+    contract = _contract()
+    contract["observed_batches"] = [{"id": f"batch_{index}", "label": f"Batch {index}"} for index in range(10)]
+
+    mature = build_notebook_three_axis_scatter_figure(rows, contract=contract)
+    observed_traces = [trace for trace in mature.data if trace.name.startswith("Observed ·")]
+
+    assert len(mature.data) == 12
+    assert len({(trace.marker.color, trace.marker.symbol) for trace in observed_traces}) == 10
+    assert mature.layout.margin.b > baseline.layout.margin.b
+    assert mature.layout.height > baseline.layout.height
+    assert mature.layout.height - mature.layout.margin.b == baseline.layout.height - baseline.layout.margin.b
+
+
+def test_three_axis_hover_identity_is_ledger_backed() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    figure = build_notebook_three_axis_scatter_figure(_rows(), contract=_contract())
+    customdata = list(figure.data[1].customdata[0])
+
+    assert customdata == ["selected-b", "Selected B", 1.0]
+    assert "Candidate: %{customdata[0]}" in figure.data[1].hovertemplate
+    assert "Behavior score" in figure.data[1].hovertemplate
+    assert "<i>S</i><sub>MSRB</sub>" in figure.data[1].hovertemplate
+    assert "$" not in figure.data[1].hovertemplate
+    assert r"\mathrm" not in figure.data[1].hovertemplate
+    assert figure.layout.clickmode is None
+
+
+def test_three_axis_plotly_labels_escape_html_and_preserve_supported_math_symbols() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    contract = _contract()
+    contract["runtime"]["x_label"] = r"Unsafe <axis> & score, $Q_{\mathrm{A}}$ (log₂ units)"
+
+    figure = build_notebook_three_axis_scatter_figure(_rows(), contract=contract)
+
+    assert (
+        figure.layout.scene.xaxis.title.text == "Unsafe &lt;axis&gt; &amp; score, <i>Q</i><sub>A</sub><br>(log₂ units)"
+    )
+
+
+def test_three_axis_widget_uses_marimo_plotly_happy_path() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        render_notebook_three_axis_scatter,
+    )
+
+    captured: dict[str, object] = {}
+
+    class _PlotlyWidget(SimpleNamespace):
+        def style(self, style):
+            captured["style"] = style
+            return SimpleNamespace(points=self.points, style=style)
+
+    class _Ui:
+        @staticmethod
+        def plotly(figure, **kwargs):
+            captured["figure"] = figure
+            captured["kwargs"] = kwargs
+            return _PlotlyWidget(points=[])
+
+    class _Mo:
+        ui = _Ui()
+
+        @staticmethod
+        def iframe(text, *, width, height):
+            return {"kind": "html", "text": text, "width": width, "height": height}
+
+        @staticmethod
+        def md(text):
+            return {"kind": "md", "text": text}
+
+        @staticmethod
+        def vstack(items, *, gap):
+            return {"kind": "vstack", "items": items, "gap": gap}
+
+    widget = render_notebook_three_axis_scatter(
+        _rows(),
+        contract=_contract(),
+        mo=_Mo(),
+    )
+
+    assert widget["items"][0]["kind"] == "html"
+    assert widget["items"][1].points == []
+    assert captured["style"] == {"width": "min(100%, 900px)", "margin": "0 auto"}
+    assert "MutationObserver" in widget["items"][0]["text"]
+    assert "observer.disconnect()" in widget["items"][0]["text"]
+    assert 'plot.on?.("plotly_beforeplot"' in widget["items"][0]["text"]
+    assert 'plot.style.visibility = "hidden"' in widget["items"][0]["text"]
+    assert "plotly_relayout" in widget["items"][0]["text"]
+    assert "scene.camera" in widget["items"][0]["text"]
+    assert "plot._fullLayout?.scene?.camera" in widget["items"][0]["text"]
+    restore_position = widget["items"][0]["text"].index("if (saved && activeCamera")
+    binding_position = widget["items"][0]["text"].index("if (plot.dataset.opalCameraRevision")
+    assert restore_position < binding_position
+    assert widget["items"][0]["width"] == "0"
+    assert widget["items"][0]["height"] == "0"
+    assert "deterministic SHA-256-ID sample" in widget["items"][2]["text"]
+    assert "rendering error" not in widget["items"][2]["text"]
+    assert captured["figure"].data[0].type == "scatter3d"
+    assert captured["kwargs"] == {
+        "config": {
+            "displaylogo": False,
+            "responsive": True,
+            "scrollZoom": True,
+        },
+        "label": "Interactive three-family candidate landscape",
+    }
+
+
+def test_three_axis_renderer_requires_an_explicit_adapter_contract() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        build_notebook_three_axis_scatter_figure,
+    )
+
+    contract = _contract()
+    contract["interactive"] = {}
+
+    with pytest.raises(ValueError, match="three_axis_scatter_v1"):
+        build_notebook_three_axis_scatter_figure(_rows(), contract=contract)
+
+
+def test_three_axis_sampling_retains_all_selected_and_observed_rows() -> None:
+    from dnadesign.opal.src.analysis.notebook_components.three_axis_scatter import (
+        sample_notebook_three_axis_rows,
+    )
+
+    background_template = _rows().iloc[0].to_dict()
+    background = pd.DataFrame([{**background_template, "id": f"pool-{index}"} for index in range(5)])
+    rows = pd.concat([background, _rows().iloc[1:]], ignore_index=True)
+    contract = _contract()
+    contract["interactive"]["prediction_sample_limit"] = 2
+
+    first = sample_notebook_three_axis_rows(rows, contract=contract)
+    second = sample_notebook_three_axis_rows(
+        rows.sample(frac=1.0, random_state=17),
+        contract=contract,
+    )
+
+    assert set(first.loc[first["record_kind"].eq("prediction") & first["selected"], "id"]) == {"selected-b"}
+    assert set(first.loc[first["record_kind"].eq("observed_label"), "id"]) == {"observed-c"}
+    assert set(first["id"]) == set(second["id"])
+    assert first.attrs["complete_background_count"] == 5
+    assert first.attrs["displayed_background_count"] == 2
+
+
+def test_three_axis_generated_cells_route_mode_without_baserender_companion() -> None:
+    from dnadesign.opal.src.analysis.notebook_set_template.layered_scatter_cells import (
+        render_layered_scatter_cells,
+    )
+    from dnadesign.opal.src.analysis.notebook_set_template.visual_panel_cells import (
+        render_visual_panel_cell,
+    )
+
+    text = render_layered_scatter_cells()
+    panel = render_visual_panel_cell()
+
+    assert 'scatter_figure_ui = layered_scatter_controls["figure"]' in text
+    assert '"figure": scatter_figure_ui' in text
+    assert "baserender_record_selector=baserender_record_selector" in panel
+    assert "baserender_record_row=baserender_record_row" in panel
+    assert "baserender_candidate_evidence=baserender_candidate_evidence" in panel
+    assert "render_notebook_three_axis_sequence_companion" not in panel

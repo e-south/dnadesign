@@ -1,0 +1,256 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/folding/src/assessment/execution.py
+
+Isolated prediction execution for one structure-assessment request.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import os
+import signal
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+from typing import BinaryIO
+
+import psutil
+
+from dnadesign.contracts.folding import StructureAssessmentRequestV1
+
+from ..errors import FoldingExecutionError
+from ._limits import (
+    ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES,
+    ARTIFACT_ENTRY_COUNT_LIMIT,
+    ASSESSMENT_PROCESS_TREE_MEMORY_LIMIT_BYTES,
+)
+from .projection import project_prediction_request, project_target_sequence
+from .publication import write_model_json
+
+_PREDICTION_REQUEST = "prediction-request.json"
+_TARGET_SEQUENCE = "assessment-target-sequence.json"
+_TERMINATION_DRAIN_SECONDS = 0.5
+_WORKER_STREAM_LIMIT_BYTES = 1_048_576
+_ARTIFACT_MONITOR_INTERVAL_SECONDS = 0.05
+
+try:
+    import resource
+except ImportError:  # pragma: no cover - unavailable on non-POSIX hosts
+    resource = None  # type: ignore[assignment]
+
+
+def write_target_sequence(path: Path, request: StructureAssessmentRequestV1) -> bytes:
+    """Write the exact target bytes consumed by the isolated worker."""
+    return write_model_json(path, project_target_sequence(request))
+
+
+def run_worker(
+    request_path: Path,
+    output_path: Path,
+    *,
+    artifact_root_descriptor: int,
+    timeout_seconds: float,
+) -> None:
+    """Run and, on timeout, terminate the assessment worker process group."""
+    command = [
+        sys.executable,
+        "-m",
+        "dnadesign.folding.src.assessment.worker",
+        request_path.as_posix(),
+        output_path.as_posix(),
+    ]
+    _require_worker_resource_containment()
+    with tempfile.TemporaryFile(mode="w+b") as stdout_file, tempfile.TemporaryFile(mode="w+b") as stderr_file:
+        process = subprocess.Popen(
+            command,
+            stdout=stdout_file,
+            stderr=stderr_file,
+            start_new_session=os.name == "posix",
+            preexec_fn=_limit_worker_resources,
+        )
+        try:
+            _wait_with_artifact_budget(
+                process,
+                artifact_root_descriptor=artifact_root_descriptor,
+                timeout_seconds=timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as exc:
+            _terminate_worker_group(process)
+            _bounded_post_kill_wait(process)
+            raise FoldingExecutionError(f"Structure assessment timed out after {timeout_seconds:g} seconds.") from exc
+        except BaseException:
+            _terminate_worker_group(process)
+            _bounded_post_kill_wait(process)
+            raise
+        _terminate_worker_group(process)
+        stdout = _read_worker_stream(stdout_file, label="stdout")
+        stderr = _read_worker_stream(stderr_file, label="stderr")
+        if process.returncode != 0:
+            detail = stderr.strip() or stdout.strip() or f"worker exited with status {process.returncode}"
+            raise FoldingExecutionError(f"Structure assessment worker failed: {detail}")
+
+
+def _wait_with_artifact_budget(
+    process: subprocess.Popen[bytes],
+    *,
+    artifact_root_descriptor: int,
+    timeout_seconds: float,
+) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    while process.poll() is None:
+        _enforce_artifact_budget(artifact_root_descriptor)
+        _enforce_process_tree_memory_budget(process.pid)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(process.args, timeout_seconds)
+        try:
+            process.wait(timeout=min(_ARTIFACT_MONITOR_INTERVAL_SECONDS, remaining))
+        except subprocess.TimeoutExpired:
+            continue
+    _enforce_artifact_budget(artifact_root_descriptor)
+
+
+def _enforce_process_tree_memory_budget(worker_pid: int) -> None:
+    """Fail once the worker and its one permitted backend exceed the RSS budget."""
+    try:
+        worker = psutil.Process(worker_pid)
+        processes = [worker, *worker.children(recursive=True)]
+        resident_bytes = 0
+        seen_pids: set[int] = set()
+        for process in processes:
+            if process.pid in seen_pids:
+                continue
+            seen_pids.add(process.pid)
+            try:
+                resident_bytes += process.memory_info().rss
+            except (psutil.NoSuchProcess, psutil.ZombieProcess):
+                continue
+            if resident_bytes >= ASSESSMENT_PROCESS_TREE_MEMORY_LIMIT_BYTES:
+                raise FoldingExecutionError(
+                    "Structure assessment process tree exceeded the "
+                    f"{ASSESSMENT_PROCESS_TREE_MEMORY_LIMIT_BYTES}-byte resident-memory limit."
+                )
+    except FoldingExecutionError:
+        raise
+    except psutil.NoSuchProcess:
+        return
+    except (psutil.AccessDenied, OSError) as exc:
+        raise FoldingExecutionError("Structure assessment memory budget could not be verified safely.") from exc
+
+
+def _enforce_artifact_budget(root_descriptor: int) -> None:
+    entries = 0
+    total_bytes = 0
+    pending = [os.dup(root_descriptor)]
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    try:
+        while pending:
+            directory_descriptor = pending.pop()
+            try:
+                names = os.listdir(directory_descriptor)
+                for name in names:
+                    entries += 1
+                    if entries > ARTIFACT_ENTRY_COUNT_LIMIT:
+                        raise FoldingExecutionError(
+                            f"Structure assessment artifacts exceeded the {ARTIFACT_ENTRY_COUNT_LIMIT}-entry limit."
+                        )
+                    try:
+                        metadata = os.stat(name, dir_fd=directory_descriptor, follow_symlinks=False)
+                    except FileNotFoundError:
+                        continue
+                    if stat.S_ISDIR(metadata.st_mode):
+                        try:
+                            pending.append(os.open(name, directory_flags, dir_fd=directory_descriptor))
+                        except FileNotFoundError:
+                            continue
+                    elif stat.S_ISREG(metadata.st_mode):
+                        total_bytes += metadata.st_size
+                        if total_bytes >= ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES:
+                            raise FoldingExecutionError(
+                                "Structure assessment artifacts exceeded the "
+                                f"{ARTIFACT_AGGREGATE_SIZE_LIMIT_BYTES}-byte aggregate limit."
+                            )
+            finally:
+                os.close(directory_descriptor)
+    except FoldingExecutionError:
+        raise
+    except OSError as exc:
+        raise FoldingExecutionError("Structure assessment artifact budget could not be verified safely.") from exc
+    finally:
+        for directory_descriptor in pending:
+            os.close(directory_descriptor)
+
+
+def _require_worker_resource_containment() -> None:
+    if os.name != "posix" or resource is None or not hasattr(resource, "RLIMIT_FSIZE"):
+        raise FoldingExecutionError("Kernel resource containment is unavailable for structure assessment.")
+    if sys.platform.startswith("linux") and not hasattr(resource, "RLIMIT_AS"):
+        raise FoldingExecutionError("Kernel address-space containment is unavailable for structure assessment.")
+
+
+def _limit_worker_resources() -> None:
+    if resource is None:  # pragma: no cover - guarded before process creation
+        raise RuntimeError("Structure-assessment resource containment is unavailable.")
+    resource.setrlimit(resource.RLIMIT_FSIZE, (_WORKER_STREAM_LIMIT_BYTES, _WORKER_STREAM_LIMIT_BYTES))
+    if sys.platform.startswith("linux"):
+        resource.setrlimit(
+            resource.RLIMIT_AS,
+            (ASSESSMENT_PROCESS_TREE_MEMORY_LIMIT_BYTES, ASSESSMENT_PROCESS_TREE_MEMORY_LIMIT_BYTES),
+        )
+
+
+def _read_worker_stream(stream: BinaryIO, *, label: str) -> str:
+    stream.flush()
+    stream.seek(0, os.SEEK_END)
+    size = stream.tell()
+    if size >= _WORKER_STREAM_LIMIT_BYTES:
+        raise FoldingExecutionError(
+            f"Structure assessment worker {label} exceeded the {_WORKER_STREAM_LIMIT_BYTES}-byte limit."
+        )
+    stream.seek(0)
+    return stream.read().decode("utf-8", errors="replace")
+
+
+def _terminate_worker_group(process: subprocess.Popen[bytes]) -> None:
+    if os.name == "posix":
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    elif process.poll() is None:
+        process.kill()
+
+
+def _bounded_post_kill_wait(process: subprocess.Popen[bytes]) -> None:
+    try:
+        process.communicate(timeout=_TERMINATION_DRAIN_SECONDS)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    except Exception:
+        pass
+    for pipe in (process.stdout, process.stderr):
+        if pipe is not None:
+            pipe.close()
+    try:
+        process.wait(timeout=_TERMINATION_DRAIN_SECONDS)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=_TERMINATION_DRAIN_SECONDS)
+
+
+def prepare_prediction_request(stage: Path, request: StructureAssessmentRequestV1) -> tuple[Path, bytes]:
+    """Write the target and backend request used by one worker invocation."""
+    target_content = write_target_sequence(stage / _TARGET_SEQUENCE, request)
+    prediction_dir = stage / "prediction"
+    prediction_dir.mkdir()
+    low_level_path = prediction_dir / _PREDICTION_REQUEST
+    write_model_json(low_level_path, project_prediction_request(request))
+    return low_level_path, target_content

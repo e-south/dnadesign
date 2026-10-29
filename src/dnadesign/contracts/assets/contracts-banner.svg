@@ -1,0 +1,15 @@
+<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
+  xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-labelledby="contracts-banner-title contracts-banner-description" shape-rendering="geometricPrecision">
+  <title id="contracts-banner-title">contracts: Share data formats</title>
+  <desc id="contracts-banner-description">Define versioned data formats shared between tools.</desc>
+  <rect width="1200" height="180" rx="16" fill="#F1F4F6"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="48" y="89" fill="#163047" font-size="56" font-weight="500" letter-spacing="-1.1">contracts</text>
+    <text x="50" y="126" fill="#526475" font-size="20">Share data formats</text>
+  </g>
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
+    <path d="M5 7H51V57H5ZM77 7H123V57H77Z" stroke="#526475" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M13 18H42M13 29H36M13 40H42M85 18H114M85 29H108M85 40H114" stroke="#A5B3BE" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M46 32H82" stroke="#2F6EAD" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

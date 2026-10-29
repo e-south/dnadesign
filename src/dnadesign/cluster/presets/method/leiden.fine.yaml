@@ -1,0 +1,8 @@
+# cluster/presets/method/leiden.fine.yaml
+name: "method.leiden.fine"
+kind: "method"
+params:
+  neighbors: 30
+  resolution: 0.80
+  scale: false
+  metric: "euclidean"

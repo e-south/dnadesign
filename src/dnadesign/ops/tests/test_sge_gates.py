@@ -1,0 +1,874 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/ops/tests/test_sge_gates.py
+
+Unit tests for native Ops SGE preflight gate helpers.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import textwrap
+from pathlib import Path
+
+import pytest
+
+import dnadesign.ops.orchestrator.gates as gates
+from dnadesign.ops.orchestrator.gates import (
+    SessionCounts,
+    build_operator_brief,
+    build_shape_advisor,
+    main,
+    parse_qstat_output,
+    qa_submit_template,
+)
+
+
+def _repo_root() -> Path:
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    raise RuntimeError("repo root not found")
+
+
+def _run_gate_module(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["uv", "run", "python", "-m", "dnadesign.ops.orchestrator.gates", *args],
+        cwd=_repo_root(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+
+def _run_gate_module_via_clean_python(*args: str) -> tuple[int | str | None, str, str]:
+    payload = json.dumps(list(args))
+    code = textwrap.dedent(
+        f"""
+        import contextlib
+        import io
+        import json
+        import runpy
+        import sys
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        argv = ['dnadesign.ops.orchestrator.gates', *json.loads({payload!r})]
+        old_argv = sys.argv[:]
+        sys.argv = argv
+        try:
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                try:
+                    runpy.run_module('dnadesign.ops.orchestrator.gates', run_name='__main__')
+                    returncode = 0
+                except SystemExit as exc:
+                    returncode = exc.code
+        finally:
+            sys.argv = old_argv
+        print(json.dumps({{'returncode': returncode, 'stdout': stdout.getvalue(), 'stderr': stderr.getvalue()}}))
+        """
+    )
+    completed = subprocess.run(
+        ["./.venv/bin/python", "-c", code],
+        cwd=_repo_root(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise AssertionError(f"clean gate harness failed: {completed.stderr}")
+    payload_dict = json.loads(completed.stdout)
+    return payload_dict["returncode"], payload_dict["stdout"], payload_dict["stderr"]
+
+
+def _write_densegen_config(
+    path: Path,
+    *,
+    dataset: str = "densegen_prom_eth_cip_source",
+    run_root: str = ".",
+    usr_root: str = "outputs/usr_datasets",
+    chunk_size: int = 128,
+    parquet_path: str = "outputs/tables/records.parquet",
+    parquet_chunk_size: int = 2048,
+    max_accepted_per_library: int = 2,
+    total_sequences: int = 1_000_000,
+) -> None:
+    path.write_text(
+        textwrap.dedent(
+            f"""
+            densegen:
+              run:
+                id: demo_densegen_run
+                root: {run_root}
+              output:
+                targets: [parquet, usr]
+                schema:
+                  bio_type: dna
+                  alphabet: dna_4
+                parquet:
+                  path: {parquet_path}
+                  deduplicate: true
+                  chunk_size: {parquet_chunk_size}
+                usr:
+                  root: {usr_root}
+                  dataset: {dataset}
+                  chunk_size: {chunk_size}
+              generation:
+                plan:
+                  - name: stress
+                    sequences: {total_sequences}
+              runtime:
+                round_robin: true
+                max_accepted_per_library: {max_accepted_per_library}
+            """
+        ).strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_infer_config(
+    path: Path,
+    *,
+    dataset: str = "infer/demo",
+    usr_root: str = "outputs/usr_datasets",
+) -> None:
+    path.write_text(
+        textwrap.dedent(
+            f"""
+            model:
+              id: evo2_7b
+              device: cpu
+              precision: fp32
+              alphabet: dna
+            jobs:
+              - id: infer_extract
+                operation: extract
+                ingest:
+                  source: usr
+                  root: {usr_root}
+                  dataset: {dataset}
+                  field: sequence
+                outputs:
+                  - id: ll_mean
+                    fn: evo2.log_likelihood
+                    format: float
+                io:
+                  write_back: true
+            """
+        ).strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_parse_qstat_output_counts_running_queued_and_eqw() -> None:
+    qstat_text = """
+job-ID prior name user state submit/start at queue slots ja-task-ID
+--------------------------------------------------------------------------------
+81001 0.555 a b r 03/01/2026 queueA 16
+81002 0.555 a b qw 03/01/2026 queueA 1
+81003 0.555 a b Eqw 03/01/2026 queueA 1
+"""
+    counts = parse_qstat_output(qstat_text)
+    assert counts.running_jobs == 1
+    assert counts.queued_jobs == 2
+    assert counts.eqw_jobs == 1
+
+
+def test_qa_submit_template_rejects_now_y_directive(tmp_path: Path) -> None:
+    template = tmp_path / "bad.qsub"
+    template.write_text("#!/bin/bash -l\n#$ -now y\n", encoding="utf-8")
+
+    failures = qa_submit_template(template)
+    assert failures
+    assert any("disallowed_queue_bypass_directive" in failure for failure in failures)
+
+
+def test_build_shape_advisor_prefers_hold_jid_for_ordered_pipeline() -> None:
+    advisor = build_shape_advisor(
+        counts=SessionCounts(running_jobs=0, queued_jobs=0, eqw_jobs=0),
+        planned_submits=2,
+        warn_over_running=3,
+        requires_order=True,
+    )
+    assert advisor["advisor"] == "hold_jid"
+    assert advisor["recommended_action"] == "dependency_chain"
+
+
+def test_build_operator_brief_blocks_when_eqw_jobs_present() -> None:
+    brief, exit_code = build_operator_brief(
+        counts=SessionCounts(running_jobs=0, queued_jobs=0, eqw_jobs=1),
+        planned_submits=2,
+        warn_over_running=3,
+    )
+    assert brief["submit_gate"] == "blocked"
+    assert brief["next_action"] == "triage_eqw"
+    assert exit_code == 2
+
+
+def test_build_operator_brief_uses_shape_advisor_for_ordered_pipeline() -> None:
+    brief, exit_code = build_operator_brief(
+        counts=SessionCounts(running_jobs=0, queued_jobs=0, eqw_jobs=0),
+        planned_submits=2,
+        warn_over_running=3,
+        requires_order=True,
+    )
+
+    assert brief["advisor"] == "hold_jid"
+    assert brief["submit_gate"] == "ready"
+    assert brief["requires_order"] == "yes"
+    assert exit_code == 0
+
+
+def test_qa_submit_template_accepts_valid_template(tmp_path: Path) -> None:
+    template = tmp_path / "ok.qsub"
+    template.write_text("#!/bin/bash -l\n#$ -N demo\n", encoding="utf-8")
+
+    failures = qa_submit_template(template)
+    assert failures == []
+
+
+def test_main_qa_submit_preflight_passes_for_valid_template(tmp_path: Path, capsys) -> None:
+    template = tmp_path / "ok.qsub"
+    template.write_text("#!/bin/bash -l\n#$ -N demo\n", encoding="utf-8")
+
+    exit_code = main(["qa-submit-preflight", "--template", str(template)])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "qa_preflight=pass" in captured.out
+
+
+def test_main_qa_submit_preflight_fails_for_missing_template(capsys) -> None:
+    exit_code = main(["qa-submit-preflight", "--template", "/tmp/does-not-exist.qsub"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "template_missing=" in captured.err
+
+
+def test_run_native_gate_command_surfaces_failure_text_to_stderr() -> None:
+    returncode, stdout, stderr = gates.run_native_gate_command(
+        (
+            "uv",
+            "run",
+            "python",
+            "-m",
+            "dnadesign.ops.orchestrator.gates",
+            "qa-submit-preflight",
+            "--template",
+            "/tmp/does-not-exist.qsub",
+        )
+    )
+
+    assert returncode == 2
+    assert stdout == ""
+    assert "template_missing=/tmp/does-not-exist.qsub" in stderr
+
+
+def test_gate_module_subprocess_is_warning_free_on_success() -> None:
+    fixture_path = (
+        _repo_root() / ".agents" / "skills" / "sge-hpc-ops" / "references" / "audit-fixtures" / "qstat-busy.txt"
+    )
+
+    completed = _run_gate_module("session-counts", "--qstat-file", str(fixture_path))
+
+    assert completed.returncode == 0
+    assert "queue_probe=ok" in completed.stdout
+    assert "RuntimeWarning" not in completed.stderr
+    assert completed.stderr == ""
+
+
+def test_gate_module_runpy_surfaces_fixture_errors_without_import_warning() -> None:
+    returncode, stdout, stderr = _run_gate_module_via_clean_python(
+        "session-counts",
+        "--qstat-file",
+        "/tmp/does-not-exist.qstat",
+    )
+
+    assert returncode == 2
+    assert stdout == ""
+    assert "qstat fixture file does not exist" in stderr
+    assert "RuntimeWarning" not in stderr
+
+
+def test_main_submit_shape_advisor_emits_record(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    monkeypatch.setattr(
+        gates,
+        "_load_session_counts",
+        lambda **_kwargs: SessionCounts(running_jobs=1, queued_jobs=2, eqw_jobs=0),
+    )
+    exit_code = main(["submit-shape-advisor", "--planned-submits", "2", "--warn-over-running", "3"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "advisor=array" in captured.out
+    assert "queue_policy=respect_queue" in captured.out
+
+
+def test_main_submit_shape_advisor_accepts_qstat_fixture(capsys) -> None:
+    fixture_path = (
+        _repo_root() / ".agents" / "skills" / "sge-hpc-ops" / "references" / "audit-fixtures" / "qstat-busy.txt"
+    )
+
+    exit_code = main(
+        [
+            "submit-shape-advisor",
+            "--qstat-file",
+            str(fixture_path),
+            "--planned-submits",
+            "8",
+            "--warn-over-running",
+            "3",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "advisor=array" in captured.out
+    assert "qstat_source=fixture" in captured.out
+    assert "running_jobs=4" in captured.out
+
+
+def test_main_operator_brief_returns_non_zero_for_eqw(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    monkeypatch.setattr(
+        gates,
+        "_load_session_counts",
+        lambda **_kwargs: SessionCounts(running_jobs=0, queued_jobs=0, eqw_jobs=1),
+    )
+    exit_code = main(["operator-brief", "--planned-submits", "2", "--warn-over-running", "3"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "submit_gate=blocked" in captured.out
+
+
+def test_main_operator_brief_accepts_requires_order_and_qstat_fixture(capsys) -> None:
+    fixture_path = (
+        _repo_root() / ".agents" / "skills" / "sge-hpc-ops" / "references" / "audit-fixtures" / "qstat-busy.txt"
+    )
+
+    exit_code = main(
+        [
+            "operator-brief",
+            "--qstat-file",
+            str(fixture_path),
+            "--planned-submits",
+            "8",
+            "--warn-over-running",
+            "3",
+            "--requires-order",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "submit_gate=confirmation_required" in captured.out
+    assert "advisor=hold_jid" in captured.out
+    assert "requires_order=yes" in captured.out
+    assert "qstat_source=fixture" in captured.out
+
+
+def test_main_session_counts_emits_record(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    monkeypatch.setattr(
+        gates,
+        "_load_session_counts",
+        lambda **_kwargs: SessionCounts(running_jobs=2, queued_jobs=1, eqw_jobs=0),
+    )
+    exit_code = main(["session-counts"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "running_jobs=2" in captured.out
+    assert "queued_jobs=1" in captured.out
+    assert "eqw_jobs=0" in captured.out
+
+
+def test_main_session_counts_accepts_qstat_fixture(capsys) -> None:
+    fixture_path = (
+        _repo_root() / ".agents" / "skills" / "sge-hpc-ops" / "references" / "audit-fixtures" / "qstat-busy.txt"
+    )
+
+    exit_code = main(["session-counts", "--qstat-file", str(fixture_path)])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "queue_probe=ok" in captured.out
+    assert "qstat_source=fixture" in captured.out
+    assert "running_jobs=4" in captured.out
+    assert "queued_jobs=1" in captured.out
+
+
+def test_main_session_counts_rejects_missing_qstat_fixture_even_with_allow_missing_qstat(capsys) -> None:
+    exit_code = main(
+        [
+            "session-counts",
+            "--qstat-file",
+            "/tmp/does-not-exist.qstat",
+            "--allow-missing-qstat",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "qstat fixture file does not exist" in captured.err
+
+
+def test_main_session_counts_can_degrade_explicitly_when_qstat_times_out(
+    monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    def _timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=kwargs.get("args", args[0] if args else ["qstat"]), timeout=10.0)
+
+    monkeypatch.setattr(gates.subprocess, "run", _timeout)
+
+    exit_code = main(["session-counts", "--allow-missing-qstat"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "queue_probe=degraded" in captured.out
+    assert "qstat_source=degraded" in captured.out
+    assert "timed out after 10 seconds" in captured.err
+
+
+def test_main_session_counts_can_degrade_explicitly_when_qstat_is_missing(
+    monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    monkeypatch.setattr(
+        gates,
+        "_load_session_counts",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("qstat unavailable")),
+    )
+
+    exit_code = main(["session-counts", "--allow-missing-qstat"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "queue_probe=degraded" in captured.out
+    assert "running_jobs=unknown" in captured.out
+    assert "queue probe degraded:" in captured.err
+
+
+def test_main_session_counts_reports_host_denied_when_qstat_denies_submit_host(
+    monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    monkeypatch.setattr(
+        gates,
+        "_load_session_counts",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            RuntimeError('error: denied: host "scc1.bu.edu" is neither submit nor admin host')
+        ),
+    )
+
+    exit_code = main(["session-counts", "--allow-missing-qstat"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "queue_probe=host_denied" in captured.out
+    assert "qstat_source=degraded" in captured.out
+    assert "running_jobs=unknown" in captured.out
+    assert "queue probe blocked:" in captured.err
+    assert "Current host is not submit-capable" in captured.err
+
+
+def test_main_submit_shape_advisor_blocks_when_qstat_denies_submit_host(
+    monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    monkeypatch.setattr(
+        gates,
+        "_load_session_counts",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError('denied: host "scc1.bu.edu" is no submit host')),
+    )
+
+    exit_code = main(
+        [
+            "submit-shape-advisor",
+            "--planned-submits",
+            "2",
+            "--warn-over-running",
+            "3",
+            "--allow-missing-qstat",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "advisor=blocked" in captured.out
+    assert "queue_policy=submit_host_required" in captured.out
+    assert "queue_probe=host_denied" in captured.out
+    assert "next_action=use_submit_host" in captured.out
+
+
+def test_main_operator_brief_can_degrade_explicitly_when_qstat_is_missing(
+    monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    monkeypatch.setattr(
+        gates,
+        "_load_session_counts",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("qstat unavailable")),
+    )
+
+    exit_code = main(["operator-brief", "--planned-submits", "2", "--warn-over-running", "3", "--allow-missing-qstat"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "submit_gate=degraded" in captured.out
+    assert "queue_probe=degraded" in captured.out
+    assert "next_action=queue_probe_unavailable" in captured.out
+
+
+def test_main_operator_brief_blocks_when_qstat_denies_submit_host(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+    monkeypatch.setattr(
+        gates,
+        "_load_session_counts",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            RuntimeError('error: denied: host "scc1.bu.edu" is neither submit nor admin host')
+        ),
+    )
+
+    exit_code = main(
+        [
+            "operator-brief",
+            "--planned-submits",
+            "2",
+            "--warn-over-running",
+            "3",
+            "--allow-missing-qstat",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "submit_gate=blocked" in captured.out
+    assert "advisor=blocked" in captured.out
+    assert "queue_probe=host_denied" in captured.out
+    assert "queue_policy=submit_host_required" in captured.out
+    assert "next_action=use_submit_host" in captured.out
+
+
+def test_main_ensure_dir_writable_creates_directory_and_emits_record(tmp_path: Path, capsys) -> None:
+    target = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "runtime"
+    exit_code = main(["ensure-dir-writable", "--path", str(target)])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert target.exists()
+    assert target.is_dir()
+    assert f"path={target.resolve()}" in captured.out
+
+
+def test_main_prune_ops_logs_prunes_old_files_and_writes_manifest(tmp_path: Path, capsys) -> None:
+    stdout_dir = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "sge" / "demo_densegen_run"
+    stdout_dir.mkdir(parents=True, exist_ok=True)
+    keep_file = stdout_dir / "dnadesign_densegen_cpu.100.out"
+    prune_file = stdout_dir / "dnadesign_densegen_cpu.101.out"
+    keep_file.write_text("keep\n", encoding="utf-8")
+    prune_file.write_text("prune\n", encoding="utf-8")
+    old_timestamp = 946684800  # 2000-01-01T00:00:00Z
+    os.utime(prune_file, (old_timestamp, old_timestamp))
+    manifest_path = stdout_dir / "retention-manifest.json"
+
+    exit_code = main(
+        [
+            "prune-ops-logs",
+            "--stdout-dir",
+            str(stdout_dir),
+            "--runbook-id",
+            "demo_densegen_run",
+            "--keep-last",
+            "1",
+            "--max-age-days",
+            "7",
+            "--manifest-path",
+            str(manifest_path),
+            "--json",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert keep_file.exists()
+    assert not prune_file.exists()
+    payload = json.loads(captured.out)
+    assert payload["pruned_count"] == 1
+    assert payload["manifest_path"] == str(manifest_path)
+    manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest_payload["runbook_id"] == "demo_densegen_run"
+    assert manifest_payload["pruned_count"] == 1
+
+
+def test_main_prune_ops_logs_rejects_stdout_dir_outside_runbook_scope(tmp_path: Path, capsys) -> None:
+    stdout_dir = tmp_path / "outside"
+    stdout_dir.mkdir(parents=True, exist_ok=True)
+
+    exit_code = main(
+        [
+            "prune-ops-logs",
+            "--stdout-dir",
+            str(stdout_dir),
+            "--runbook-id",
+            "demo_densegen_run",
+            "--keep-last",
+            "5",
+            "--max-age-days",
+            "30",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "must be exactly workspace/outputs/logs/ops/sge/<runbook-id>" in captured.err
+
+
+def test_main_prune_ops_logs_runtime_kind_prunes_old_files(tmp_path: Path, capsys) -> None:
+    runtime_dir = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "runtime"
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    keep_file = runtime_dir / "dnadesign_densegen_cpu.300.trace.log"
+    prune_file = runtime_dir / "dnadesign_densegen_cpu.301.trace.log"
+    keep_file.write_text("keep\n", encoding="utf-8")
+    prune_file.write_text("prune\n", encoding="utf-8")
+    old_timestamp = 946684800  # 2000-01-01T00:00:00Z
+    os.utime(prune_file, (old_timestamp, old_timestamp))
+    manifest_path = runtime_dir / "retention-manifest.json"
+
+    exit_code = main(
+        [
+            "prune-ops-logs",
+            "--stdout-dir",
+            str(runtime_dir),
+            "--log-kind",
+            "runtime",
+            "--runbook-id",
+            "demo_densegen_run",
+            "--keep-last",
+            "1",
+            "--max-age-days",
+            "7",
+            "--manifest-path",
+            str(manifest_path),
+            "--json",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert keep_file.exists()
+    assert not prune_file.exists()
+    payload = json.loads(captured.out)
+    assert payload["log_kind"] == "runtime"
+    assert payload["pruned_count"] == 1
+
+
+def test_main_prune_ops_logs_runtime_kind_rejects_invalid_scope(tmp_path: Path, capsys) -> None:
+    wrong_dir = tmp_path / "workspace" / "outputs" / "logs" / "ops" / "sge" / "demo_densegen_run"
+    wrong_dir.mkdir(parents=True, exist_ok=True)
+
+    exit_code = main(
+        [
+            "prune-ops-logs",
+            "--stdout-dir",
+            str(wrong_dir),
+            "--log-kind",
+            "runtime",
+            "--runbook-id",
+            "demo_densegen_run",
+            "--keep-last",
+            "5",
+            "--max-age-days",
+            "30",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "must be exactly workspace/outputs/logs/ops/runtime" in captured.err
+
+
+def test_main_usr_overlay_guard_rejects_unsupported_tool(tmp_path: Path, capsys) -> None:
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    config_path = workspace_root / "config.yaml"
+    _write_densegen_config(config_path)
+
+    exit_code = main(
+        [
+            "seqledger-overlay-guard",
+            "--tool",
+            "unknown_tool",
+            "--config",
+            str(config_path),
+            "--workspace-root",
+            str(workspace_root),
+            "--mode",
+            "fresh",
+            "--run-args",
+            "--fresh --no-plot",
+            "--max-projected-overlay-parts",
+            "1000",
+            "--max-existing-overlay-parts",
+            "1000",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "unsupported seqledger-overlay-guard tool" in captured.err
+
+
+def test_main_usr_overlay_guard_infer_tool_is_explicitly_skipped(tmp_path: Path, capsys) -> None:
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    config_path = workspace_root / "configs" / "infer_config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_infer_config(
+        config_path,
+        dataset="infer/demo",
+        usr_root="../outputs/usr_datasets",
+    )
+
+    exit_code = main(
+        [
+            "seqledger-overlay-guard",
+            "--tool",
+            "infer",
+            "--config",
+            str(config_path),
+            "--workspace-root",
+            str(workspace_root),
+            "--mode",
+            "fresh",
+            "--run-args",
+            "",
+            "--max-projected-overlay-parts",
+            "1000",
+            "--max-existing-overlay-parts",
+            "1000",
+            "--json",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    payload = json.loads(captured.out)
+    assert payload["guard_status"] == "skipped"
+    assert payload["tool"] == "infer"
+    assert "does not emit overlay parts" in payload["reason"]
+
+
+def test_main_usr_overlay_guard_infer_tool_rejects_ambiguous_multi_job_configs(tmp_path: Path, capsys) -> None:
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    config_path = workspace_root / "configs" / "infer_config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        textwrap.dedent(
+            f"""
+            model:
+              id: evo2_7b
+              device: cpu
+              precision: fp32
+              alphabet: dna
+            jobs:
+              - id: job_a
+                operation: extract
+                ingest:
+                  source: usr
+                  root: "{tmp_path / "usr_a"}"
+                  dataset: dataset_a
+                  field: sequence
+                outputs:
+                  - id: ll_mean
+                    fn: evo2.log_likelihood
+                    format: float
+                io:
+                  write_back: true
+              - id: job_b
+                operation: extract
+                ingest:
+                  source: usr
+                  root: "{tmp_path / "usr_b"}"
+                  dataset: dataset_b
+                  field: sequence
+                outputs:
+                  - id: ll_mean
+                    fn: evo2.log_likelihood
+                    format: float
+                io:
+                  write_back: true
+            """
+        ).strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "seqledger-overlay-guard",
+            "--tool",
+            "infer",
+            "--config",
+            str(config_path),
+            "--workspace-root",
+            str(workspace_root),
+            "--mode",
+            "fresh",
+            "--run-args=--overwrite",
+            "--max-projected-overlay-parts",
+            "1000",
+            "--max-existing-overlay-parts",
+            "1000",
+            "--json",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "multiple SeqLedger destinations" in captured.err
+
+
+def test_main_usr_records_part_guard_infer_tool_is_explicitly_skipped(tmp_path: Path, capsys) -> None:
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+    config_path = workspace_root / "config.yaml"
+    _write_infer_config(config_path, dataset="infer/demo", usr_root="outputs/usr_datasets")
+
+    exit_code = main(
+        [
+            "seqledger-records-part-guard",
+            "--tool",
+            "infer",
+            "--config",
+            str(config_path),
+            "--workspace-root",
+            str(workspace_root),
+            "--mode",
+            "fresh",
+            "--run-args",
+            "",
+            "--max-projected-records-parts",
+            "1000",
+            "--max-existing-records-parts",
+            "1000",
+            "--max-existing-records-part-age-days",
+            "14",
+            "--json",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    payload = json.loads(captured.out)
+    assert payload["guard_status"] == "skipped"
+    assert payload["tool"] == "infer"
+    assert "does not emit records part files" in payload["reason"]

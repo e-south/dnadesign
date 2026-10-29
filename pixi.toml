@@ -1,0 +1,15 @@
+[workspace]
+name = "dnadesign-tools"
+version = "0.1.0"
+channels = ["conda-forge", "bioconda"]
+platforms = ["osx-arm64", "osx-64", "linux-64"]
+
+[tasks]
+cruncher = "uv run cruncher"
+dense = "uv run dense"
+pytest = "uv run pytest -q"
+
+[dependencies]
+meme = "*"
+mafft = ">=7.526,<8"
+clustalo = ">=1.2.4,<2"

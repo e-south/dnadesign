@@ -1,0 +1,12 @@
+plot_defaults:
+  output: {format: png, dpi: 160, save_data: false}
+
+plots:
+  - name: score_vs_rank_latest
+    kind: scatter_score_vs_rank
+    params: {rank_mode: competition, alpha: 0.65, figsize_in: [8, 5]}
+    output: {save_data: true}
+
+  - name: feature_importance_latest
+    kind: feature_importance_bars
+    params: {order_policy: preserve}

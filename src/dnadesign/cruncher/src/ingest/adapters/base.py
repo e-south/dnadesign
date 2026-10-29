@@ -1,0 +1,62 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/cruncher/src/ingest/adapters/base.py
+
+Ingest helpers for base Cruncher ingest adapters.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from __future__ import annotations
+
+from typing import Iterable, Protocol, Set
+
+from dnadesign.cruncher.ingest.models import (
+    DatasetDescriptor,
+    DatasetQuery,
+    MotifDescriptor,
+    MotifQuery,
+    MotifRecord,
+    SiteInstance,
+    SiteQuery,
+)
+from dnadesign.cruncher.ingest.promoters import (
+    PromoterDescriptor,
+    PromoterExportManifest,
+    PromoterQuery,
+    PromoterRecord,
+)
+
+
+class SourceAdapter(Protocol):
+    source_id: str
+
+    def capabilities(self) -> Set[str]: ...
+
+    def list_motifs(self, query: MotifQuery) -> list[MotifDescriptor]: ...
+
+    def iter_motifs(self, query: MotifQuery, *, page_size: int = 200) -> Iterable[MotifDescriptor]: ...
+
+    def get_motif(self, motif_id: str) -> MotifRecord: ...
+
+    def list_sites(self, query: SiteQuery) -> Iterable[SiteInstance]: ...
+
+    def get_sites_for_motif(self, motif_id: str, query: SiteQuery) -> Iterable[SiteInstance]: ...
+
+    def list_datasets(self, query: DatasetQuery) -> list[DatasetDescriptor]: ...
+
+
+class PromoterSourceAdapter(Protocol):
+    source_id: str
+
+    def capabilities(self) -> Set[str]: ...
+
+    def list_promoters(self, query: PromoterQuery) -> Iterable[PromoterDescriptor]: ...
+
+    def iter_promoters(self, query: PromoterQuery) -> Iterable[PromoterRecord]: ...
+
+    def get_promoter(self, query: PromoterQuery) -> PromoterRecord: ...
+
+    def export_promoters(self, query: PromoterQuery, destination) -> PromoterExportManifest: ...

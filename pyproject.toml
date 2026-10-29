@@ -1,0 +1,409 @@
+[build-system]
+requires = ["setuptools>=84.1.0", "wheel>=0.48.0", "pyyaml>=6"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name            = "dnadesign-tools"
+version         = "0.4.0"
+description     = "DNA sequence design pipelines and bioinformatics helpers."
+authors         = [{ name = "Eric South" }]
+dynamic         = ["readme"]
+requires-python = ">=3.12,<3.13"
+
+dependencies = ["numpy"]
+
+[project.scripts]
+seqledger = "dnadesign._entrypoints:seqledger"
+seqledger-sync-audit-drill = "dnadesign._entrypoints:seqledger_sync_audit_drill"
+opal       = "dnadesign._entrypoints:opal"
+notify     = "dnadesign._entrypoints:notify"
+infer      = "dnadesign._entrypoints:infer"
+construct  = "dnadesign._entrypoints:construct"
+folding    = "dnadesign._entrypoints:folding"
+cluster    = "dnadesign._entrypoints:cluster"
+latentdna  = "dnadesign._entrypoints:latentdna"
+permuter   = "dnadesign._entrypoints:permuter"
+baserender = "dnadesign._entrypoints:baserender"
+cruncher   = "dnadesign._entrypoints:cruncher"
+junction = "dnadesign._entrypoints:junction"
+ops        = "dnadesign._entrypoints:ops"
+dnadesign-storage = "dnadesign.contracts.storage_objects.cli:main"
+
+[project.optional-dependencies]
+seqledger = [
+  "biopython>=1.87", "duckdb>=1.5.5,<2", "pandas", "pyarrow>=23.0.1",
+  "pydantic>=2.12.5,<3", "pyyaml", "rich", "typer", "psutil>=7.2.1",
+]
+infer = ["dnadesign-tools[seqledger]", "tqdm"]
+ops = ["pydantic>=2.12.5,<3", "pyyaml", "typer", "pyarrow>=23.0.1", "click>=8.3.3"]
+notify = ["typer", "click>=8.3.3", "keyring>=25.6.0", "certifi>=2026.10.19"]
+folding = ["pydantic>=2.12.5,<3", "pyyaml", "typer", "psutil>=7.2.1", "viennarna>=2.7.2"]
+construct = ["dnadesign-tools[seqledger,folding]", "vl-convert-python>=1.9.0"]
+baserender = ["pydantic>=2.12.5,<3", "pyyaml", "typer", "pyarrow>=23.0.1", "matplotlib", "pillow>=13.0.0", "psutil>=7.2.1"]
+junction = ["pydantic>=2.12.5,<3", "pyyaml", "typer", "matplotlib", "psutil>=7.2.1"]
+cluster = [
+  "dnadesign-tools[seqledger]", "scanpy==1.10.3", "igraph", "leidenalg",
+  "scikit-learn>=1.8,<2", "scipy>=1.17.0", "seaborn", "matplotlib",
+  "umap-learn>=0.5.11", "python-levenshtein", "click>=8.3.3",
+]
+latentdna = [
+  "dnadesign-tools[seqledger]", "anndata", "igraph", "leidenalg", "pynndescent",
+  "scipy>=1.17.0", "scikit-learn>=1.8,<2", "matplotlib", "umap-learn>=0.5.11",
+]
+latentdna-notebook = ["dnadesign-tools[latentdna]", "marimo>=0.23.16"]
+cruncher = [
+  "dnadesign-tools[baserender]", "biopython>=1.87", "python-levenshtein",
+  "arviz>=0.23.0", "certifi>=2026.10.19", "click>=8.3.3", "logomaker",
+  "numba", "pandas", "pysam>=0.23.3", "rich", "tqdm",
+]
+cruncher-notebook = ["dnadesign-tools[cruncher]", "marimo>=0.23.16"]
+permuter = [
+  "pandas", "pyarrow>=23.0.1", "pydantic>=2.12.5,<3", "pyyaml", "rich", "typer",
+  "matplotlib", "seaborn", "psutil>=7.2.1",
+]
+opal = [
+  "pandas",
+  "pyarrow>=23.0.1",
+  "polars>=1.36.1",
+  "scikit-learn>=1.8,<2",
+  "scipy>=1.17.0",
+  "joblib",
+  "pydantic>=2.12.5,<3",
+  "pyyaml",
+  "rich",
+  "typer",
+  "typing-extensions",
+  "matplotlib",
+  "openpyxl",
+]
+opal-notebook = [
+  "dnadesign-tools[opal]",
+  "marimo>=0.23.16",
+  "altair>=6.0.0",
+  "plotly>=6.9.0",
+  "vegafusion>=2.0.3",
+  "vl-convert-python>=1.9.0",
+  "pillow>=13.0.0",
+]
+
+# Complete runtime composes the tool profiles and adds shared optional backends.
+full = [
+  "dnadesign-tools[seqledger,infer,permuter,opal-notebook,ops,notify,folding,construct,baserender,junction,cluster,latentdna-notebook,cruncher-notebook]",
+  "anyio>=4.14.2",
+  "markdown-it-py>=4.0.0,<5",
+  "pygments>=2.20.0",
+  "xlrd",
+  "torch>=2.13,<2.14; (sys_platform == 'darwin' and platform_machine == 'arm64') or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "netcdf4>=1.7.3",
+  "fastparquet>=2025.12.0",
+  "filelock>=4.2.4,<5",
+  "zstd>=1.5.7.2,!=1.5.7.3",
+  "py3dmol==2.5.5",
+]
+
+# GPU stack (Linux x86_64 only)
+infer-evo2 = [
+  "dnadesign-tools[infer]",
+  # --- torch (GPU wheels via uv sources below)
+  "torch>=2.13,<2.14; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  # --- build helpers (required because we disable build isolation for flash-attn + TE-torch)
+  "pip>=26.1.2; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "setuptools>=84.1.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "wheel>=0.48.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "packaging; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "ninja; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "cmake>=3.18; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  # --- kernels
+  # flash-attn commonly requires building against the torch in the env; install it w/o build isolation.
+  "flash-attn>=2.8.3.post2,<3; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  # Transformer Engine: let it float within major=2.
+  # (TE is a prereq for Evo2; Evo2 requires TE>=2.0.0)
+  "transformer-engine[pytorch]>=2.0,<3; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "evo2>=0.5.3; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "onnx>=1.22.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "transformers; sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+[dependency-groups]
+# A checkout keeps the existing full tool environment; installed libraries opt in.
+tools = ["dnadesign-tools[full]"]
+test = ["pytest>=9.0.3", "pytest-cov", "hypothesis>=6.100", "filelock>=4.2.4,<5"]
+lint = ["ruff>=0.4", "pre-commit>=3.7"]
+dev = [
+  { include-group = "test" }, { include-group = "lint" },
+  "html5lib>=1.1,<2", "markdown-it-py>=4.0.0,<5", "upa-url>=1.1.0,<2",
+]
+ci-docs = [
+  { include-group = "dev" },
+  "pyyaml", "pydantic>=2.12.5,<3",
+]
+
+[tool.setuptools]
+# Runtime resources are explicit so Git checkouts and exported source build alike.
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = [
+  "dnadesign.usr",
+  "dnadesign.usr.*",
+  "dnadesign.devtools",
+  "dnadesign.devtools.*",
+  "dnadesign.*.devtools",
+  "dnadesign.*.devtools.*",
+  "dnadesign.*.tests",
+  "dnadesign.*.tests.*",
+  "dnadesign.*.prototypes",
+  "dnadesign.*.prototypes.*",
+  "dnadesign.*.archived",
+  "dnadesign.*.archived.*",
+  "dnadesign.densegen",
+  "dnadesign.densegen.*",
+  "dnadesign.archived",
+  "dnadesign.archived.*",
+  "dnadesign.prototypes",
+  "dnadesign.prototypes.*",
+  "dnadesign.studies",
+  "dnadesign.studies.*",
+  "dnadesign.seqledger.archived",
+  "dnadesign.seqledger.archived.*",
+  "dnadesign.seqledger.datasets.usr_regulondb_native_promoters",
+  "dnadesign.seqledger.datasets.usr_regulondb_native_promoters.*",
+  "dnadesign.opal.campaigns.*.notebooks",
+  "dnadesign.opal.campaigns.*.notebooks.*",
+  "dnadesign.latentdna.workspaces.*.outputs.notebooks",
+  "dnadesign.latentdna.workspaces.*.outputs.notebooks.*",
+]
+
+[tool.setuptools.package-data]
+# Reviewed runtime resources; local workspace files are not distribution inputs.
+"dnadesign.baserender" = [
+  "assets/overlays/rnap_sigma70.json",
+  "assets/overlays/rnap_sigma70.png",
+  "assets/overlays/rnap_sigma70.svg",
+  "styles/style_v1/cassette_duplex_contact_sheet.yaml",
+  "styles/style_v1/cassette_duplex_qa.yaml",
+  "styles/style_v1/cassette_hairpin_qa.yaml",
+  "styles/style_v1/presentation_default.yaml",
+  "workspaces/demo_cruncher_render/.baserender-workspace",
+  "workspaces/demo_cruncher_render/inputs/elites_showcase_records.parquet",
+  "workspaces/demo_cruncher_render/job.yaml",
+  "workspaces/demo_densegen_render/.baserender-workspace",
+  "workspaces/demo_densegen_render/inputs/input.parquet",
+  "workspaces/demo_densegen_render/job.yaml",
+]
+"dnadesign.cruncher" = [
+  "resources/cassette/catalogs/neb_nicking_v1.yaml",
+  "resources/cassette/catalogs/thermo_nicking_v1.yaml",
+  "src/ingest/certs/globalsign_rsa_ov_ssl_ca_2018.pem",
+  "workspaces/demo_monotypic_tetr/configs/config.yaml",
+  "workspaces/demo_monotypic_tetr/configs/runbook.yaml",
+  "workspaces/demo_monotypic_tetr/configs/studies/diversity_vs_score.study.yaml",
+  "workspaces/demo_monotypic_tetr/configs/studies/length_vs_score.study.yaml",
+  "workspaces/demo_monotypic_tetr/configs/yiu/tetr_monotypic_hit.yiu.yaml",
+  "workspaces/demo_monotypic_tetr/configs/yiu/tetr_teto2_wt_direct.yiu.yaml",
+  "workspaces/demo_monotypic_tetr/inputs/local_motifs/tetR.tsv",
+  "workspaces/demo_pairwise/configs/config.yaml",
+  "workspaces/demo_pairwise/configs/runbook.yaml",
+  "workspaces/demo_pairwise/configs/studies/chains_vs_seeds_score_bullish.study.yaml",
+  "workspaces/demo_pairwise/configs/studies/diversity_vs_score.study.yaml",
+  "workspaces/demo_pairwise/configs/studies/kernel_tuning_score_diversity.study.yaml",
+  "workspaces/demo_pairwise/configs/studies/length_vs_score.study.yaml",
+  "workspaces/demo_pairwise/configs/studies/mmr_diversity_kernel_calibration.study.yaml",
+  "workspaces/demo_pairwise/inputs/local_motifs/cpxR.txt",
+  "workspaces/demo_pairwise/inputs/local_motifs/lexA.txt",
+  "workspaces/demo_yiu_payload/configs/runbook.yaml",
+  "workspaces/demo_yiu_payload/configs/yiu/example_payload.advanced_pwm.example.yaml",
+  "workspaces/demo_yiu_payload/configs/yiu/example_payload.yiu.yaml",
+  "workspaces/demo_yiu_payload/motifs/example_pwm_context.yaml",
+]
+"dnadesign.cluster" = [
+  "ops/status.registry.yaml",
+  "presets/analysis/analysis.promoter_set1.yaml",
+  "presets/method/leiden.coarse.yaml",
+  "presets/method/leiden.fine.yaml",
+  "presets/plot/plot.tight.yaml",
+  "presets/umap/umap.permuter.yaml",
+  "presets/umap/umap.promoter_set1.yaml",
+  "workspaces/perm_v1/config.yaml",
+  "workspaces/promoter_clusters_v1/config.yaml",
+]
+"dnadesign.construct" = [
+  "src/seeds/anchor_template_demo.yaml",
+  "workspaces/README.md",
+  "workspaces/demo_anchor_template_local/README.md",
+  "workspaces/demo_anchor_template_local/config.slot_a.full.yaml",
+  "workspaces/demo_anchor_template_local/config.slot_a.window.yaml",
+  "workspaces/demo_anchor_template_local/config.slot_b.full.yaml",
+  "workspaces/demo_anchor_template_local/config.slot_b.window.yaml",
+  "workspaces/demo_anchor_template_local/construct.workspace.yaml",
+  "workspaces/demo_anchor_template_local/inputs/README.md",
+  "workspaces/demo_anchor_template_local/inputs/seed_manifest.yaml",
+  "workspaces/demo_anchor_template_local/runbook.md",
+  "workspaces/demo_anchor_template_local/runbook.sh",
+  "workspaces/demo_anchor_template_shared_dataset/README.md",
+  "workspaces/demo_anchor_template_shared_dataset/config.slot_a.window.yaml",
+  "workspaces/demo_anchor_template_shared_dataset/config.slot_b.window.yaml",
+  "workspaces/demo_anchor_template_shared_dataset/construct.workspace.yaml",
+  "workspaces/demo_anchor_template_shared_dataset/inputs/README.md",
+  "workspaces/demo_anchor_template_shared_dataset/inputs/seed_manifest.yaml",
+  "workspaces/demo_anchor_template_shared_dataset/runbook.md",
+  "workspaces/demo_anchor_template_shared_dataset/runbook.sh",
+]
+"dnadesign.infer" = [
+  "docs/operations/examples/pressure_test_infer_config.yaml",
+  "docs/operations/examples/workspace_local_records_config.yaml",
+  "src/presets/evo2/extract_logits_ll.yaml",
+  "workspaces/README.md",
+  "workspaces/demo_usr_pressure/config.yaml",
+  "workspaces/evo2_feature_bundle_smoke/README.md",
+  "workspaces/evo2_feature_bundle_smoke/config.yaml",
+  "workspaces/evo2_feature_bundle_smoke/inputs/anchor_only_records.jsonl",
+  "workspaces/evo2_feature_bundle_smoke/inputs/template_1kb_records.jsonl",
+]
+"dnadesign.junction" = [
+  "docs/assets/annealed-fragments.svg",
+  "docs/assets/assembly-process.svg",
+  "docs/assets/junction-detail.svg",
+  "docs/assets/purchase-price-comparison.svg",
+  "docs/assets/sequence-dissimilarity.svg",
+  "economics/data/twist-academic-2026-08-11.yaml",
+  "examples/gene-scale/jobs/annealed-fragments.yaml",
+  "examples/gene-scale/jobs/assembly-process.yaml",
+  "examples/gene-scale/jobs/junction-detail.yaml",
+  "examples/gene-scale/request.yaml",
+]
+"dnadesign.latentdna" = [
+  "ops/status.registry.yaml",
+  "workspaces/templates/minimal/README.md",
+  "workspaces/templates/minimal/config.yaml",
+]
+"dnadesign.opal" = [
+  "campaigns/_fixtures/scalar-regression/labels.csv",
+  "campaigns/_fixtures/scalar-regression/records.parquet",
+  "campaigns/demo_gp_ei/configs/campaign.yaml",
+  "campaigns/demo_gp_ei/configs/plots.yaml",
+  "campaigns/demo_gp_topn/configs/campaign.yaml",
+  "campaigns/demo_gp_topn/configs/plots.yaml",
+  "campaigns/demo_rf_topn/configs/campaign.yaml",
+  "campaigns/demo_rf_topn/configs/plots.yaml",
+  "src/ops/status.registry.yaml",
+]
+"dnadesign.permuter" = [
+  "src/resources/codon_tables/codon_ecoli.csv",
+  "workspaces/_shared/inputs/refs.csv",
+  "workspaces/cpfatb1_codon_scan/config.yaml",
+  "workspaces/hp_gc_scan/config.yaml",
+  "workspaces/hp_mismatch_scan/config.yaml",
+  "workspaces/nt_scan_demo/config.yaml",
+  "workspaces/rnaseh1_codon_scan/config.yaml",
+  "workspaces/rnaseh1_nt_scan/config.yaml",
+  "workspaces/rt_combine_from_dms/config.yaml",
+  "workspaces/rt_multisite_select/config.yaml",
+]
+"dnadesign.ops" = [
+  "catalog/builtin.json",
+  "providers/builtin/status.registry.yaml",
+  "runbooks/templates/evo2-gpu-infer.qsub",
+  "runbooks/templates/notify-watch.qsub",
+]
+"dnadesign.seqledger" = [
+  "assets/demo_material/demo_attachment_one.csv",
+  "assets/demo_material/demo_attachment_two.csv",
+  "assets/demo_material/demo_sequences.csv",
+  "assets/demo_material/demo_y_sfxi.csv",
+  "datasets/registry.yaml",
+  "ops/status.registry.yaml",
+  "remotes.example.yaml",
+]
+
+[tool.setuptools.exclude-package-data]
+"*" = [
+  "reader_spop_*.parquet",
+  "remotes.yaml",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra -q --strict-markers --import-mode=importlib"
+testpaths = ["src/dnadesign"]
+pythonpath = ["src"]
+# Do not collect tests from generated artifacts or the ignored local safety
+# copy retained during external study migration. Architecture checks still
+# reject any tracked src/dnadesign/studies package.
+norecursedirs = [
+  "*/archived/*",
+  ".venv",
+  "venv",
+  "build",
+  "dist",
+  "*.egg-info",
+  ".hypothesis",
+  ".pytest_cache",
+  "outputs",
+  "batch_results",
+  "runs",
+  "studies",
+]
+markers = [
+  "slow: sampling-heavy tests (>10 s)",
+  "fimo: tests requiring MEME/FIMO external tooling",
+  "integration: cross-component integration tests",
+]
+filterwarnings = [
+  "ignore:ArviZ is undergoing a major refactor.*:FutureWarning",
+  "ignore::FutureWarning:arviz.*",
+  "ignore:builtin type SwigPyPacked has no __module__ attribute:DeprecationWarning",
+  "ignore:builtin type SwigPyObject has no __module__ attribute:DeprecationWarning",
+  "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["dnadesign"]
+
+[tool.uv]
+required-version = ">=0.12.3,<0.13"
+default-groups = ["tools"]
+environments = [
+  "sys_platform == 'darwin'",
+  "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+constraint-dependencies = [
+  "filelock>=4.2.4",
+  "setuptools>=84.1.0",
+  "virtualenv>=21.14.9",
+  "cryptography>=50.0.0",
+  "click>=8.3.3",
+  "idna>=3.15",
+  "onnx>=1.22.0",
+  "pillow>=13.0.0",
+  "pymdown-extensions>=11.0.1",
+  "starlette>=1.3.1",
+]
+
+# flash-attn + TE-torch must build against the same torch as the runtime env
+# uv supports this directly and will do a two-phase install so deps (torch, pip, etc.) land first
+no-build-isolation-package = ["flash-attn", "transformer-engine-torch"]
+
+# Help uv resolve flash-attn without trying to build it during the resolution step.
+[[tool.uv.dependency-metadata]]
+name = "flash-attn"
+requires-dist = ["torch", "einops"]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+# When infer-evo2 is enabled, use CUDA 13.0 wheels for the Torch family.
+torch = [
+  { index = "pytorch-cu130", extra = "infer-evo2", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
+]

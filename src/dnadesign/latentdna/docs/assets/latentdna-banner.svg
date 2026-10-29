@@ -1,0 +1,15 @@
+<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
+  xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-labelledby="latentdna-banner-title latentdna-banner-description" shape-rendering="geometricPrecision">
+  <title id="latentdna-banner-title">latentdna: Compare sequence data</title>
+  <desc id="latentdna-banner-description">Compare numerical sequence features and save review-ready results.</desc>
+  <rect width="1200" height="180" rx="16" fill="#F1F4F6"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="48" y="89" fill="#163047" font-size="56" font-weight="500" letter-spacing="-1.1">latentdna</text>
+    <text x="50" y="126" fill="#526475" font-size="20">Compare sequence data</text>
+  </g>
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
+    <path d="M9 5V57H122" stroke="#A5B3BE" stroke-width="1.5" fill="none" stroke-linejoin="round" stroke-linecap="round"/><circle cx="24" cy="39" r="3" fill="#2F6EAD"/><circle cx="37" cy="31" r="3" fill="#526475"/><circle cx="44" cy="45" r="3" fill="#526475"/><circle cx="59" cy="27" r="3" fill="#2F6EAD"/><circle cx="68" cy="38" r="3" fill="#526475"/><circle cx="74" cy="18" r="3" fill="#526475"/><circle cx="89" cy="29" r="3" fill="#2F6EAD"/><circle cx="105" cy="14" r="3" fill="#526475"/><circle cx="112" cy="23" r="3" fill="#526475"/>
+  </g>
+</svg>

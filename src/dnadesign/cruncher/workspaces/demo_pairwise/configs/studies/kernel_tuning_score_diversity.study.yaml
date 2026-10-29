@@ -1,0 +1,115 @@
+study:
+  schema_version: 3
+  name: kernel_tuning_score_diversity
+  base_config: config.yaml
+  target:
+    kind: regulator_set
+    set_index: 1
+  execution:
+    parallelism: 6
+    on_trial_error: continue
+    exit_code_policy: nonzero_if_any_error
+    summarize_after_run: true
+  artifacts:
+    trial_output_profile: minimal
+  replicates:
+    seed_path: sample.seed
+    seeds:
+    - 31
+    - 32
+    - 33
+  trials:
+  - id: BASE
+    factors: {}
+  - id: COLD_TAIL_24
+    factors:
+      sample.moves.overrides.proposal_adapt.freeze_after_beta: 5.0
+      sample.moves.overrides.gibbs_inertia.p_stay_end: 0.9
+      sample.optimizer.cooling.stages:
+      - sweeps: 35000
+        beta: 0.2
+      - sweeps: 90000
+        beta: 1.2
+      - sweeps: 138000
+        beta: 6.0
+      - sweeps: 146000
+        beta: 12.0
+      - sweeps: 150000
+        beta: 24.0
+  - id: COLD_TAIL_26
+    factors:
+      sample.moves.overrides.proposal_adapt.freeze_after_beta: 5.0
+      sample.moves.overrides.gibbs_inertia.p_stay_end: 0.9
+      sample.optimizer.cooling.stages:
+      - sweeps: 35000
+        beta: 0.2
+      - sweeps: 90000
+        beta: 1.2
+      - sweeps: 138000
+        beta: 6.0
+      - sweeps: 146000
+        beta: 12.0
+      - sweeps: 150000
+        beta: 26.0
+  - id: EXPLOIT_S_58
+    factors:
+      sample.moves.overrides.proposal_adapt.freeze_after_beta: 5.0
+      sample.moves.overrides.gibbs_inertia.p_stay_end: 0.9
+      sample.moves.overrides.move_schedule.end:
+        S: 0.58
+        B: 0.2
+        M: 0.12
+        L: 0.0
+        W: 0.0
+        I: 0.1
+      sample.optimizer.cooling.stages:
+      - sweeps: 35000
+        beta: 0.2
+      - sweeps: 90000
+        beta: 1.2
+      - sweeps: 138000
+        beta: 6.0
+      - sweeps: 146000
+        beta: 12.0
+      - sweeps: 150000
+        beta: 24.0
+  - id: EXPLOIT_S_62
+    factors:
+      sample.moves.overrides.proposal_adapt.freeze_after_beta: 5.0
+      sample.moves.overrides.gibbs_inertia.p_stay_end: 0.9
+      sample.moves.overrides.move_schedule.end:
+        S: 0.62
+        B: 0.18
+        M: 0.1
+        L: 0.0
+        W: 0.0
+        I: 0.1
+      sample.optimizer.cooling.stages:
+      - sweeps: 35000
+        beta: 0.2
+      - sweeps: 90000
+        beta: 1.2
+      - sweeps: 138000
+        beta: 6.0
+      - sweeps: 146000
+        beta: 12.0
+      - sweeps: 150000
+        beta: 24.0
+  - id: CONSERVATIVE_20
+    factors:
+      sample.moves.overrides.proposal_adapt.freeze_after_beta: 6.0
+      sample.moves.overrides.gibbs_inertia.p_stay_end: 0.85
+      sample.optimizer.cooling.stages:
+      - sweeps: 35000
+        beta: 0.2
+      - sweeps: 90000
+        beta: 1.2
+      - sweeps: 140000
+        beta: 6.0
+      - sweeps: 147000
+        beta: 10.0
+      - sweeps: 150000
+        beta: 20.0
+  replays:
+    mmr_sweep:
+      enabled: false

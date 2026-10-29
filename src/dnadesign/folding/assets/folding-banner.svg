@@ -1,0 +1,15 @@
+<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
+  xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-labelledby="folding-banner-title folding-banner-description" shape-rendering="geometricPrecision">
+  <title id="folding-banner-title">folding: Draw RNA structures</title>
+  <desc id="folding-banner-description">Predict and draw RNA secondary structures from sequence records.</desc>
+  <rect width="1200" height="180" rx="16" fill="#F1F4F6"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="48" y="89" fill="#163047" font-size="56" font-weight="500" letter-spacing="-1.1">folding</text>
+    <text x="50" y="126" fill="#526475" font-size="20">Draw RNA structures</text>
+  </g>
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
+    <path d="M24 57H48V27C33 21 33 5 48 4H80C95 5 95 21 80 27V57H104" stroke="#163047" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M48 32H80M48 41H80M48 50H80" stroke="#2F6EAD" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

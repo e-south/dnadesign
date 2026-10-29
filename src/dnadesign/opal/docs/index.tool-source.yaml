@@ -1,0 +1,13 @@
+schema_version: 1
+catalog_order: 6
+tool: opal
+summary: Active-learning campaigns, configuration and candidate-selection workflows.
+keywords:
+  - active learning
+  - sequence design
+  - infer
+  - feature matrix
+routes:
+  - id: seqledger-infer-x-active-learning
+    path: workflows/seqledger-infer-x-active-learning.md
+    summary: Use features stored in SeqLedger for iterative candidate selection.

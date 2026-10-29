@@ -1,0 +1,15 @@
+<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
+  xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-labelledby="baserender-banner-title baserender-banner-description" shape-rendering="geometricPrecision">
+  <title id="baserender-banner-title">baserender: Draw sequence maps</title>
+  <desc id="baserender-banner-description">Draw annotated sequence diagrams from saved job files.</desc>
+  <rect width="1200" height="180" rx="16" fill="#F1F4F6"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="48" y="89" fill="#163047" font-size="56" font-weight="500" letter-spacing="-1.1">baserender</text>
+    <text x="50" y="126" fill="#526475" font-size="20">Draw sequence maps</text>
+  </g>
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
+    <path d="M7 20H121M7 46H121" stroke="#A5B3BE" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M15 13H42L50 20L42 27H15Z" fill="#163047"/><path d="M103 39H76L68 46L76 53H103Z" fill="#2F6EAD"/>
+  </g>
+</svg>

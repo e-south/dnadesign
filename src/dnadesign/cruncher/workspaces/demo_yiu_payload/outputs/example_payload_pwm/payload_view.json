@@ -1,0 +1,134 @@
+{
+  "contract_kind": "yiu_payload_visual_v1",
+  "schema_version": 1,
+  "state_id": "payload",
+  "alphabet": "iupac_dna",
+  "reference_payload_sequence": "AAATTTCCCGGGAAATTTCCC",
+  "selected_payload_sequence": "AAATTTCCCGGGGAATTTCCC",
+  "selected_complement_sequence": "TTTAAAGGGTCCTTTAAAGGG",
+  "show_reference_payload_row": true,
+  "junction": {
+    "start": 9,
+    "end": 13,
+    "offsets": [
+      0,
+      1,
+      2,
+      3
+    ]
+  },
+  "mismatches": [
+    {
+      "payload_index": 9,
+      "junction_offset": 0,
+      "mutated_strand": "complement",
+      "native_base": "C",
+      "mutated_base": "T",
+      "opposing_base": "G"
+    },
+    {
+      "payload_index": 12,
+      "junction_offset": 3,
+      "mutated_strand": "payload",
+      "native_base": "A",
+      "mutated_base": "G",
+      "opposing_base": "T"
+    }
+  ],
+  "motif_layers": [
+    {
+      "start": 7,
+      "end": 11,
+      "motif_instance_id": "motif_plus_example",
+      "tf_name": "EXAMPLE_TF_PLUS",
+      "motif_name": "example_plus",
+      "reference_strand": "+",
+      "label": "EXAMPLE_TF_PLUS (+)",
+      "matrix": [
+        [
+          0.7,
+          0.1,
+          0.1,
+          0.1
+        ],
+        [
+          0.1,
+          0.7,
+          0.1,
+          0.1
+        ],
+        [
+          0.1,
+          0.1,
+          0.7,
+          0.1
+        ],
+        [
+          0.1,
+          0.1,
+          0.1,
+          0.7
+        ]
+      ]
+    },
+    {
+      "start": 8,
+      "end": 12,
+      "motif_instance_id": "motif_minus_example",
+      "tf_name": "EXAMPLE_TF_MINUS",
+      "motif_name": "example_minus",
+      "reference_strand": "-",
+      "label": "EXAMPLE_TF_MINUS (-)",
+      "matrix": [
+        [
+          0.55,
+          0.15,
+          0.15,
+          0.15
+        ],
+        [
+          0.15,
+          0.55,
+          0.15,
+          0.15
+        ],
+        [
+          0.15,
+          0.15,
+          0.55,
+          0.15
+        ],
+        [
+          0.15,
+          0.15,
+          0.15,
+          0.55
+        ]
+      ]
+    }
+  ],
+  "display": {
+    "title": "Example Payload Pwm"
+  },
+  "meta": {
+    "payload_label": null,
+    "site_label": null,
+    "row_labels": {},
+    "pwm_effective": true,
+    "motif_ids": [
+      "motif_plus_example",
+      "motif_minus_example"
+    ],
+    "span_backdrops": [
+      {
+        "start": 9,
+        "end": 13,
+        "fill": "#BFDBFE",
+        "alpha": 0.3,
+        "corner_radius": 8.0,
+        "cover_rows": "both",
+        "coordinate_space": "payload_forward"
+      }
+    ]
+  }
+}

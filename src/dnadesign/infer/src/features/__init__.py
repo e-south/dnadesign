@@ -1,0 +1,36 @@
+"""
+--------------------------------------------------------------------------------
+dnadesign
+src/dnadesign/infer/src/features/__init__.py
+
+Feature-contract helpers for higher-level infer workflows.
+
+Module Author(s): Eric J. South
+--------------------------------------------------------------------------------
+"""
+
+from .contracts import (
+    FEATURE_SCHEMA_VERSION,
+    OpalMatrixExport,
+    SelectorResolution,
+    SequenceContextRecord,
+    SequenceFeatureBundleConfig,
+    SequenceFeatureContextConfig,
+    SequenceFeatureDebugConfig,
+    SequenceFeaturePoolingConfig,
+)
+from .selectors import canonical_selector_for_block, provider_layer_for_block, resolve_intermediate_selector
+
+__all__ = [
+    "FEATURE_SCHEMA_VERSION",
+    "OpalMatrixExport",
+    "SequenceFeatureContextConfig",
+    "SequenceFeatureDebugConfig",
+    "SequenceFeatureBundleConfig",
+    "SequenceFeaturePoolingConfig",
+    "SelectorResolution",
+    "SequenceContextRecord",
+    "canonical_selector_for_block",
+    "provider_layer_for_block",
+    "resolve_intermediate_selector",
+]

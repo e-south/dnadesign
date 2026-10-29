@@ -1,0 +1,27 @@
+runbook:
+  schema_version: 1
+  name: demo_yiu_payload
+  steps:
+  - id: yiu_validate
+    description: Validate the checked-in user-sequence YIU demo spec.
+    run:
+    - yiu
+    - validate
+    - --spec
+    - configs/yiu/example_payload.yiu.yaml
+  - id: yiu_render
+    description: Publish the deterministic user-sequence YIU v4 payload bundle and render the standard views.
+    run:
+    - yiu
+    - render
+    - --spec
+    - configs/yiu/example_payload.yiu.yaml
+    - --force-overwrite
+    - --emit-renders
+  - id: yiu_show
+    description: Inspect the published user-sequence payload bundle and integrity checks.
+    run:
+    - yiu
+    - show
+    - --bundle
+    - outputs/example_payload

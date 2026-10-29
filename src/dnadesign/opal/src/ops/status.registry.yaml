@@ -1,0 +1,29 @@
+version: 1
+provider_id: builtin.opal
+entries:
+  - status_kind: opal-campaign-state
+    owner_boundary: opal
+    observes_plane: control
+    provider_ref: dnadesign.opal.src.ops.status_providers:provide_opal_campaign_state_status
+    description: Read one OPAL campaign workdir and summarize state.json plus round ledgers.
+    surface_type: campaign_snapshot
+    cost_class: cheap
+    summary_scope: workspace
+    input_schema:
+      - name: opal_config
+        manifest_key: opal_config
+        cli_flag: --opal-config
+        placeholder: <opal-workdir>/configs/campaign.yaml
+        summary: Canonical OPAL campaign config used to resolve campaign.workdir.
+        type: path
+        required: false
+        scaffold_required: true
+      - name: opal_workdir
+        manifest_key: opal_workdir
+        cli_flag: --opal-workdir
+        placeholder: <opal-workdir>
+        summary: Use when you want to point directly at the OPAL campaign workdir instead of resolving it from config.
+        type: path
+        required: false
+    notes:
+      - Prefer `--opal-config` so Ops resolves `campaign.workdir` relative to the campaign root, matching OPAL's config contract.

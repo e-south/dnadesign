@@ -1,0 +1,25 @@
+# cluster/presets/plot/umap.tight.yaml
+name: "plot.umap.tight"
+kind: "plot"
+
+# A compact, publication-friendly baseline
+plot:
+  dims: [10, 10]
+  alpha: 0.6
+  size: 6.0                  # base size for all non-highlight points
+  legend:
+    ncol: 1
+    bbox: [1.0, 1.0]
+    max_items: 40
+    frameon: false
+
+  # Highlight overlay defaults (rings drawn on non-"highlight" hues)
+  highlight:
+    overlay: true            # set to false to disable overlays on other hues
+    size: 18.0               # absolute size for overlay rings
+    alpha: 0.95
+    facecolor: "none"        # "none" -> ring
+    edgecolor: "red"
+    linewidth: 0.9
+    marker: "o"
+    legend: false

@@ -1,0 +1,157 @@
+---
+doc_id: documentation-index
+surface: docs-router
+owner: dnadesign-maintainers
+last_verified: 2026-10-29
+---
+
+## Documentation Index
+
+**Owner:** dnadesign-maintainers
+**Last verified:** 2026-10-29
+
+Find the next task, command, or reference doc from the routes below.
+
+Start with:
+
+- [Installation](setup/installation.md) to set up the repo on a new machine.
+- [Inspect available work](#inspect-available-work) to list packaged workspaces or dataset roots before choosing a workflow.
+- [Choose a workflow](#choose-a-workflow) to follow a single-tool path, a cross-tool dataset path, or an operations path.
+- [Runbook catalog](runbooks/README.md) when you want commands before longer docs.
+- [Tool docs](#tool-docs) when you already know the package.
+- [External study workspaces](integrations/study-workspaces.md) when a private
+  study needs to call dnadesign without importing tool internals.
+- [External storage objects](integrations/storage-objects.md) when a private or
+  large workspace, store, or tool cache must live outside a public Git checkout.
+- [System records](#system-records), [Operations](#operations), and [Maintainer references](#maintainer-references) for repo contracts and operator docs.
+
+### Inspect available work
+
+Use this table when the first question is "what is available right now?"
+rather than "which workflow should I run?" It lists durable workspace and
+dataset roots only. Folding reads producer-owned bundles and does not create a
+workspace. BaseRender can run optional examples and one-off jobs, but most
+cross-tool use should target producer-emitted render job files or visual
+contracts.
+
+| Tool | What it owns | First command | Next doc |
+| --- | --- | --- | --- |
+| `construct` | packaged workspaces and their current output state | `uv run construct workspace list` | [Construct workspaces](../src/dnadesign/construct/workspaces/README.md) |
+| `infer` | packaged workspaces and their current output state | `uv run infer workspace list` | [infer workspaces](../src/dnadesign/infer/workspaces/README.md) |
+| `cluster` | packaged workspaces and their current output state | `uv run cluster workspace list` | [Cluster workspaces](../src/dnadesign/cluster/workspaces/README.md) |
+| `seqledger` | dataset roots and datasets, not workspaces | `uv run seqledger --help` to see the default root, then `uv run seqledger ls --root <seqledger-root>` | [SeqLedger CLI quickstart](../src/dnadesign/seqledger/docs/getting-started/cli-quickstart.md) |
+
+### Choose a workflow
+
+#### Single-tool workflows
+
+Use these when one tool owns the next step.
+
+| Need | Primary workflow | Verify next |
+| --- | --- | --- |
+| Build DNA constructs from templates or multiple parts into derived datasets | [Construct docs overview](../src/dnadesign/construct/docs/README.md) | Verify resulting lineage and sequence identity in [SeqLedger schema contract](../src/dnadesign/seqledger/docs/reference/schema-contract.md). |
+| Compose declared linear ssDNA parts into a local artifact bundle | [Construct linear ssDNA composition](../src/dnadesign/construct/docs/reference/linear-ssdna-composition.md) | Verify the bundle manifest, optional Folding plot artifacts, and optional BaseRender review handoff. |
+| Select candidates from measured labels and sequence features | [OPAL demo and campaign workflow](../src/dnadesign/opal/docs/index.md) | Inspect and export the selected batch with [OPAL selection commands](../src/dnadesign/opal/docs/reference/cli.md#selection-batch). |
+| Run model inference and write outputs back to datasets | [Infer docs index](../src/dnadesign/infer/docs/README.md) | Verify write-back columns and types with [SeqLedger schema contract](../src/dnadesign/seqledger/docs/reference/schema-contract.md). |
+| Set up the SCC Evo2 infer GPU environment | [BU SCC install bootstrap](bu-scc/setup/install.md#gpu-setup-and-verification-runbook) | Verify infer model capabilities with [infer SCC Evo2 GPU runbook](../src/dnadesign/infer/docs/operations/scc-evo2-gpu-uv-runbook.md). |
+| Run Notify for local event watching and webhook setup | [Notify docs index](notify/README.md) | Verify mode and delivery contracts in [Notify command contracts](../src/dnadesign/notify/docs/reference/command-contracts.md). |
+| Inspect or extend Notify package internals | [Notify package docs index](../src/dnadesign/notify/docs/README.md) | Verify module boundaries in [Notify maintainer architecture map](../src/dnadesign/notify/docs/dev/architecture.md). |
+
+#### Cross-tool dataset workflows
+
+Use these when data moves through more than one tool and the shared record lives in SeqLedger.
+
+| Need | Primary workflow | Verify next |
+| --- | --- | --- |
+| Assemble multiple producer datasets before construct and infer share one downstream dataset | [Multi-source shared dataset assembly](../src/dnadesign/seqledger/docs/operations/assembly/multi-source-shared-dataset.md) | Verify carried overlays, construct lineage, and infer write-back contracts with [SeqLedger schema contract](../src/dnadesign/seqledger/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
+| Hand one construct-backed dataset to infer and downstream watchers | [Construct -> SeqLedger -> Infer shared dataset runbook](../src/dnadesign/seqledger/docs/operations/assembly/construct-infer-shared-dataset-runbook.md) | Verify lineage plus downstream write-back contracts with [SeqLedger schema contract](../src/dnadesign/seqledger/docs/reference/schema-contract.md) and [Infer docs](../src/dnadesign/infer/docs/README.md). |
+| Connect a private study workspace to dnadesign | [External study workspace contract](integrations/study-workspaces.md) | Pin dnadesign, pass explicit paths, and register only study-owned status or evidence adapters. |
+| Validate private runtime state outside Git | [External storage-object contract](integrations/storage-objects.md) | Inventory one exact workspace, store, or cache and verify its ownership, retention, file closure, and digests before execution. |
+| Build a promoter feature dataset from anchors, wildtype/manual promoters, optional construct contexts, and infer outputs | [Promoter characterization feature matrix](../src/dnadesign/seqledger/docs/operations/promoter/characterization-feature-matrix.md) | Verify one explicit `infer__...` column is chosen as `X` or export a flattened matrix before continuing to the exploratory [cluster workflow](../src/dnadesign/cluster/docs/workflows/exploratory-clustering.md) or the downstream [SeqLedger dataset with infer-derived X -> OPAL active learning](../src/dnadesign/opal/docs/workflows/seqledger-infer-x-active-learning.md) workflow. |
+| Sync iterative HPC outputs to local analysis safely | [SeqLedger workflow map](../src/dnadesign/seqledger/docs/operations/routes/workflow-map.md) -> [SeqLedger HPC sync flow](../src/dnadesign/seqledger/docs/operations/sync/hpc-agent-flow.md) | Verify transfer parity with [SeqLedger sync audit loop](../src/dnadesign/seqledger/docs/operations/sync/audit-loop.md). |
+| Run cross-machine sync with stricter failure checks | [SeqLedger sync command contract](../src/dnadesign/seqledger/docs/operations/sync/README.md) | Verify sidecar and overlay fidelity with [SeqLedger sync fidelity drills](../src/dnadesign/seqledger/docs/operations/sync/fidelity-drills.md). |
+
+#### Scheduler and environment workflows
+
+Use these when the next step is orchestration, environment setup, or audit output rather than dataset mutation.
+
+| Need | Primary workflow | Verify next |
+| --- | --- | --- |
+| Run BU SCC batch jobs with notifications | [BU SCC batch + notify runbook](bu-scc/runbooks/batch-notify.md) | Verify event delivery contract in [Notify SeqLedger events contract](notify/seqledger-events.md). |
+| Plan and execute configured batch workflows | [Ops orchestration index](operations/README.md) | Verify command ordering and outcomes in [orchestration audit contract](operations/orchestration/runbooks.md#plan-execute-and-inspect). |
+
+### Tool docs
+
+Choose a tool below. Artifact services such as `folding` read bundles or job
+files produced by other tools; their guides describe the required inputs.
+
+#### Design, workspace, and analysis tools
+
+| Tool | CLI | Docs |
+| --- | --- | --- |
+| `aligner` | n/a | [aligner docs](../src/dnadesign/aligner/docs/README.md) |
+| `cluster` | `uv run cluster --help` | [cluster README](../src/dnadesign/cluster/README.md) |
+| `cruncher` | `uv run cruncher --help` | [cruncher README](../src/dnadesign/cruncher/README.md) |
+| `construct` | `uv run construct --help` | [construct README](../src/dnadesign/construct/README.md) |
+| `junction` | `uv run junction --help` | [junction docs](../src/dnadesign/junction/docs/README.md); plans oligos directly from a request file |
+| `infer` | `uv run infer --help` | [infer README](../src/dnadesign/infer/README.md) |
+| `latentdna` | `uv run latentdna --help` | [latentdna README](../src/dnadesign/latentdna/README.md) |
+| `opal` | `uv run opal --help` | [opal README](../src/dnadesign/opal/README.md) |
+| `permuter` | `uv run permuter --help` | [permuter docs](../src/dnadesign/permuter/docs/README.md) |
+| `seqledger` | `uv run seqledger --help` | [SeqLedger README](../src/dnadesign/seqledger/README.md) |
+
+#### Artifact services
+
+| Tool | CLI | Docs |
+| --- | --- | --- |
+| `baserender` | `uv run baserender --help` | [baserender README](../src/dnadesign/baserender/README.md); draws producer-supplied visual records from job files |
+| `folding` | `uv run folding --help` | [folding README](../src/dnadesign/folding/README.md); predicts structures from producer-owned bundles without creating a workspace |
+
+#### Operator surfaces
+
+| Tool | CLI | Docs |
+| --- | --- | --- |
+| `notify` | `uv run notify --help` | [notify README](../src/dnadesign/notify/README.md) |
+| `ops` | `uv run ops --help` | [ops README](../src/dnadesign/ops/README.md) |
+
+#### Shared contracts and routing
+
+| Surface | CLI | Docs |
+| --- | --- | --- |
+| `contracts` | `uv run dnadesign-storage --help` | [contracts docs](../src/dnadesign/contracts/docs/README.md) |
+| external studies | n/a | [study workspace integration contract](integrations/study-workspaces.md) |
+
+### System records
+
+- [Architecture](../ARCHITECTURE.md): component boundaries and cross-tool integration map.
+- [Design](../DESIGN.md): engineering invariants and interface expectations.
+- [Reliability](../RELIABILITY.md): operational model, failure posture, and recovery contracts.
+- [Security](../SECURITY.md): secrets, dependency, and supply-chain handling policy.
+- [Plans](../PLANS.md): proposal, execution-plan, and decision lifecycle.
+- [Quality score](../QUALITY_SCORE.md): quality rubric and improvement framework.
+- Cross-tool handoff rules live in [Architecture](../ARCHITECTURE.md#cross-tool-information-architecture), [Design](../DESIGN.md#information-architecture-invariants), and the shared dataset workflows linked above.
+- Scheduler accumulation rules live in [Ops orchestration runbook contracts](operations/orchestration/runbooks.md#fill-remaining-infer-lanes).
+
+### Operations
+
+- [Installation](setup/installation.md): environment setup and verification baseline.
+- [Runbook catalog](runbooks/README.md): shell command index for cross-tool procedures and tool entrypoints.
+- [Ops orchestration index](operations/README.md): orchestration docs for init, plan, execute, and status checks.
+- [OPS mental model](operations/model/mental-model.md): plane model, shared state semantics, and snapshot versus preflight guidance.
+- [OPS failure contract](operations/contracts/failure.md): CLI exit-code and stderr contract for automation and maintainers.
+- [BU SCC docs index](bu-scc/README.md): cluster setup, submission, and operator runbooks.
+- [Notify docs index](notify/README.md): notifier setup, runtime behavior, and recovery routes.
+- [SeqLedger operations index](../src/dnadesign/seqledger/docs/operations/README.md): sync, transfer, dataset assembly, and downstream handoff runbooks.
+
+### Maintainer references
+
+- [Developer docs](dev/README.md): CI/testing contracts and maintainer operations.
+- [Repo change gate](repo-change-gate.md): tactical validation route for local code, docs, and study changes.
+- [Repo maintenance](repo-maintenance.md): compact route map for broad maintainer work.
+- [Execution plans index](exec-plans/README.md): active and completed execution-plan records.
+- [External study workspaces](integrations/study-workspaces.md): public contracts for private study packages.
+- [External storage objects](integrations/storage-objects.md): fail-fast
+  envelopes for private workspaces, stores, and caches outside Git checkouts.
+- [Templates index](templates/README.md): reusable templates for runbooks, plans, and records.
+- [Architecture decisions index](architecture/decisions/README.md): ADR catalog and decision history.
+- [Quality docs index](quality/README.md): quality gates, audits, and measurement references.

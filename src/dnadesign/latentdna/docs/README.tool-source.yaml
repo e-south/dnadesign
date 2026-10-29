@@ -1,0 +1,17 @@
+schema_version: 1
+catalog_order: 7
+tool: latentdna
+summary: Representation-comparison workflows, workspace contracts, plots, snapshots, and notebook routes.
+keywords:
+  - representations
+  - comparison
+  - plots
+  - notebooks
+  - downstream
+  - embeddings
+  - trait-axis
+  - projection
+routes:
+  - id: trait-axis-projection-dev-spec
+    path: dev/trait-axis-projection.md
+    summary: Proposed generic fitted-geometry scalar primitive for trait endpoint axes, row projections, summaries, and provenance.

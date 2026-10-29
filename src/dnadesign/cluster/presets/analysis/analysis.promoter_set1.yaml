@@ -1,0 +1,21 @@
+# cluster/presets/analysis/promoter_set1.yaml
+name: "analysis.promoter_set1"
+kind: "analysis"
+
+# These map directly to 'cluster analyze' flags
+params:
+  composition: true
+  diversity: true
+  difffeat: true
+  plots: true
+  font_scale: 1.3
+
+  # Numeric metrics to summarize & plot per cluster (strict numeric)
+  numeric:
+    - "infer__evo2_7b__60bp_dual_promoter_cpxR_LexA__ll_mean"
+
+  # Analyses sliced by these categorical columns
+  group_by: ["densegen__plan"]
+
+  # Non-finite (NaN/Inf) in numeric metrics are logged and dropped
+  missing_policy: "drop_and_log"

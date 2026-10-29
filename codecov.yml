@@ -1,0 +1,111 @@
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "0...100"
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 0.5%
+        if_ci_failed: error
+        if_not_found: failure
+    patch:
+      default:
+        target: auto
+        threshold: 0.5%
+        informational: true
+        if_ci_failed: error
+        if_not_found: failure
+
+flags:
+  core:
+    paths:
+      - src/dnadesign
+    carryforward: false
+  external_integration:
+    paths:
+      - src/dnadesign
+    carryforward: false
+
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        target: auto
+        threshold: 0.5%
+        if_ci_failed: error
+        if_not_found: failure
+  individual_components:
+    - component_id: seqledger
+      name: seqledger
+      paths:
+        - src/dnadesign/seqledger/**
+    - component_id: ops
+      name: ops
+      paths:
+        - src/dnadesign/ops/**
+    - component_id: notify
+      name: notify
+      paths:
+        - src/dnadesign/notify/**
+    - component_id: infer
+      name: infer
+      paths:
+        - src/dnadesign/infer/**
+    - component_id: construct
+      name: construct
+      paths:
+        - src/dnadesign/construct/**
+    - component_id: folding
+      name: folding
+      paths:
+        - src/dnadesign/folding/**
+    - component_id: opal
+      name: opal
+      paths:
+        - src/dnadesign/opal/**
+    - component_id: cluster
+      name: cluster
+      paths:
+        - src/dnadesign/cluster/**
+    - component_id: latentdna
+      name: latentdna
+      paths:
+        - src/dnadesign/latentdna/**
+    - component_id: cruncher
+      name: cruncher
+      paths:
+        - src/dnadesign/cruncher/**
+    - component_id: aligner
+      name: aligner
+      paths:
+        - src/dnadesign/aligner/**
+    - component_id: thread
+      name: thread
+      paths:
+        - src/dnadesign/thread/**
+    - component_id: baserender
+      name: baserender
+      paths:
+        - src/dnadesign/baserender/**
+    - component_id: contracts
+      name: contracts
+      paths:
+        - src/dnadesign/contracts/**
+    - component_id: permuter
+      name: permuter
+      paths:
+        - src/dnadesign/permuter/**
+    - component_id: junction
+      name: junction
+      paths:
+        - src/dnadesign/junction/**
+comment:
+  require_changes: true
+  layout: "reach,diff,flags,components,files"
+
+github_checks:
+  annotations: true

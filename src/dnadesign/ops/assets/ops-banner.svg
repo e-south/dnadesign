@@ -1,0 +1,15 @@
+<svg width="1200" height="180" viewBox="0 0 1200 180" fill="none"
+  xmlns="http://www.w3.org/2000/svg" role="img"
+  aria-labelledby="ops-banner-title ops-banner-description" shape-rendering="geometricPrecision">
+  <title id="ops-banner-title">ops: Find and run jobs</title>
+  <desc id="ops-banner-description">Find, run, and inspect jobs owned by repository tools.</desc>
+  <rect width="1200" height="180" rx="16" fill="#F1F4F6"/>
+  <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+    <text x="48" y="89" fill="#163047" font-size="56" font-weight="500" letter-spacing="-1.1">ops</text>
+    <text x="50" y="126" fill="#526475" font-size="20">Find and run jobs</text>
+  </g>
+  <path d="M622 43V137" stroke="#CDD6DE" stroke-width="1.2"/>
+  <g transform="translate(808.8 32.4) scale(1.8)">
+    <rect x="8" y="10" width="88" height="9" rx="1" fill="#A5B3BE"/><circle cx="115" cy="14.5" r="4" fill="#163047"/><rect x="8" y="28" width="88" height="9" rx="1" fill="#A5B3BE"/><circle cx="115" cy="32.5" r="4" fill="#2F6EAD"/><rect x="8" y="46" width="88" height="9" rx="1" fill="#A5B3BE"/><circle cx="115" cy="50.5" r="4" fill="#A5B3BE"/>
+  </g>
+</svg>
