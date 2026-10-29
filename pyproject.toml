@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name            = "dnadesign-tools"
-version         = "0.4.0"
+version         = "0.4.1"
 description     = "DNA sequence design pipelines and bioinformatics helpers."
 authors         = [{ name = "Eric South" }]
 dynamic         = ["readme"]
