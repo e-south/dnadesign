@@ -16,7 +16,9 @@
 Use this workflow when a SeqLedger candidate table already contains one or more
 infer-derived feature columns and OPAL should own the label/train/select loop.
 
-This workflow applies after Infer write-back completes.
+This workflow applies after Infer write-back completes. Use the activated
+[OPAL environment](../index.md#try-a-complete-selection-round); the campaign
+directory does not need its own Python project.
 
 For Evo2 sequence-feature bundles, `infer` may write several coordinated
 `infer__...` columns per job. In that case, materialize one OPAL-ready
@@ -134,8 +136,8 @@ selection_batch: # Build the logical union of all view selections.
 ### 3) Validate and initialize the campaign
 
 ```bash
-uv run opal validate -c "$OPAL_WORKDIR/configs/campaign.yaml" # Validate the SeqLedger-backed campaign config and plugin wiring.
-uv run opal init -c "$OPAL_WORKDIR/configs/campaign.yaml" # Initialize campaign state and output ledgers.
+opal validate -c "$OPAL_WORKDIR/configs/campaign.yaml" # Validate the SeqLedger-backed campaign config and plugin wiring.
+opal init -c "$OPAL_WORKDIR/configs/campaign.yaml" # Initialize campaign state and output ledgers.
 ```
 
 ### 4) Ingest the first label batch
@@ -148,7 +150,7 @@ and omit `--apply`.
 
 ```bash
 # Ingest the first observed label batch into the SeqLedger-backed campaign.
-uv run opal ingest-y \
+opal ingest-y \
   -c "$OPAL_WORKDIR/configs/campaign.yaml" \
   --round 0 \
   --csv "$OPAL_WORKDIR/inputs/r0_labels.xlsx" \
@@ -159,16 +161,16 @@ uv run opal ingest-y \
 ### 5) Run the first round against the infer-derived `X` column
 
 ```bash
-uv run opal run -c "$OPAL_WORKDIR/configs/campaign.yaml" --round 0 # Train, score, and select against the chosen infer-derived X column.
+opal run -c "$OPAL_WORKDIR/configs/campaign.yaml" --round 0 # Train, score, and select against the chosen infer-derived X column.
 ```
 
 ### 6) Verify artifacts and round state
 
 ```bash
-uv run opal verify-outputs -c "$OPAL_WORKDIR/configs/campaign.yaml" --view primary --round latest # Verify ledgers and round outputs.
-uv run opal status -c "$OPAL_WORKDIR/configs/campaign.yaml" # Inspect current round and selection state.
-uv run opal runs list -c "$OPAL_WORKDIR/configs/campaign.yaml" # Review recorded runs for this campaign.
-uv run opal ctx audit -c "$OPAL_WORKDIR/configs/campaign.yaml" --round latest # Audit the round contract payload.
+opal verify-outputs -c "$OPAL_WORKDIR/configs/campaign.yaml" --view primary --round latest # Verify ledgers and round outputs.
+opal status -c "$OPAL_WORKDIR/configs/campaign.yaml" # Inspect current round and selection state.
+opal runs list -c "$OPAL_WORKDIR/configs/campaign.yaml" # Review recorded runs for this campaign.
+opal ctx audit -c "$OPAL_WORKDIR/configs/campaign.yaml" --round latest # Audit the round contract payload.
 ```
 
 ### 7) Iterate as labels accumulate
@@ -180,13 +182,13 @@ correction. Inspect or export the selected batch with the
 
 ```bash
 # Ingest the next observed label batch before resuming the round loop.
-uv run opal ingest-y \
+opal ingest-y \
   -c "$OPAL_WORKDIR/configs/campaign.yaml" \
   --round 1 \
   --csv "$OPAL_WORKDIR/inputs/r1_labels.xlsx" \
   --unknown-sequences error \
   --apply
-uv run opal run -c "$OPAL_WORKDIR/configs/campaign.yaml" --round 1 --resume # Refit and reselection with labels visible through round 1.
+opal run -c "$OPAL_WORKDIR/configs/campaign.yaml" --round 1 # Fit and select with labels visible through round 1.
 ```
 
 ### Model and selection variations

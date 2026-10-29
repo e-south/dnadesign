@@ -70,7 +70,7 @@ opal selection-set export -c configs/campaign.yaml --view primary --round latest
 `validate` is read-only. `init` creates campaign state. `ingest-y` records the
 labels visible to a round. `run` fits, scores, and selects. `verify-outputs`
 checks the persisted selection against the ledger. Replace `primary` if you
-renamed the selection view. If a round contains multiple runs, pass `--run-id`
+renamed the selection view. If a round contains multiple runs, replace `--round` with `--run-id`
 to inspect or export the intended run. The exported selection is a candidate proposal
 for experimental review.
 
@@ -83,6 +83,19 @@ you need a read-only account of its label cutoff and preconditions.
 Measure the selected candidates, then ingest that label file with `--round 1`
 and run round 1. Keep target definitions, thresholds and calibration with the
 campaign so each score can be interpreted against the intended experiment.
+
+## Inspect or retry a run
+
+A round identifies the label cutoff; each execution receives its own run ID.
+If an interrupted run left round artifacts, inspect `opal status` and
+`opal runs list` before rerunning that round with `--resume`. This creates a
+new run and preserves completed runs. When several runs share a round, replace
+`--round` with the intended `--run-id` in verification, inspection and export
+commands.
+
+The default batch removes duplicate candidate IDs. Set
+`selection_batch.deduplicate_by: sequence` when distinct IDs may contain the
+same DNA and the experiment requires unique sequences.
 
 ## Continue
 
