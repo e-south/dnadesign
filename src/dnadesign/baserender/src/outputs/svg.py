@@ -92,7 +92,7 @@ def compose_svg(figure, placements):
                     "y": f"{cy:.12g}",
                     "font-family": caption.family,
                     "font-size": f"{caption.size_pt:.12g}",
-                    "text-anchor": "middle",
+                    "text-anchor": caption.text_anchor,
                     "fill": "#000000",
                     "{http://www.w3.org/XML/1998/namespace}space": "preserve",
                 },

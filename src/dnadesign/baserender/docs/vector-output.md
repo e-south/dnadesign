@@ -45,10 +45,14 @@ Import from `dnadesign.baserender`:
   `asset_id`. Caller-owned asset IDs need not be packaged. No scientific name or
   producer-specific branch is needed by drawing code.
 - `IllustrationCaption(text, family=..., size_pt=..., anchor_fraction=...,
-  offset_px=..., visible=...)` controls text separately from illustration scale.
+  offset_px=..., visible=..., text_anchor="middle")` controls text separately from illustration scale.
   Fractions start at the illustration's top left; positive offsets move right
   and down. The generic default anchor is bottom-center. Packaged artwork owns
   its particular default caption position in its manifest.
+  `text_anchor` accepts `start`, `middle` or `end` and is shared by measurement
+  and SVG text output. For a label beside the artwork, use `anchor_fraction=(1, 0.5)`,
+  `text_anchor="start"` and a positive horizontal `offset_px`; increasing the font
+  then grows the text away from the artwork without reducing its gap.
 
 `illustrations` and `captions` are keyed by anchored-effect `asset_id`. The RNAP
 manifest selects its existing SVG body IDs and source hash, excluding the source
@@ -62,7 +66,7 @@ Diagnostics report base pitch, forward/reverse strand positions, logical feature
 and illustration anchors/bounds in points, with origin at the canvas top left.
 Bounds are `(x0, y0, x1, y1)`. Illustration diagnostics include source SHA-256
 and the font file resolved for the caption. They also return `caption_origin_pt`
-(the text-anchor midpoint and baseline) and `caption_bounds_pt` (visible ink).
+(the selected text anchor and baseline) and `caption_bounds_pt` (visible ink).
 Hidden captions return neither bound nor origin. Native output requires
 `figure_scale=1`; explicit font sizes keep their physical size.
 
@@ -180,7 +184,7 @@ result = render_record_svg(
 `sequence_scale=1` matches the sequence nucleotide font size. A larger ratio
 keeps annotations proportionally larger when that sequence font changes.
 `AnnotationTypography(size_pt=18)` pins the group at a fixed point size instead.
-An explicitly selected empty group defaults to `sequence_scale=1.25`.
+An explicitly selected empty group defaults to `sequence_scale=1`.
 Fixed and relative sizing are mutually exclusive; invalid/nonfinite values and
 resolved sizes below 6 points fail before drawing.
 

@@ -104,7 +104,7 @@ class AnnotationTypography:
 
     An explicitly selected group overrides site/span/caption sizes together.
     Omit the group to retain independently specified sizes. The selected group's
-    default is 1.25 times the sequence font; fonts, text and anchors are unchanged.
+    default matches the sequence font; fonts, text and anchors are unchanged.
     """
 
     size_pt: float | None = None
@@ -114,7 +114,7 @@ class AnnotationTypography:
         if self.size_pt is not None and self.sequence_scale is not None:
             raise RenderingError("annotation_typography selects size_pt or sequence_scale, not both")
         if self.size_pt is None and self.sequence_scale is None:
-            object.__setattr__(self, "sequence_scale", 1.25)
+            object.__setattr__(self, "sequence_scale", 1.0)
         for name in ("size_pt", "sequence_scale"):
             value = getattr(self, name)
             if value is not None:
@@ -141,6 +141,7 @@ class IllustrationCaption:
     anchor_fraction: tuple[float, float] = (0.5, 1.0)
     offset_px: tuple[float, float] = (0.0, 0.0)
     visible: bool = True
+    text_anchor: str = "middle"
 
     def validate(self):
         validate_literal_text(self.text, field_name="caption.text")
@@ -151,6 +152,8 @@ class IllustrationCaption:
         if any(not 0 <= n <= 1 for n in self.anchor_fraction):
             raise RenderingError("caption.anchor_fraction must lie within [0, 1]")
         finite_tuple(self.offset_px, 2, "caption.offset_px")
+        if self.text_anchor not in ("start", "middle", "end"):
+            raise RenderingError("caption.text_anchor must be start, middle or end")
         if not isinstance(self.visible, bool):
             raise RenderingError("caption.visible must be boolean")
         return self

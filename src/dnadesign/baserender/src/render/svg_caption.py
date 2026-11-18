@@ -42,7 +42,8 @@ def measure_caption(
     cx = x0 + caption.anchor_fraction[0] * (x1 - x0) + caption.offset_px[0] * px_to_pt
     cy = y0 + caption.anchor_fraction[1] * (y1 - y0) + caption.offset_px[1] * px_to_pt
     metrics = measure_literal_text(caption.text, font, caption.size_pt)
-    left = cx - metrics.advance_pt / 2.0
+    anchor_fraction = {"start": 0.0, "middle": 0.5, "end": 1.0}[caption.text_anchor]
+    left = cx - metrics.advance_pt * anchor_fraction
     bounds = (left + metrics.left_pt, cy - metrics.top_pt, left + metrics.right_pt, cy - metrics.bottom_pt)
     width, height = canvas_size_pt
     if (

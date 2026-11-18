@@ -25,7 +25,9 @@ from .sequence_layout import sequence_layout_from_options
 
 def _caption(raw, context):
     data = require_mapping(raw, context)
-    reject_unknown_keys(data, {"text", "family", "size_pt", "anchor_fraction", "offset_px", "visible"}, context)
+    reject_unknown_keys(
+        data, {"text", "family", "size_pt", "anchor_fraction", "offset_px", "visible", "text_anchor"}, context
+    )
     if "text" not in data:
         raise SchemaError(f"{context}.text is required")
     return IllustrationCaption(**data).validate()

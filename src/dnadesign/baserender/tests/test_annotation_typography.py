@@ -64,7 +64,7 @@ def _size(node):
 
 
 @pytest.mark.parametrize(
-    "settings,expected", [({"size_pt": 18}, 18), ({"sequence_scale": 1}, 14), ({"sequence_scale": 1.5}, 21), ({}, 17.5)]
+    "settings,expected", [({"size_pt": 18}, 18), ({"sequence_scale": 1}, 14), ({"sequence_scale": 1.5}, 21), ({}, 14)]
 )
 def test_shared_annotation_role_resolves_all_sizes_together(settings, expected):
     style = {
