@@ -12,6 +12,9 @@ last_verified: 2026-11-17
 contracts before adding consumer-specific rendering workarounds. This is a
 proposal, not an implemented API or permission to modify caller artwork.
 
+Use the [implementation plan](../../../../exec-plans/active/baserender-vector-api.md)
+for ordered slices, the package hardening pass, validation and the next executor contract.
+
 ### Observed problems
 
 The packaged RNAP SVG already contains vector body geometry and separate
