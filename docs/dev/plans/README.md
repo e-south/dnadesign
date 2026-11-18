@@ -10,3 +10,5 @@ their accepted contracts are recorded in [architecture decisions](../../architec
 
 Current tool ownership is defined by the [lifecycle inventory](../../../.github/tool-lifecycle.toml).
 Study-specific decisions belong in the consuming study repository.
+
+- BaseRender: [vector artwork and explicit sequence layout](tools/baserender/vector-assets-and-layout.md) — proposed; preserve SVG assets and physical typography through a supported output contract.
