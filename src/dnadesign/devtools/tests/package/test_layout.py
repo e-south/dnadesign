@@ -121,7 +121,10 @@ def test_active_python_module_headers_are_canonical() -> None:
     elm_seen: set[str] = set()
 
     for path in sorted(dnadesign_root.rglob("*.py")):
-        relative_parts = set(path.relative_to(dnadesign_root).parts)
+        parts = path.relative_to(dnadesign_root).parts
+        if len(parts) > 1 and parts[1] in {"outputs", "runs", "batch_results"}:
+            continue
+        relative_parts = set(parts)
         if relative_parts & _HEADER_EXCLUDED_PARTS:
             continue
         relative_path = path.relative_to(repo_root).as_posix()

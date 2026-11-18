@@ -808,3 +808,23 @@ def test_source_readme_uses_local_routes_and_private_repository_image() -> None:
     assert banner == "assets/dnadesign-banner.png"
     data = (root / banner).read_bytes()
     assert data.startswith(b"\x89PNG\r\n\x1a\n") and len(data) < 10_000_000
+
+
+@pytest.mark.parametrize("shelf", ["outputs", "runs", "batch_results"])
+def test_generated_root_shelves_never_supply_python_modules(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, shelf: str
+) -> None:
+    root = _repo_root()
+    with monkeypatch.context() as scoped:
+        scoped.setattr("setuptools.setup", lambda **kwargs: None)
+        backend = runpy.run_path(str(root / "setup.py"))
+    distribution = Distribution({"long_description": ""})
+    distribution.script_name = str(root / "setup.py")
+    apply_configuration(distribution, str(root / "pyproject.toml"))
+    builder = backend["PortableBuild"](distribution)
+    builder.ensure_finalized()
+    (tmp_path / "__init__.py").write_text("")
+    (tmp_path / "snapshot.py").write_text("snapshot = True\n")
+    assert builder.find_package_modules(f"dnadesign.baserender.{shelf}.example", str(tmp_path)) == []
+    runtime = builder.find_package_modules(f"dnadesign.baserender.src.{shelf}", str(tmp_path))
+    assert any(module[1] == "snapshot" for module in runtime)
