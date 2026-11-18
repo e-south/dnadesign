@@ -18,7 +18,7 @@ from types import MappingProxyType
 from typing import Callable, Mapping
 
 from ..core import RenderingError, SchemaError, reject_unknown_keys, require_mapping
-from ..core.vector import IllustrationCaption, SvgArtwork, SvgIllustration
+from ..core.vector import AnnotationTypography, IllustrationCaption, SvgArtwork, SvgIllustration
 from .raster import RasterOptions
 from .sequence_layout import sequence_layout_from_options
 
@@ -41,8 +41,11 @@ class NativeSvgCfg:
     illustrations: Mapping[str, SvgIllustration] = field(default_factory=dict)
     captions: Mapping[str, IllustrationCaption] = field(default_factory=dict)
     rasterization: RasterOptions = field(default_factory=RasterOptions)
+    annotation_typography: AnnotationTypography | None = None
 
     def __post_init__(self):
+        if self.annotation_typography is not None and not isinstance(self.annotation_typography, AnnotationTypography):
+            raise RenderingError("native_svg.annotation_typography must be AnnotationTypography")
         if not isinstance(self.rasterization, RasterOptions):
             raise RenderingError("native_svg.rasterization must be RasterOptions")
         for name, values in (("illustrations", self.illustrations), ("captions", self.captions)):
@@ -69,7 +72,14 @@ class NativeSvgCfg:
     @classmethod
     def from_mapping(cls, raw, *, resolve_path: Callable[[str, str], Path]):
         data = require_mapping(raw, "render.native_svg")
-        reject_unknown_keys(data, {"illustrations", "captions", "rasterization"}, "render.native_svg")
+        reject_unknown_keys(
+            data, {"illustrations", "captions", "rasterization", "annotation_typography"}, "render.native_svg"
+        )
+        typography = None
+        if data.get("annotation_typography") is not None:
+            settings = require_mapping(data["annotation_typography"], "native_svg.annotation_typography")
+            reject_unknown_keys(settings, {"size_pt", "sequence_scale"}, "native_svg.annotation_typography")
+            typography = AnnotationTypography(**settings)
         illustrations = {}
         for key, raw_value in require_mapping(data.get("illustrations", {}), "native_svg.illustrations").items():
             context = f"native_svg.illustrations.{key}"
@@ -94,18 +104,21 @@ class NativeSvgCfg:
             key: _caption(value, f"native_svg.captions.{key}")
             for key, value in require_mapping(data.get("captions", {}), "native_svg.captions").items()
         }
-        return cls(illustrations, captions, RasterOptions.from_mapping(data.get("rasterization", {})))
+        return cls(illustrations, captions, RasterOptions.from_mapping(data.get("rasterization", {})), typography)
 
     def to_mapping(self, *, portable=False):
         illustrations = {key: value.to_mapping(portable=portable) for key, value in self.illustrations.items()}
         raster = self.rasterization.to_mapping()
         if portable:
             raster["inkscape"] = Path(raster["inkscape"]).name
-        return {
+        result = {
             "illustrations": illustrations,
             "captions": {key: asdict(value) for key, value in self.captions.items()},
             "rasterization": raster,
         }
+        if self.annotation_typography is not None:
+            result["annotation_typography"] = self.annotation_typography.to_mapping()
+        return result
 
 
 def validate_native_outputs(render, outputs):
@@ -118,6 +131,14 @@ def validate_native_outputs(render, outputs):
         return
     if not isinstance(render.native_svg, NativeSvgCfg):
         raise SchemaError("render.native_svg must be NativeSvgCfg in a typed job")
+    if render.native_svg.annotation_typography is not None:
+        from .style_v1 import resolve_style
+
+        try:
+            style = resolve_style(preset=render.style_preset, overrides=render.style_overrides)
+            render.native_svg.annotation_typography.resolve_size(style.font_size_seq)
+        except RenderingError as exc:
+            raise SchemaError(str(exc)) from exc
     if render.renderer != "sequence_rows":
         raise SchemaError("render.native_svg currently requires renderer sequence_rows")
     if any(

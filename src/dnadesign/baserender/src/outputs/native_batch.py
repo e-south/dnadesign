@@ -72,6 +72,7 @@ class PreparedNativeBatch:
                     layout=layout,
                     illustrations={key: value for key, value in config.illustrations.items() if key in selected},
                     captions={key: value for key, value in config.captions.items() if key in selected},
+                    annotation_typography=config.annotation_typography,
                 )
             )
         return cls(tuple(plans), config)

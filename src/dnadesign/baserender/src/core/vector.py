@@ -99,6 +99,41 @@ class SvgArtwork:
 
 
 @dataclass(frozen=True)
+class AnnotationTypography:
+    """One native annotation size, fixed in points or relative to sequence type.
+
+    An explicitly selected group overrides site/span/caption sizes together.
+    Omit the group to retain independently specified sizes. The selected group's
+    default is 1.25 times the sequence font; fonts, text and anchors are unchanged.
+    """
+
+    size_pt: float | None = None
+    sequence_scale: float | None = None
+
+    def __post_init__(self):
+        if self.size_pt is not None and self.sequence_scale is not None:
+            raise RenderingError("annotation_typography selects size_pt or sequence_scale, not both")
+        if self.size_pt is None and self.sequence_scale is None:
+            object.__setattr__(self, "sequence_scale", 1.25)
+        for name in ("size_pt", "sequence_scale"):
+            value = getattr(self, name)
+            if value is not None:
+                finite_tuple((value,), 1, f"annotation_typography.{name}", positive=True)
+        if self.size_pt is not None and self.size_pt < 6:
+            raise RenderingError("annotation_typography.size_pt must be >= 6 pt")
+
+    def resolve_size(self, sequence_size_pt):
+        value = self.size_pt if self.size_pt is not None else sequence_size_pt * self.sequence_scale
+        finite_tuple((value,), 1, "annotation_typography resolved size", positive=True)
+        if value < 6:
+            raise RenderingError("annotation_typography resolved size must be >= 6 pt")
+        return float(value)
+
+    def to_mapping(self):
+        return {name: value for name in ("size_pt", "sequence_scale") if (value := getattr(self, name)) is not None}
+
+
+@dataclass(frozen=True)
 class IllustrationCaption:
     text: str
     family: str = "DejaVu Sans"
@@ -207,10 +242,13 @@ class SvgRenderDiagnostics:
     fonts: Mapping[str, ResolvedFont]
     span_links: tuple[SvgSpanLinkPlacement, ...]
     bottom_legend: tuple[SvgLegendEntryPlacement, ...]
+    annotation_font_size_pt: float | None = None
 
     def to_mapping(self, *, portable: bool = False):
         """Return detached JSON-shaped diagnostics, optionally without local font paths."""
         payload = _plain(self)
+        if self.annotation_font_size_pt is None:
+            payload.pop("annotation_font_size_pt")
         if portable:
             for font in payload["fonts"].values():
                 font.pop("path")

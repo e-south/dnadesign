@@ -17,7 +17,7 @@ from typing import Mapping
 from ..config.raster import RasterOptions
 from ..config.sequence_layout import SequenceLayout
 from ..core import Record
-from ..core.vector import IllustrationCaption, PngRenderResult, SvgIllustration, SvgRenderResult
+from ..core.vector import AnnotationTypography, IllustrationCaption, PngRenderResult, SvgIllustration, SvgRenderResult
 
 
 def render_record_svg(
@@ -28,6 +28,7 @@ def render_record_svg(
     illustrations: Mapping[str, SvgIllustration] | None = None,
     captions: Mapping[str, IllustrationCaption] | None = None,
     layout: SequenceLayout | None = None,
+    annotation_typography: AnnotationTypography | None = None,
 ) -> SvgRenderResult:
     """Return native SVG plus geometry in points, with no source writes or fitting.
 
@@ -41,7 +42,14 @@ def render_record_svg(
 
     initialize_runtime()
     style = resolve_style(preset=style_preset, overrides=dict(style_overrides or {}))
-    return render_svg_sequence(record, style=style, illustrations=illustrations, captions=captions, layout=layout)
+    return render_svg_sequence(
+        record,
+        style=style,
+        illustrations=illustrations,
+        captions=captions,
+        layout=layout,
+        annotation_typography=annotation_typography,
+    )
 
 
 def rasterize_svg(

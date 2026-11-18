@@ -162,6 +162,47 @@ For a 12-point sequence with 18-point feature lettering, repeat the example with
 `--sequence-font-size 12 --feature-font-size 18 --font-family Arial`. The review
 uses point-sized viewports and scrolling, not per-record fitting.
 
+### Link annotation sizes
+
+Native SVG, PNG and fixed native video can use one annotation role for feature
+annotations, span labels and illustration captions. Select it through the public
+API rather than repeating three sizes:
+
+```python
+from dnadesign.baserender import AnnotationTypography, render_record_svg
+
+result = render_record_svg(
+    record,
+    annotation_typography=AnnotationTypography(sequence_scale=1.25),
+)
+```
+
+`sequence_scale=1` matches the sequence nucleotide font size. A larger ratio
+keeps annotations proportionally larger when that sequence font changes.
+`AnnotationTypography(size_pt=18)` pins the group at a fixed point size instead.
+An explicitly selected empty group defaults to `sequence_scale=1.25`.
+Fixed and relative sizing are mutually exclusive; invalid/nonfinite values and
+resolved sizes below 6 points fail before drawing.
+
+The explicit group takes priority over individual feature-annotation, span-label
+and caption sizes. Omit it or pass `None` to retain those independent controls.
+Text, font families, caption anchors and visibility remain independently defined;
+larger text still has to pass collision and canvas admission. This control does
+not pin annotation positions between different records.
+
+The same job setting is:
+
+```yaml
+render:
+  native_svg:
+    annotation_typography:
+      sequence_scale: 1.25
+```
+
+The resolved size is returned as `diagnostics.annotation_font_size_pt` and is
+recorded with native job output diagnostics. The selected rule is retained in
+the job manifest. Existing figure/raster APIs keep their independent style roles.
+
 ### Spacer labels
 
 Native output and explicit `SequenceLayout` rendering preserve spacer-label
@@ -203,6 +244,21 @@ when needed; even that route fails if no complete, nonoverlapping legend fits.
 The default presentation preset now reserves 40 px instead of 16 px so its
 11-point legend fits at 180 dpi. This intentionally increases the natural height
 of figures using that bottom legend; figures without it are unchanged.
+
+## Composing with another renderer
+
+Match final visible type, rather than only configured point sizes. Use
+`measure_text(...).ink_height_pt` and the declared points-to-output scale to
+derive a common cap-height target. A raster component additionally carries its
+sampling DPI and later placement scale. If a producer accepts measured font
+metrics, supply those metrics through its public interface and scale the complete
+composition once. Validate every component after placement; a font minimum on
+the sequence alone says nothing about a separately scaled graph. More canvas
+space, another panel allocation or an explicit pitch change may be needed.
+
+Keep record adaptation and final page placement with the consumer. Reusable
+sequence drawing and measurement stay here; another tool retains its own graph
+geometry, quantitative plots or scientific state.
 
 ## Final raster output
 

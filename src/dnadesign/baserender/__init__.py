@@ -37,6 +37,7 @@ if TYPE_CHECKING:
         Span,
     )
     from dnadesign.baserender.src.core.vector import (  # noqa: F401
+        AnnotationTypography,
         IllustrationCaption,
         PngRenderResult,
         RasterizerInfo,
@@ -90,6 +91,7 @@ if TYPE_CHECKING:
     from dnadesign.baserender.src.runtime import initialize_runtime  # noqa: F401
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
+    "AnnotationTypography": ("dnadesign.baserender.src.core.vector", "AnnotationTypography"),
     "measure_text": ("dnadesign.baserender.src.public.typography", "measure_text"),
     "TextMeasurement": ("dnadesign.baserender.src.core.vector", "TextMeasurement"),
     "SequenceLayout": ("dnadesign.baserender.src.config.sequence_layout", "SequenceLayout"),

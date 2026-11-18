@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Mapping
 from ..config import SequenceLayout, Style
 from ..core import Record, RenderingError
 from ..core.vector import (
+    AnnotationTypography,
     IllustrationCaption,
     SvgArtwork,
     SvgIllustration,
@@ -45,6 +46,7 @@ class PreparedNativeSvg:
     fonts: Mapping[str, ResolvedFont]
     slots: Mapping[int, str]
     px_to_pt: float
+    annotation_font_size_pt: float | None = None
 
 
 def _box_pt(box, layout, scale):
@@ -59,10 +61,17 @@ def prepare_native_svg(
     illustrations: Mapping[str, SvgIllustration] | None = None,
     captions: Mapping[str, IllustrationCaption] | None = None,
     layout: SequenceLayout | None = None,
+    annotation_typography: AnnotationTypography | None = None,
 ) -> PreparedNativeSvg:
     """Bind assets, fonts and geometry before allocating a figure."""
     if not isinstance(record, Record):
         raise RenderingError("record must be a Record")
+    annotation_size = None
+    if annotation_typography is not None:
+        if not isinstance(annotation_typography, AnnotationTypography):
+            raise RenderingError("annotation_typography must be AnnotationTypography")
+        annotation_size = annotation_typography.resolve_size(style.font_size_seq)
+        style = replace(style, font_size_annotation_label=annotation_size, font_size_span_link_label=annotation_size)
     if style.figure_scale != 1:
         raise RenderingError("native SVG requires figure_scale=1 to preserve physical typography")
     if record.display.trajectory_panel is not None:
@@ -99,6 +108,8 @@ def prepare_native_svg(
             if not isinstance(caption, IllustrationCaption):
                 raise RenderingError("captions must contain IllustrationCaption")
             caption.validate()
+            if annotation_size is not None:
+                caption = replace(caption, size_pt=annotation_size)
         font = resolve_font(caption.family) if caption is not None else None
         if font is not None:
             fonts[f"caption:{asset_id}"] = font
@@ -169,7 +180,13 @@ def prepare_native_svg(
         )
 
     return PreparedNativeSvg(
-        prepared, tuple(pending), tuple(diagnostics), MappingProxyType(fonts), MappingProxyType(slot_by_effect), scale
+        prepared,
+        tuple(pending),
+        tuple(diagnostics),
+        MappingProxyType(fonts),
+        MappingProxyType(slot_by_effect),
+        scale,
+        annotation_size,
     )
 
 
@@ -221,6 +238,7 @@ def draw_native_svg(source: PreparedNativeSvg) -> SvgRenderResult:
             illustrations=source.illustrations,
             text_font_policy="reference",
             fonts=source.fonts,
+            annotation_font_size_pt=source.annotation_font_size_pt,
             bottom_legend=tuple(
                 SvgLegendEntryPlacement(
                     tag=entry.tag,
@@ -261,7 +279,15 @@ def render_svg_sequence(
     illustrations: Mapping[str, SvgIllustration] | None = None,
     captions: Mapping[str, IllustrationCaption] | None = None,
     layout: SequenceLayout | None = None,
+    annotation_typography: AnnotationTypography | None = None,
 ) -> SvgRenderResult:
     return draw_native_svg(
-        prepare_native_svg(record, style=style, illustrations=illustrations, captions=captions, layout=layout)
+        prepare_native_svg(
+            record,
+            style=style,
+            illustrations=illustrations,
+            captions=captions,
+            layout=layout,
+            annotation_typography=annotation_typography,
+        )
     )
