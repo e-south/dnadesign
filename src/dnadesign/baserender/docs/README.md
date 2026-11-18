@@ -3,7 +3,7 @@ doc_id: baserender-docs-index
 title: BaseRender documentation
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-11-17
+last_verified: 2026-11-18
 ---
 
 # BaseRender documentation
