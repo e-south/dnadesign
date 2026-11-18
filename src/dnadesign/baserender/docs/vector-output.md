@@ -346,6 +346,9 @@ failure aborts the entire new bundle, including static fallbacks.
 
 ## Admission and current qualification
 
+For stage-separated measurements, repeat commands and local regression budgets,
+see [native output performance](native-performance.md).
+
 Source hashes, selections, definitions and fonts are checked before allocating
 a figure. Vector selections reject raster images, active content, external
 references, DTDs, cycles and unsupported stylesheets. Unused definitions are

@@ -33,7 +33,7 @@ or remote publication. Rasterization remains an explicit final output operation.
 - [x] (2026-11-18 02:34Z) B — Native SVG artwork and independent vector captions proved through the public API on 60/100-base examples.
 - [x] (2026-11-18 05:54Z) C — Layout, font identity, neutral label, spacer and bottom-legend contracts are implemented; native/explicit-layout overflow fails before drawing.
 - [x] (2026-11-18 07:39Z) D — Native SVG/PNG and fixed native MP4 share preparation, composition and rasterization; exact held-frame order and static fallbacks qualify.
-- [ ] (2026-11-18 02:06Z) E — Measure and improve batch preparation against fidelity-preserving baselines.
+- [x] (2026-11-18 07:54Z) E — Cold/warm stage timings and memory qualified; backend reuse saves about 14–15% while source/font/pixel identities remain fixed. No additional cache is justified.
 - [ ] (2026-11-18 02:06Z) F — Migrate the two real sequence uses in separate verified batches.
 - [ ] (2026-11-18 02:06Z) G — Remove displaced consumer logic and close the bounded package hardening review.
 
@@ -355,6 +355,26 @@ documentation gates pass. This qualifies the neutral output primitive, not real
 talk placements, native PowerPoint playback, throughput or broad font portability.
 E/F/G remain required.
 
+E's repeatable benchmark uses the existing neutral fixture, compares repeated
+public calls with the job batch path, and times preparation, drawing, SVG
+serialization, backend admission and raster conversion separately. Five cold
+processes and nine warm samples per path qualify identical SVG bytes, PNG pixels
+and diagnostics. The counterbalanced repeat at
+`outputs/native-performance-20261118-02/` under BaseRender records runtime,
+source/style/font/artwork/backend identities, parent/child peak RSS and all raw
+observations; the initial `-01` remains as independent evidence.
+
+Warm batch median is 3.118 s per four records versus 3.663 s for individual calls
+(about 15%; the initial run measured about 14%). Backend admission drops from
+0.784 to 0.195 s. Warm preparation is 0.121 s, about 4% of the batch; final raster
+conversion dominates. Parent/child observed peaks remain below 133/147 MiB.
+Cold raster outliers remain visible, so no general tail-latency claim is made.
+The [performance guide](../../../src/dnadesign/baserender/docs/native-performance.md)
+sets numeric local regression budgets and explains repeat conditions. The
+measured benefit comes from existing per-batch backend reuse and unchanged
+frame holds. Further caching would add invalidation state for little measured
+preparation benefit, so none was added. F consumer qualification remains open.
+
 F must also pin the producer source revision alongside its distribution version:
 the current talk preparer checks `dnadesign-tools` version alone, which cannot
 distinguish changes within an editable checkout. Keep the existing v2 comparison
@@ -466,21 +486,26 @@ revise that bounded approach; do not substitute a raster or rewrite the renderer
 hashes, SVG plus preview, measurements and a short list of unresolved findings.
 The next executor updates this plan rather than creating a competing roadmap.
 
-#### Next executor contract — E measured batch costs
+#### Next executor contract — F first real consumer
 
-Measure cold/warm and batch preparation, drawing, serialization and final
-rasterization separately, with source/style/font/output identities and peak
-memory. Compare the qualified batch route with repeated individual calls before
-adding caches. Record median/tail observations and numeric regression budgets
-from the tracer. Any optimization must preserve source invalidation, exact SVG
-and PNG output, fixed geometry and error-before-publication behavior. No
-unbounded cache or new execution framework is authorized by this step.
+Migrate the graph-plus-sequence placement first, then the compact library use in
+an independently reviewed batch. Keep the original v2 recipe and qualified
+comparison recoverable. Use the public native SVG/layout/source APIs and pin the
+producer source revision alongside its editable distribution version. Preserve
+actual selected records, full teaching-row width, font minima, actual spacer
+coordinates, transparent composition and protected neighboring artwork.
 
-After E, qualify both real sequence consumers independently, pinning the producer
-source revision as well as its editable distribution version. Keep existing
-qualified assets and consumer helpers until both F migrations pass. G removes
-only the resulting proven replacements. Author artwork and upstream scientific
-sources remain protected.
+The consumer currently measures fonts with Matplotlib and inspects artist IDs to
+infer strand baselines. Use producer diagnostics for placement. If the consumer
+still needs a reusable text-ink measurement primitive, add it to BaseRender with
+shared font/glyph admission and a public contract rather than duplicating its
+geometry in the talk. Qualify producer changes before selecting their revision.
+
+Keep data translation, scientific provenance, page placement and timing in the
+consumer. Do not write to saved author SVGs, manuscripts or upstream data. After
+both F placements pass, G removes only proven displaced helpers and completes
+risk/requirements review. No source promotion, package release or PowerPoint
+playback qualification follows from an SVG review.
 
 ### Validation and Acceptance
 
