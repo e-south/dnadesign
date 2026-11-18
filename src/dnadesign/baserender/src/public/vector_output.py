@@ -57,15 +57,6 @@ def _default_illustration(asset_id):
         ) from exc
 
 
-def _font_path(family):
-    from matplotlib.font_manager import FontProperties, findfont
-
-    try:
-        return findfont(FontProperties(family=family), fallback_to_default=False)
-    except ValueError as exc:
-        raise RenderingError(f"font {family!r} is unavailable; select an installed font explicitly") from exc
-
-
 def render_record_svg(
     record: Record,
     *,
@@ -82,7 +73,9 @@ def render_record_svg(
     All asset and font admission happens before allocating a figure.
     """
     from ..config import resolve_style
+    from ..render.fonts import resolve_font
     from ..render.svg_assets import load_svg_selection
+    from ..render.svg_caption import measure_caption
     from ..runtime import initialize_runtime
 
     initialize_runtime()
@@ -110,8 +103,7 @@ def render_record_svg(
     unknown = (illustrations.keys() | captions.keys()) - asset_ids
     if unknown:
         raise RenderingError(f"unused illustration or caption selections: {sorted(unknown)}")
-    _font_path(style.font_mono)
-    _font_path(style.font_label)
+    fonts = {"sequence": resolve_font(style.font_mono), "label": resolve_font(style.font_label)}
     selections = {}
     for asset_id in asset_ids:
         spec = illustrations.get(asset_id)
@@ -126,8 +118,11 @@ def render_record_svg(
             if not isinstance(caption, IllustrationCaption):
                 raise RenderingError("captions must contain IllustrationCaption")
             caption.validate()
-        font_path = _font_path(caption.family) if caption is not None else None
-        selections[asset_id] = (source, load_svg_selection(source), caption, font_path)
+        font = resolve_font(caption.family) if caption is not None else None
+        if font is not None:
+            fonts[f"caption:{asset_id}"] = font
+            caption = replace(caption, family=font.resolved_family)
+        selections[asset_id] = (source, load_svg_selection(source), caption, font)
     bound_effects = []
     for effect in record.effects:
         if effect.kind == "anchored_illustration":
@@ -158,17 +153,47 @@ def render_record_svg(
     renderer = SequenceRowsRenderer()
     prepared = renderer.prepare(bound, style, palette, layout_request=layout)
     layout = prepared.layout
-    placements = []
-    diagnostics = []
     scale = 72.0 / style.dpi
 
-    def draw_body(axis, effect, geometry):
-        source, fragment, caption, font_path = selections[effect.params["asset_id"]]
-        slot = f"br-vector-{len(placements)}"
-        # The final canvas height is supplied below before serialization.
-        placements.append((slot, source, fragment, caption, geometry))
-        diagnostics.append((effect.params["asset_id"], source, geometry, font_path))
-        axis.add_artist(SvgSlot(slot))
+    def box_pt(box):
+        x0, y0, x1, y1 = box
+        return (x0 * scale, (layout.height - y1) * scale, x1 * scale, (layout.height - y0) * scale)
+
+    pending = []
+    diagnostics = []
+    slot_by_effect = {}
+    for effect_index, geometry in prepared.illustration_geometries.items():
+        effect = prepared.record.effects[effect_index]
+        asset_id = effect.params["asset_id"]
+        source, fragment, caption, font = selections[asset_id]
+        slot = f"br-vector-{len(pending)}"
+        bounds = box_pt(geometry.box)
+        caption_geometry = measure_caption(
+            caption,
+            font,
+            bounds,
+            asset_id=asset_id,
+            px_to_pt=scale,
+            canvas_size_pt=(layout.width * scale, layout.height * scale),
+        )
+        pending.append(SvgPlacement(slot, source, fragment, bounds, caption, caption_geometry))
+        slot_by_effect[effect_index] = slot
+        diagnostics.append(
+            SvgIllustrationPlacement(
+                asset_id=asset_id,
+                source_sha256=source.sha256,
+                bounds_pt=bounds,
+                anchors_pt=MappingProxyType(
+                    {key: (x * scale, (layout.height - y) * scale) for key, (x, y) in geometry.anchors.items()}
+                ),
+                caption_font_path=None if font is None else font.path,
+                caption_origin_pt=None if caption_geometry is None else caption_geometry.origin_pt,
+                caption_bounds_pt=None if caption_geometry is None else caption_geometry.bounds_pt,
+            )
+        )
+
+    def draw_body(axis, effect, geometry, *, effect_index):
+        axis.add_artist(SvgSlot(slot_by_effect[effect_index]))
 
     import matplotlib.pyplot as plt
 
@@ -176,14 +201,6 @@ def render_record_svg(
     try:
         figure = renderer.draw_prepared(prepared, illustration_drawer=draw_body)
 
-        def box_pt(box):
-            x0, y0, x1, y1 = box
-            return (x0 * scale, (layout.height - y1) * scale, x1 * scale, (layout.height - y0) * scale)
-
-        pending = [
-            SvgPlacement(slot, source, fragment, box_pt(geometry.box), caption, scale)
-            for slot, source, fragment, caption, geometry in placements
-        ]
         svg = compose_svg(figure, pending)
         nucleotide_boxes = {}
         for placement in layout.placements:
@@ -201,24 +218,15 @@ def render_record_svg(
                 )
                 nucleotide_boxes[placement.feature_id] = box_pt(shape.paint_bounds)
         result_diagnostics = SvgRenderDiagnostics(
-            record.id,
-            layout.cw * scale,
-            ((layout.height - layout.y_forward) * scale, (layout.height - layout.y_reverse) * scale),
-            (layout.x_left * scale, (layout.height - layout.y_forward) * scale),
-            MappingProxyType({key: box_pt(box) for key, box in layout.feature_boxes.items()}),
-            MappingProxyType(nucleotide_boxes),
-            tuple(
-                SvgIllustrationPlacement(
-                    asset_id,
-                    source.sha256,
-                    box_pt(geometry.box),
-                    MappingProxyType(
-                        {key: (x * scale, (layout.height - y) * scale) for key, (x, y) in geometry.anchors.items()}
-                    ),
-                    font_path,
-                )
-                for asset_id, source, geometry, font_path in diagnostics
-            ),
+            record_id=record.id,
+            base_pitch_pt=layout.cw * scale,
+            strand_anchors_pt=((layout.height - layout.y_forward) * scale, (layout.height - layout.y_reverse) * scale),
+            sequence_origin_pt=(layout.x_left * scale, (layout.height - layout.y_forward) * scale),
+            feature_bounds_pt=MappingProxyType({key: box_pt(box) for key, box in layout.feature_boxes.items()}),
+            nucleotide_box_bounds_pt=MappingProxyType(nucleotide_boxes),
+            illustrations=tuple(diagnostics),
+            text_font_policy="reference",
+            fonts=MappingProxyType(fonts),
         )
         return SvgRenderResult(svg, layout.width * scale, layout.height * scale, result_diagnostics)
     finally:

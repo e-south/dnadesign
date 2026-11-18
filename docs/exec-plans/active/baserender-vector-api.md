@@ -31,7 +31,7 @@ or remote publication. Rasterization remains an explicit final output operation.
 - [x] (2026-11-18 02:06Z) Capture the proposal, known source findings, focused baseline and next-executor contract; implementation has not started.
 - [x] (2026-11-18 02:34Z) A — Baseline package suite, catalog, demo admission and public usage reviewed; prioritized findings below retain open work.
 - [x] (2026-11-18 02:34Z) B — Native SVG artwork and independent vector captions proved through the public API on 60/100-base examples.
-- [ ] (2026-11-18 04:29Z) C — In progress: shared glyph/label geometry, neutral annotations and typed physical canvas across API/image jobs; illustration overflow and font policy remain.
+- [ ] (2026-11-18 04:55Z) C — In progress: native artwork/caption bounds and referenced-font identities now admitted; strict spacer/legend type fitting remains before C closes.
 - [ ] (2026-11-18 02:06Z) D — Qualify shared geometry through SVG, PNG, representative frames and CLI/job admission.
 - [ ] (2026-11-18 02:06Z) E — Measure and improve batch preparation against fidelity-preserving baselines.
 - [ ] (2026-11-18 02:06Z) F — Migrate the two real sequence uses in separate verified batches.
@@ -65,10 +65,11 @@ SVG feature has been exhaustively audited.
 | P1: vector requests preserve actual geometry | [Illustration loader](../../../src/dnadesign/baserender/src/render/effects/anchored_illustration.py) selected pixels; the new native API reads pinned SVG selections without decoding PNG. Closed for the native API; legacy APIs remain explicit raster paths. | B |
 | P1: fixed typography and transparent composition | [Fitted panel](../../../src/dnadesign/baserender/src/public/api.py) forces white and rescales. Native SVG avoids that route; fixed-canvas admission and PNG/frame parity are still open. | C/D |
 | P2: neutral placement policy | [Sequence labels](../../../src/dnadesign/baserender/src/render/sequence_rows.py) now use explicit feature annotation declarations. DenseGen/GenBank adapters supply the policy; provenance attributes no longer control placement. | C, closed |
-| P2: exact placement is observable | [Illustration geometry](../../../src/dnadesign/baserender/src/render/effects/anchored_illustration.py) still clamps horizontal placement. Native diagnostics expose actual bounds; explicit anchor/overflow policy remains open. | C |
-| P2: viewer font identity | Chrome used a serif fallback for a Matplotlib-bundled font. Explicit Arial proofs render correctly in Chrome and Inkscape; referenced-font portability is not solved by Python font resolution. | C/D |
+| P2: exact placement is observable | Native illustration frames now fail on overflow instead of clamping; captions share admitted origins with serialization and report ink bounds. Existing raster behavior stays explicit. | C, closed |
+| P2: viewer font identity | Native diagnostics declare referenced text and hash the resolved declared fonts. Captions reject missing glyphs and use resolved family names. Arial proofs render in Chrome/Inkscape; target font availability still needs consumer qualification. | C policy closed; D/F qualification |
 | P2: repeated illustrations have unique IDs | A two-instance test exposed colliding footprint IDs. Unique footprint IDs and definition namespaces now pass structural tests. | B, closed |
 | P2: video honors admitted layout | [Legacy video](../../../src/dnadesign/baserender/src/outputs/video.py) receives no renderer options, mutates layout metadata and applies its own fitting (including a 0.96 content scale). Explicit layout with video now fails at admission. D must qualify a shared native frame path before enabling it. | D, open |
+| P2: native labels preserve requested type | Spacer labels still default to shrink-to-fit; nonuniform bottom legends may also reduce fonts. Native output must choose explicit preserve-type failure behavior through shared measured geometry, retaining legitimate legacy fitting. | C, open |
 
 ### Decision Log
 
@@ -137,8 +138,8 @@ DNA case and ambiguity-code variants. Chrome and Inkscape inspection agree.
 Twenty-seven additional tests cover centering, both strands/fonts, preserved
 glyph scale and columns, invalid spacing units, tight-pitch rejection and
 diagnostic-to-painted-bound agreement. The package suite now passes 686 tests.
-Illustration overflow and portable font policy remain open in C; the physical
-canvas controls are qualified below. This is not completion of C–G or real
+Strict spacer/legend fitting remains open in C; artwork/caption overflow and the
+referenced-font policy are qualified below. This is not completion of C–G or real
 consumer qualification.
 
 The CLI/API admission review found that `job validate` accepted negative glyph
@@ -200,6 +201,25 @@ private `render_with_layout` tuple route is removed. Four 60/100-base SVGs with
 12/18-point captions remain byte-identical across this preparatory refactor;
 their comparison is retained in `outputs/vector-placement-20261118-01/` under
 BaseRender. All 734 package tests still pass.
+
+Native illustration placement now rejects horizontal overflow, keeping the
+calculated anchors. Captions are measured before figure allocation using the
+resolved font's literal text advances and ink bounds. Serialization uses that
+same admitted origin. Diagnostics include caption origins/bounds and frozen
+`ResolvedFont` identities under an explicit `reference` text-font policy. Missing
+glyphs, unsupported control characters, extreme units and collapsing SVG aspect
+ratios fail with context. The original raster clamping route remains supported.
+The checked-in example now uses `SequenceLayout`, pins its DPI and records font
+and caption geometry. Native SVG still contains no raster images. The review at
+`outputs/vector-placement-20261118-03/` under BaseRender includes a transparent
+Inkscape PNG and Chrome inspection of the 60/100-base examples. Caption and body
+geometry agree across independently sized captions; font-file embedding and
+arbitrary source-SVG font interpretation are not claimed.
+Eighteen new placement/font tests pass, including explicit recovery through a
+larger typed canvas. The full package suite passes 752 tests. The browser review
+resets per-card horizontal scroll before comparing caption sizes; automatic
+`scrollIntoView` had panned one review card by 16 CSS pixels, while its SVG bounds
+were unchanged. The aligned screenshot records the actual common frame.
 
 F must also pin the producer source revision alongside its distribution version:
 the current talk preparer checks `dnadesign-tools` version alone, which cannot
@@ -314,14 +334,13 @@ The next executor updates this plan rather than creating a competing roadmap.
 
 #### Next executor contract — C
 
-Qualify illustration/caption overflow and explicit font policy. Preserve the
-typed layout contract and neutral annotations. Reuse existing geometry and
-report resolved font/placement identities. Move the checked-in neutral example
-from legacy extent metadata to `SequenceLayout` after its artwork bounds qualify.
-Carry the demonstrated viewer-font mismatch into an explicit output policy;
-do not claim portability from Matplotlib font lookup alone. Add negative tests
-for invalid settings and insufficient bounds, plus crowded and reverse-strand
-examples. Preserve the A/B native proof and all existing supported APIs.
+Remove implicit native spacer/legend font shrinking through shared measured
+plans and explicit insufficient-space errors. Consolidate duplicated spacer
+measurements between effect drawing and label collision planning. Preserve the
+new caption, layout and neutral annotation contracts, the A/B proofs and supported
+legacy raster fitting. Qualify crowded/reverse-strand cases and keep font-policy
+claims limited to declared referenced fonts; consumer viewers need their own
+inspection. Then audit C against its original criteria before starting D.
 
 ### Validation and Acceptance
 

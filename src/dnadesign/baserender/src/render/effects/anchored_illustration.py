@@ -25,7 +25,7 @@ from matplotlib.patches import PathPatch
 from matplotlib.path import Path as MatplotlibPath
 
 from ...config import Style
-from ...core import Effect, Record, RenderingError
+from ...core import Effect, LayoutError, Record, RenderingError
 from ...core.vector import SvgArtwork
 from ..layout import LayoutContext
 from ..palette import Palette
@@ -75,7 +75,10 @@ def _required_text(value: object, *, field_name: str) -> str:
 def _finite_positive(value: object, *, field_name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise RenderingError(f"{field_name} must be numeric")
-    number = float(value)
+    try:
+        number = float(value)
+    except OverflowError as exc:
+        raise RenderingError(f"{field_name} must be finite and > 0") from exc
     if not math.isfinite(number) or number <= 0.0:
         raise RenderingError(f"{field_name} must be finite and > 0")
     return number
@@ -204,9 +207,18 @@ def compute_anchored_illustration_geometry(
     x0 = (sum(planned_centers) / len(planned_centers)) - anchor_center * width
     minimum_x = float(style.padding_x)
     maximum_x = float(layout.width - style.padding_x - width)
-    if maximum_x < minimum_x:
-        raise RenderingError("anchored illustration is wider than the available sequence-row canvas")
-    x0 = min(maximum_x, max(minimum_x, x0))
+    native = "svg_asset" in effect.params
+    if native:
+        if x0 < minimum_x - 1e-7 or x0 > maximum_x + 1e-7:
+            raise LayoutError(
+                f"asset {asset.asset_id!r} illustration bounds {(x0, x0 + width)} px exceed canvas interval "
+                f"{(minimum_x, layout.width - style.padding_x)} px; "
+                "move the sequence origin, increase the canvas or explicitly change illustration width"
+            )
+    else:
+        if maximum_x < minimum_x:
+            raise RenderingError("anchored illustration is wider than the available sequence-row canvas")
+        x0 = min(maximum_x, max(minimum_x, x0))
     x1 = x0 + width
     top_gap = _finite_positive(
         effect.params.get("top_gap_px", 8.0), field_name="anchored_illustration params.top_gap_px"
@@ -214,6 +226,11 @@ def compute_anchored_illustration_geometry(
     y1 = float(layout.content_top) - top_gap
     y0 = y1 - height
     if y0 <= float(layout.content_bottom):
+        if native:
+            raise LayoutError(
+                f"asset {asset.asset_id!r} illustration bounds {(y0, y1)} px exceed the reserved vertical lane "
+                f"{(layout.content_bottom, layout.content_top)} px; increase the layout top extent"
+            )
         raise RenderingError("anchored illustration has no reserved vertical lane")
     anchor_points = {key: (x0 + point[0] * width, y1 - point[1] * height) for key, point in asset.anchors.items()}
     return asset, AnchoredIllustrationGeometry(x0, y0, x1, y1, anchor_points, bindings)
@@ -264,9 +281,13 @@ def draw_anchored_illustration(
     feature_boxes: dict[str, tuple[float, float, float, float]],
     *,
     body_drawer=None,
+    geometry: AnchoredIllustrationGeometry | None = None,
 ) -> None:
     del palette
-    asset, geometry = compute_anchored_illustration_geometry(effect, record, layout, style)
+    if geometry is None:
+        asset, geometry = compute_anchored_illustration_geometry(effect, record, layout, style)
+    else:
+        asset = _effect_asset(effect)
     color = str(effect.params.get("fill_color", "#DDE2E7"))
     alpha = float(effect.params.get("fill_alpha", 0.42))
     visible = []

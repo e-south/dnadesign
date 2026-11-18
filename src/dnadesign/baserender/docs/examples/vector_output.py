@@ -14,10 +14,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from dataclasses import asdict
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from dnadesign.baserender import Effect, Feature, IllustrationCaption, Record, Span, render_record_svg
+from dnadesign.baserender import Effect, Feature, IllustrationCaption, Record, SequenceLayout, Span, render_record_svg
 
 
 def example(length):
@@ -43,7 +44,6 @@ def example(length):
             ),
             Effect("span_link", {"from_feature_id": "left", "to_feature_id": "right"}, {"label": "18 bp"}),
         ),
-        meta={"fixed_content_top_extent_px": 260},
     )
 
 
@@ -62,6 +62,7 @@ def main():
             result = render_record_svg(
                 example(length),
                 style_overrides={
+                    "dpi": 180,
                     "legend": False,
                     "show_pair_rungs": False,
                     "font_label": "Arial",
@@ -74,6 +75,7 @@ def main():
                         "RNAP", size_pt=size, family="Arial", anchor_fraction=(0.83827, 0.55688)
                     )
                 },
+                layout=SequenceLayout(top_extent_pt=104),
             )
             root = ET.fromstring(result.svg)
             rendered[name] = result.svg
@@ -90,6 +92,10 @@ def main():
                     "base_pitch_pt": result.diagnostics.base_pitch_pt,
                     "image_count": len(root.findall(".//{http://www.w3.org/2000/svg}image")),
                     "source_sha256": result.diagnostics.illustrations[0].source_sha256,
+                    "illustration_bounds_pt": result.diagnostics.illustrations[0].bounds_pt,
+                    "caption_bounds_pt": result.diagnostics.illustrations[0].caption_bounds_pt,
+                    "text_font_policy": result.diagnostics.text_font_policy,
+                    "fonts": {role: asdict(font) for role, font in result.diagnostics.fonts.items()},
                 }
             )
     args.output_dir.mkdir(parents=True, exist_ok=False)

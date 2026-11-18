@@ -21,6 +21,7 @@ from matplotlib.artist import Artist
 from ..core import RenderingError
 from ..core.vector import IllustrationCaption, SvgArtwork
 from ..render.svg_assets import SVG, namespace_selection
+from ..render.svg_caption import CaptionGeometry
 
 
 class SvgSlot(Artist):
@@ -44,7 +45,7 @@ class SvgPlacement:
     fragment: object
     bounds_pt: tuple[float, float, float, float]
     caption: IllustrationCaption | None
-    px_to_pt: float
+    caption_geometry: CaptionGeometry | None
 
 
 def compose_svg(figure, placements):
@@ -67,11 +68,11 @@ def compose_svg(figure, placements):
         x0, y0, x1, y1 = placement.bounds_pt
         fragment.attrib.update(
             {
-                "x": f"{x0:g}",
-                "y": f"{y0:g}",
-                "width": f"{x1 - x0:g}",
-                "height": f"{y1 - y0:g}",
-                "viewBox": " ".join(f"{n:g}" for n in placement.artwork.view_box),
+                "x": f"{x0:.12g}",
+                "y": f"{y0:.12g}",
+                "width": f"{x1 - x0:.12g}",
+                "height": f"{y1 - y0:.12g}",
+                "viewBox": " ".join(f"{n:.12g}" for n in placement.artwork.view_box),
                 "preserveAspectRatio": "xMidYMid meet",
                 "overflow": "visible",
             }
@@ -79,19 +80,21 @@ def compose_svg(figure, placements):
         group.append(fragment)
         caption = placement.caption
         if caption is not None and caption.visible:
-            cx = x0 + caption.anchor_fraction[0] * (x1 - x0) + caption.offset_px[0] * placement.px_to_pt
-            cy = y0 + caption.anchor_fraction[1] * (y1 - y0) + caption.offset_px[1] * placement.px_to_pt
+            if placement.caption_geometry is None:
+                raise RenderingError("visible SVG caption has no admitted placement")
+            cx, cy = placement.caption_geometry.origin_pt
             text = ET.SubElement(
                 group,
                 f"{SVG}text",
                 {
                     "data-baserender-caption": placement.slot_id,
-                    "x": f"{cx:g}",
-                    "y": f"{cy:g}",
+                    "x": f"{cx:.12g}",
+                    "y": f"{cy:.12g}",
                     "font-family": caption.family,
-                    "font-size": f"{caption.size_pt:g}",
+                    "font-size": f"{caption.size_pt:.12g}",
                     "text-anchor": "middle",
                     "fill": "#000000",
+                    "{http://www.w3.org/XML/1998/namespace}space": "preserve",
                 },
             )
             text.text = caption.text

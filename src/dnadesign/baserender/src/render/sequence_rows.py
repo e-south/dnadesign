@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, replace
-from functools import lru_cache
+from functools import lru_cache, partial
+from types import MappingProxyType
 from typing import Mapping, Sequence
 
 import matplotlib
@@ -30,7 +31,11 @@ from matplotlib.transforms import Affine2D
 from ..config import SequenceLayout, Style
 from ..config.sequence_layout import sequence_layout_from_options
 from ..core import Record, RenderingError
-from .effects.anchored_illustration import draw_anchored_illustration
+from .effects.anchored_illustration import (
+    AnchoredIllustrationGeometry,
+    compute_anchored_illustration_geometry,
+    draw_anchored_illustration,
+)
 from .effects.motif_logo import MotifLogoGeometry, compute_motif_logo_geometry
 from .effects.registry import draw_effect, validate_effect
 from .feature_labels import (
@@ -65,6 +70,7 @@ class PreparedSequenceRows:
     tone_rev: tuple[float, ...] | None
     explicit_complement_sequence: str | None
     labels: tuple[PlannedLabel, ...]
+    illustration_geometries: Mapping[int, AnchoredIllustrationGeometry]
 
 
 def _without_redundant_full_span_overlay(record: Record) -> Record:
@@ -133,6 +139,11 @@ def _preflight_sequence_rows(
     if record.display.overlay_text:
         reserved_boxes = (_overlay_layout(layout, style, record.display.overlay_text)[-1],)
     labels = plan_feature_labels(record, layout, palette, style, reserved_boxes=reserved_boxes)
+    illustration_geometries = {
+        index: compute_anchored_illustration_geometry(effect, record, layout, style)[1]
+        for index, effect in enumerate(record.effects)
+        if effect.kind == "anchored_illustration"
+    }
 
     return PreparedSequenceRows(
         record=record,
@@ -144,6 +155,7 @@ def _preflight_sequence_rows(
         tone_rev=tone_rev,
         explicit_complement_sequence=explicit_complement_sequence,
         labels=labels,
+        illustration_geometries=MappingProxyType(illustration_geometries),
     )
 
 
@@ -405,10 +417,18 @@ class SequenceRowsRenderer:
             )
 
         # Draw effects with strict unknown-kind failure from registry.
-        for effect in record.effects:
+        for effect_index, effect in enumerate(record.effects):
             if effect.kind == "anchored_illustration" and illustration_drawer is not None:
                 draw_anchored_illustration(
-                    ax, effect, record, layout, style, palette, feature_boxes, body_drawer=illustration_drawer
+                    ax,
+                    effect,
+                    record,
+                    layout,
+                    style,
+                    palette,
+                    feature_boxes,
+                    body_drawer=partial(illustration_drawer, effect_index=effect_index),
+                    geometry=prepared.illustration_geometries[effect_index],
                 )
             else:
                 draw_effect(ax, effect, record, layout, style, palette, feature_boxes)

@@ -61,8 +61,27 @@ callers use the public result and diagnostics, not artists or generated IDs.
 Diagnostics report base pitch, forward/reverse strand positions, logical feature bounds
 and illustration anchors/bounds in points, with origin at the canvas top left.
 Bounds are `(x0, y0, x1, y1)`. Illustration diagnostics include source SHA-256
-and the font file resolved for the caption. Native output requires
+and the font file resolved for the caption. They also return `caption_origin_pt`
+(the text-anchor midpoint and baseline) and `caption_bounds_pt` (visible ink).
+Hidden captions return neither bound nor origin. Native output requires
 `figure_scale=1`; explicit font sizes keep their physical size.
+
+### Artwork and caption bounds
+
+Native artwork keeps its calculated anchor position. A declared illustration
+frame outside the canvas fails with its asset ID and attempted bounds; the
+existing raster figure route retains its clamping behavior. Change the explicit
+grid origin, canvas, reserved top extent or illustration width to resolve the
+failure. The illustration frame comes from the selected source's declared
+`view_box`; callers must supply a frame containing the selected geometry.
+BaseRender preserves those SVG paths and transforms rather than estimating them
+through a second SVG geometry engine.
+
+Captions are single-line literal text. Dollar signs remain literal, repeated
+spaces are preserved, and control characters fail admission. Missing visible caption
+glyphs fail instead of producing replacement characters. The measured caption
+origin is used directly by serialization. Out-of-canvas captions fail before
+figure allocation; they are not moved, clipped or reduced automatically.
 
 ### Physical canvas and grid
 
@@ -136,12 +155,20 @@ trajectory panels are explicitly unsupported on this path. There is no pixel
 substitution or silent fit. Retain a separate supported raster input when using
 the existing raster figure path.
 
-SVG references font families; fonts are not embedded. A Matplotlib-resolved font
-can still be unavailable to another viewer. Select a font installed in the
-target viewer and inspect the intended output. The first proof uses explicit
-Arial in Chrome and Inkscape. Feature annotations now use the explicit neutral
+Diagnostics declare `text_font_policy="reference"` and return `fonts` by declared
+role (`sequence`, `label`, `caption:<asset_id>`). Each `ResolvedFont` records the
+requested/resolved family, face style, local file and SHA-256. The SVG references
+fonts and does not embed font files; the local file paths stay in diagnostics.
+Caption text references the canonical resolved family. Text already present in
+caller-selected artwork retains its source SVG styling.
+
+A resolved producer font can still be unavailable to another viewer. Select a
+font installed in the target viewer and inspect the intended output; this policy
+does not claim portable text rendering from Matplotlib lookup alone. The example
+uses explicit Arial for editable labels in Chrome and Inkscape and records font
+identities alongside the SVGs. Feature annotations use the explicit neutral
 declaration in the [record contract](reference.md#neutral-record). Portable font
-policy, illustration overflow admission, PNG/frame output and native SVG CLI/job integration remain in the
+qualification, strict spacer/legend type fitting, PNG/frame output and native SVG CLI/job integration remain in the
 [execution plan](../../../../docs/exec-plans/active/baserender-vector-api.md).
 Native PowerPoint behavior and real consumer migration are not qualified by this
 neutral proof.

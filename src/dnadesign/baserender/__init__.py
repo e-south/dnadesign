@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     )
     from dnadesign.baserender.src.core.vector import (  # noqa: F401
         IllustrationCaption,
+        ResolvedFont,
         SvgArtwork,
         SvgIllustration,
         SvgIllustrationPlacement,
@@ -84,6 +85,7 @@ if TYPE_CHECKING:
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "SequenceLayout": ("dnadesign.baserender.src.config.sequence_layout", "SequenceLayout"),
+    "ResolvedFont": ("dnadesign.baserender.src.core.vector", "ResolvedFont"),
     "render_record_svg": ("dnadesign.baserender.src.public.vector_output", "render_record_svg"),
     "IllustrationCaption": ("dnadesign.baserender.src.core.vector", "IllustrationCaption"),
     "SvgArtwork": ("dnadesign.baserender.src.core.vector", "SvgArtwork"),

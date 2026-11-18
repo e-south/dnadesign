@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import math
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
@@ -24,7 +25,12 @@ def finite_tuple(value, length, name, *, positive=False):
     if not isinstance(value, (tuple, list)) or len(value) != length:
         raise RenderingError(f"{name} must contain {length} numbers")
     for item in value:
-        if isinstance(item, bool) or not isinstance(item, (int, float)) or not math.isfinite(item):
+        valid = not isinstance(item, bool) and isinstance(item, (int, float))
+        try:
+            valid = valid and math.isfinite(item)
+        except OverflowError:
+            valid = False
+        if not valid:
             raise RenderingError(f"{name} must contain finite numbers")
         if positive and item <= 0:
             raise RenderingError(f"{name} must contain positive numbers")
@@ -53,6 +59,9 @@ class SvgArtwork:
         finite_tuple(self.view_box, 4, "svg artwork.view_box")
         if self.view_box[2] <= 0 or self.view_box[3] <= 0:
             raise RenderingError("svg artwork.view_box width and height must be positive")
+        ratio = self.view_box[3] / self.view_box[2]
+        if not math.isfinite(ratio) or ratio <= 0:
+            raise RenderingError("svg artwork.view_box aspect ratio must remain finite and positive")
         if not isinstance(self.anchors, Mapping) or not self.anchors:
             raise RenderingError("svg artwork.anchors must be a non-empty mapping")
         for key, point in self.anchors.items():
@@ -76,6 +85,8 @@ class IllustrationCaption:
     def validate(self):
         if not isinstance(self.text, str) or not self.text.strip():
             raise RenderingError("caption.text must be a non-empty string")
+        if any(unicodedata.category(char) in {"Cc", "Zl", "Zp"} for char in self.text):
+            raise RenderingError("caption.text must be single-line literal text without control characters")
         if not isinstance(self.family, str) or not self.family.strip():
             raise RenderingError("caption.family must name a font")
         finite_tuple((self.size_pt,), 1, "caption.size_pt", positive=True)
@@ -101,6 +112,17 @@ class SvgIllustrationPlacement:
     bounds_pt: tuple[float, float, float, float]
     anchors_pt: Mapping[str, tuple[float, float]]
     caption_font_path: str | None
+    caption_origin_pt: tuple[float, float] | None
+    caption_bounds_pt: tuple[float, float, float, float] | None
+
+
+@dataclass(frozen=True)
+class ResolvedFont:
+    requested_family: str
+    resolved_family: str
+    style: str
+    path: str
+    sha256: str
 
 
 @dataclass(frozen=True)
@@ -112,6 +134,8 @@ class SvgRenderDiagnostics:
     feature_bounds_pt: Mapping[str, tuple[float, float, float, float]]
     nucleotide_box_bounds_pt: Mapping[str, tuple[float, float, float, float]]
     illustrations: tuple[SvgIllustrationPlacement, ...]
+    text_font_policy: str
+    fonts: Mapping[str, ResolvedFont]
 
 
 @dataclass(frozen=True)
