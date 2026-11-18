@@ -14,11 +14,20 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from dnadesign.baserender import Effect, Feature, IllustrationCaption, Record, SequenceLayout, Span, render_record_svg
+from dnadesign.baserender import (
+    Display,
+    Effect,
+    Feature,
+    IllustrationCaption,
+    Record,
+    SequenceLayout,
+    Span,
+    render_record_svg,
+)
 
 
 def example(length):
@@ -53,17 +62,28 @@ def main():
     parser.add_argument("--sequence-font-size", type=float, default=14)
     parser.add_argument("--feature-font-size", type=float, default=None)
     parser.add_argument("--font-family", default="DejaVu Sans Mono")
+    parser.add_argument("--legend-font-size", type=float, default=None)
+    parser.add_argument("--legend-height-px", type=float, default=60)
     args = parser.parse_args()
     rendered = {}
     records = []
     for length in (60, 100):
         for size in (12, 18):
             name = f"{length}bp-caption-{size}.svg"
+            record = example(length)
+            if args.legend_font_size is not None:
+                record = replace(
+                    record,
+                    features=tuple(replace(feature, tags=(feature.id,)) for feature in record.features),
+                    display=Display(tag_labels={"left": "Upstream element", "right": "Downstream element"}),
+                )
             result = render_record_svg(
-                example(length),
+                record,
                 style_overrides={
                     "dpi": 180,
-                    "legend": False,
+                    "legend": args.legend_font_size is not None,
+                    "legend_font_size": 11 if args.legend_font_size is None else args.legend_font_size,
+                    "legend_height_px": args.legend_height_px,
                     "show_pair_rungs": False,
                     "font_label": "Arial",
                     "font_mono": args.font_family,
@@ -96,6 +116,7 @@ def main():
                     "caption_bounds_pt": result.diagnostics.illustrations[0].caption_bounds_pt,
                     "text_font_policy": result.diagnostics.text_font_policy,
                     "fonts": {role: asdict(font) for role, font in result.diagnostics.fonts.items()},
+                    "bottom_legend": [asdict(entry) for entry in result.diagnostics.bottom_legend],
                 }
             )
     args.output_dir.mkdir(parents=True, exist_ok=False)

@@ -22,7 +22,8 @@ legend: true
 legend_mode: bottom
 legend_inline_side: auto
 legend_inline_margin_cells: 0.35
-legend_height_px: 16.0
+# At 180 dpi, the 11-point legend needs 27.5 px plus row clearance.
+legend_height_px: 40.0
 legend_pad_px: 10.0
 legend_font_size: 11
 legend_patch_w: 22.0

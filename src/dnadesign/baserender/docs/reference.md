@@ -135,6 +135,13 @@ Every output path is relative to bundle.path and confined within it.
 - Private render contracts preserve owner-only directory and file modes.
 - A failed render or publication leaves no partial final bundle.
 
+Bottom legends share style admission across API calls and jobs. Font size is in
+points; `legend_height_px`, swatch dimensions and gaps are finite pixel values.
+Font size is at least 6 pt, height/dimensions are positive and gaps are nonnegative.
+Native SVG and explicit layouts preserve the requested type and swatch geometry;
+see [bottom-legend layout](vector-output.md#bottom-legends) for wrapping, fitting
+and measured diagnostics.
+
 ## Neutral record
 
 Record is the renderer input:

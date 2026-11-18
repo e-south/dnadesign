@@ -163,6 +163,32 @@ bounds (including clearance). Unlabelled spacers return no font or label bounds;
 their line/tick bounds still undergo canvas admission. Span targets accept
 read-only mappings and reject fractional, boolean or out-of-range base coordinates.
 
+### Bottom legends
+
+Repeat the first-use command with `--font-family Arial --legend-font-size 12.5`
+to include measured bottom legends in all four proofs. `--legend-height-px`
+controls their reserved footer (60 px in the example).
+
+Native SVG and explicit `SequenceLayout` output preserve `legend_font_size`,
+including fractional points. `uniform_display_font_size=True` uses the largest
+configured display role instead. Legends wrap at that size within the declared
+`legend_height_px` footer; insufficient width or height fails before allocation.
+Increase the canvas width/footer reservation or choose another size explicitly.
+Native swatch dimensions and gaps also retain their configured values.
+
+`diagnostics.bottom_legend` contains `SvgLegendEntryPlacement` values: tag, exact
+label, point size, swatch bounds, text origin and reserved entry bounds. Coordinates
+use the same top-left point frame as the other diagnostics. Row heights account
+for DPI; swatches and text share the row center. Labels are literal text, with
+optional newline breaks, rather than math expressions. Fonts, glyph coverage,
+colors and units are checked before drawing.
+
+The ordinary figure route retains font fitting and uses spare footer clearance
+when needed; even that route fails if no complete, nonoverlapping legend fits.
+The default presentation preset now reserves 40 px instead of 16 px so its
+11-point legend fits at 180 dpi. This intentionally increases the natural height
+of figures using that bottom legend; figures without it are unchanged.
+
 ## Admission and current qualification
 
 Source hashes, selections, definitions and fonts are checked before allocating
@@ -186,7 +212,7 @@ does not claim portable text rendering from Matplotlib lookup alone. The example
 uses explicit Arial for editable labels in Chrome and Inkscape and records font
 identities alongside the SVGs. Feature annotations use the explicit neutral
 declaration in the [record contract](reference.md#neutral-record). Portable font
-qualification, strict bottom-legend type fitting, PNG/frame output and native SVG CLI/job integration remain in the
+qualification, PNG/frame output and native SVG CLI/job integration remain in the
 [execution plan](../../../../docs/exec-plans/active/baserender-vector-api.md).
 Native PowerPoint behavior and real consumer migration are not qualified by this
 neutral proof.

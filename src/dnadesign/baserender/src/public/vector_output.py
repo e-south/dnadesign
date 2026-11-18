@@ -24,6 +24,7 @@ from ..core.vector import (
     SvgArtwork,
     SvgIllustration,
     SvgIllustrationPlacement,
+    SvgLegendEntryPlacement,
     SvgRenderDiagnostics,
     SvgRenderResult,
     SvgSpanLinkPlacement,
@@ -228,6 +229,17 @@ def render_record_svg(
             illustrations=tuple(diagnostics),
             text_font_policy="reference",
             fonts=MappingProxyType(fonts),
+            bottom_legend=tuple(
+                SvgLegendEntryPlacement(
+                    tag=entry.tag,
+                    label=entry.label,
+                    font_size_pt=entry.font_size_pt,
+                    patch_bounds_pt=box_pt(entry.patch_bounds),
+                    text_origin_pt=(entry.text_origin[0] * scale, (layout.height - entry.text_origin[1]) * scale),
+                    bounds_pt=box_pt(entry.bounds),
+                )
+                for entry in prepared.bottom_legend
+            ),
             span_links=tuple(
                 SvgSpanLinkPlacement(
                     effect_index=index,

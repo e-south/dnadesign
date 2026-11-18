@@ -31,7 +31,7 @@ or remote publication. Rasterization remains an explicit final output operation.
 - [x] (2026-11-18 02:06Z) Capture the proposal, known source findings, focused baseline and next-executor contract; implementation has not started.
 - [x] (2026-11-18 02:34Z) A — Baseline package suite, catalog, demo admission and public usage reviewed; prioritized findings below retain open work.
 - [x] (2026-11-18 02:34Z) B — Native SVG artwork and independent vector captions proved through the public API on 60/100-base examples.
-- [ ] (2026-11-18 05:15Z) C — In progress: spacer drawing/collision geometry now unified with native preserve-type checks; bottom-legend fitting remains before C closes.
+- [x] (2026-11-18 05:54Z) C — Layout, font identity, neutral label, spacer and bottom-legend contracts are implemented; native/explicit-layout overflow fails before drawing.
 - [ ] (2026-11-18 02:06Z) D — Qualify shared geometry through SVG, PNG, representative frames and CLI/job admission.
 - [ ] (2026-11-18 02:06Z) E — Measure and improve batch preparation against fidelity-preserving baselines.
 - [ ] (2026-11-18 02:06Z) F — Migrate the two real sequence uses in separate verified batches.
@@ -69,7 +69,7 @@ SVG feature has been exhaustively audited.
 | P2: viewer font identity | Native diagnostics declare referenced text and hash the resolved declared fonts. Captions reject missing glyphs and use resolved family names. Arial proofs render in Chrome/Inkscape; target font availability still needs consumer qualification. | C policy closed; D/F qualification |
 | P2: repeated illustrations have unique IDs | A two-instance test exposed colliding footprint IDs. Unique footprint IDs and definition namespaces now pass structural tests. | B, closed |
 | P2: video honors admitted layout | [Legacy video](../../../src/dnadesign/baserender/src/outputs/video.py) receives no renderer options, mutates layout metadata and applies its own fitting (including a 0.96 content scale). Explicit layout with video now fails at admission. D must qualify a shared native frame path before enabling it. | D, open |
-| P2: native labels preserve requested type | Spacers now use one plan and preserve fractional native sizes or fail. Nonuniform bottom legends still need explicit preserve-type admission; ordinary fitting remains supported. | C, bottom legend open |
+| P2: native labels preserve requested type | Spacers now use one plan and preserve fractional native sizes or fail. Bottom legends also have a measured preserve-type plan; ordinary fitting remains supported without overflow. | C, closed |
 
 ### Decision Log
 
@@ -138,8 +138,8 @@ DNA case and ambiguity-code variants. Chrome and Inkscape inspection agree.
 Twenty-seven additional tests cover centering, both strands/fonts, preserved
 glyph scale and columns, invalid spacing units, tight-pitch rejection and
 diagnostic-to-painted-bound agreement. The package suite now passes 686 tests.
-Strict bottom-legend fitting remains open in C; spacer, artwork/caption overflow and the
-referenced-font policy are qualified below. This is not completion of C–G or real
+Subsequent C batches qualify spacer, bottom-legend and artwork/caption overflow,
+with an explicit referenced-font policy, as described below. This is not completion of C–G or real
 consumer qualification.
 
 The CLI/API admission review found that `job validate` accepted negative glyph
@@ -238,6 +238,36 @@ expansion for clipping; that hypothesis was corrected before qualification.
 All 767 package tests pass, including the Yiu job. Evidence and the matched-font
 native SVG regression comparison live in
 `outputs/span-type-contract-20261118-01/` under BaseRender.
+
+Bottom legends now have a measured plan in the existing
+[`render/legend.py`](../../../src/dnadesign/baserender/src/render/legend.py)
+owner. Sequence-row preparation binds fonts, literal text, swatches, colors,
+rows and bounds before allocation; painting consumes that immutable plan. Native
+SVG and explicit layouts preserve fractional type and configured swatch/gap
+geometry, wrap within the footer or fail with sizing guidance. Ordinary figure
+fitting remains supported, with an explicit error when even fitting cannot
+produce a complete, nonoverlapping footer. DPI conversion and row centering are
+shared; the default presentation footer grows from 16 to 40 px to contain its
+11-point font at 180 dpi. This is an intentional natural-height change for
+figures with bottom legends, not an invisible scaling adjustment.
+
+A Chrome review exposed another representation mismatch: supplying a font file
+alone painted Arial in the raster backend but serialized a DejaVu-first SVG
+family list. The plan now binds the canonical family as well as the file. The
+regression test checks the emitted primary family rather than merely finding
+Arial somewhere in a fallback list. The reviewed native 60/100-base proofs at
+`outputs/legend-type-contract-20261118-03/` under BaseRender retain independent
+captions, 12.5-point Arial legends, transparency and vector artwork. The first
+review and failures are retained in `legend-type-contract-20261118-01/`.
+Twenty-three added tests cover exact size/swatches, default footer, both DPI row
+layouts, ordinary fitting and failures before allocation (including malformed
+units and secondary-tag palette values). All 790 package tests pass, as do Ruff, architecture boundaries, documentation
+checks (298 files), catalog and demo-job admission. Chrome legend bounds agree
+with the reserved entries within 0.01 pt; an Inkscape PNG preserves alpha. The
+four prior examples without legends remain byte-identical. Evidence is recorded
+with the proof. C is complete for the supported native/explicit-layout
+surface; D/E output integration/performance and both consumer migrations remain
+required.
 
 F must also pin the producer source revision alongside its distribution version:
 the current talk preparer checks `dnadesign-tools` version alone, which cannot
@@ -350,14 +380,23 @@ revise that bounded approach; do not substitute a raster or rewrite the renderer
 hashes, SVG plus preview, measurements and a short list of unresolved findings.
 The next executor updates this plan rather than creating a competing roadmap.
 
-#### Next executor contract — C
+#### Next executor contract — D
 
-Remove implicit native bottom-legend font shrinking through a measured plan and
-explicit insufficient-space errors. Preserve the new spacer, caption, layout and
-neutral annotation contracts, the A/B proofs and supported legacy raster fitting.
-Qualify crowded/reverse-strand cases and keep font-policy
-claims limited to declared referenced fonts; consumer viewers need their own
-inspection. Then audit C against its original criteria before starting D.
+Qualify native composition at the final raster boundary, then connect it to the
+existing image-job/CLI surface. First inspect available dependencies and current
+output contracts; choose one explicit conversion route that preserves SVG
+geometry, referenced fonts, alpha, point size and pixel dimensions. Avoid
+reintroducing illustration decoding, white canvas patches or fitted-panel scale.
+Keep native/raster asset selection explicit and validate job settings through
+the same public admission. No additional general scene DSL or silent fallback.
+
+Prove the 60/100-base outputs and a crowded/reverse-strand case through SVG and
+PNG, with exact dimensions/anchor/type comparisons and failure-before-publication
+checks. Only then qualify representative frames using the same prepared geometry.
+Legacy video layout remains rejected until the frame contract passes; forwarding
+options into its metadata-driven crop/fit path is insufficient. Stage E measures
+preparation/drawing/serialization/raster costs before changing caches or batch
+behavior. Consumers, source artwork and package releases remain outside D.
 
 ### Validation and Acceptance
 

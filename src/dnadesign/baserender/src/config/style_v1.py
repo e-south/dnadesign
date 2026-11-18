@@ -127,7 +127,7 @@ class Style:
     legend_mode: str = "bottom"
     legend_inline_side: str = "auto"
     legend_inline_margin_cells: float = 0.35
-    legend_font_size: int = 11
+    legend_font_size: float = 11
     legend_patch_w: float = 18.0
     legend_patch_h: float = 12.0
     legend_gap_x: float = 14.0
@@ -209,6 +209,25 @@ class Style:
         ensure(self.figure_scale > 0, "style.figure_scale must be > 0", SchemaError)
         ensure(self.font_size_seq >= 6, "style.font_size_seq must be >= 6", SchemaError)
         ensure(self.font_size_label >= 6, "style.font_size_label must be >= 6", SchemaError)
+        for name, minimum, inclusive in (
+            ("legend_font_size", 6, True),
+            ("legend_height_px", 0, False),
+            ("legend_patch_w", 0, False),
+            ("legend_patch_h", 0, False),
+            ("legend_gap_x", 0, True),
+            ("legend_gap_patch_text", 0, True),
+            ("legend_pad_px", 0, True),
+            ("legend_content_gap_px", 0, True),
+        ):
+            value = getattr(self, name)
+            if value is None and name == "legend_content_gap_px":
+                continue
+            valid = not isinstance(value, bool) and isinstance(value, (int, float))
+            try:
+                valid = valid and isfinite(value) and (value >= minimum if inclusive else value > minimum)
+            except OverflowError:
+                valid = False
+            ensure(valid, f"style.{name} must be finite and {'>=' if inclusive else '>'} {minimum}", SchemaError)
         if self.font_size_feature_label is not None:
             ensure(self.font_size_feature_label >= 6, "style.font_size_feature_label must be >= 6", SchemaError)
         if self.font_size_annotation_label is not None:
@@ -268,8 +287,6 @@ class Style:
             "style.legend_vertical_align must be between 0 and 1",
             SchemaError,
         )
-        if self.legend_content_gap_px is not None:
-            ensure(self.legend_content_gap_px >= 0, "style.legend_content_gap_px must be >= 0", SchemaError)
         ensure(self.sequence.strand_gap_cells >= 0, "style.sequence.strand_gap_cells must be >= 0", SchemaError)
         ensure(self.sequence.to_kmer_gap_cells >= 0, "style.sequence.to_kmer_gap_cells must be >= 0", SchemaError)
         dash_raw = self.connector_dash

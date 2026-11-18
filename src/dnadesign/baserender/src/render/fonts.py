@@ -49,7 +49,7 @@ def measure_literal_text(text: str, font: ResolvedFont, size_pt: float) -> Liter
     missing = sorted({ord(char) for char in text if not face.get_char_index(ord(char))})
     if missing:
         codes = ", ".join(f"U+{code:04X}" for code in missing)
-        raise RenderingError(f"font {font.requested_family!r} does not cover caption characters {codes}")
+        raise RenderingError(f"font {font.requested_family!r} does not cover text characters {codes}")
     prop = FontProperties(fname=font.path, size=size_pt)
     converter = TextToPath()
     advance, _height, _descent = converter.get_text_width_height_descent(text, prop, ismath=False)

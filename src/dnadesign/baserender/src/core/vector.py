@@ -135,6 +135,16 @@ class SvgSpanLinkPlacement:
 
 
 @dataclass(frozen=True)
+class SvgLegendEntryPlacement:
+    tag: str
+    label: str
+    font_size_pt: float
+    patch_bounds_pt: tuple[float, float, float, float]
+    text_origin_pt: tuple[float, float]
+    bounds_pt: tuple[float, float, float, float]
+
+
+@dataclass(frozen=True)
 class SvgRenderDiagnostics:
     record_id: str
     base_pitch_pt: float
@@ -146,6 +156,7 @@ class SvgRenderDiagnostics:
     text_font_policy: str
     fonts: Mapping[str, ResolvedFont]
     span_links: tuple[SvgSpanLinkPlacement, ...]
+    bottom_legend: tuple[SvgLegendEntryPlacement, ...]
 
 
 @dataclass(frozen=True)
