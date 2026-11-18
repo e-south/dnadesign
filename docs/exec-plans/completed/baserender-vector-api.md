@@ -2,13 +2,13 @@
 doc_id: baserender-vector-api-execution
 title: BaseRender vector output and pragmatic API hardening
 owner: dnadesign-maintainers
-status: active
+status: completed
 last_verified: 2026-11-18
 ---
 
 ## Exec plan: BaseRender vector output and pragmatic API hardening
 
-**Status:** active
+**Status:** completed
 **Owner:** dnadesign-maintainers
 **Created:** 2026-11-18
 **Last updated:** 2026-11-18
@@ -34,8 +34,8 @@ or remote publication. Rasterization remains an explicit final output operation.
 - [x] (2026-11-18 05:54Z) C — Layout, font identity, neutral label, spacer and bottom-legend contracts are implemented; native/explicit-layout overflow fails before drawing.
 - [x] (2026-11-18 07:39Z) D — Native SVG/PNG and fixed native MP4 share preparation, composition and rasterization; exact held-frame order and static fallbacks qualify.
 - [x] (2026-11-18 07:54Z) E — Cold/warm stage timings and memory qualified; backend reuse saves about 14–15% while source/font/pixel identities remain fixed. No additional cache is justified.
-- [ ] (2026-11-18 02:06Z) F — Migrate the two real sequence uses in separate verified batches.
-- [ ] (2026-11-18 02:06Z) G — Remove displaced consumer logic and close the bounded package hardening review.
+- [x] (2026-11-18 08:47Z) F — Both real placements migrated in separate qualified consumer commits; runtime bytes, source identities, fonts, anchors and neighboring artwork verified.
+- [x] (2026-11-18 09:24Z) G — Displaced worker/private inspection/schema dispatch removed after both migrations; four final stills preserve exact pixels and geometry. Configuration hardening, package gates and final performance budgets pass.
 
 ### Surprises & Discoveries
 
@@ -90,6 +90,42 @@ SVG feature has been exhaustively audited.
   fidelity while separating preparation, drawing, serialization and raster cost.
 
 ### Outcomes & Retrospective
+
+All six original requirements and A–G are complete. Public native SVG/text APIs
+and the existing job CLI share explicit contracts; valid legacy figure APIs
+remain supported. Both real consumer placements have migrated and the displaced
+consumer worker has been removed in consumer commit `f795b22`. No release, scientific source edit or
+presentation playback qualification is implied.
+
+| Original requirement | Final evidence |
+| --- | --- |
+| Audit boundaries, contracts and callers | Ranked findings above, closed by the named slices; public import/resource and architecture checks pass. |
+| Actual vector artwork and independent captions on 60/100 bases | Public native API, four real consumer SVGs with zero images and editable captions, source/definition/painter-order tests. |
+| Explicit type, pitch, anchors, bounds, alpha and diagnostics | Shared measured nucleotide/label/spacer geometry; requested type retained or overflow rejected; public text and placement diagnostics. |
+| Shared SVG/raster/frame geometry and measured performance | Native image/video tests, decoded exact frame holds and atomic rollback; final benchmark retains exact prior SVG, pixels and diagnostics under every local budget. |
+| Both real placements | Independently reviewed 100/60-base batches; final four full-frame stills are pixel-identical, with unchanged source IDs, fonts, spacer/strand coordinates and neighboring arrows. Evidence stays with that consumer. |
+| Remove proven replacements | One consumer native worker, no private artist inspection or old execution dispatch; actual graph dimensions replace hard-coded assumptions; 80 Python and 6 JavaScript consumer regressions pass. |
+
+Final source qualification is `caa77a11b`, still distribution 0.4.1. All 890
+BaseRender tests pass. Ruff check/format, architecture boundaries, docs checks,
+catalog and demo admission pass. Generated evidence remains ignored under
+`outputs/configuration-hardening-20261118-01/` and
+`outputs/native-performance-final-20261118-01/` in BaseRender. Five cold and nine
+warm observations per path pass every local performance budget: warm batch
+median / p95 2.754 / 2.805 s per four records, with unchanged SVG bytes, pixels
+and diagnostics. No additional render cache was introduced.
+
+The final review reproduced silent duplicate YAML keys, stale path-keyed style
+caching and late typed-video validation (14 failing regressions). Jobs and styles
+now share safe duplicate-key admission while preserving intentional YAML merges.
+Style parsing retains a bounded content-keyed cache and detached return values.
+Parsed and typed videos share timing/sizing constraints before dependencies and
+input capture. Seventeen focused admission tests pass. These are bounded fixes,
+not a claim of exhaustive hostile-input or all-renderer verification.
+
+The chronological checkpoints below retain the decisions, red evidence and
+then-current counts. Their descriptions of later slices as open are historical;
+the Progress list and completion table above are the terminal status.
 
 The implementation rationale is the
 [vector-assets proposal](../../dev/plans/tools/baserender/vector-assets-and-layout.md).
@@ -394,10 +430,37 @@ layout and actual saved lettering minima per placement rather than silently
 fitting or declaring that probe a migrated consumer. No selected recipe, saved
 artwork, manuscript or scientific input changed.
 
-F must also pin the producer source revision alongside its distribution version:
-the current talk preparer checks `dnadesign-tools` version alone, which cannot
-distinguish changes within an editable checkout. Keep the existing v2 comparison
-as retained evidence until both caller migrations verify.
+F now qualifies both real downstream placements. The first consumer commit
+`7ad7443` migrates the graph-plus-sequence row on two real 100-base records. The
+second, `eda1daa`, independently qualifies two 60-base library records using the
+same native worker, font roles, pitch, caption and producer source pin. Private
+source selections and full review evidence remain with the consumer owner.
+No source data, editable artwork, manuscript, narrative or media selection was
+changed or promoted upstream.
+
+The runtime pin fingerprints imported Python/rendering resources and records
+qualified source revision `525891726` alongside distribution version 0.4.1;
+unrelated repository/documentation changes do not invalidate those bytes. The
+native consumer imports no Matplotlib or producer internals and obtains text
+ink/strand registration from public APIs. Consumer admission and boundary checks
+pass 77 Python and 6 JavaScript tests. An invalid runtime pin fails before
+writing vectors or publishing HTML.
+
+Both placements retain 9.50-pixel nucleotide capitals at their 1600-pixel guide
+width, above the measured 8.49-pixel saved minimum. Annotation/spacer roles also
+pass saved-ink checks. Fixed 100/60-base canvases share a 10-point pitch and
+`[35, 109]` grid origin. The first row spans its complete measured teaching width.
+The second retains both adjacent arrow elements byte-for-byte, omits only the
+138 declared obsolete IDs, and has zero raster-image elements in its complete
+SVG. Both example pairs retain identical projected anchors; browser switching
+keeps stable frame geometry. Re-running the joint native recipe leaves the first
+placement's pixels unchanged. G may now contract the displaced helpers.
+
+The earlier distribution-only pin gap is closed. The final consumer explicitly
+selects qualified revision `caa77a11b` and imported runtime bytes. Older recipes,
+comparisons and source subsets remain recoverable without being active execution
+routes. G rebuilt both real placements after contraction and the explicit repin;
+all four vectors and full-frame pixels equal the independent F2 checkpoint.
 
 ### Context and Orientation
 
@@ -505,26 +568,24 @@ revise that bounded approach; do not substitute a raster or rewrite the renderer
 hashes, SVG plus preview, measurements and a short list of unresolved findings.
 The next executor updates this plan rather than creating a competing roadmap.
 
-#### Next executor contract — F first real consumer
+#### Completed executor contract — G contraction and completion audit
 
-Migrate the graph-plus-sequence placement first, then the compact library use in
-an independently reviewed batch. Keep the original v2 recipe and qualified
-comparison recoverable. Use the public native SVG/layout/source APIs and pin the
-producer source revision alongside its editable distribution version. Preserve
-actual selected records, full teaching-row width, font minima, actual spacer
-coordinates, transparent composition and protected neighboring artwork.
+Both real consumer placements pass their independent reviews. Remove the
+consumer's displaced figure worker, private artist/font inspection and temporary
+v2/v3 execution dispatch. Keep historical source selections and review artifacts
+recoverable through their owner and Git history. Leave one explicit native
+preparation path with clear retirement errors for old execution schemas.
 
-The consumer currently measures fonts with Matplotlib and inspects artist IDs to
-infer strand baselines. Replace those with `measure_text` and producer placement
-diagnostics. The public text primitive is qualified below; select its committed
-producer revision before updating a consumer recipe. Keep requested font roles
-explicit and compare actual projected ink with the saved exemplar minima.
+Keep scientific data translation, source/runtime provenance, page composition
+and timing downstream. Resolve any remaining hard-coded producer canvas
+assumptions through actual output geometry rather than another rendering wrapper.
+Rebuild both placements and require identical pixels, source IDs, typography,
+spacer coordinates and registered anchors after contraction.
 
-Keep data translation, scientific provenance, page placement and timing in the
-consumer. Do not write to saved author SVGs, manuscripts or upstream data. After
-both F placements pass, G removes only proven displaced helpers and completes
-risk/requirements review. No source promotion, package release or PowerPoint
-playback qualification follows from an SVG review.
+Review the final bounded package and consumer diff against the original
+requirements, supported interfaces, failure cases, source ownership, packaging
+and current operator routes. Use actual artifacts and executable gates for
+completion; no release, source promotion or native PowerPoint claim is implied.
 
 ### Validation and Acceptance
 

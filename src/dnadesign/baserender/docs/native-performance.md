@@ -70,6 +70,20 @@ workload before introducing backend lifetime, cache invalidation or concurrency
 state. Reusing backend admission is already qualified by the native job tests;
 held video frames do not repeat rendering.
 
+## Final source qualification
+
+The repeat on `caa77a11b` is retained at
+`outputs/native-performance-final-20261118-01/` under BaseRender, using the same
+fixture and benchmark hash. Five cold and nine warm observations per path retain
+exactly the earlier SVG bytes, PNG pixels and diagnostics. Warm batch median /
+observed p95 is 2.754 / 2.805 s; cold is 2.948 / 2.981 s. Warm preparation is
+0.107 / 0.112 s. Parent / largest raster-child peaks are 133.3 / 143.6 MiB. All
+local budgets below pass. The comparable individual warm median is 3.262 s,
+so batch admission saves about 16% relative to individual calls.
+This repeat supports the existing batch admission reuse; it does not justify
+additional caches or a portable latency claim. Raw observations and the explicit
+budget comparison remain in the generated report and `qualification.json`.
+
 ## Local regression budgets
 
 For this exact four-record fixture and host class, review changes against:

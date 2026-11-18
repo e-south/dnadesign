@@ -2,20 +2,22 @@
 doc_id: baserender-vector-assets-and-layout-proposal
 title: Vector artwork and explicit sequence layout
 owner: dnadesign-maintainers
-status: proposed
-last_verified: 2026-11-17
+status: implemented
+last_verified: 2026-11-18
 ---
 
 ## Vector artwork and explicit sequence layout
 
-**Decision requested:** extend BaseRender's vector artwork, layout and output
-contracts before adding consumer-specific rendering workarounds. This is a
-proposal, not an implemented API or permission to modify caller artwork.
+**Implemented design record.** Native SVG artwork, independent captions and
+measured point layout now use BaseRender's public API and job CLI. For current
+syntax and repeat commands, use the [native output guide](../../../../../src/dnadesign/baserender/docs/vector-output.md).
+The proposal below retains its original rationale and illustrative alternatives;
+it is not the current API reference or permission to modify caller artwork.
 
-Use the [implementation plan](../../../../exec-plans/active/baserender-vector-api.md)
-for ordered slices, the package hardening pass, validation and the next executor contract.
+Use the [implementation plan](../../../../exec-plans/completed/baserender-vector-api.md)
+for implementation outcomes and qualification.
 
-### Observed problems
+### Original observations (before implementation)
 
 The packaged RNAP SVG already contains vector body geometry and separate
 `rnap_label` text. The selected drawable closure contains no embedded images.

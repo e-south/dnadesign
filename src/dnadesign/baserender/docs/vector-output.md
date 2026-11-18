@@ -391,8 +391,9 @@ font installed in the target viewer and inspect the intended output; this policy
 does not claim portable text rendering from Matplotlib lookup alone. The example
 uses explicit Arial for editable labels in Chrome and Inkscape and records font
 identities alongside the SVGs. Feature annotations use the explicit neutral
-declaration in the [record contract](reference.md#neutral-record). Portable font
-qualification, performance and consumer migration remain in the
-[execution plan](../../../../docs/exec-plans/active/baserender-vector-api.md).
-Native PowerPoint behavior and real consumer migration are not qualified by this
-neutral proof.
+declaration in the [record contract](reference.md#neutral-record). Performance and both real consumer placements are qualified in the
+[completed execution plan](../../../../docs/exec-plans/completed/baserender-vector-api.md).
+The native consumer uses public rendering and measurement APIs, preserving its
+source IDs, projected font minima and neighboring artwork. Font portability to
+other machines and native PowerPoint behavior still need target-environment
+review; these rendering proofs do not establish presentation playback.
