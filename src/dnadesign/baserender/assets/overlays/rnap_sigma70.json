@@ -10,6 +10,12 @@
     }
   },
   "asset_id": "rnap_sigma70",
+  "caption": {
+    "anchor_fraction": [0.83827, 0.55688],
+    "family": "DejaVu Sans",
+    "size_pt": 12.0,
+    "text": "RNAP"
+  },
   "image": "rnap_sigma70.png",
   "pixel_size": [
     1400,
@@ -17,5 +23,23 @@
   ],
   "schema": "baserender.anchored_illustration_asset.v1",
   "source": "phd/figures/blank copy.svg",
-  "source_svg": "rnap_sigma70.svg"
+  "source_svg": "rnap_sigma70.svg",
+  "vector": {
+    "element_ids": [
+      "path28392-1-7-1",
+      "path28392-1-2-6-0",
+      "rnap_subunits",
+      "path30655-16-0",
+      "path28392-44-8",
+      "path30655-6-9-4",
+      "g328298-4-5-7"
+    ],
+    "sha256": "b00f478c58d3e9ed28ad410561ec371d1ca46a3f0c02c8eb6510703c72d22676",
+    "view_box": [
+      92.075,
+      34.66,
+      10.319,
+      4.498
+    ]
+  }
 }

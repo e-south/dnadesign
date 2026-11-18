@@ -3,7 +3,7 @@ doc_id: baserender-docs-index
 title: BaseRender documentation
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-08-10
+last_verified: 2026-11-17
 ---
 
 # BaseRender documentation
@@ -16,6 +16,7 @@ route that matches the artifact you have.
 
 - Start a new job: [technical reference](reference.md).
 - Render an artifact from another tool: [integration index](integrations/README.md).
+- Preserve SVG artwork and editable captions: [native vector output](vector-output.md).
 - Run a checked-in example: [workspace demos](demos/workspaces.md).
 - Inspect job syntax: [example jobs](examples).
 

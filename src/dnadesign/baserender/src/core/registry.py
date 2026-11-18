@@ -335,7 +335,7 @@ class _AnchoredIllustrationEffectContract:
             seen_features.add(feature_id)
         reject_unknown_keys(
             effect.params,
-            {"asset_id", "width_px", "top_gap_px", "fill_color", "fill_alpha", "image_tint"},
+            {"asset_id", "width_px", "top_gap_px", "fill_color", "fill_alpha", "image_tint", "svg_asset"},
             "anchored_illustration.params",
         )
         ensure(

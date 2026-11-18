@@ -29,8 +29,8 @@ or remote publication. Rasterization remains an explicit final output operation.
 ### Progress
 
 - [x] (2026-11-18 02:06Z) Capture the proposal, known source findings, focused baseline and next-executor contract; implementation has not started.
-- [ ] (2026-11-18 02:06Z) A — Complete the package baseline and prioritized maintainability audit before runtime edits.
-- [ ] (2026-11-18 02:06Z) B — Prove native SVG artwork and independent vector captions through a public call.
+- [x] (2026-11-18 02:34Z) A — Baseline package suite, catalog, demo admission and public usage reviewed; prioritized findings below retain open work.
+- [x] (2026-11-18 02:34Z) B — Native SVG artwork and independent vector captions proved through the public API on 60/100-base examples.
 - [ ] (2026-11-18 02:06Z) C — Expose explicit layout/label controls and documented diagnostics.
 - [ ] (2026-11-18 02:06Z) D — Qualify shared geometry through SVG, PNG, representative frames and CLI/job admission.
 - [ ] (2026-11-18 02:06Z) E — Measure and improve batch preparation against fidelity-preserving baselines.
@@ -53,9 +53,21 @@ placement is currently gated by producer-name attributes.
 Read-only observations identified large responsibility concentrations in
 `render/sequence_rows.py`, `outputs/video.py`, `public/api.py`, `render/layout.py`
 and `config/style_v1.py`. Size alone is not a defect or a reason to split them.
-The full package audit is pending. Focused public-playback, sequence-panel-layout
-and runtime/public-API tests, catalog output and demo-job validation passed during
-planning; this is not a full-suite claim.
+Before implementation, the complete package suite passed on `4bb0793da`.
+Catalog output and demo-job validation also passed. Review covered API/job
+admission, configuration, the asset loader, sequence layout/drawing, image/video
+output routes, public/resource tests and documentation. The resulting findings
+are bounded to these observed paths, not a claim that every renderer or hostile
+SVG feature has been exhaustively audited.
+
+| Priority / criterion | Evidence and status | Owning slice |
+| --- | --- | --- |
+| P1: vector requests preserve actual geometry | [Illustration loader](../../../src/dnadesign/baserender/src/render/effects/anchored_illustration.py) selected pixels; the new native API reads pinned SVG selections without decoding PNG. Closed for the native API; legacy APIs remain explicit raster paths. | B |
+| P1: fixed typography and transparent composition | [Fitted panel](../../../src/dnadesign/baserender/src/public/api.py) forces white and rescales. Native SVG avoids that route; fixed-canvas admission and PNG/frame parity are still open. | C/D |
+| P2: neutral placement policy | [Sequence labels](../../../src/dnadesign/baserender/src/render/sequence_rows.py) still branch on producer names. Replace through explicit declarations and integration migration. | C |
+| P2: exact placement is observable | [Illustration geometry](../../../src/dnadesign/baserender/src/render/effects/anchored_illustration.py) still clamps horizontal placement. Native diagnostics expose actual bounds; explicit anchor/overflow policy remains open. | C |
+| P2: viewer font identity | Chrome used a serif fallback for a Matplotlib-bundled font. Explicit Arial proofs render correctly in Chrome and Inkscape; referenced-font portability is not solved by Python font resolution. | C/D |
+| P2: repeated illustrations have unique IDs | A two-instance test exposed colliding footprint IDs. Unique footprint IDs and definition namespaces now pass structural tests. | B, closed |
 
 ### Decision Log
 
@@ -77,12 +89,34 @@ planning; this is not a full-suite claim.
 
 ### Outcomes & Retrospective
 
-Planning only. The implementation rationale is the
+The implementation rationale is the
 [vector-assets proposal](../../dev/plans/tools/baserender/vector-assets-and-layout.md).
-No executable, asset, source-selection or release change is made by this plan.
-Update this section with actual results, deviations and residual risks per slice.
-No blocking user question is currently required; public naming and backend details
-are executor decisions constrained by the tracer and acceptance criteria below.
+Slices A/B now provide `render_record_svg`, explicit source/caption records and
+measured diagnostics. Exact body IDs and a SHA-256 were added to the packaged
+manifest; original SVG bytes are unchanged. SVG emission composes at internal
+slots in painter order, without a new general renderer or SVG-to-path parser.
+Legacy figure output remains supported. Public-API-only neutral proofs and
+repeat commands live in the [native output guide](../../../src/dnadesign/baserender/docs/vector-output.md).
+
+The proof at `src/dnadesign/baserender/outputs/vector-proof-20261118-03/` has
+four SVGs, a source/artifact index, a Chrome screenshot and an Inkscape-rendered
+PNG. Its `receipt.json` reports zero raster images in every SVG. The earlier
+`vector-proof-20261118-01/` retains the observed font fallback. These are ignored
+review artifacts, reproducible by the checked-in example; no scientific asset,
+consumer selection, manuscript or release changed. C–G remain required.
+
+Qualification: 659 package tests passed, including 28 new native-output and
+negative-path tests; Ruff check/format, architecture boundaries, documentation
+checks, catalog and demo-job admission passed. Before runtime edits, all 631
+baseline tests passed. Red evidence includes the missing public API, duplicate
+footprint IDs, a corrupt-pixel preflight regression and a silently omitted
+missing-feature connector. The latter two now fail before figure allocation.
+The compact-docs allowlist deliberately adds only the focused native-output guide.
+Harness endpoints are architecture-invariants and knowledge-integrity, verified
+with existing checks rather than a new execution framework.
+The commit detector flagged the new SVG SHA-256 as high entropy. One exact
+false-positive entry was added after matching it to the artwork bytes; detector
+settings and unrelated baseline entries are unchanged.
 
 ### Context and Orientation
 
@@ -162,7 +196,7 @@ continue when a specific render capability is blocked.
    final diff and review standards and specification axes separately. Close or
    explicitly defer findings, align owner docs, and preserve recoverable sources.
 
-#### Next executor contract — A then B
+#### Completed executor contract — A then B
 
 **Goal:** one public BaseRender call preserves an SVG illustration and a separate,
 independently styled caption on neutral 60/100-base examples. No consumer repair
@@ -188,6 +222,16 @@ revise that bounded approach; do not substitute a raster or rewrite the renderer
 **Handoff:** commit/diff identity, exact commands and test results, source/style
 hashes, SVG plus preview, measurements and a short list of unresolved findings.
 The next executor updates this plan rather than creating a competing roadmap.
+
+#### Next executor contract — C
+
+Expose typed layout settings with units, preserve-type bounds and explicit
+overflow behavior, replacing temporary layout metadata and producer-name label
+triggers. Reuse existing geometry and report resolved font/placement identities.
+Carry the demonstrated viewer-font mismatch into an explicit output policy;
+do not claim portability from Matplotlib font lookup alone. Add negative tests
+for invalid settings and insufficient bounds, plus crowded and reverse-strand
+examples. Preserve the A/B native proof and all existing supported APIs.
 
 ### Validation and Acceptance
 

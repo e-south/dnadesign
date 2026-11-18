@@ -29,7 +29,7 @@ from matplotlib.transforms import Affine2D
 
 from ..config import Style
 from ..core import Record, RenderingError
-from .effects.anchored_illustration import anchored_illustration_occupied_boxes
+from .effects.anchored_illustration import anchored_illustration_occupied_boxes, draw_anchored_illustration
 from .effects.motif_logo import MotifLogoGeometry, compute_motif_logo_geometry
 from .effects.registry import draw_effect, validate_effect
 from .layout import LayoutContext, comp, compute_layout, measure_text_width_px
@@ -177,9 +177,15 @@ def _preflight_sequence_rows(record: Record, style: Style, palette: Palette) -> 
 @dataclass(frozen=True)
 class SequenceRowsRenderer:
     def preflight(self, record: Record, style: Style, palette: Palette) -> None:
+        if any("svg_asset" in effect.params for effect in record.effects):
+            raise RenderingError("SVG artwork requires render_record_svg; no raster substitution is permitted")
         _preflight_sequence_rows(_without_redundant_full_span_overlay(record), style, palette)
 
     def render(self, record: Record, style: Style, palette: Palette):
+        figure, _layout = self.render_with_layout(record, style, palette)
+        return figure
+
+    def render_with_layout(self, record: Record, style: Style, palette: Palette, *, illustration_drawer=None):
         record = _without_redundant_full_span_overlay(record.validate())
         prepared = _preflight_sequence_rows(record, style, palette)
         show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
@@ -420,7 +426,12 @@ class SequenceRowsRenderer:
 
         # Draw effects with strict unknown-kind failure from registry.
         for effect in record.effects:
-            draw_effect(ax, effect, record, layout, style, palette, feature_boxes)
+            if effect.kind == "anchored_illustration" and illustration_drawer is not None:
+                draw_anchored_illustration(
+                    ax, effect, record, layout, style, palette, feature_boxes, body_drawer=illustration_drawer
+                )
+            else:
+                draw_effect(ax, effect, record, layout, style, palette, feature_boxes)
 
         _draw_span_brackets(ax, feature_boxes, span_brackets, style)
         _draw_fixed_element_annotations(ax, record, layout, palette, style)
@@ -443,7 +454,7 @@ class SequenceRowsRenderer:
 
         ax.set_xlim(0, layout.width)
         ax.set_ylim(0, layout.height)
-        return fig
+        return fig, layout
 
 
 @lru_cache(maxsize=2048)

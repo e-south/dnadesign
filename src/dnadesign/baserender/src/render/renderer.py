@@ -214,8 +214,13 @@ def validate_records_for_rendering(
     style: Style,
     palette: Palette,
     renderer_options: Mapping[str, object] | None = None,
+    preflight_renderer: bool = True,
 ) -> tuple[Record, ...]:
-    """Validate one complete render batch before any renderer or figure is allocated."""
+    """Validate one complete render batch before any figure is allocated.
+
+    A format-owning renderer may defer the registered renderer's preflight only
+    when it performs its own equivalent preflight before drawing.
+    """
 
     try:
         descriptor = get_renderer_descriptor(renderer_name)
@@ -238,12 +243,13 @@ def validate_records_for_rendering(
     except (ContractError, SchemaError) as exc:
         raise RenderingError(str(exc)) from exc
 
-    renderer = get_renderer(renderer_name)
-    for validated in validated_records:
-        if options:
-            renderer.preflight(validated, style, palette, options)
-        else:
-            renderer.preflight(validated, style, palette)
+    if preflight_renderer:
+        renderer = get_renderer(renderer_name)
+        for validated in validated_records:
+            if options:
+                renderer.preflight(validated, style, palette, options)
+            else:
+                renderer.preflight(validated, style, palette)
     return tuple(validated_records)
 
 

@@ -32,6 +32,7 @@ def test_docs_surface_stays_compact() -> None:
         "docs/integrations/junction.md",
         "docs/integrations/yiu.md",
         "docs/reference.md",
+        "docs/vector-output.md",
     ]
 
 
