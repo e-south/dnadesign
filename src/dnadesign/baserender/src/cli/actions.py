@@ -110,6 +110,7 @@ def _job_to_mapping(parsed: RenderJobV4) -> dict[str, Any]:
         },
         "render": {
             "renderer": parsed.render.renderer,
+            **({"native_svg": parsed.render.native_svg.to_mapping()} if parsed.render.native_svg is not None else {}),
             "options": dict(parsed.render.options),
             "style": {
                 "preset": parsed.render.style_preset,
@@ -140,6 +141,8 @@ def _job_to_mapping(parsed: RenderJobV4) -> dict[str, Any]:
                     "title_text": cfg.title_text,
                     "title_font_size": cfg.title_font_size,
                     "title_align": cfg.title_align,
+                    **({"background": cfg.background} if cfg.background is not None else {}),
+                    **({"encode_timeout_s": cfg.encode_timeout_s} if cfg.encode_timeout_s is not None else {}),
                 }
             )
             for cfg in parsed.outputs

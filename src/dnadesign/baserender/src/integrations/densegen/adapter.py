@@ -386,7 +386,11 @@ class DensegenTfbsAdapter:
                     label=str(upstream["sequence"]),
                     tags=(upstream_tag,),
                     attrs=upstream_attrs,
-                    render={"priority": 8, "track": track},
+                    render={
+                        "priority": 8,
+                        "track": track,
+                        "annotation_label": {"text": upstream_display_label, "placement": "near_feature"},
+                    },
                 )
             )
             features.append(
@@ -397,7 +401,11 @@ class DensegenTfbsAdapter:
                     label=str(downstream["sequence"]),
                     tags=(downstream_tag,),
                     attrs=downstream_attrs,
-                    render={"priority": 8, "track": track},
+                    render={
+                        "priority": 8,
+                        "track": track,
+                        "annotation_label": {"text": downstream_display_label, "placement": "near_feature"},
+                    },
                 )
             )
             if spacer_bp > 0:
@@ -545,7 +553,11 @@ class DensegenTfbsAdapter:
                     label=upstream_seq,
                     tags=(upstream_tag,),
                     attrs=upstream_attrs,
-                    render={"priority": 8, "track": placement_track},
+                    render={
+                        "priority": 8,
+                        "track": placement_track,
+                        "annotation_label": {"text": upstream_display_label, "placement": "near_feature"},
+                    },
                 )
             )
             promoter_features.append(
@@ -556,7 +568,11 @@ class DensegenTfbsAdapter:
                     label=downstream_seq,
                     tags=(downstream_tag,),
                     attrs=downstream_attrs,
-                    render={"priority": 8, "track": placement_track},
+                    render={
+                        "priority": 8,
+                        "track": placement_track,
+                        "annotation_label": {"text": downstream_display_label, "placement": "near_feature"},
+                    },
                 )
             )
             if spacer_bp > 0:

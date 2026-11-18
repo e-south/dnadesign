@@ -11,14 +11,15 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from functools import lru_cache
+from math import isfinite
 from pathlib import Path
 from typing import Any, Mapping
 
-import yaml
-
 from ..core import SchemaError, ensure
+from .yaml_io import parse_unique_yaml
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,8 @@ class GlyphStyle:
     box_height_cells: float = 1.15
     text_color: str = "#ffffff"
     pad_x_px: float = 1.0
+    pad_y_px: float = 1.0
+    min_glyph_gap_px: float = 1.0
     text_y_nudge_cells: float = 0.0
     to_logo_gap_cells: float = 0.30
 
@@ -98,7 +101,7 @@ class Style:
     font_size_label: int = 12
     font_size_feature_label: int | None = None
     font_size_annotation_label: int | None = None
-    font_size_span_link_label: int | None = None
+    font_size_span_link_label: float | None = None
 
     padding_x: float = 24.0
     padding_y: float = 20.0
@@ -124,7 +127,7 @@ class Style:
     legend_mode: str = "bottom"
     legend_inline_side: str = "auto"
     legend_inline_margin_cells: float = 0.35
-    legend_font_size: int = 11
+    legend_font_size: float = 11
     legend_patch_w: float = 18.0
     legend_patch_h: float = 12.0
     legend_gap_x: float = 14.0
@@ -206,6 +209,25 @@ class Style:
         ensure(self.figure_scale > 0, "style.figure_scale must be > 0", SchemaError)
         ensure(self.font_size_seq >= 6, "style.font_size_seq must be >= 6", SchemaError)
         ensure(self.font_size_label >= 6, "style.font_size_label must be >= 6", SchemaError)
+        for name, minimum, inclusive in (
+            ("legend_font_size", 6, True),
+            ("legend_height_px", 0, False),
+            ("legend_patch_w", 0, False),
+            ("legend_patch_h", 0, False),
+            ("legend_gap_x", 0, True),
+            ("legend_gap_patch_text", 0, True),
+            ("legend_pad_px", 0, True),
+            ("legend_content_gap_px", 0, True),
+        ):
+            value = getattr(self, name)
+            if value is None and name == "legend_content_gap_px":
+                continue
+            valid = not isinstance(value, bool) and isinstance(value, (int, float))
+            try:
+                valid = valid and isfinite(value) and (value >= minimum if inclusive else value > minimum)
+            except OverflowError:
+                valid = False
+            ensure(valid, f"style.{name} must be finite and {'>=' if inclusive else '>'} {minimum}", SchemaError)
         if self.font_size_feature_label is not None:
             ensure(self.font_size_feature_label >= 6, "style.font_size_feature_label must be >= 6", SchemaError)
         if self.font_size_annotation_label is not None:
@@ -265,8 +287,6 @@ class Style:
             "style.legend_vertical_align must be between 0 and 1",
             SchemaError,
         )
-        if self.legend_content_gap_px is not None:
-            ensure(self.legend_content_gap_px >= 0, "style.legend_content_gap_px must be >= 0", SchemaError)
         ensure(self.sequence.strand_gap_cells >= 0, "style.sequence.strand_gap_cells must be >= 0", SchemaError)
         ensure(self.sequence.to_kmer_gap_cells >= 0, "style.sequence.to_kmer_gap_cells must be >= 0", SchemaError)
         dash_raw = self.connector_dash
@@ -312,6 +332,13 @@ class Style:
         )
         ensure(self.kmer.box_height_cells > 0, "style.kmer.box_height_cells must be > 0", SchemaError)
         ensure(self.kmer.pad_x_px >= 0, "style.kmer.pad_x_px must be >= 0", SchemaError)
+        for name in ("pad_y_px", "min_glyph_gap_px"):
+            value = getattr(self.kmer, name)
+            ensure(
+                not isinstance(value, bool) and isinstance(value, (int, float)) and isfinite(value) and value >= 0,
+                f"style.kmer.{name} must be finite and >= 0",
+                SchemaError,
+            )
         ensure(self.kmer.to_logo_gap_cells >= 0, "style.kmer.to_logo_gap_cells must be >= 0", SchemaError)
         ensure(self.span_link_inner_margin_bp >= 0, "style.span_link_inner_margin_bp must be >= 0", SchemaError)
         ensure(self.span_link_line_width > 0, "style.span_link_line_width must be > 0", SchemaError)
@@ -468,16 +495,20 @@ def _styles_v1_root() -> Path:
 
 
 @lru_cache(maxsize=64)
-def _load_yaml_mapping(path: Path) -> dict[str, Any]:
-    try:
-        raw = yaml.safe_load(path.read_text())
-    except Exception as exc:
-        raise SchemaError(f"Could not parse style YAML: {path}") from exc
+def _parse_style_yaml(text: str) -> dict[str, Any]:
+    raw = parse_unique_yaml(text)
     if raw is None:
         raw = {}
     if not isinstance(raw, Mapping):
-        raise SchemaError(f"style YAML must be a mapping/dict: {path}")
+        raise SchemaError("style YAML must be a mapping/dict")
     return dict(raw)
+
+
+def _load_yaml_mapping(path: Path) -> dict[str, Any]:
+    try:
+        return deepcopy(_parse_style_yaml(path.read_text()))
+    except (OSError, SchemaError) as exc:
+        raise SchemaError(f"Could not parse style YAML: {path}: {exc}") from exc
 
 
 def list_style_presets() -> list[str]:

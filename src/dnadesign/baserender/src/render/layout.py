@@ -12,15 +12,16 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from typing import Mapping, Sequence
 
 from matplotlib.font_manager import FontProperties
 from matplotlib.textpath import TextPath
 
-from ..config import Style
-from ..core import BoundsError, Effect, Feature, Record
+from ..config import SequenceLayout, Style
+from ..core import BoundsError, Effect, Feature, LayoutError, Record
+from .nucleotide_geometry import minimum_sequence_pitch_px, nucleotide_layout_requirements
 
 _DNA_COMP = str.maketrans(
     "ACGTRYSWKMBDHVNacgtryswkmbdhvn",  # pragma: allowlist secret
@@ -59,6 +60,31 @@ def span_to_x(layout: LayoutContext, start: int, end: int) -> tuple[float, float
 class CharCell:
     width: float
     height: float
+
+
+@dataclass(frozen=True)
+class AnnotationLabelMetrics:
+    size_pt: float
+    width_px: float
+    height_px: float
+    gap_px: float
+
+
+def measure_annotation_label(text: str, style: Style) -> AnnotationLabelMetrics:
+    if style.font_size_annotation_label is not None:
+        size = float(style.font_size_annotation_label)
+    elif style.uniform_display_font_size:
+        size = style.display_font_size()
+    else:
+        size = float(max(6, style.font_size_label, style.font_size_seq))
+    scale = float(style.figure_scale)
+    height = max(8.0, size / 72.0 * style.dpi) / scale
+    return AnnotationLabelMetrics(
+        size,
+        measure_text_width_px(text, style.font_label, size, style.dpi) / scale,
+        height,
+        max(4.0, float(style.kmer.pad_x_px) + height * 0.25),
+    )
 
 
 @dataclass(frozen=True)
@@ -469,6 +495,7 @@ def compute_layout(
     fixed_content_bottom_extent_px: float | None = None,
     fixed_content_radius_px: float | None = None,
     extra_bottom_padding_px: float = 0.0,
+    base_pitch_pt: float | None = None,
 ) -> LayoutContext:
     cell = measure_char_cell(style.font_mono, style.font_size_seq, style.dpi)
     cw, ch = cell.width, cell.height
@@ -476,6 +503,28 @@ def compute_layout(
     if not math.isfinite(scale) or scale <= 0.0:
         raise BoundsError("cell_width_scale must be finite and > 0")
     cw *= scale
+    if base_pitch_pt is not None:
+        SequenceLayout(base_pitch_pt=base_pitch_pt)
+        if scale != 1:
+            raise LayoutError("base_pitch_pt and cell_width_scale cannot both declare sequence pitch")
+        cw = base_pitch_pt * style.dpi / 72.0
+    nucleotide_requirements = nucleotide_layout_requirements(
+        record.features, style, cell_width=cw, cell_height=ch, alphabet=record.alphabet
+    )
+    minimum_pitch = nucleotide_requirements.minimum_pitch_px
+    if base_pitch_pt is not None:
+        minimum_pitch = max(minimum_pitch, minimum_sequence_pitch_px(style, record.alphabet))
+        if cw + 1e-9 < minimum_pitch:
+            raise LayoutError(
+                f"layout.base_pitch_pt gives pitch {base_pitch_pt:g} pt, but sequence/feature glyphs need at least "
+                f"{minimum_pitch * 72 / style.dpi:g} pt; increase pitch or explicitly choose another font size"
+            )
+    if scale != 1.0 and cw < minimum_pitch:
+        raise BoundsError(
+            f"cell_width_scale gives pitch {cw:g}px, but nucleotide labels need at least {minimum_pitch:g}px; "
+            "increase the pitch or explicitly choose another font size"
+        )
+    cw = max(cw, minimum_pitch)
     n = len(record.sequence) if fixed_n is None else max(len(record.sequence), int(fixed_n))
 
     show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
@@ -489,7 +538,7 @@ def compute_layout(
     y_reverse_base = 0.0
     y_forward_base = baseline_spacing if show_two else 0.0
 
-    kmer_box_height = ch * style.kmer.box_height_cells
+    kmer_box_height = max(ch * style.kmer.box_height_cells, nucleotide_requirements.minimum_box_height_px)
     motif_logo_height = style.motif_logo.height_bits * style.motif_logo.bits_to_cells * ch
     motif_logo_gap = style.kmer.to_logo_gap_cells * ch
     sequence_to_kmer_gap = style.sequence.to_kmer_gap_cells * ch
@@ -514,6 +563,8 @@ def compute_layout(
     right_gutter = terminal_label_dx + terminal_label_width
     x_left = style.padding_x + left_gutter
     width = x_left + n * cw + style.padding_x + right_gutter
+    if base_pitch_pt is not None and not math.isfinite(width):
+        raise LayoutError("layout.base_pitch_pt produced non-finite sequence bounds; choose a smaller pitch")
 
     up_indices = [i for i, feat in enumerate(record.features) if feat.span.strand == "fwd"]
     dn_indices = [i for i, feat in enumerate(record.features) if feat.span.strand == "rev"]
@@ -639,6 +690,21 @@ def compute_layout(
     for y0 in motif_logo_y0_by_effect.values():
         y_mins.append(y0)
         y_maxs.append(y0 + motif_logo_height)
+    for placement in placements:
+        annotation = record.features[placement.feature_index].render.get("annotation_label")
+        if annotation is None or annotation["placement"] != "near_feature":
+            continue
+        metrics = measure_annotation_label(annotation["text"], style)
+        if metrics.width_px > width - 2 * style.padding_x:
+            raise LayoutError(
+                f"Feature {placement.feature_id!r} annotation cannot fit: "
+                f"text needs {metrics.width_px:g} px; canvas allows {width - 2 * style.padding_x:g} px"
+            )
+        clearance = metrics.gap_px + metrics.height_px
+        if placement.above:
+            y_maxs.append(placement.y + placement.h / 2.0 + clearance)
+        else:
+            y_mins.append(placement.y - placement.h / 2.0 - clearance)
 
     raw_content_bottom = min(y_mins)
     raw_content_top = max(y_maxs)
@@ -721,7 +787,7 @@ def compute_layout(
             overlay_space += (overlay_lines - 1) * max(label_height * 1.05, ch * 0.5)
     height = content_top + style.padding_y + outer_pad + header_margin + overlay_space + legend_space
 
-    return LayoutContext(
+    layout = LayoutContext(
         cw=cw,
         ch=ch,
         width=width,
@@ -752,4 +818,64 @@ def compute_layout(
         motif_logo_lanes_down=motif_lanes_down,
         content_top=content_top,
         content_bottom=content_bottom,
+    )
+
+    return _include_span_link_bounds(record, style, layout)
+
+
+def translate_layout(layout: LayoutContext, *, dx: float, dy: float, width: float, height: float) -> LayoutContext:
+    """Translate one measured layout without changing typography or pitch."""
+    return replace(
+        layout,
+        width=width,
+        height=height,
+        x_left=layout.x_left + dx,
+        y_forward=layout.y_forward + dy,
+        y_reverse=layout.y_reverse + dy,
+        placements=tuple(replace(item, x=item.x + dx, y=item.y + dy) for item in layout.placements),
+        feature_boxes={
+            key: (x0 + dx, y0 + dy, x1 + dx, y1 + dy) for key, (x0, y0, x1, y1) in layout.feature_boxes.items()
+        },
+        motif_logo_y0_by_effect={key: value + dy for key, value in layout.motif_logo_y0_by_effect.items()},
+        content_top=layout.content_top + dy,
+        content_bottom=layout.content_bottom + dy,
+    )
+
+
+def _include_span_link_bounds(record: Record, style: Style, layout: LayoutContext) -> LayoutContext:
+    # Endpoint/label placement stays owned by the span primitive. Natural layout
+    # admits its complete extent before a caller's fixed canvas is applied.
+    from .effects.span_link import compute_span_link_geometry
+
+    bounds = [
+        box
+        for effect in record.effects
+        if effect.kind == "span_link"
+        for box in compute_span_link_geometry(
+            effect, layout, style, layout.feature_boxes, enforce_bounds=False
+        ).occupied_boxes
+    ]
+    if not bounds:
+        return layout
+    left = min(0.0, min(box[0] for box in bounds))
+    bottom = min(0.0, min(box[1] for box in bounds))
+    right = max(layout.width, max(box[2] for box in bounds))
+    top = max(layout.height, max(box[3] for box in bounds))
+    if (left, bottom, right, top) == (0.0, 0.0, layout.width, layout.height):
+        return layout
+    if not all(math.isfinite(value) for value in (left, bottom, right, top)):
+        raise LayoutError("span_link produced non-finite natural canvas bounds")
+    if left < 0:
+        left -= style.padding_x
+    if bottom < 0:
+        bottom -= style.padding_y
+    if right > layout.width:
+        right += style.padding_x
+    if top > layout.height:
+        top += style.padding_y
+    expanded = translate_layout(layout, dx=-left, dy=-bottom, width=right - left, height=top - bottom)
+    return replace(
+        expanded,
+        content_top=max(layout.content_top, max(box[3] for box in bounds)) - bottom,
+        content_bottom=min(layout.content_bottom, min(box[1] for box in bounds)) - bottom,
     )

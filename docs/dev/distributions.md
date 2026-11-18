@@ -1,7 +1,7 @@
 ## Distribution builds and verification
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-29
+**Last verified:** 2026-11-18
 
 DNADesign has one distribution version, declared in `pyproject.toml`. Runtime
 `dnadesign.__version__` reads installed metadata. Individual tools can version
@@ -45,6 +45,11 @@ uv run --locked --no-default-groups python -m dnadesign.devtools.package.build \
 This requires the same source commit, Python/uv toolchain and retained build
 requirements. Runtime dependencies remain separately declared in `uv.lock`.
 Python and system-tool/platform compatibility require their own execution checks.
+
+Tool-root `outputs/`, `runs/` and `batch_results/` are generated shelves and
+cannot supply Python modules, even when they retain a script snapshot. Runtime
+modules such as `baserender/src/outputs/` remain executable source. Package tests
+exercise both cases; header checks use the same tool-root boundary.
 
 Runtime resources are selected explicitly in `pyproject.toml`. Git checkouts and
 exported source must produce identical wheel contents. Tests, agent instructions,

@@ -25,7 +25,8 @@ from matplotlib.patches import PathPatch
 from matplotlib.path import Path as MatplotlibPath
 
 from ...config import Style
-from ...core import Effect, Record, RenderingError
+from ...core import Effect, LayoutError, Record, RenderingError
+from ...core.vector import SvgArtwork
 from ..layout import LayoutContext
 from ..palette import Palette
 
@@ -36,7 +37,7 @@ _ASSET_ROOT = Path(__file__).resolve().parents[3] / "assets" / "overlays"
 @dataclass(frozen=True)
 class AnchoredIllustrationAsset:
     asset_id: str
-    image: object
+    image_path: Path | None
     aspect_ratio: float
     anchors: Mapping[str, tuple[float, float]]
 
@@ -74,7 +75,10 @@ def _required_text(value: object, *, field_name: str) -> str:
 def _finite_positive(value: object, *, field_name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise RenderingError(f"{field_name} must be numeric")
-    number = float(value)
+    try:
+        number = float(value)
+    except OverflowError as exc:
+        raise RenderingError(f"{field_name} must be finite and > 0") from exc
     if not math.isfinite(number) or number <= 0.0:
         raise RenderingError(f"{field_name} must be finite and > 0")
     return number
@@ -126,16 +130,31 @@ def _load_asset(asset_id: str) -> AnchoredIllustrationAsset:
     image_path = _ASSET_ROOT / image_name
     if not image_path.is_file():
         raise RenderingError(f"anchored illustration image is missing: {image_path}")
-    try:
-        image = mpimg.imread(image_path)
-    except (OSError, ValueError) as exc:
-        raise RenderingError(f"Could not load anchored illustration image: {image_path}") from exc
     return AnchoredIllustrationAsset(
         asset_id=asset_id,
-        image=image,
+        image_path=image_path,
         aspect_ratio=height / width,
         anchors=anchors,
     )
+
+
+def _effect_asset(effect: Effect) -> AnchoredIllustrationAsset:
+    asset_id = _required_text(effect.params.get("asset_id"), field_name="anchored_illustration params.asset_id")
+    if "svg_asset" not in effect.params:
+        return _load_asset(asset_id)
+    artwork = effect.params["svg_asset"]
+    if not isinstance(artwork, SvgArtwork):
+        raise RenderingError("anchored_illustration params.svg_asset must be SvgArtwork")
+    artwork.validate()
+    return AnchoredIllustrationAsset(asset_id, None, artwork.view_box[3] / artwork.view_box[2], artwork.anchors)
+
+
+@lru_cache(maxsize=8)
+def _load_pixels(path: Path):
+    try:
+        return mpimg.imread(path)
+    except (OSError, ValueError, SyntaxError) as exc:
+        raise RenderingError(f"Could not load anchored illustration image: {path}") from exc
 
 
 def _bindings(
@@ -177,8 +196,9 @@ def compute_anchored_illustration_geometry(
     layout: LayoutContext,
     style: Style,
 ) -> tuple[AnchoredIllustrationAsset, AnchoredIllustrationGeometry]:
-    asset_id = _required_text(effect.params.get("asset_id"), field_name="anchored_illustration params.asset_id")
-    asset = _load_asset(asset_id)
+    asset = _effect_asset(effect)
+    if asset.image_path is not None:
+        _load_pixels(asset.image_path)
     bindings = _bindings(effect, record, asset)
     width = _finite_positive(effect.params.get("width_px", 300.0), field_name="anchored_illustration params.width_px")
     height = width * asset.aspect_ratio
@@ -187,9 +207,18 @@ def compute_anchored_illustration_geometry(
     x0 = (sum(planned_centers) / len(planned_centers)) - anchor_center * width
     minimum_x = float(style.padding_x)
     maximum_x = float(layout.width - style.padding_x - width)
-    if maximum_x < minimum_x:
-        raise RenderingError("anchored illustration is wider than the available sequence-row canvas")
-    x0 = min(maximum_x, max(minimum_x, x0))
+    native = "svg_asset" in effect.params
+    if native:
+        if x0 < minimum_x - 1e-7 or x0 > maximum_x + 1e-7:
+            raise LayoutError(
+                f"asset {asset.asset_id!r} illustration bounds {(x0, x0 + width)} px exceed canvas interval "
+                f"{(minimum_x, layout.width - style.padding_x)} px; "
+                "move the sequence origin, increase the canvas or explicitly change illustration width"
+            )
+    else:
+        if maximum_x < minimum_x:
+            raise RenderingError("anchored illustration is wider than the available sequence-row canvas")
+        x0 = min(maximum_x, max(minimum_x, x0))
     x1 = x0 + width
     top_gap = _finite_positive(
         effect.params.get("top_gap_px", 8.0), field_name="anchored_illustration params.top_gap_px"
@@ -197,6 +226,11 @@ def compute_anchored_illustration_geometry(
     y1 = float(layout.content_top) - top_gap
     y0 = y1 - height
     if y0 <= float(layout.content_bottom):
+        if native:
+            raise LayoutError(
+                f"asset {asset.asset_id!r} illustration bounds {(y0, y1)} px exceed the reserved vertical lane "
+                f"{(layout.content_bottom, layout.content_top)} px; increase the layout top extent"
+            )
         raise RenderingError("anchored illustration has no reserved vertical lane")
     anchor_points = {key: (x0 + point[0] * width, y1 - point[1] * height) for key, point in asset.anchors.items()}
     return asset, AnchoredIllustrationGeometry(x0, y0, x1, y1, anchor_points, bindings)
@@ -245,9 +279,15 @@ def draw_anchored_illustration(
     style: Style,
     palette: Palette,
     feature_boxes: dict[str, tuple[float, float, float, float]],
+    *,
+    body_drawer=None,
+    geometry: AnchoredIllustrationGeometry | None = None,
 ) -> None:
     del palette
-    asset, geometry = compute_anchored_illustration_geometry(effect, record, layout, style)
+    if geometry is None:
+        asset, geometry = compute_anchored_illustration_geometry(effect, record, layout, style)
+    else:
+        asset = _effect_asset(effect)
     color = str(effect.params.get("fill_color", "#DDE2E7"))
     alpha = float(effect.params.get("fill_alpha", 0.42))
     visible = []
@@ -285,9 +325,14 @@ def draw_anchored_illustration(
                 alpha=alpha,
                 zorder=1.35,
             )
-            patch.set_gid(f"anchored_illustration_footprint:{asset.asset_id}:{anchor[0]:.3f}")
+            patch.set_gid(f"anchored_illustration_footprint:{asset.asset_id}:{anchor[0]:.3f}:{len(ax.patches)}")
             ax.add_artist(patch)
-    pixels = asset.image
+    if body_drawer is not None:
+        body_drawer(ax, effect, geometry)
+        return
+    if asset.image_path is None:
+        raise RenderingError("SVG artwork requires render_record_svg; no raster substitution is permitted")
+    pixels = _load_pixels(asset.image_path)
     if "image_tint" in effect.params:
         pixels = np.array(pixels, copy=True)
         pixels[:, :, :3] = mcolors.to_rgb(effect.params["image_tint"])

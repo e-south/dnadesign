@@ -31,7 +31,9 @@ def test_docs_surface_stays_compact() -> None:
         "docs/integrations/densegen.md",
         "docs/integrations/junction.md",
         "docs/integrations/yiu.md",
+        "docs/native-performance.md",
         "docs/reference.md",
+        "docs/vector-output.md",
     ]
 
 

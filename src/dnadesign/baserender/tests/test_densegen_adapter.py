@@ -20,8 +20,9 @@ from dnadesign.baserender.src.config import resolve_style
 from dnadesign.baserender.src.core import SchemaError
 from dnadesign.baserender.src.integrations.densegen.adapter import DensegenTfbsAdapter
 from dnadesign.baserender.src.render import Palette, legend_entries_for_record, render_record
+from dnadesign.baserender.src.render.feature_labels import _span_link_label_boxes
 from dnadesign.baserender.src.render.layout import compute_layout
-from dnadesign.baserender.src.render.sequence_rows import _span_link_label_boxes, _text_px_width
+from dnadesign.baserender.src.render.sequence_rows import _text_px_width
 from dnadesign.baserender.src.runtime import initialize_runtime
 
 
@@ -990,6 +991,9 @@ def test_densegen_span_link_label_matches_default_sequence_typography() -> None:
     try:
         span_label = next(text for text in fig.axes[0].texts if text.get_text() == "18 bp")
         assert float(span_label.get_fontsize()) == pytest.approx(float(style.font_size_seq))
+        annotations = [text for text in fig.axes[0].texts if text.get_text() in {"-35 site (a)", "-10 site (H)"}]
+        assert len(annotations) == 2
+        assert all(text.get_fontsize() == 24 for text in annotations)
     finally:
         plt.close(fig)
 

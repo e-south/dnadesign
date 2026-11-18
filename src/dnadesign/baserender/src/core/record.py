@@ -45,8 +45,10 @@ def _attrs_mapping(obj: Mapping[str, object] | None) -> Mapping[str, object]:
     return obj
 
 
-def _validate_render_keys(render: Mapping[str, object], *, ctx: str) -> None:
+def _validate_render_keys(render: Mapping[str, object], *, ctx: str, feature: bool = False) -> None:
     allowed = {"track", "priority", "lane"}
+    if feature:
+        allowed.add("annotation_label")
     unknown = sorted(set(render.keys()) - allowed)
     if unknown:
         raise ContractError(f"Unknown render keys in {ctx}: {unknown}")
@@ -56,6 +58,18 @@ def _validate_render_keys(render: Mapping[str, object], *, ctx: str) -> None:
     if "priority" in render:
         if not isinstance(render["priority"], int):
             raise ContractError(f"{ctx}.priority must be int")
+    if "annotation_label" in render:
+        annotation = render["annotation_label"]
+        label_ctx = f"{ctx}.annotation_label"
+        if not isinstance(annotation, Mapping):
+            raise ContractError(f"{label_ctx} must be a mapping with text and placement")
+        if set(annotation) != {"text", "placement"}:
+            raise ContractError(f"{label_ctx} must contain exactly text and placement")
+        text = annotation["text"]
+        if not isinstance(text, str) or not text.strip():
+            raise ContractError(f"{label_ctx}.text must be a non-empty string")
+        if annotation["placement"] not in ("near_feature", "inline"):
+            raise ContractError(f"{label_ctx}.placement must be 'near_feature' or 'inline'")
 
 
 @dataclass(frozen=True)
@@ -72,7 +86,7 @@ class Feature:
         ensure(isinstance(self.kind, str) and self.kind.strip() != "", f"{ctx}.kind must be a non-empty string")
         self.span.validate_within(seq_len, alphabet)
         ensure(all(isinstance(tag, str) and tag.strip() != "" for tag in self.tags), f"{ctx}.tags must be strings")
-        _validate_render_keys(_render_mapping(self.render), ctx=f"{ctx}.render")
+        _validate_render_keys(_render_mapping(self.render), ctx=f"{ctx}.render", feature=True)
         _attrs_mapping(self.attrs)
         return self
 

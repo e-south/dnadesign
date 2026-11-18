@@ -1,0 +1,459 @@
+---
+doc_id: baserender-native-vector-output
+title: Native SVG sequence output
+owner: dnadesign-maintainers
+status: experimental
+last_verified: 2026-11-18
+---
+
+# Native SVG sequence output
+
+Use `render_record_svg` when sequence artwork must remain vector and illustration
+captions must remain independently editable text. This is a source-checkout API;
+no package release is implied. The existing figure and fitted-panel APIs retain
+their existing raster-illustration behavior.
+
+## First use
+
+From the DNADesign repository with its environment and Arial available:
+
+```sh
+uv run --locked python src/dnadesign/baserender/docs/examples/vector_output.py \
+  --output-dir src/dnadesign/baserender/outputs/vector-proof-example
+```
+
+Choose a fresh directory. The public-API-only example creates four neutral SVGs:
+60/100-base records with identical body geometry and independent 12/18-point
+captions, an artifact/source index and an HTML comparison. It preserves the
+18-base gap between declared features. It does not select scientific data.
+
+The operation returns `SvgRenderResult(svg, width_pt, height_pt, diagnostics)` in
+memory and closes its internal figure. It never writes source files or fits
+content to a box. The example is responsible for publishing its new review files.
+
+## Source and caption contracts
+
+Import from `dnadesign.baserender`:
+
+- `render_record_svg(record, style_preset=..., style_overrides=...,
+  illustrations=..., captions=..., layout=...)` supports sequence-row records.
+- `SvgArtwork(path, sha256, element_ids, view_box, anchors)` selects caller-owned
+  geometry. `path` is a `Path`; the hash pins exact bytes; IDs are a distinct
+  tuple. `view_box` is `(x, y, width, height)` in source SVG coordinates. Named
+  anchors are `(x_fraction, y_fraction_from_top)` within that frame.
+- `SvgIllustration(artwork, caption=None)` supplies artwork for an effect's
+  `asset_id`. Caller-owned asset IDs need not be packaged. No scientific name or
+  producer-specific branch is needed by drawing code.
+- `IllustrationCaption(text, family=..., size_pt=..., anchor_fraction=...,
+  offset_px=..., visible=..., text_anchor="middle")` controls text separately from illustration scale.
+  Fractions start at the illustration's top left; positive offsets move right
+  and down. The generic default anchor is bottom-center. Packaged artwork owns
+  its particular default caption position in its manifest.
+  `text_anchor` accepts `start`, `middle` or `end` and is shared by measurement
+  and SVG text output. For a label beside the artwork, use `anchor_fraction=(1, 0.5)`,
+  `text_anchor="start"` and a positive horizontal `offset_px`; increasing the font
+  then grows the text away from the artwork without reducing its gap.
+
+`illustrations` and `captions` are keyed by anchored-effect `asset_id`. The RNAP
+manifest selects its existing SVG body IDs and source hash, excluding the source
+caption. Bindings reference explicit `Feature.id` values; missing bindings fail
+rather than silently dropping a connector. Nothing edits that SVG. Each instance namespaces IDs and retained
+definition references and preserves ancestor transforms and source painter order.
+The internal SVG slots and effect parameter `svg_asset` are implementation details;
+callers use the public result and diagnostics, not artists or generated IDs.
+
+Diagnostics report base pitch, forward/reverse strand positions, logical feature bounds
+and illustration anchors/bounds in points, with origin at the canvas top left.
+Bounds are `(x0, y0, x1, y1)`. Illustration diagnostics include source SHA-256
+and the font file resolved for the caption. They also return `caption_origin_pt`
+(the selected text anchor and baseline) and `caption_bounds_pt` (visible ink).
+Hidden captions return neither bound nor origin. Native output requires
+`figure_scale=1`; explicit font sizes keep their physical size.
+
+### Artwork and caption bounds
+
+Native artwork keeps its calculated anchor position. A declared illustration
+frame outside the canvas fails with its asset ID and attempted bounds; the
+existing raster figure route retains its clamping behavior. Change the explicit
+grid origin, canvas, reserved top extent or illustration width to resolve the
+failure. The illustration frame comes from the selected source's declared
+`view_box`; callers must supply a frame containing the selected geometry.
+BaseRender preserves those SVG paths and transforms rather than estimating them
+through a second SVG geometry engine.
+
+Captions are single-line literal text. Dollar signs remain literal, repeated
+spaces are preserved, and control characters fail admission. Missing visible caption
+glyphs fail instead of producing replacement characters. The measured caption
+origin is used directly by serialization. Out-of-canvas captions fail before
+figure allocation; they are not moved, clipped or reduced automatically.
+
+### Physical canvas and grid
+
+`SequenceLayout` declares physical units independently of output DPI:
+
+```python
+from dnadesign.baserender import SequenceLayout, render_record_svg
+
+layout = SequenceLayout(
+    base_pitch_pt=10,
+    canvas_size_pt=(1200, 400),
+    sequence_origin_pt=(80, 200),
+)
+result = render_record_svg(record, style_overrides={"legend": False}, layout=layout)
+```
+
+The origin is the left edge of base column zero on the forward strand's grid
+reference line, measured rightward/downward from the top left. It is independent
+of a particular glyph's ink or baseline. Diagnostics return `sequence_origin_pt`
+in that same frame. Without a new origin, expanding the canvas preserves the
+existing top-left grid position. Features, nucleotide rectangles and motif lanes
+move with the grid; type and pitch are not fitted to the new canvas. Natural
+canvas sizing also includes spacer lines and labels, for both feature references
+and explicit spans.
+
+`top_extent_pt` and `bottom_extent_pt` reserve minimum space about the midpoint
+between the two strand-reference lines (or the single line).
+`extra_bottom_padding_pt` reserves additional footer space. These values preserve
+the measured content rather than cropping it. The canvas must contain the
+natural surface, including its configured margins. Insufficient pitch or bounds,
+invalid units, arithmetic overflow and unknown mapping fields fail before figure
+allocation. `SequenceLayout.from_mapping(...)` admits JSON/YAML-shaped settings;
+`to_mapping()` returns a detached, serializable mapping.
+
+The figure API uses the same settings through
+`renderer_options={"layout": layout}`. Image jobs use `render.options.layout`;
+see the [job syntax](reference.md#physical-sequence-layout). Existing metadata
+keys for cell scale, fixed extents/radius and video padding remain supported when
+no typed layout is supplied. Declaring both authorities fails with the conflicting
+keys instead of choosing one. Explicit layout requires `figure_scale=1`.
+Native video uses the fixed canvas contract described below. Ordinary figure video
+with explicit layout remains rejected because its compositor applies fitting.
+
+### Nucleotide rectangles
+
+`measure_text(text, family=..., size_pt=...)` returns the same literal font
+geometry used for native captions without allocating a figure. Import it and
+`TextMeasurement` from `dnadesign.baserender`. The result contains the resolved
+font identity, requested point size, advance, `ink_bounds_pt`, `ink_width_pt`
+and `ink_height_pt`. Bounds are left/bottom/right/top relative to the text
+origin and baseline, with positive y upward; they are local text measurements,
+not top-left canvas coordinates. For example, measuring `"ACGT"` provides the
+visible capital height for a consumer's explicit projection scale.
+
+Empty and space-only strings have zero ink while retaining their measured
+advance. Text is literal, single-line and checked for glyph coverage. Invalid
+units or control characters fail before font loading. `to_mapping(portable=True)`
+omits the local font path. This API lets consumers enforce lettering minima
+without using Matplotlib internals or interpreting generated artist IDs.
+
+Layout and drawing share nucleotide ink measurements. Letters stay aligned to
+the sequence's column grid; the colored rectangle is optically centered around
+the visible run. Capitals use their own ink bounds rather than a descender-based
+text baseline. Larger feature lettering reserves column pitch and box height
+without reducing its requested point size. Too-small explicit pitch fails.
+Minimum spacing uses a font/alphabet reference so changing sequence letters
+does not change the grid or rectangle height between examples.
+
+`font_size_seq` and `font_size_feature_label` control the two roles separately.
+`kmer.pad_y_px` sets minimum vertical inset; `kmer.min_glyph_gap_px` sets minimum
+space between neighboring glyphs. Both default to one pixel and reject invalid
+units. `kmer.box_height_cells` is a minimum based on both sequence and feature
+font cell heights. Diagnostics expose
+`nucleotide_box_bounds_pt` for actual colored rectangles separately from
+`feature_bounds_pt`, which retains genomic span bounds used by spacer indicators.
+
+For a 12-point sequence with 18-point feature lettering, repeat the example with
+`--sequence-font-size 12 --feature-font-size 18 --font-family Arial`. The review
+uses point-sized viewports and scrolling, not per-record fitting.
+
+### Link annotation sizes
+
+Native SVG, PNG and fixed native video can use one annotation role for feature
+annotations, span labels and illustration captions. Select it through the public
+API rather than repeating three sizes:
+
+```python
+from dnadesign.baserender import AnnotationTypography, render_record_svg
+
+result = render_record_svg(
+    record,
+    annotation_typography=AnnotationTypography(sequence_scale=1.25),
+)
+```
+
+`sequence_scale=1` matches the sequence nucleotide font size. A larger ratio
+keeps annotations proportionally larger when that sequence font changes.
+`AnnotationTypography(size_pt=18)` pins the group at a fixed point size instead.
+An explicitly selected empty group defaults to `sequence_scale=1`.
+Fixed and relative sizing are mutually exclusive; invalid/nonfinite values and
+resolved sizes below 6 points fail before drawing.
+
+The explicit group takes priority over individual feature-annotation, span-label
+and caption sizes. Omit it or pass `None` to retain those independent controls.
+Text, font families, caption anchors and visibility remain independently defined;
+larger text still has to pass collision and canvas admission. This control does
+not pin annotation positions between different records.
+
+The same job setting is:
+
+```yaml
+render:
+  native_svg:
+    annotation_typography:
+      sequence_scale: 1.25
+```
+
+The resolved size is returned as `diagnostics.annotation_font_size_pt` and is
+recorded with native job output diagnostics. The selected rule is retained in
+the job manifest. Existing figure/raster APIs keep their independent style roles.
+
+### Spacer labels
+
+Native output and explicit `SequenceLayout` rendering preserve spacer-label
+sizes, including fractional points. A label that cannot fit its declared span
+fails before allocation instead of shrinking. Explicit
+`shrink_label_to_fit=True` conflicts with that contract; remove the flag or set
+it to `False`, then choose the size/pitch/clearance explicitly. The existing
+ordinary figure route retains its fitting behavior.
+
+Spacer drawing and feature-label collision checks consume one measured plan.
+`diagnostics.span_links` returns `SvgSpanLinkPlacement` values with the source
+effect index, rendered text, point size, endpoint coordinates and reserved label
+bounds (including clearance). Unlabelled spacers return no font or label bounds;
+their line/tick bounds still undergo canvas admission. Span targets accept
+read-only mappings and reject fractional, boolean or out-of-range base coordinates.
+
+### Bottom legends
+
+Repeat the first-use command with `--font-family Arial --legend-font-size 12.5`
+to include measured bottom legends in all four proofs. `--legend-height-px`
+controls their reserved footer (60 px in the example).
+
+Native SVG and explicit `SequenceLayout` output preserve `legend_font_size`,
+including fractional points. `uniform_display_font_size=True` uses the largest
+configured display role instead. Legends wrap at that size within the declared
+`legend_height_px` footer; insufficient width or height fails before allocation.
+Increase the canvas width/footer reservation or choose another size explicitly.
+Native swatch dimensions and gaps also retain their configured values.
+
+`diagnostics.bottom_legend` contains `SvgLegendEntryPlacement` values: tag, exact
+label, point size, swatch bounds, text origin and reserved entry bounds. Coordinates
+use the same top-left point frame as the other diagnostics. Row heights account
+for DPI; swatches and text share the row center. Labels are literal text, with
+optional newline breaks, rather than math expressions. Fonts, glyph coverage,
+colors and units are checked before drawing.
+
+The ordinary figure route retains font fitting and uses spare footer clearance
+when needed; even that route fails if no complete, nonoverlapping legend fits.
+The default presentation preset now reserves 40 px instead of 16 px so its
+11-point legend fits at 180 dpi. This intentionally increases the natural height
+of figures using that bottom legend; figures without it are unchanged.
+
+## Composing with another renderer
+
+Match final visible type, rather than only configured point sizes. Use
+`measure_text(...).ink_height_pt` and the declared points-to-output scale to
+derive a common cap-height target. A raster component additionally carries its
+sampling DPI and later placement scale. If a producer accepts measured font
+metrics, supply those metrics through its public interface and scale the complete
+composition once. Validate every component after placement; a font minimum on
+the sequence alone says nothing about a separately scaled graph. More canvas
+space, another panel allocation or an explicit pitch change may be needed.
+
+Keep record adaptation and final page placement with the consumer. Reusable
+sequence drawing and measurement stay here; another tool retains its own graph
+geometry, quantitative plots or scientific state.
+
+## Final raster output
+
+Keep the SVG result as the composition and rasterize only when an output needs
+pixels. This reuses its measured point geometry without repeating record layout:
+
+```python
+from pathlib import Path
+from dnadesign.baserender import rasterize_svg
+
+png = rasterize_svg(result, dpi=144)
+output = Path("src/dnadesign/baserender/outputs/native-png/sequence.png")
+output.parent.mkdir(parents=True, exist_ok=True)
+with output.open("xb") as handle:
+    handle.write(png.png)
+```
+
+This native conversion requires an **existing Inkscape CLI** on `PATH`, or an
+explicit `inkscape=Path(...)`. It does not install a dependency or try another
+renderer. The ordinary Matplotlib figure API remains independent of Inkscape.
+Repeat the first-use example with `--raster-dpi 144` to generate SVG and PNG
+pairs; `--inkscape` selects an explicit executable for that example.
+
+`PngRenderResult` reports `png`, `width_px`, `height_px`, `dpi`,
+`source_svg_sha256`, the same `diagnostics` object and a `RasterizerInfo` value.
+The latter records the resolved executable path, that file's SHA-256 and the
+reported Inkscape version. An executable can be a platform wrapper; its digest
+identifies the selected file, not every library used by the application.
+
+The converter exports the page at the selected DPI, preserving alpha. It does
+not crop, fit, recolor, or regenerate the artwork. Pixel dimensions are nearest
+integer samples of the serialized point page; half-pixel ties depend on the
+backend. Use a common canvas with integral pixel dimensions for a frame series.
+
+`timeout_s` defaults to 30 per external invocation and `max_pixels` to 64 million.
+Invalid units/budgets, incomplete or changed font identities, unsafe SVG content,
+missing tools, process failures/timeouts and corrupt or wrongly sized PNGs fail
+with `RenderingError`. No partial PNG result is returned. The caller owns file
+publication; native image jobs use the staged-publication boundary described
+below. Native MP4 uses these same compositions and sampled dimensions.
+
+## Native image jobs
+
+From the repository root, with Arial installed:
+
+```sh
+uv run --locked baserender job validate native_svg_job
+uv run --locked baserender job run native_svg_job
+```
+
+The [example job](examples/native_svg_job.yaml) renders two neutral 60/100-base
+records from [curated example data](examples/data/native_svg_rows.json). They are
+illustration fixtures, not a scientific promoter selection. The create-only
+bundle is `docs/examples/results/native-svg-example-v1/` under BaseRender.
+Use a fresh bundle name for another run. To produce PNG, change the example's
+`outputs[0].fmt` to `png` and choose a fresh bundle path; PNG requires Inkscape.
+
+The explicit choice is `render.native_svg`. An empty mapping activates native
+composition with packaged illustration selections. Omit the field for the
+existing figure path; `null` and booleans are not valid native settings. Current
+native jobs require `renderer: sequence_rows` and SVG/PNG image outputs, with
+optional fixed-layout MP4. Native PDF and implicit multi-record grids are rejected. A single image path
+requires one selected record; a directory writes one artifact per record.
+
+```yaml
+render:
+  renderer: sequence_rows
+  options:
+    layout:
+      canvas_size_pt: [1300, 400]
+      sequence_origin_pt: [60, 280]
+      top_extent_pt: 104
+  native_svg:
+    captions:
+      rnap_sigma70:
+        text: RNAP
+        family: Arial
+        size_pt: 18
+        anchor_fraction: [0.83827, 0.55688]
+    rasterization:
+      dpi: 144
+```
+
+`native_svg.illustrations` maps each effect's asset ID to an `artwork` mapping
+and optional `caption`. Artwork has the same `path`, `sha256`, `element_ids`,
+`view_box` and fractional `anchors` as `SvgArtwork`. Paths follow the existing
+job-owned input rules. `native_svg.captions` overrides captions by asset ID and
+uses the `IllustrationCaption` fields. Explicit overrides must be used somewhere
+in the batch; records without that asset do not receive them. Unknown keys and
+invalid units fail during shared job admission.
+
+`native_svg.rasterization` uses the same settings and defaults as
+`rasterize_svg`: `dpi`, `inkscape`, `timeout_s` and `max_pixels`. PNG jobs resolve
+Inkscape before capturing input data. All records, assets, captions and fonts
+are prepared before any figure is drawn. Used SVG inputs are rechecked before
+publication; an input change or late rendering failure aborts the bundle.
+
+The manifest records the requested native settings, per-record point geometry,
+resolved illustration selections/captions, SVG hashes and PNG/backend identities.
+Known local artwork, font and executable paths are omitted from portable metadata.
+The API's `diagnostics.to_mapping(portable=True)` supplies the same detached
+JSON-shaped geometry. `SvgArtwork`, `SvgIllustration` and `RasterizerInfo` also
+provide `to_mapping` for input/source receipts.
+
+## Fixed native video
+
+Start from the same example job, retain its SVG or PNG image output, choose a
+fresh bundle name, and append this output:
+
+```yaml
+outputs:
+  - kind: images
+    fmt: png
+  - kind: video
+    path: sequence.mp4
+    fps: 30
+    frames_per_record: 30
+    pauses: {native-60: 0.5}
+    background: "#ffffff"
+    encode_timeout_s: 120
+```
+
+Native MP4 requires existing Inkscape and FFmpeg CLIs with `libx264`. Both are
+admitted before input capture; dependencies are never installed. The image
+output supplies a static fallback. Every record is prepared before drawing and
+is composed/rasterized once; held frames reuse that result. Images and frames
+share source IDs, caption/font identities, canvas, sequence origin and pitch.
+
+`render.options.layout` must declare `canvas_size_pt` and `sequence_origin_pt`.
+The selected DPI must sample that canvas to even pixel dimensions for H.264.
+Optional `width_px`, `height_px` and `aspect` must agree with those dimensions;
+they never trigger resizing. All frames must share the same measured canvas,
+grid origin and pitch. Insufficient bounds, a different pitch or conflicting
+size fail before drawing. There is no border trimming, metadata mutation,
+text overlay, automatic scaling or per-frame centering.
+
+PNG fallbacks retain alpha; MP4 flattens those exact pixel positions onto the
+required opaque `#RRGGBB` background. Encoding uses H.264, CRF 18, yuv420p and
+square pixels. It is lossy and does not preserve alpha. A transparent composition
+is available from the corresponding SVG/PNG, rather than from the MP4.
+`encode_timeout_s` bounds encoding (default 120 seconds), independently of each
+rasterizer invocation's `timeout_s`. These two output fields currently require
+native composition; ordinary video cannot silently ignore them.
+
+Timing follows the existing job semantics: `frames_per_record` sets the base hold,
+`pauses` adds rounded frame counts by record ID, and `total_duration`, when set,
+derives a common hold after subtracting pauses. Integer division can produce a
+shorter clip than the requested duration. The manifest reports actual planned
+frame repeats, FPS, dimensions, background and encoder/rasterizer identities.
+Looping is a presentation playback choice, not an embedded MP4 instruction.
+
+Only `content_fit: native` is supported. Video-specific title and subtitle
+overlays are rejected; use a normal record display title if needed. Ordinary
+figure video retains its established compositor. Encoding or source-verification
+failure aborts the entire new bundle, including static fallbacks.
+
+## Admission and current qualification
+
+Job and style YAML reject duplicate explicit keys, including nested duplicates.
+Intentional YAML merge overrides remain supported. Style files are reread on
+resolution; the bounded parse cache is keyed by content and returns detached
+values, so saved edits take effect within the same process. Parsed jobs and
+already-typed jobs share video timing and sizing checks before dependency probes
+or input capture.
+
+For stage-separated measurements, repeat commands and local regression budgets,
+see [native output performance](native-performance.md).
+
+Source hashes, selections, definitions and fonts are checked before allocating
+a figure. Vector selections reject raster images, active content, external
+references, DTDs, cycles and unsupported stylesheets. Unused definitions are
+pruned. Sources are bounded to 64 MiB and 128 nesting levels. Raster tinting and
+trajectory panels are explicitly unsupported on this path. There is no pixel
+substitution or silent fit. Retain a separate supported raster input when using
+the existing raster figure path.
+
+Diagnostics declare `text_font_policy="reference"` and return `fonts` by declared
+role (`sequence`, `label`, `caption:<asset_id>`). Each `ResolvedFont` records the
+requested/resolved family, face style, local file and SHA-256. The SVG references
+fonts and does not embed font files; the local file paths stay in diagnostics.
+Caption text references the canonical resolved family. Text already present in
+caller-selected artwork retains its source SVG styling.
+
+A resolved producer font can still be unavailable to another viewer. Select a
+font installed in the target viewer and inspect the intended output; this policy
+does not claim portable text rendering from Matplotlib lookup alone. The example
+uses explicit Arial for editable labels in Chrome and Inkscape and records font
+identities alongside the SVGs. Feature annotations use the explicit neutral
+declaration in the [record contract](reference.md#neutral-record). Performance and both real consumer placements are qualified in the
+[completed execution plan](../../../../docs/exec-plans/completed/baserender-vector-api.md).
+The native consumer uses public rendering and measurement APIs, preserving its
+source IDs, projected font minima and neighboring artwork. Font portability to
+other machines and native PowerPoint behavior still need target-environment
+review; these rendering proofs do not establish presentation playback.

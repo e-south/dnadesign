@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from dnadesign.baserender.src.config import (  # noqa: F401
         RenderContractDescriptor,
         RenderJobV4,
+        SequenceLayout,
         Style,
         list_style_presets,
         resolve_preset_path,
@@ -34,6 +35,21 @@ if TYPE_CHECKING:
         RenderingError,
         SchemaError,
         Span,
+    )
+    from dnadesign.baserender.src.core.vector import (  # noqa: F401
+        AnnotationTypography,
+        IllustrationCaption,
+        PngRenderResult,
+        RasterizerInfo,
+        ResolvedFont,
+        SvgArtwork,
+        SvgIllustration,
+        SvgIllustrationPlacement,
+        SvgLegendEntryPlacement,
+        SvgRenderDiagnostics,
+        SvgRenderResult,
+        SvgSpanLinkPlacement,
+        TextMeasurement,
     )
     from dnadesign.baserender.src.public import (  # noqa: F401
         BASERENDER_SEQUENCE_PANEL_CONTRACT_ID,
@@ -67,12 +83,31 @@ if TYPE_CHECKING:
         validate_job,
         validate_render_job,
     )
+    from dnadesign.baserender.src.public.typography import measure_text  # noqa: F401
+    from dnadesign.baserender.src.public.vector_output import rasterize_svg, render_record_svg  # noqa: F401
     from dnadesign.baserender.src.render.layout import compute_layout  # noqa: F401
     from dnadesign.baserender.src.render.palette import Palette  # noqa: F401
     from dnadesign.baserender.src.render.renderer import render_record  # noqa: F401
     from dnadesign.baserender.src.runtime import initialize_runtime  # noqa: F401
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
+    "AnnotationTypography": ("dnadesign.baserender.src.core.vector", "AnnotationTypography"),
+    "measure_text": ("dnadesign.baserender.src.public.typography", "measure_text"),
+    "TextMeasurement": ("dnadesign.baserender.src.core.vector", "TextMeasurement"),
+    "SequenceLayout": ("dnadesign.baserender.src.config.sequence_layout", "SequenceLayout"),
+    "ResolvedFont": ("dnadesign.baserender.src.core.vector", "ResolvedFont"),
+    "SvgSpanLinkPlacement": ("dnadesign.baserender.src.core.vector", "SvgSpanLinkPlacement"),
+    "SvgLegendEntryPlacement": ("dnadesign.baserender.src.core.vector", "SvgLegendEntryPlacement"),
+    "render_record_svg": ("dnadesign.baserender.src.public.vector_output", "render_record_svg"),
+    "IllustrationCaption": ("dnadesign.baserender.src.core.vector", "IllustrationCaption"),
+    "SvgArtwork": ("dnadesign.baserender.src.core.vector", "SvgArtwork"),
+    "SvgIllustration": ("dnadesign.baserender.src.core.vector", "SvgIllustration"),
+    "SvgIllustrationPlacement": ("dnadesign.baserender.src.core.vector", "SvgIllustrationPlacement"),
+    "SvgRenderDiagnostics": ("dnadesign.baserender.src.core.vector", "SvgRenderDiagnostics"),
+    "PngRenderResult": ("dnadesign.baserender.src.core.vector", "PngRenderResult"),
+    "RasterizerInfo": ("dnadesign.baserender.src.core.vector", "RasterizerInfo"),
+    "rasterize_svg": ("dnadesign.baserender.src.public.vector_output", "rasterize_svg"),
+    "SvgRenderResult": ("dnadesign.baserender.src.core.vector", "SvgRenderResult"),
     "initialize_runtime": ("dnadesign.baserender.src.runtime", "initialize_runtime"),
     "compute_layout": ("dnadesign.baserender.src.render.layout", "compute_layout"),
     "render_record": ("dnadesign.baserender.src.render.renderer", "render_record"),

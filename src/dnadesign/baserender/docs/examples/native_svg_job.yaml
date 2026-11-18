@@ -1,0 +1,47 @@
+# Neutral 60/100-base illustration demo, not a scientific promoter selection.
+version: 4
+contract:
+  kind: sequence_rows_render_v3
+bundle:
+  path: results/native-svg-example-v1
+input:
+  kind: json
+  path: data/native_svg_rows.json
+  alphabet: DNA
+  adapter:
+    kind: generic_features
+    columns:
+      id: id
+      sequence: sequence
+      features: features
+      effects: effects
+    policies: {}
+render:
+  renderer: sequence_rows
+  style:
+    preset: presentation_default
+    overrides:
+      legend: false
+      font_mono: Arial
+      font_label: Arial
+      font_size_seq: 14
+  options:
+    layout:
+      canvas_size_pt: [1300, 400]
+      sequence_origin_pt: [60, 280]
+      top_extent_pt: 104
+  native_svg:
+    captions:
+      rnap_sigma70:
+        text: RNAP
+        family: Arial
+        size_pt: 18
+        anchor_fraction: [0.83827, 0.55688]
+    rasterization:
+      dpi: 144
+outputs:
+  - kind: images
+    fmt: svg
+run:
+  strict: true
+  fail_on_skips: true

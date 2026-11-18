@@ -16,13 +16,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
-import yaml
-
 from dnadesign.artifacts import portable_path_identity
 
 from ..core import (
     Alphabet,
     ContractError,
+    RenderingError,
     SchemaError,
     ensure,
     reject_unknown_keys,
@@ -44,6 +43,10 @@ from .job_contracts import (
     render_contract_renderer_kinds,
     validate_render_contract_renderer,
 )
+from .native_svg import NativeSvgCfg, validate_native_outputs
+from .style_v1 import resolve_style
+from .video import validate_video_settings
+from .yaml_io import parse_unique_yaml
 
 _RESERVED_BUNDLE_METADATA_NAMES = frozenset({"manifest.json", ".dnadesign-publication-owner.json"})
 
@@ -99,6 +102,7 @@ class RenderCfg:
     style_preset: str | Path | None
     style_overrides: Mapping[str, Any]
     options: Mapping[str, Any]
+    native_svg: NativeSvgCfg | None = None
 
 
 @dataclass(frozen=True)
@@ -130,6 +134,8 @@ class VideoOutputCfg:
     title_text: str | None = None
     title_font_size: int | None = None
     title_align: str = "center"
+    background: str | None = None
+    encode_timeout_s: float | None = None
 
 
 OutputCfg = ImagesOutputCfg | VideoOutputCfg
@@ -274,6 +280,14 @@ def _inline_mapping_allowed_roots(
                     continue
                 for value in declared_transform_path_values(name, params):
                     _append_if_absolute(value)
+
+    render_data = mapping.get("render")
+    if isinstance(render_data, Mapping) and isinstance(render_data.get("native_svg"), Mapping):
+        illustrations = render_data["native_svg"].get("illustrations")
+        if isinstance(illustrations, Mapping):
+            for spec in illustrations.values():
+                if isinstance(spec, Mapping) and isinstance(spec.get("artwork"), Mapping):
+                    _append_if_absolute(spec["artwork"].get("path"))
 
     return tuple(roots)
 
@@ -600,9 +614,9 @@ def _parse_selection(job_path: Path, raw: Any, *, allowed_roots: tuple[Path, ...
     )
 
 
-def _parse_render(raw: Any) -> RenderCfg:
+def _parse_render(raw: Any, *, job_path: Path, allowed_roots: tuple[Path, ...]) -> RenderCfg:
     data = require_mapping(raw, "render")
-    reject_unknown_keys(data, {"renderer", "style", "options"}, "render")
+    reject_unknown_keys(data, {"renderer", "style", "options", "native_svg"}, "render")
 
     renderer = str(data.get("renderer", "")).strip()
     require_one_of(
@@ -626,17 +640,36 @@ def _parse_render(raw: Any) -> RenderCfg:
     if not isinstance(overrides_raw, Mapping):
         raise SchemaError("render.style.overrides must be a mapping")
 
+    # Admission and execution share the same style schema, including preset
+    # resolution. Validation must not defer bad geometry until rendering.
+    style = resolve_style(preset=style_preset, overrides=overrides_raw)
+
     options_raw = data.get("options", {})
     if options_raw is None:
         options_raw = {}
     if not isinstance(options_raw, Mapping):
         raise SchemaError("render.options must be a mapping")
+    from ..render.renderer import normalize_renderer_options
+
+    options = normalize_renderer_options(renderer, options_raw)
+    native = None
+    if "native_svg" in data:
+        try:
+            native = NativeSvgCfg.from_mapping(
+                data["native_svg"],
+                resolve_path=lambda raw, field: _resolve_path(job_path, raw, field=field, allowed_roots=allowed_roots),
+            )
+        except (ContractError, RenderingError) as exc:
+            raise SchemaError(f"render.native_svg: {exc}") from exc
+        if style.figure_scale != 1:
+            raise SchemaError("render.native_svg requires style.figure_scale=1")
 
     return RenderCfg(
         renderer=renderer,
         style_preset=style_preset,
         style_overrides=dict(overrides_raw),
-        options=dict(options_raw),
+        options=options,
+        native_svg=native,
     )
 
 
@@ -765,6 +798,8 @@ def _parse_outputs(
                 "title_text",
                 "title_font_size",
                 "title_align",
+                "background",
+                "encode_timeout_s",
             },
             f"outputs[{i}]",
         )
@@ -772,10 +807,8 @@ def _parse_outputs(
         ensure(fmt == "mp4", f"outputs[{i}].fmt must be 'mp4'", SchemaError)
 
         fps = _parse_int(data.get("fps", 2), field=f"outputs[{i}].fps")
-        ensure(fps >= 1, f"outputs[{i}].fps must be >= 1", SchemaError)
 
         frames_per_record = _parse_int(data.get("frames_per_record", 1), field=f"outputs[{i}].frames_per_record")
-        ensure(frames_per_record >= 1, f"outputs[{i}].frames_per_record must be >= 1", SchemaError)
 
         pauses_raw = data.get("pauses", {})
         if pauses_raw is None:
@@ -786,23 +819,11 @@ def _parse_outputs(
 
         width_raw = data.get("width_px")
         width_px = None if width_raw is None else _parse_int(width_raw, field=f"outputs[{i}].width_px")
-        if width_px is not None:
-            ensure(width_px >= 1, f"outputs[{i}].width_px must be >= 1", SchemaError)
 
         height_raw = data.get("height_px")
         height_px = None if height_raw is None else _parse_int(height_raw, field=f"outputs[{i}].height_px")
-        if height_px is not None:
-            ensure(height_px >= 1, f"outputs[{i}].height_px must be >= 1", SchemaError)
 
         aspect_ratio = _parse_aspect(data.get("aspect"))
-        if aspect_ratio is not None:
-            ensure(aspect_ratio > 0, f"outputs[{i}].aspect must be > 0", SchemaError)
-        if width_px is not None and height_px is not None and aspect_ratio is not None:
-            declared_ratio = float(width_px) / float(height_px)
-            if abs(declared_ratio - float(aspect_ratio)) > 1.0e-6:
-                raise SchemaError(
-                    f"outputs[{i}].aspect conflicts with width_px/height_px ({aspect_ratio!r} != {declared_ratio:.6g})"
-                )
 
         total_duration_raw = data.get("total_duration")
         total_duration = (
@@ -810,15 +831,8 @@ def _parse_outputs(
             if total_duration_raw is None
             else _parse_float(total_duration_raw, field=f"outputs[{i}].total_duration")
         )
-        if total_duration is not None:
-            ensure(total_duration > 0, f"outputs[{i}].total_duration must be > 0", SchemaError)
 
         content_fit = str(data.get("content_fit", "native")).strip().lower()
-        require_one_of(
-            content_fit,
-            {"native", "fill_width", "fill_width_per_frame"},
-            f"outputs[{i}].content_fit",
-        )
 
         title_text_raw = data.get("title_text")
         title_text = None if title_text_raw is None else str(title_text_raw).strip()
@@ -831,11 +845,15 @@ def _parse_outputs(
             if title_font_size_raw is None
             else _parse_int(title_font_size_raw, field=f"outputs[{i}].title_font_size")
         )
-        if title_font_size is not None:
-            ensure(title_font_size >= 6, f"outputs[{i}].title_font_size must be >= 6", SchemaError)
 
         title_align = str(data.get("title_align", "center")).strip().lower()
-        require_one_of(title_align, {"left", "center", "right"}, f"outputs[{i}].title_align")
+        background = data.get("background")
+        encode_timeout_raw = data.get("encode_timeout_s")
+        encode_timeout_s = (
+            None
+            if encode_timeout_raw is None
+            else _parse_float(encode_timeout_raw, field=f"outputs[{i}].encode_timeout_s")
+        )
 
         raw_path = data.get("path")
         out_path = _resolve_output_file(
@@ -861,6 +879,8 @@ def _parse_outputs(
                 title_text=title_text,
                 title_font_size=title_font_size,
                 title_align=title_align,
+                background=background,
+                encode_timeout_s=encode_timeout_s,
             )
         )
 
@@ -908,6 +928,7 @@ def validate_output_configuration(bundle_root: Path, outputs: tuple[OutputCfg, .
         elif isinstance(output, VideoOutputCfg):
             ensure(output.kind == "video", f"outputs[{index}].kind must be 'video'", SchemaError)
             ensure(output.fmt == "mp4", f"outputs[{index}].fmt must be 'mp4'", SchemaError)
+            validate_video_settings(output, field=f"outputs[{index}]")
         else:
             raise SchemaError(f"outputs[{index}] must be an images or video output configuration")
 
@@ -1022,10 +1043,20 @@ def _parse_sequence_rows_job_mapping(
         plugins=_parse_plugin_specs(job_path, pipeline_raw.get("plugins"), allowed_roots=allowed_roots)
     )
 
-    render_cfg = _parse_render(data.get("render"))
+    render_cfg = _parse_render(data.get("render"), job_path=job_path, allowed_roots=allowed_roots)
     validate_render_contract_renderer(contract_cfg.kind, render_cfg.renderer, field="contract.kind")
     validate_adapter_renderer_compatibility(input_cfg, render_cfg)
     outputs_cfg = _parse_outputs(job_path, bundle_cfg.path, data.get("outputs"))
+    validate_native_outputs(render_cfg, outputs_cfg)
+    if (
+        render_cfg.native_svg is None
+        and "layout" in render_cfg.options
+        and any(isinstance(output, VideoOutputCfg) for output in outputs_cfg)
+    ):
+        raise SchemaError(
+            "explicit layout requires native video composition; "
+            "use render.native_svg with a fixed canvas/background, or use image outputs"
+        )
     validate_adapter_output_compatibility(input_cfg.adapter.kind, outputs_cfg)
     run_cfg = _parse_run(data.get("run"))
 
@@ -1053,9 +1084,9 @@ def load_render_job(path: str | Path, *, caller_root: str | Path | None = None) 
         else:
             caller_scope = Path(caller_root).expanduser().resolve()
         try:
-            raw = yaml.safe_load(job_path.read_text())
-        except Exception as exc:
-            raise SchemaError(f"Could not parse job YAML: {job_path}") from exc
+            raw = parse_unique_yaml(job_path.read_text())
+        except (OSError, SchemaError) as exc:
+            raise SchemaError(f"Could not parse job YAML: {job_path}: {exc}") from exc
         return _parse_sequence_rows_job_mapping(raw, job_path=job_path, caller_scope=caller_scope)
     except ContractError as exc:
         raise SchemaError(str(exc)) from exc

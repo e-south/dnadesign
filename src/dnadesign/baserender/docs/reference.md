@@ -3,7 +3,7 @@ doc_id: baserender-reference
 title: BaseRender reference
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-09-13
+last_verified: 2026-11-18
 ---
 
 # BaseRender reference
@@ -43,9 +43,10 @@ plugin protocol before an independently packaged integration needs one.
     uv run baserender job validate path/to/job.yaml
     uv run baserender job run path/to/job.yaml
 
-Validation resolves required paths and rejects unknown keys, incompatible
-adapters and renderers, unsupported parameters, and unsafe output paths before
-rendering. A run stages every declared artifact, writes manifest.json last,
+Validation resolves required paths and style presets and rejects unknown keys,
+invalid style values, incompatible adapters and renderers, unsupported parameters,
+and unsafe output paths before rendering. CLI and API job validation use the same
+style schema as rendering and do not publish outputs. A run stages every declared artifact, writes manifest.json last,
 and publishes the complete directory with one atomic, create-only rename.
 Existing bundle paths fail.
 
@@ -78,7 +79,7 @@ Optional keys:
 | input | Declares the source, alphabet, and adapter | src/config/, src/io/, src/integrations/ |
 | selection | Selects and orders records | src/pipeline/selection.py |
 | pipeline | Applies declared transforms | src/pipeline/, src/integrations/ |
-| render | Chooses a renderer and style | src/render/, src/config/style_v1.py |
+| render | Chooses renderer, style and optional native composition | src/render/, src/config/ |
 | outputs | Declares bundle-relative images or video | src/outputs/ |
 | run | Controls strict skip behavior | src/execution/ |
 
@@ -124,6 +125,14 @@ Render contracts constrain compatible renderers and may apply resource or
 sensitivity policies. Use list_render_contracts() or the CLI catalog instead
 of maintaining a separate hard-coded list in clients.
 
+`render.native_svg: {}` explicitly selects native sequence-row composition for
+SVG/PNG image jobs and fixed-layout MP4. Its optional `illustrations`, `captions` and `rasterization`
+settings share the public API contracts. Layout remains `render.options.layout`.
+See [native image jobs](vector-output.md#native-image-jobs) for the runnable
+example, strict source settings and supported output modes. Merely selecting
+`fmt: svg` retains the ordinary figure representation unless native composition
+is declared.
+
 ### Outputs
 
 Every output path is relative to bundle.path and confined within it.
@@ -133,6 +142,13 @@ Every output path is relative to bundle.path and confined within it.
 - BaseRender never stretches a frame non-uniformly.
 - Private render contracts preserve owner-only directory and file modes.
 - A failed render or publication leaves no partial final bundle.
+
+Bottom legends share style admission across API calls and jobs. Font size is in
+points; `legend_height_px`, swatch dimensions and gaps are finite pixel values.
+Font size is at least 6 pt, height/dimensions are positive and gaps are nonnegative.
+Native SVG and explicit layouts preserve the requested type and swatch geometry;
+see [bottom-legend layout](vector-output.md#bottom-legends) for wrapping, fitting
+and measured diagnostics.
 
 ## Neutral record
 
@@ -150,9 +166,30 @@ Feature and effect registries reject unknown kinds. Their payload contracts
 reject unknown fields and invalid coordinates. Adapters should retain
 provenance in meta without placing producer logic in the neutral model.
 
+Feature annotations use an explicit declaration, separate from the nucleotide
+string in `Feature.label`:
+
+```python
+render={"annotation_label": {"text": "Binding site", "placement": "near_feature"}}
+```
+
+`annotation_label` requires exactly `text` and `placement`. Placement is
+`near_feature` or `inline`; inline labels follow `legend=True` and
+`legend_mode="inline"`. A near-feature annotation replaces that feature's inline
+tag label. Its text is preserved exactly, its font is not shrunk, and insufficient
+space fails with feature/bounds context. Layout reserves room for declared near
+labels. Label positions, collisions and colors are resolved before allocating a
+figure. Producer adapters supply the declaration; `attrs.source` and
+`attrs.display_label` remain descriptive metadata and no longer trigger placement.
+Callers that construct neutral records directly must declare their annotations.
+
 Each `span_link` effect can set `params.color` and `params.label_color` to
 override its line and label colors. Without those fields, the style supplies
-both colors. An `anchored_illustration` can set `params.image_tint` to draw its
+both colors. `font_size_span_link_label` accepts fractional points. Ordinary
+figure rendering may fit text by default; native SVG and explicit layout preserve
+type and fail when it cannot fit. Their explicit shrinking requests are rejected.
+The [spacer contract](vector-output.md#spacer-labels) describes diagnostics and
+admission. An `anchored_illustration` can set `params.image_tint` to draw its
 image in one color while preserving the source alpha mask. Omit the tint to
 keep the image's original colors. Invalid colors fail before a figure is
 allocated.
@@ -182,6 +219,36 @@ exporting producer-named helpers. Sequence-panel helpers require an explicit
 style_profile, so a generic API call cannot silently select a domain-specific
 presentation.
 
+### Physical sequence layout
+
+`sequence_rows` and `nucleotide_evidence_map` accept `render.options.layout`:
+
+```yaml
+render:
+  renderer: sequence_rows
+  style:
+    overrides:
+      figure_scale: 1
+      legend: false
+  options:
+    layout:
+      base_pitch_pt: 10
+      canvas_size_pt: [1200, 400]
+      sequence_origin_pt: [80, 200]
+```
+
+This is the serialized `SequenceLayout` Python contract. Job validation checks
+the registered renderer's option keys and nested layout units without loading
+plotting libraries. Image execution uses the same measurements as the figure
+and native SVG APIs. Explicit layout and legacy metadata declarations cannot
+compete. See [physical canvas and grid](vector-output.md#physical-canvas-and-grid)
+for origin, clearances and bounds semantics. Native SVG illustration composition
+requires explicit `render.native_svg`; choosing SVG as an image-job format alone
+retains the existing figure-based illustration behavior. Explicit layout with
+ordinary video still fails at admission. Native video uses the same measured
+composition with a fixed canvas and an explicit background; see
+[fixed native video](vector-output.md#fixed-native-video).
+
 ## Public Python API
 
 Import from dnadesign.baserender. Imports from dnadesign.baserender.src.* are
@@ -205,6 +272,7 @@ Record and figure helpers:
 - adapt_record, adapt_records
 - load_record_from_parquet, load_records_from_parquet
 - render_record_figure, render_record_grid_figure
+- SequenceLayout, render_record_svg
 - render_parquet_record_figure
 - render_sequence_panel_image, sequence_panel_config_for_adapter
 

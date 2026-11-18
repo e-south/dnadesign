@@ -39,7 +39,7 @@ class RunReport:
     skipped_records_by_reason: dict[str, int] = field(default_factory=dict)
     missing_selection_keys: list[str] = field(default_factory=list)
     outputs: dict[str, str] = field(default_factory=dict)
-    output_metrics: dict[str, dict[str, int | float | str]] = field(default_factory=dict)
+    output_metrics: dict[str, dict[str, Any]] = field(default_factory=dict)
     render_spec: dict[str, Any] = field(default_factory=dict)
     _source_evidence: dict[str, CapturedSource] = field(default_factory=dict, init=False, repr=False)
 

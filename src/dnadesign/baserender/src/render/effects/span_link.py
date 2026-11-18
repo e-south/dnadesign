@@ -13,20 +13,13 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import Mapping
 
 import matplotlib.colors as mcolors
-from matplotlib.font_manager import FontProperties
-from matplotlib.textpath import TextPath
 
-from ...core import Effect, Record, RenderingError, Span
-from ..layout import LayoutContext
+from ...core import Effect, LayoutError, Record, RenderingError, Span
+from ..layout import LayoutContext, measure_text_width_px
 from ..palette import Palette
-
-
-def _text_px_width(text: str, family: str, size_pt: int, dpi: int) -> float:
-    prop = FontProperties(family=family, size=size_pt)
-    bbox = TextPath((0, 0), text, prop=prop).get_extents()
-    return bbox.width / 72.0 * dpi
 
 
 def _span_mid_x(span: Span, layout: LayoutContext) -> float:
@@ -52,7 +45,7 @@ def _resolve_endpoints(
     if "from_span" in target and "to_span" in target:
         from_raw = target["from_span"]
         to_raw = target["to_span"]
-        if not isinstance(from_raw, dict) or not isinstance(to_raw, dict):
+        if not isinstance(from_raw, Mapping) or not isinstance(to_raw, Mapping):
             raise RenderingError("span_link span targets must be mappings")
         from_span = Span(start=int(from_raw["start"]), end=int(from_raw["end"]), strand=from_raw.get("strand"))
         to_span = Span(start=int(to_raw["start"]), end=int(to_raw["end"]), strand=to_raw.get("strand"))
@@ -69,13 +62,20 @@ class SpanLinkGeometry:
     x2: float
     y: float
     label: str
+    font_size_pt: float | None
+    gap: float
+    label_bounds: tuple[float, float, float, float] | None
+    occupied_boxes: tuple[tuple[float, float, float, float], ...]
 
 
 def compute_span_link_geometry(
     effect: Effect,
     layout: LayoutContext,
     style,
-    feature_boxes: dict[str, tuple[float, float, float, float]],
+    feature_boxes: Mapping[str, tuple[float, float, float, float]],
+    *,
+    preserve_type: bool = False,
+    enforce_bounds: bool = True,
 ) -> SpanLinkGeometry:
     """Resolve and validate span-link geometry without allocating artists."""
 
@@ -110,12 +110,84 @@ def compute_span_link_geometry(
     if x2 <= x1:
         raise RenderingError("span_link collapsed geometry after applying inner_margin_bp")
 
-    return SpanLinkGeometry(
-        x1=x1,
-        x2=x2,
-        y=y,
-        label=str(effect.params.get("label", "")).strip(),
-    )
+    label = str(effect.params.get("label", "")).strip()
+    shrink = effect.params.get("shrink_label_to_fit", True)
+    if not isinstance(shrink, bool):
+        raise RenderingError("span_link params.shrink_label_to_fit must be bool")
+    if preserve_type and effect.params.get("shrink_label_to_fit") is True:
+        raise RenderingError(
+            "native or explicit-layout output rejects span_link.params.shrink_label_to_fit=True; "
+            "remove it or set False and choose the font size explicitly"
+        )
+    font_size = None
+    gap = 0.0
+    label_bounds = None
+    mid = (x1 + x2) / 2.0
+    available = x2 - x1
+    text_height = 0.0
+    if label:
+        try:
+            base_size = float(style.font_size_span_link_label or max(6, style.font_size_seq))
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise RenderingError("span_link font size must be finite and >= 6 pt") from exc
+        if not math.isfinite(base_size) or base_size < 6:
+            raise RenderingError("span_link font size must be finite and >= 6 pt")
+        font_size = base_size
+        label_width = measure_text_width_px(label, style.font_label, font_size, style.dpi)
+        if label_width + 12.0 > 0.85 * available:
+            if preserve_type:
+                raise LayoutError(
+                    f"span_link label {label!r} at {font_size:g} pt requires "
+                    f"{(label_width + 12.0) / 0.85:g} px but the span allows {available:g} px; "
+                    "increase pitch, reduce the inner margin or explicitly choose another label/font size"
+                )
+            if shrink:
+                scale = (0.85 * max(4.0, available)) / max(1.0, label_width)
+                font_size = float(max(6, int(base_size * min(1.0, scale))))
+                label_width = measure_text_width_px(label, style.font_label, font_size, style.dpi)
+        text_height = max(8.0, font_size / 72.0 * style.dpi)
+        gap = min(available * 0.9, label_width + 12.0)
+        label_bounds = (
+            mid - (label_width + 12.0) / 2,
+            y - text_height / 2,
+            mid + (label_width + 12.0) / 2,
+            y + text_height / 2,
+        )
+        if preserve_type and (
+            min(label_bounds[:2]) < 0 or label_bounds[2] > layout.width or label_bounds[3] > layout.height
+        ):
+            raise LayoutError(
+                f"span_link label {label!r} bounds {label_bounds} px exceed the canvas; increase layout clearances"
+            )
+    line_half_height = max(2.0, text_height * 0.33)
+    tick_half_height = 4.0
+    tick_half_width = 1.2
+    occupied = [
+        (x1 - tick_half_width, y - tick_half_height, x1 + tick_half_width, y + tick_half_height),
+        (x2 - tick_half_width, y - tick_half_height, x2 + tick_half_width, y + tick_half_height),
+    ]
+    if label:
+        left_end, right_start = mid - gap / 2, mid + gap / 2
+        if left_end > x1:
+            occupied.append((x1, y - line_half_height, left_end, y + line_half_height))
+        if x2 > right_start:
+            occupied.append((right_start, y - line_half_height, x2, y + line_half_height))
+        occupied.append(label_bounds)
+    else:
+        occupied.append((x1, y - line_half_height, x2, y + line_half_height))
+    for bounds in occupied if enforce_bounds else ():
+        if (
+            not all(math.isfinite(value) for value in bounds)
+            or min(bounds[:2]) < 0
+            or bounds[2] > layout.width
+            or bounds[3] > layout.height
+        ):
+            raise LayoutError(
+                f"span_link bounds {tuple(float(value) for value in bounds)} px exceed the "
+                f"{layout.width:g} x {layout.height:g} px canvas; "
+                "increase layout clearances or revise the declared track"
+            )
+    return SpanLinkGeometry(x1, x2, y, label, font_size, gap, label_bounds, tuple(occupied))
 
 
 def validate_span_link(
@@ -127,16 +199,10 @@ def validate_span_link(
     feature_boxes: dict[str, tuple[float, float, float, float]],
 ) -> None:
     _ = (record, palette)
-    geometry = compute_span_link_geometry(effect, layout, style, feature_boxes)
-    shrink_to_fit = effect.params.get("shrink_label_to_fit", True)
-    if not isinstance(shrink_to_fit, bool):
-        raise RenderingError("span_link params.shrink_label_to_fit must be bool")
+    compute_span_link_geometry(effect, layout, style, feature_boxes)
     for key in ("color", "label_color"):
         if key in effect.params and not mcolors.is_color_like(effect.params[key]):
             raise RenderingError(f"span_link params.{key} must be a valid color")
-    if geometry.label:
-        base_fs = int(style.font_size_span_link_label or max(6, style.font_size_seq))
-        _text_px_width(geometry.label, style.font_label, base_fs, style.dpi)
 
 
 def draw_span_link(
@@ -147,31 +213,20 @@ def draw_span_link(
     style,
     palette: Palette,
     feature_boxes: dict[str, tuple[float, float, float, float]],
+    *,
+    geometry: SpanLinkGeometry | None = None,
 ) -> None:
-    geometry = compute_span_link_geometry(effect, layout, style, feature_boxes)
+    if geometry is None:
+        geometry = compute_span_link_geometry(effect, layout, style, feature_boxes)
     x1, x2, y, label = geometry.x1, geometry.x2, geometry.y, geometry.label
     color = effect.params.get("color", style.span_link_color)
     label_color = effect.params.get("label_color", style.span_link_label_color or color)
     line_width = max(0.8, float(getattr(style, "span_link_line_width", 1.1)))
     tick_line_width = max(0.8, float(getattr(style, "span_link_tick_line_width", line_width)))
-    base_fs = int(style.font_size_span_link_label or max(6, style.font_size_seq))
-    shrink_to_fit = effect.params.get("shrink_label_to_fit", True)
-    if not isinstance(shrink_to_fit, bool):
-        raise RenderingError("span_link params.shrink_label_to_fit must be bool")
-
     if label:
-        label_w = _text_px_width(label, style.font_label, base_fs, style.dpi)
-        avail = max(4.0, x2 - x1)
-        if shrink_to_fit and label_w + 12.0 > 0.85 * avail:
-            scale = (0.85 * avail) / max(1.0, label_w)
-            fs = max(6, int(base_fs * min(1.0, scale)))
-            label_w = _text_px_width(label, style.font_label, fs, style.dpi)
-        else:
-            fs = base_fs
-        gap = min(avail * 0.9, label_w + 12.0)
         mid = (x1 + x2) / 2.0
-        left_end = mid - gap / 2.0
-        right_start = mid + gap / 2.0
+        left_end = mid - geometry.gap / 2.0
+        right_start = mid + geometry.gap / 2.0
 
         ax.plot([x1, left_end], [y, y], color=color, lw=line_width, zorder=5)
         ax.plot([right_start, x2], [y, y], color=color, lw=line_width, zorder=5)
@@ -181,7 +236,7 @@ def draw_span_link(
             label,
             ha="center",
             va="center",
-            fontsize=float(fs) * float(style.figure_scale),
+            fontsize=geometry.font_size_pt * float(style.figure_scale),
             family=style.font_label,
             color=label_color,
             zorder=6,

@@ -1,0 +1,617 @@
+---
+doc_id: baserender-vector-api-execution
+title: BaseRender vector output and pragmatic API hardening
+owner: dnadesign-maintainers
+status: completed
+last_verified: 2026-11-18
+---
+
+## Exec plan: BaseRender vector output and pragmatic API hardening
+
+**Status:** completed
+**Owner:** dnadesign-maintainers
+**Created:** 2026-11-18
+**Last updated:** 2026-11-18
+
+### Purpose / Big Picture
+
+Make BaseRender the reusable owner of vector artwork, independent captions and
+predictable typography/layout. Success lets actual consumers select records and
+place outputs without duplicating drawing, SVG repair or geometry inspection.
+That reduces visual drift and makes future aesthetic changes local to one API.
+
+In scope: BaseRender's public API/CLI, configuration, assets, layout, drawing,
+SVG/raster/frame publication, performance and supporting tests/docs, plus bounded
+consumer migration. Out of scope: scientific searches/reductions, manuscript or
+author-SVG edits, a presentation engine, a monorepo-wide rewrite, package release
+or remote publication. Rasterization remains an explicit final output operation.
+
+### Progress
+
+- [x] (2026-11-18 02:06Z) Capture the proposal, known source findings, focused baseline and next-executor contract; implementation has not started.
+- [x] (2026-11-18 02:34Z) A — Baseline package suite, catalog, demo admission and public usage reviewed; prioritized findings below retain open work.
+- [x] (2026-11-18 02:34Z) B — Native SVG artwork and independent vector captions proved through the public API on 60/100-base examples.
+- [x] (2026-11-18 05:54Z) C — Layout, font identity, neutral label, spacer and bottom-legend contracts are implemented; native/explicit-layout overflow fails before drawing.
+- [x] (2026-11-18 07:39Z) D — Native SVG/PNG and fixed native MP4 share preparation, composition and rasterization; exact held-frame order and static fallbacks qualify.
+- [x] (2026-11-18 07:54Z) E — Cold/warm stage timings and memory qualified; backend reuse saves about 14–15% while source/font/pixel identities remain fixed. No additional cache is justified.
+- [x] (2026-11-18 08:47Z) F — Both real placements migrated in separate qualified consumer commits; runtime bytes, source identities, fonts, anchors and neighboring artwork verified.
+- [x] (2026-11-18 09:24Z) G — Displaced worker/private inspection/schema dispatch removed after both migrations; four final stills preserve exact pixels and geometry. Configuration hardening, package gates and final performance budgets pass.
+
+### Surprises & Discoveries
+
+The packaged RNAP SVG has editable body geometry and separate `rnap_label` text.
+Its drawable closure has no images, but the manifest chooses PNG and the loader
+uses `imread`/`imshow`. SVG export therefore embeds pixels. Some unused SVG
+definitions contain raster material: selection/definition closure matters more
+than the filename or a blanket scan of every unused definition.
+
+The fitted-panel path forces white RGBA and rescales it; a fixed canvas does not
+fix physical typography. Public `Style`, `resolve_style` and `compute_layout`
+already exist and should supply the new path's geometry authority. Some label
+placement is currently gated by producer-name attributes.
+
+Read-only observations identified large responsibility concentrations in
+`render/sequence_rows.py`, `outputs/video.py`, `public/api.py`, `render/layout.py`
+and `config/style_v1.py`. Size alone is not a defect or a reason to split them.
+Before implementation, the complete package suite passed on `4bb0793da`.
+Catalog output and demo-job validation also passed. Review covered API/job
+admission, configuration, the asset loader, sequence layout/drawing, image/video
+output routes, public/resource tests and documentation. The resulting findings
+are bounded to these observed paths, not a claim that every renderer or hostile
+SVG feature has been exhaustively audited.
+
+| Priority / criterion | Evidence and status | Owning slice |
+| --- | --- | --- |
+| P1: vector requests preserve actual geometry | [Illustration loader](../../../src/dnadesign/baserender/src/render/effects/anchored_illustration.py) selected pixels; the new native API reads pinned SVG selections without decoding PNG. Closed for the native API; legacy APIs remain explicit raster paths. | B |
+| P1: fixed typography and transparent composition | [Fitted panel](../../../src/dnadesign/baserender/src/public/api.py) forces white and rescales. Native SVG/PNG preserve admitted point geometry and alpha; fixed native MP4 flattens those same frames onto an explicit background. | C/D |
+| P2: neutral placement policy | [Sequence labels](../../../src/dnadesign/baserender/src/render/sequence_rows.py) now use explicit feature annotation declarations. DenseGen/GenBank adapters supply the policy; provenance attributes no longer control placement. | C, closed |
+| P2: exact placement is observable | Native illustration frames now fail on overflow instead of clamping; captions share admitted origins with serialization and report ink bounds. Existing raster behavior stays explicit. | C, closed |
+| P2: viewer font identity | Native diagnostics declare referenced text and hash the resolved declared fonts. Captions reject missing glyphs and use resolved family names. Arial proofs render in Chrome/Inkscape; target font availability still needs consumer qualification. | C policy closed; D/F qualification |
+| P2: repeated illustrations have unique IDs | A two-instance test exposed colliding footprint IDs. Unique footprint IDs and definition namespaces now pass structural tests. | B, closed |
+| P2: video honors admitted layout | [Legacy video](../../../src/dnadesign/baserender/src/outputs/video.py) receives no renderer options, mutates layout metadata and applies its own fitting (including a 0.96 content scale). Ordinary video with explicit layout fails at admission. The qualified native route uses fixed shared geometry without that compositor. | D, closed |
+| P2: native labels preserve requested type | Spacers now use one plan and preserve fractional native sizes or fail. Bottom legends also have a measured preserve-type plan; ordinary fitting remains supported without overflow. | C, closed |
+
+### Decision Log
+
+- Preserve selected SVG artwork through composition, with explicit caption
+  text/style and anchors. A vector request must not silently substitute pixels.
+- Reuse existing layout/style machinery. Prefer owner-local SVG composition
+  over a general SVG-to-Matplotlib parser or a new public scene framework.
+- Expand the supported vector surface, migrate real consumers, then contract
+  displaced code. Existing raster/figure APIs remain valid where appropriate;
+  do not remove them merely because the new vector path exists.
+- Keep generic layout/labels producer-neutral. Scientific mappings, inferred
+  order, classifications and data selection remain with their current owners.
+- Refactor only responsibilities exposed by findings or touched by a slice.
+  Separate behavior-preserving extraction from new behavior and use red/green
+  evidence for contract changes. Do not create pass-through modules or generic
+  utilities solely to reduce line counts.
+- Treat performance as measured work: preserve correctness, fonts and source
+  fidelity while separating preparation, drawing, serialization and raster cost.
+
+### Outcomes & Retrospective
+
+All six original requirements and A–G are complete. Public native SVG/text APIs
+and the existing job CLI share explicit contracts; valid legacy figure APIs
+remain supported. Both real consumer placements have migrated and the displaced
+consumer worker has been removed in consumer commit `f795b22`. No release, scientific source edit or
+presentation playback qualification is implied.
+
+| Original requirement | Final evidence |
+| --- | --- |
+| Audit boundaries, contracts and callers | Ranked findings above, closed by the named slices; public import/resource and architecture checks pass. |
+| Actual vector artwork and independent captions on 60/100 bases | Public native API, four real consumer SVGs with zero images and editable captions, source/definition/painter-order tests. |
+| Explicit type, pitch, anchors, bounds, alpha and diagnostics | Shared measured nucleotide/label/spacer geometry; requested type retained or overflow rejected; public text and placement diagnostics. |
+| Shared SVG/raster/frame geometry and measured performance | Native image/video tests, decoded exact frame holds and atomic rollback; final benchmark retains exact prior SVG, pixels and diagnostics under every local budget. |
+| Both real placements | Independently reviewed 100/60-base batches; final four full-frame stills are pixel-identical, with unchanged source IDs, fonts, spacer/strand coordinates and neighboring arrows. Evidence stays with that consumer. |
+| Remove proven replacements | One consumer native worker, no private artist inspection or old execution dispatch; actual graph dimensions replace hard-coded assumptions; 80 Python and 6 JavaScript consumer regressions pass. |
+
+Final source qualification is `caa77a11b`, still distribution 0.4.1. All 890
+BaseRender tests pass. Ruff check/format, architecture boundaries, docs checks,
+catalog and demo admission pass. Generated evidence remains ignored under
+`outputs/configuration-hardening-20261118-01/` and
+`outputs/native-performance-final-20261118-01/` in BaseRender. Five cold and nine
+warm observations per path pass every local performance budget: warm batch
+median / p95 2.754 / 2.805 s per four records, with unchanged SVG bytes, pixels
+and diagnostics. No additional render cache was introduced.
+
+The final review reproduced silent duplicate YAML keys, stale path-keyed style
+caching and late typed-video validation (14 failing regressions). Jobs and styles
+now share safe duplicate-key admission while preserving intentional YAML merges.
+Style parsing retains a bounded content-keyed cache and detached return values.
+Parsed and typed videos share timing/sizing constraints before dependencies and
+input capture. Seventeen focused admission tests pass. These are bounded fixes,
+not a claim of exhaustive hostile-input or all-renderer verification.
+
+The chronological checkpoints below retain the decisions, red evidence and
+then-current counts. Their descriptions of later slices as open are historical;
+the Progress list and completion table above are the terminal status.
+
+The implementation rationale is the
+[vector-assets proposal](../../dev/plans/tools/baserender/vector-assets-and-layout.md).
+Slices A/B now provide `render_record_svg`, explicit source/caption records and
+measured diagnostics. Exact body IDs and a SHA-256 were added to the packaged
+manifest; original SVG bytes are unchanged. SVG emission composes at internal
+slots in painter order, without a new general renderer or SVG-to-path parser.
+Legacy figure output remains supported. Public-API-only neutral proofs and
+repeat commands live in the [native output guide](../../../src/dnadesign/baserender/docs/vector-output.md).
+
+The proof at `src/dnadesign/baserender/outputs/vector-proof-20261118-03/` has
+four SVGs, a source/artifact index, a Chrome screenshot and an Inkscape-rendered
+PNG. Its `receipt.json` reports zero raster images in every SVG. The earlier
+`vector-proof-20261118-01/` retains the observed font fallback. These are ignored
+review artifacts, reproducible by the checked-in example; no scientific asset,
+consumer selection, manuscript or release changed. C–G remain required.
+
+Qualification: 659 package tests passed, including 28 new native-output and
+negative-path tests; Ruff check/format, architecture boundaries, documentation
+checks, catalog and demo-job admission passed. Before runtime edits, all 631
+baseline tests passed. Red evidence includes the missing public API, duplicate
+footprint IDs, a corrupt-pixel preflight regression and a silently omitted
+missing-feature connector. The latter two now fail before figure allocation.
+The compact-docs allowlist deliberately adds only the focused native-output guide.
+Harness endpoints are architecture-invariants and knowledge-integrity, verified
+with existing checks rather than a new execution framework.
+The commit detector flagged the new SVG SHA-256 as high entropy. One exact
+false-positive entry was added after matching it to the artwork bytes; detector
+settings and unrelated baseline entries are unchanged.
+
+C's first implementation addresses the reported nucleotide/rectangle mismatch.
+[Shared nucleotide geometry](../../../src/dnadesign/baserender/src/render/nucleotide_geometry.py)
+now owns ink metrics, minimum pitch/height and optical box placement. Layout and
+drawing use that authority; genomic column correspondence and requested font
+sizes remain intact. A 12-point sequence with 18-point feature lettering reserves its
+required space. Explicit insufficient pitch fails rather than shrinking text.
+Public diagnostics distinguish genomic spans from painted nucleotide rectangles.
+
+The review at `src/dnadesign/baserender/outputs/vector-alignment-20261118-03/comparison.html`
+compares the retained B proof with corrected SVGs at natural point size. The
+default example's left/right margins changed from 1.63/3.56 px to 2.59/2.59 px,
+and bottom/top from 8.67/1.19 px to 4.93/4.93 px at 180 dpi. The larger-font
+stress case also fits without overlap. Font/alphabet reference dimensions keep
+the grid and rectangle height stable when sequence letters change, including
+DNA case and ambiguity-code variants. Chrome and Inkscape inspection agree.
+Twenty-seven additional tests cover centering, both strands/fonts, preserved
+glyph scale and columns, invalid spacing units, tight-pitch rejection and
+diagnostic-to-painted-bound agreement. The package suite now passes 686 tests.
+Subsequent C batches qualify spacer, bottom-legend and artwork/caption overflow,
+with an explicit referenced-font policy, as described below. This is not completion of C–G or real
+consumer qualification.
+
+The CLI/API admission review found that `job validate` accepted negative glyph
+spacing, unknown style fields and nonexistent presets that rendering rejected.
+Job parsing now resolves the existing style contract before returning a job.
+Seven failing public-path/mapping/CLI checks reproduced the gap; all eight new
+admission tests now pass, including valid explicit geometry with no published
+bundle. The complete package suite passes 694 tests. Preset lookup and rendering
+remain owned by the existing style module; no duplicate validator was added.
+
+C now also admits `Feature.render.annotation_label` with explicit text and
+`near_feature`/`inline` placement. DenseGen/GenBank adapters translate their labels
+into that neutral declaration; the renderer no longer branches on producer
+names or trims scientific prefixes. Invalid nested fields fail at record
+admission. Declared annotations retain exact text and font size; insufficient
+space raises instead of silently omitting them. Shared label measurements now
+reserve vertical room in layout. This exposed and fixed an older 24-point example
+that silently lost both site labels. Nine new public contract checks plus the
+adapter regression pass; the complete package suite passes 703 tests.
+
+The label responsibilities are now separated into
+[`render/feature_labels.py`](../../../src/dnadesign/baserender/src/render/feature_labels.py).
+It produces immutable label placements before figure allocation; the sequence
+renderer only paints that plan. Both label modes account for reserved overlay
+space, and inline labels also avoid already planned near-feature labels. This
+removes about 500 lines from the sequence-row orchestrator without adding a
+public controller or wrapper. Two negative tests exposed allocation leaks from
+bad annotation colors and unfittable inline text; both now fail before allocation.
+The package suite passes 705 tests. A 60/100-base forward/reverse proof at
+`src/dnadesign/baserender/outputs/annotation-contract-20261118-02/index.html`
+preserves 14-point sequence text and 24-point annotations in Chrome. Its natural
+point-sized view scrolls for the longer sequence rather than shrinking type.
+
+`SequenceLayout` now owns explicit point-based pitch, canvas, forward grid origin,
+minimum content extents and footer clearance. Strict mapping admission and frozen
+values live in configuration; measured canvas placement lives in
+[`render/layout_frame.py`](../../../src/dnadesign/baserender/src/render/layout_frame.py).
+Both reuse the existing layout engine. Native SVG, figure rendering and image
+jobs share the contract; registered option normalization also serves CLI job
+validation without constructing a renderer or loading NumPy/Matplotlib. Conflicting
+legacy metadata, bad units, insufficient pitch/canvas and non-finite arithmetic
+fail before allocation. No fitting or font reduction is introduced by this path.
+
+The neutral review at `src/dnadesign/baserender/outputs/layout-contract-20261118-01/`
+contains public-API 60/100-base SVGs and a real CLI image job. Both CLI outputs
+have exact `0 0 1200 400` viewBoxes; the API examples pin the same (80, 200)-point
+grid origin and 10-point pitch. Browser inspection preserves the requested type.
+Twenty-nine new tests exercise both public surfaces, 72/144-dpi geometry,
+mapping isolation, empty/small-feature glyph cases and negative admission.
+Image jobs still use the existing figure-based illustration output; D must
+integrate native SVG composition and qualify raster/frame parity. Video layout
+is explicitly rejected until that work passes; forwarding options into the
+current compositor alone would still trigger competing metadata and hidden fit.
+
+Sequence rows now separate `prepare` from `draw_prepared` internally. The
+prepared value binds the admitted record, style, palette and measured geometry;
+native output can inspect that plan before allocating a figure. The previous
+private `render_with_layout` tuple route is removed. Four 60/100-base SVGs with
+12/18-point captions remain byte-identical across this preparatory refactor;
+their comparison is retained in `outputs/vector-placement-20261118-01/` under
+BaseRender. All 734 package tests still pass.
+
+Native illustration placement now rejects horizontal overflow, keeping the
+calculated anchors. Captions are measured before figure allocation using the
+resolved font's literal text advances and ink bounds. Serialization uses that
+same admitted origin. Diagnostics include caption origins/bounds and frozen
+`ResolvedFont` identities under an explicit `reference` text-font policy. Missing
+glyphs, unsupported control characters, extreme units and collapsing SVG aspect
+ratios fail with context. The original raster clamping route remains supported.
+The checked-in example now uses `SequenceLayout`, pins its DPI and records font
+and caption geometry. Native SVG still contains no raster images. The review at
+`outputs/vector-placement-20261118-03/` under BaseRender includes a transparent
+Inkscape PNG and Chrome inspection of the 60/100-base examples. Caption and body
+geometry agree across independently sized captions; font-file embedding and
+arbitrary source-SVG font interpretation are not claimed.
+Eighteen new placement/font tests pass, including explicit recovery through a
+larger typed canvas. The full package suite passes 752 tests. The browser review
+resets per-card horizontal scroll before comparing caption sizes; automatic
+`scrollIntoView` had panned one review card by 16 CSS pixels, while its SVG bounds
+were unchanged. The aligned screenshot records the actual common frame.
+
+Spacer geometry now owns font selection, gap and occupied bounds once. Drawing
+and annotation collision checks consume that plan, removing about 100 lines of
+duplicated calculation. Native/explicit-layout preparation preserves fractional
+point sizes, rejects conflicting shrink requests and fails on insufficient span
+or canvas bounds, including unlabelled brackets. Ordinary figure fitting stays
+supported. Native diagnostics report spacer placement by source effect index.
+The contract review also found that accepted read-only span mappings failed in
+the drawer and that explicit spans bypassed coordinate admission; both are fixed.
+Fifteen new tests cover those cases and actual drawn-text containment on both
+lanes. A valid Yiu diagram exposed a natural-canvas omission for explicit-span
+links; natural measurement now includes all spacer extents, reusing the same
+primitive geometry. Both output routes expand naturally, while a fixed canvas
+rejects content that cannot fit. An initial high-track test mistook valid natural
+expansion for clipping; that hypothesis was corrected before qualification.
+All 767 package tests pass, including the Yiu job. Evidence and the matched-font
+native SVG regression comparison live in
+`outputs/span-type-contract-20261118-01/` under BaseRender.
+
+Bottom legends now have a measured plan in the existing
+[`render/legend.py`](../../../src/dnadesign/baserender/src/render/legend.py)
+owner. Sequence-row preparation binds fonts, literal text, swatches, colors,
+rows and bounds before allocation; painting consumes that immutable plan. Native
+SVG and explicit layouts preserve fractional type and configured swatch/gap
+geometry, wrap within the footer or fail with sizing guidance. Ordinary figure
+fitting remains supported, with an explicit error when even fitting cannot
+produce a complete, nonoverlapping footer. DPI conversion and row centering are
+shared; the default presentation footer grows from 16 to 40 px to contain its
+11-point font at 180 dpi. This is an intentional natural-height change for
+figures with bottom legends, not an invisible scaling adjustment.
+
+A Chrome review exposed another representation mismatch: supplying a font file
+alone painted Arial in the raster backend but serialized a DejaVu-first SVG
+family list. The plan now binds the canonical family as well as the file. The
+regression test checks the emitted primary family rather than merely finding
+Arial somewhere in a fallback list. The reviewed native 60/100-base proofs at
+`outputs/legend-type-contract-20261118-03/` under BaseRender retain independent
+captions, 12.5-point Arial legends, transparency and vector artwork. The first
+review and failures are retained in `legend-type-contract-20261118-01/`.
+Twenty-three added tests cover exact size/swatches, default footer, both DPI row
+layouts, ordinary fitting and failures before allocation (including malformed
+units and secondary-tag palette values). All 790 package tests pass, as do Ruff, architecture boundaries, documentation
+checks (298 files), catalog and demo-job admission. Chrome legend bounds agree
+with the reserved entries within 0.01 pt; an Inkscape PNG preserves alpha. The
+four prior examples without legends remain byte-identical. Evidence is recorded
+with the proof. C is complete for the supported native/explicit-layout
+surface; D/E output integration/performance and both consumer migrations remain
+required.
+
+D's first batch separates format composition from the public entrypoint.
+[`outputs/native_svg.py`](../../../src/dnadesign/baserender/src/outputs/native_svg.py)
+owns native record preparation and composition, while the public API resolves
+its settings. Jobs can call that same implementation without importing public
+API internals. Packaged SVG resolution stays with the existing asset loader.
+The four C proofs remain byte-identical across this preparatory refactor.
+
+`rasterize_svg` converts a previously admitted `SvgRenderResult` to a
+`PngRenderResult`, retaining the same point diagnostics rather than preparing or
+fitting the record again. The existing Inkscape CLI is the explicit rasterizer;
+no Python package/system installation or silent alternate renderer is introduced.
+Its version and selected executable SHA-256 are reported. The implementation
+uses piped SVG and RGBA PNG, a transparent background, bounded pixels and a
+process timeout. Fonts are rechecked, the complete SVG document is admitted
+before process execution, and returned PNG dimensions/content are checked before
+an artifact is returned. Metadata is omitted from the conversion transport;
+rendered SVG geometry and its source hash remain authoritative. Pixel dimensions
+are nearest-integer samples of the serialized page at the requested DPI.
+
+The public example accepts `--raster-dpi` to create both formats from each
+composition. Current proof: `outputs/native-output-20261118-01/raster-proof/`
+under BaseRender. All 814 package tests pass (including four live Inkscape cases and a lazy-import
+regression), along with Ruff, architecture, docs, catalog and demo admission.
+The conversion transport and unchanged source SVG yield identical pixels; all
+four PNGs retain alpha and source hashes. This qualifies the conversion
+primitive, not native CLI job selection or video layout. D must still connect the image-job contract and
+qualify shared native frames, then E measures cold/warm/batch costs before
+optimizing repeated font/backend work.
+
+Native image jobs now declare `render.native_svg`, with strict source/caption
+settings in [`config/native_svg.py`](../../../src/dnadesign/baserender/src/config/native_svg.py).
+Raster options/defaults are shared with the public API in
+[`config/raster.py`](../../../src/dnadesign/baserender/src/config/raster.py).
+Layout continues through the existing renderer options. Native preparation and
+drawing are separated so complete batches are admitted before the first figure;
+`outputs/native_images.py` publishes through the existing bundle stage. A missing
+PNG dependency fails before input capture, and used SVG sources are rechecked
+before publication. That image-only checkpoint rejected native video/PDF and
+implicit raster grids; the following batch enables fixed native video.
+
+Native manifests include requested settings, resolved vector/caption selections,
+per-record geometry and raster identities, omitting known machine-local paths.
+The public models expose detached `to_mapping` receipts. Actual SVG/PNG CLI runs,
+API-byte parity, mixed records, malformed settings, changed artwork and late
+failure rollback pass. The first 100-base Arial fixture correctly failed a
+1200-point canvas; the qualified fixture uses 1300 points without reducing type.
+Current evidence is in `outputs/native-job-20261118-01/` under BaseRender. The
+835-test regression baseline passes; final source/static evidence is bound to
+the commit in that directory. No native frame or performance claim follows from
+these image-job results.
+
+D now qualifies fixed native MP4 through the same image-job contract. The
+shared [`native_batch.py`](../../../src/dnadesign/baserender/src/outputs/native_batch.py)
+prepares all records and sources before drawing. Image and video writers consume
+that plan. Record holds/pauses moved unchanged into
+[`video_timing.py`](../../../src/dnadesign/baserender/src/outputs/video_timing.py),
+separating timing from the legacy compositor. The native writer uses the existing
+FFmpeg CLI directly; it never invokes legacy fitting, border trimming, extra
+legend repainting or metadata mutation. Fonts, pitch, origin and physical canvas
+remain the admitted image geometry.
+
+Native video requires a static SVG/PNG output, fixed canvas/origin, even sampled
+pixel dimensions and an explicit opaque background. Conflicting sizes and
+unsupported fitting/title overlays fail. PNG fallbacks retain alpha; MP4 flattens
+the same positions before H.264 encoding. Dependencies are probed before input
+capture; sources are rechecked across encoding and the existing publication
+stage rolls back failed clips and fallbacks together. No system dependency,
+package release, scientific source or consumer artwork changed.
+
+Decoded-frame inspection found a defect missed by the first total-count test:
+FFmpeg output-rate synchronization held a nominal 30-frame image for only 29
+frames. Two red tests reproduced that shift at 5/30 FPS. Explicit FPS filtering
+now preserves each exact hold, verified by decoding every frame. The initial
+failed movie and input timestamp evidence are retained. Qualified proof:
+`outputs/native-video-20261118-01/video-bundle-v2/` under BaseRender, with
+`frame-checks.json`, CLI repeat input, browser screenshots and decoded boundary
+frames. Its two 30-frame compositions retain 2600×800 pixels, the same origin
+and typography; both transparent fallbacks are pixel-identical to D2.
+
+All 853 package tests pass, including 18 new native-video checks, 5/30 FPS exact
+holds, SVG/PNG fallbacks, missing prerequisites, malformed geometry before drawing
+and atomic rollback. Ordinary video tests remain green. Ruff, architecture and
+documentation gates pass. This qualifies the neutral output primitive, not real
+talk placements, native PowerPoint playback, throughput or broad font portability.
+E/F/G remain required.
+
+E's repeatable benchmark uses the existing neutral fixture, compares repeated
+public calls with the job batch path, and times preparation, drawing, SVG
+serialization, backend admission and raster conversion separately. Five cold
+processes and nine warm samples per path qualify identical SVG bytes, PNG pixels
+and diagnostics. The counterbalanced repeat at
+`outputs/native-performance-20261118-02/` under BaseRender records runtime,
+source/style/font/artwork/backend identities, parent/child peak RSS and all raw
+observations; the initial `-01` remains as independent evidence.
+
+Warm batch median is 3.118 s per four records versus 3.663 s for individual calls
+(about 15%; the initial run measured about 14%). Backend admission drops from
+0.784 to 0.195 s. Warm preparation is 0.121 s, about 4% of the batch; final raster
+conversion dominates. Parent/child observed peaks remain below 133/147 MiB.
+Cold raster outliers remain visible, so no general tail-latency claim is made.
+The [performance guide](../../../src/dnadesign/baserender/docs/native-performance.md)
+sets numeric local regression budgets and explains repeat conditions. The
+measured benefit comes from existing per-batch backend reuse and unchanged
+frame holds. Further caching would add invalidation state for little measured
+preparation benefit, so none was added. F consumer qualification remains open.
+
+F's preparatory API slice adds public `measure_text`/`TextMeasurement` using the
+same literal font geometry as native captions. It reports requested point size,
+resolved font identity, advance and baseline-relative ink bounds without drawing.
+This removes the need for consumers to import Matplotlib just to check projected
+lettering. Caption and measurement admission share single-line literal rules;
+blank strings have zero ink and finite advance. Missing fonts/glyphs, bad units
+and overflow (including space-only advance) fail explicitly. Imports stay lazy.
+
+All 873 package tests pass, including 20 new measurement/import/negative tests.
+The documentation inventory now admits the focused performance procedure. The
+four retained SVGs remain byte-identical. Evidence is in
+`outputs/text-measurement-20261118-01/` under BaseRender. A read-only real-data
+probe produced new, unselected SVGs under the talk build owner: 100/60-base
+records admit native vector output, but the old requested 18-point feature role
+increases width and can change natural height. F must qualify explicit shared
+layout and actual saved lettering minima per placement rather than silently
+fitting or declaring that probe a migrated consumer. No selected recipe, saved
+artwork, manuscript or scientific input changed.
+
+F now qualifies both real downstream placements. The first consumer commit
+`7ad7443` migrates the graph-plus-sequence row on two real 100-base records. The
+second, `eda1daa`, independently qualifies two 60-base library records using the
+same native worker, font roles, pitch, caption and producer source pin. Private
+source selections and full review evidence remain with the consumer owner.
+No source data, editable artwork, manuscript, narrative or media selection was
+changed or promoted upstream.
+
+The runtime pin fingerprints imported Python/rendering resources and records
+qualified source revision `525891726` alongside distribution version 0.4.1;
+unrelated repository/documentation changes do not invalidate those bytes. The
+native consumer imports no Matplotlib or producer internals and obtains text
+ink/strand registration from public APIs. Consumer admission and boundary checks
+pass 77 Python and 6 JavaScript tests. An invalid runtime pin fails before
+writing vectors or publishing HTML.
+
+Both placements retain 9.50-pixel nucleotide capitals at their 1600-pixel guide
+width, above the measured 8.49-pixel saved minimum. Annotation/spacer roles also
+pass saved-ink checks. Fixed 100/60-base canvases share a 10-point pitch and
+`[35, 109]` grid origin. The first row spans its complete measured teaching width.
+The second retains both adjacent arrow elements byte-for-byte, omits only the
+138 declared obsolete IDs, and has zero raster-image elements in its complete
+SVG. Both example pairs retain identical projected anchors; browser switching
+keeps stable frame geometry. Re-running the joint native recipe leaves the first
+placement's pixels unchanged. G may now contract the displaced helpers.
+
+The earlier distribution-only pin gap is closed. The final consumer explicitly
+selects qualified revision `caa77a11b` and imported runtime bytes. Older recipes,
+comparisons and source subsets remain recoverable without being active execution
+routes. G rebuilt both real placements after contraction and the explicit repin;
+all four vectors and full-frame pixels equal the independent F2 checkpoint.
+
+### Context and Orientation
+
+Work inside `src/dnadesign/baserender/`, following its `AGENTS.md` and the
+[repo change gate](../../repo-change-gate.md). Public imports are
+`dnadesign.baserender`; consumers must not import sibling internals. Keep private
+consumer paths/identities out of this public package. Use neutral 60/100-base
+fixtures here; qualify the real pinned records in their consuming workspace.
+
+The inspected runtime baseline is `ff88f42ba95995c9c4db5bc6b0d1f857f5057bf0`
+(`dnadesign-tools` 0.4.1); the proposal is local commit `2b729d719` on
+`plan/baserender-vector-api`. A rechecks the working revision and dirty state
+before recording implementation evidence. This plan does not assert that an API
+exists in an installed distribution.
+
+| Current surface | Contract/responsibility to inspect |
+| --- | --- |
+| `src/public/api.py`, `sequence_panel.py` | Small public entrypoints, explicit sizing and artifact/diagnostic results; preserve lazy imports. |
+| `src/config/`, `src/core/` | Boundary parsing, versioned asset/layout/label records, units, supported fields and failures. |
+| `src/render/layout.py` | One authority for pitch, strands, feature boxes, caption/illustration bounds. |
+| `src/render/feature_labels.py` | Producer-neutral annotation planning, collision checks and painting of admitted placements. |
+| `src/render/effects/anchored_illustration.py`, `assets/overlays/` | Separate source resolution, geometry and format-specific emission; preserve SVG definitions and painter order. |
+| `src/render/sequence_rows.py` | Neutral label placement and focused drawing helpers; remove producer-name policy from core after adapter migration. |
+| `src/outputs/images.py`, `video.py` | Shared placement, final conversion, deterministic output and create-only publication. |
+| `tests/`, `docs/`, catalog/CLI | Public boundaries, packaged resources, failure cases and one runnable first-use path. |
+
+### Plan of Work
+
+A establishes the fixed review baseline. B is the first end-to-end tracer. C/D
+expand its contract and outputs without breaking current users. E qualifies the
+batch path before wider migration. F moves each consumer independently. G removes
+only proven replacements and closes audit findings. Each dependent slice starts
+after its predecessor's acceptance; independent documentation/audit work can
+continue when a specific render capability is blocked.
+
+### Concrete Steps
+
+1. **A — Baseline and findings.** Freeze source revision and diff scope, run the
+   BaseRender suite, catalog and one current API/job path. Inventory active
+   callers, config versions and known source defects. Audit API/config through
+   assets/layout/drawing/output/tests/docs against ownership, contracts, DRY
+   knowledge and failure behavior. Produce ranked findings with evidence, failed
+   criteria, remediation slice and deferred coverage. Separate observed defects
+   from unverified risks; do not claim a package audit from file sizes alone.
+2. **B — Native vector tracer.** Define the smallest asset/caption and output
+   contract needed by a public SVG operation. Reuse the bundled SVG with exact
+   body/caption selections and named anchors; support explicit caller-owned,
+   hash-pinned selections without copying their files into the package. Separate
+   loading, measured placement and SVG emission within existing tool boundaries.
+   Add tests that currently fail because the illustration exports as PNG, then
+   prove vector paths plus independently styled text at 60 and 100 bases.
+3. **C — Layout and label ergonomics.** Expose font roles, base pitch, strand
+   anchor, clearance, bounds, transparency and preserve-type/fit policy with
+   explicit units. Return measured anchors/bounds and resolved font identities.
+   Replace producer-name triggers with neutral placement declarations through
+   the owning integrations. Unknown fields, missing fonts/IDs and overflow must
+   fail with actionable bounds/context; never shrink or omit labels silently.
+   Extract only the touched drawing/config/API responsibilities with stable tests.
+4. **D/E — Outputs and performance.** Route SVG, PNG and representative frame
+   output through the same measured composition. Keep rasterization at the final
+   boundary, preserve alpha, and admit new settings through the existing CLI/job
+   contract rather than another DSL. Benchmark cold/warm and batch cases before
+   profiling/optimizing measured bottlenecks. Reuse bounded asset/font/layout
+   preparation where justified, keyed by content and resolved settings; test
+   invalidation. Do not add unbounded caches, a video engine or a new system
+   dependency without a documented need. Qualify packaging, catalog and docs.
+5. **F — Migrate in two batches.** First qualify the graph-plus-sequence use,
+   then the compact library use with their existing pinned selections. Both use
+   the same producer style/layout authority. Preserve actual coordinates, source
+   identities, spacer semantics, font minima and neighboring artwork. Record
+   source hashes, repeat commands and visual/native-output limits per batch.
+   Keep record adaptation, page composition and timing at the consumer.
+6. **G — Contract and review.** Only after both batches pass, remove displaced
+   consumer asset handling, typography/layout workarounds, artist/GID inspection
+   and duplicate SVG composition. Keep legitimate page-placement code and all
+   scientific provenance. Retire obsolete routes/config selections with explicit
+   migration guidance; retain still-valid public raster/figure APIs. Freeze the
+   final diff and review standards and specification axes separately. Close or
+   explicitly defer findings, align owner docs, and preserve recoverable sources.
+
+#### Completed executor contract — A then B
+
+**Goal:** one public BaseRender call preserves an SVG illustration and a separate,
+independently styled caption on neutral 60/100-base examples. No consumer repair
+is needed to restore vector artwork or separate its caption.
+
+**Allowed:** BaseRender source/contracts/tests/docs and fresh disposable review
+outputs, after A records the full baseline. B may introduce minimal public types
+and SVG output plumbing; C's full layout migration, optimization, video encoding,
+consumer rewrites, original SVG edits and publishing remain outside this slice.
+
+**Done:** the selected vector fixture exports without an embedded raster image;
+caption family/size/offset/visibility vary independently of body scale; anchors,
+transforms, gradients and painter order remain correct. Existing supported paths
+still pass. Missing/unsupported sources fail before publication. Both neutral
+examples use only public imports and receive diagnostics sufficient for placement.
+
+**Verify:** red/green structural and failure tests, focused public/import/resource
+checks, then the BaseRender suite and static/docs gates. Inspect SVG in a browser
+and Inkscape, plus a faithful raster preview, at intended placement sizes. If the
+chosen backend cannot preserve vector semantics, record the failed criterion and
+revise that bounded approach; do not substitute a raster or rewrite the renderer.
+
+**Handoff:** commit/diff identity, exact commands and test results, source/style
+hashes, SVG plus preview, measurements and a short list of unresolved findings.
+The next executor updates this plan rather than creating a competing roadmap.
+
+#### Completed executor contract — G contraction and completion audit
+
+Both real consumer placements pass their independent reviews. Remove the
+consumer's displaced figure worker, private artist/font inspection and temporary
+v2/v3 execution dispatch. Keep historical source selections and review artifacts
+recoverable through their owner and Git history. Leave one explicit native
+preparation path with clear retirement errors for old execution schemas.
+
+Keep scientific data translation, source/runtime provenance, page composition
+and timing downstream. Resolve any remaining hard-coded producer canvas
+assumptions through actual output geometry rather than another rendering wrapper.
+Rebuild both placements and require identical pixels, source IDs, typography,
+spacer coordinates and registered anchors after contraction.
+
+Review the final bounded package and consumer diff against the original
+requirements, supported interfaces, failure cases, source ownership, packaging
+and current operator routes. Use actual artifacts and executable gates for
+completion; no release, source promotion or native PowerPoint claim is implied.
+
+### Validation and Acceptance
+
+| Area | Required proof |
+| --- | --- |
+| Vector/caption fidelity | Selected fixture has paths and editable text; no raster image for vector-declared artwork. Check transform/gradient/clip definitions, repeated-instance ID collisions and independent caption sizing. |
+| Placement | Fixed pitch/type/strand anchors across 60/100-base and crowded/reverse-strand cases; outputs share one geometry, no white masking, clipping or hidden rescaling. Real consumers preserve their saved exemplar minima and adjacent arrows. |
+| Fail-fast admission | Missing/duplicate selections, changed hashes, unknown fields, bad units, missing fonts, malformed SVG, active content, unpinned external references and insufficient bounds fail clearly before final publication. Unused definitions are pruned by selection closure. |
+| Ownership | No scientific producer names in neutral drawing policy; no private paths, sibling-internal imports, copied analysis logic or writes into author assets. Test public lazy-import and package-resource contracts. |
+| Performance | Stage-separated cold/warm/batch measurements with input/style/output identities; compare median/tail and memory. Set numeric budgets from the tracer, not the earlier three-observation probe. Demonstrate gains without reducing fidelity or repeatedly rendering identical states. |
+| Migration/recovery | Both caller batches verify before deletion. Retain prior qualified artifacts/recipes; each slice is a reviewable commit. No automatic source upgrade or writeback; new schema/default behavior is explicit. |
+
+Run from the owning repository, recording counts, skips and failures:
+
+```sh
+uv run --locked pytest -q src/dnadesign/baserender/tests
+uv run --locked ruff check src/dnadesign/baserender pyproject.toml
+uv run --locked ruff format --check src/dnadesign/baserender
+uv run --locked python -m dnadesign.devtools.architecture.boundaries --repo-root .
+uv run --locked python -m dnadesign.devtools.docs.checks --repo-root .
+uv run --locked baserender catalog --json
+uv run --locked baserender job validate --workspace demo_densegen_render --workspace-root src/dnadesign/baserender/workspaces
+```
+
+Consumer migration uses its own regression suite and visual review; those results
+do not qualify native presentation playback automatically. Broaden monorepo
+checks only for actual cross-tool changes or merge-depth validation. If a source
+or dependency is unavailable, keep the failure evidence and block only dependent
+work; no historical artifact substitution or system installation is implied.
