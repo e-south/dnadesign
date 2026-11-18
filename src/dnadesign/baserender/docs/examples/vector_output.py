@@ -50,6 +50,9 @@ def example(length):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--sequence-font-size", type=float, default=14)
+    parser.add_argument("--feature-font-size", type=float, default=None)
+    parser.add_argument("--font-family", default="DejaVu Sans Mono")
     args = parser.parse_args()
     rendered = {}
     records = []
@@ -58,7 +61,14 @@ def main():
             name = f"{length}bp-caption-{size}.svg"
             result = render_record_svg(
                 example(length),
-                style_overrides={"legend": False, "show_pair_rungs": False, "font_label": "Arial"},
+                style_overrides={
+                    "legend": False,
+                    "show_pair_rungs": False,
+                    "font_label": "Arial",
+                    "font_mono": args.font_family,
+                    "font_size_seq": args.sequence_font_size,
+                    "font_size_feature_label": args.feature_font_size,
+                },
                 captions={
                     "rnap_sigma70": IllustrationCaption(
                         "RNAP", size_pt=size, family="Arial", anchor_fraction=(0.83827, 0.55688)
@@ -74,6 +84,9 @@ def main():
                     "width_pt": result.width_pt,
                     "height_pt": result.height_pt,
                     "caption_size_pt": size,
+                    "sequence_size_pt": args.sequence_font_size,
+                    "feature_size_pt": args.feature_font_size or args.sequence_font_size,
+                    "font_family": args.font_family,
                     "base_pitch_pt": result.diagnostics.base_pitch_pt,
                     "image_count": len(root.findall(".//{http://www.w3.org/2000/svg}image")),
                     "source_sha256": result.diagnostics.illustrations[0].source_sha256,
@@ -84,16 +97,18 @@ def main():
         (args.output_dir / name).write_text(payload)
     (args.output_dir / "receipt.json").write_text(json.dumps(records, indent=2) + "\n")
     cards = "".join(
-        f'<article><h2>{name}</h2><object type="image/svg+xml" data="{name}"></object>'
-        f'<p><a href="{name}">SVG source</a></p></article>'
-        for name in rendered
+        f'<article><h2>{item["file"]}</h2><object type="image/svg+xml" data="{item["file"]}" '
+        f'style="width:{item["width_pt"]}pt;height:{item["height_pt"]}pt"></object>'
+        f'<p><a href="{item["file"]}">SVG source</a></p></article>'
+        for item in records
     )
     (args.output_dir / "index.html").write_text(
         '<!doctype html><meta charset="utf-8"><title>BaseRender vector proof</title>'
         "<style>body{font:16px Arial;margin:24px;background:#e5ece8}article{background:white;padding:16px;"
-        "margin:24px 0}object{width:100%;height:auto;aspect-ratio:4/1}h2{font-size:18px}</style>"
+        "margin:24px 0;overflow:auto}object{display:block}h2{font-size:18px}</style>"
         "<h1>Native SVG: 60/100-base proof</h1><p>Identical body geometry; independent 12/18-point captions. "
-        "No source artwork was changed. The white card is review chrome, not a masking layer.</p>" + cards
+        "Preview preserves point sizes; scroll wide records rather than shrinking their letters. "
+        "The white card is review chrome, not a masking layer.</p>" + cards
     )
     print(args.output_dir / "index.html")
 

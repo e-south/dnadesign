@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, fields
 from functools import lru_cache
+from math import isfinite
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -44,6 +45,8 @@ class GlyphStyle:
     box_height_cells: float = 1.15
     text_color: str = "#ffffff"
     pad_x_px: float = 1.0
+    pad_y_px: float = 1.0
+    min_glyph_gap_px: float = 1.0
     text_y_nudge_cells: float = 0.0
     to_logo_gap_cells: float = 0.30
 
@@ -312,6 +315,13 @@ class Style:
         )
         ensure(self.kmer.box_height_cells > 0, "style.kmer.box_height_cells must be > 0", SchemaError)
         ensure(self.kmer.pad_x_px >= 0, "style.kmer.pad_x_px must be >= 0", SchemaError)
+        for name in ("pad_y_px", "min_glyph_gap_px"):
+            value = getattr(self.kmer, name)
+            ensure(
+                not isinstance(value, bool) and isinstance(value, (int, float)) and isfinite(value) and value >= 0,
+                f"style.kmer.{name} must be finite and >= 0",
+                SchemaError,
+            )
         ensure(self.kmer.to_logo_gap_cells >= 0, "style.kmer.to_logo_gap_cells must be >= 0", SchemaError)
         ensure(self.span_link_inner_margin_bp >= 0, "style.span_link_inner_margin_bp must be >= 0", SchemaError)
         ensure(self.span_link_line_width > 0, "style.span_link_line_width must be > 0", SchemaError)

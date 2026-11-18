@@ -136,6 +136,7 @@ def render_record_svg(
         bound_effects.append(effect)
     bound = replace(record, effects=tuple(bound_effects))
     from ..outputs.svg import SvgPlacement, SvgSlot, compose_svg
+    from ..render.nucleotide_geometry import displayed_nucleotides, nucleotide_box
     from ..render.palette import Palette
     from ..render.renderer import validate_records_for_rendering
     from ..render.sequence_rows import SequenceRowsRenderer
@@ -179,11 +180,27 @@ def render_record_svg(
             for slot, source, fragment, caption, geometry in placements
         ]
         svg = compose_svg(figure, pending)
+        nucleotide_boxes = {}
+        for placement in layout.placements:
+            feature = bound.features[placement.feature_index]
+            if feature.kind != "interval_annotation":
+                shape = nucleotide_box(
+                    displayed_nucleotides(feature),
+                    style,
+                    x=placement.x,
+                    y=placement.y,
+                    width=placement.w,
+                    height=placement.h,
+                    cell_width=layout.cw,
+                    cell_height=layout.ch,
+                )
+                nucleotide_boxes[placement.feature_id] = box_pt(shape.paint_bounds)
         result_diagnostics = SvgRenderDiagnostics(
             record.id,
             layout.cw * scale,
             ((layout.height - layout.y_forward) * scale, (layout.height - layout.y_reverse) * scale),
             MappingProxyType({key: box_pt(box) for key, box in layout.feature_boxes.items()}),
+            MappingProxyType(nucleotide_boxes),
             tuple(
                 SvgIllustrationPlacement(
                     asset_id,

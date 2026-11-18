@@ -109,6 +109,7 @@ class SvgRenderDiagnostics:
     base_pitch_pt: float
     strand_anchors_pt: tuple[float, float]
     feature_bounds_pt: Mapping[str, tuple[float, float, float, float]]
+    nucleotide_box_bounds_pt: Mapping[str, tuple[float, float, float, float]]
     illustrations: tuple[SvgIllustrationPlacement, ...]
 
 

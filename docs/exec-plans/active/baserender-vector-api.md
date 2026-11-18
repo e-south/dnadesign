@@ -31,7 +31,7 @@ or remote publication. Rasterization remains an explicit final output operation.
 - [x] (2026-11-18 02:06Z) Capture the proposal, known source findings, focused baseline and next-executor contract; implementation has not started.
 - [x] (2026-11-18 02:34Z) A — Baseline package suite, catalog, demo admission and public usage reviewed; prioritized findings below retain open work.
 - [x] (2026-11-18 02:34Z) B — Native SVG artwork and independent vector captions proved through the public API on 60/100-base examples.
-- [ ] (2026-11-18 02:06Z) C — Expose explicit layout/label controls and documented diagnostics.
+- [ ] (2026-11-18 03:17Z) C — In progress: shared nucleotide ink/box geometry and painted bounds; typed canvas/font policy and neutral labels remain.
 - [ ] (2026-11-18 02:06Z) D — Qualify shared geometry through SVG, PNG, representative frames and CLI/job admission.
 - [ ] (2026-11-18 02:06Z) E — Measure and improve batch preparation against fidelity-preserving baselines.
 - [ ] (2026-11-18 02:06Z) F — Migrate the two real sequence uses in separate verified batches.
@@ -117,6 +117,32 @@ with existing checks rather than a new execution framework.
 The commit detector flagged the new SVG SHA-256 as high entropy. One exact
 false-positive entry was added after matching it to the artwork bytes; detector
 settings and unrelated baseline entries are unchanged.
+
+C's first implementation addresses the reported nucleotide/rectangle mismatch.
+[Shared nucleotide geometry](../../../src/dnadesign/baserender/src/render/nucleotide_geometry.py)
+now owns ink metrics, minimum pitch/height and optical box placement. Layout and
+drawing use that authority; genomic column correspondence and requested font
+sizes remain intact. A 12-point sequence with 18-point feature lettering reserves its
+required space. Explicit insufficient pitch fails rather than shrinking text.
+Public diagnostics distinguish genomic spans from painted nucleotide rectangles.
+
+The review at `src/dnadesign/baserender/outputs/vector-alignment-20261118-03/comparison.html`
+compares the retained B proof with corrected SVGs at natural point size. The
+default example's left/right margins changed from 1.63/3.56 px to 2.59/2.59 px,
+and bottom/top from 8.67/1.19 px to 4.93/4.93 px at 180 dpi. The larger-font
+stress case also fits without overlap. Font/alphabet reference dimensions keep
+the grid and rectangle height stable when sequence letters change, including
+DNA case and ambiguity-code variants. Chrome and Inkscape inspection agree.
+Twenty-seven additional tests cover centering, both strands/fonts, preserved
+glyph scale and columns, invalid spacing units, tight-pitch rejection and
+diagnostic-to-painted-bound agreement. The package suite now passes 686 tests.
+Typed canvas/anchor controls, neutral annotation routing and portable font policy
+remain open in C; this is not completion of C–G or real consumer qualification.
+
+F must also pin the producer source revision alongside its distribution version:
+the current talk preparer checks `dnadesign-tools` version alone, which cannot
+distinguish changes within an editable checkout. Keep the existing v2 comparison
+as retained evidence until both caller migrations verify.
 
 ### Context and Orientation
 

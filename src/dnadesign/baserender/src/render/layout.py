@@ -21,6 +21,7 @@ from matplotlib.textpath import TextPath
 
 from ..config import Style
 from ..core import BoundsError, Effect, Feature, Record
+from .nucleotide_geometry import nucleotide_layout_requirements
 
 _DNA_COMP = str.maketrans(
     "ACGTRYSWKMBDHVNacgtryswkmbdhvn",  # pragma: allowlist secret
@@ -476,6 +477,16 @@ def compute_layout(
     if not math.isfinite(scale) or scale <= 0.0:
         raise BoundsError("cell_width_scale must be finite and > 0")
     cw *= scale
+    nucleotide_requirements = nucleotide_layout_requirements(
+        record.features, style, cell_width=cw, cell_height=ch, alphabet=record.alphabet
+    )
+    minimum_pitch = nucleotide_requirements.minimum_pitch_px
+    if scale != 1.0 and cw < minimum_pitch:
+        raise BoundsError(
+            f"cell_width_scale gives pitch {cw:g}px, but nucleotide labels need at least {minimum_pitch:g}px; "
+            "increase the pitch or explicitly choose another font size"
+        )
+    cw = max(cw, minimum_pitch)
     n = len(record.sequence) if fixed_n is None else max(len(record.sequence), int(fixed_n))
 
     show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
@@ -489,7 +500,7 @@ def compute_layout(
     y_reverse_base = 0.0
     y_forward_base = baseline_spacing if show_two else 0.0
 
-    kmer_box_height = ch * style.kmer.box_height_cells
+    kmer_box_height = max(ch * style.kmer.box_height_cells, nucleotide_requirements.minimum_box_height_px)
     motif_logo_height = style.motif_logo.height_bits * style.motif_logo.bits_to_cells * ch
     motif_logo_gap = style.kmer.to_logo_gap_cells * ch
     sequence_to_kmer_gap = style.sequence.to_kmer_gap_cells * ch

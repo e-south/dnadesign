@@ -298,3 +298,28 @@ def test_missing_illustration_binding_cannot_silently_drop_its_connector():
     with pytest.raises(RenderingError, match="absent-feature"):
         render_record_svg(replace(record, effects=(effect,)), style_overrides=STYLE)
     assert plt.get_fignums() == before
+
+
+@pytest.mark.parametrize("label_size", [14, 18])
+def test_nucleotide_box_diagnostics_match_painted_rectangle_bounds(label_size):
+    from matplotlib.patches import FancyBboxPatch
+
+    from dnadesign.baserender import render_record_figure
+
+    style = {**STYLE, "font_size_feature_label": label_size}
+    native = render_record_svg(example(), style_overrides=style)
+    figure = render_record_figure(example(), style_overrides=style)
+    try:
+        figure.canvas.draw()
+        boxes = [p for p in figure.axes[0].patches if isinstance(p, FancyBboxPatch) and p.get_zorder() == 3]
+        for feature_id, rectangle in zip(("left", "right"), boxes, strict=True):
+            b = rectangle.get_window_extent()
+            scale = 72 / figure.dpi
+            observed = (b.x0 * scale, native.height_pt - b.y1 * scale, b.x1 * scale, native.height_pt - b.y0 * scale)
+            assert native.diagnostics.nucleotide_box_bounds_pt[feature_id] == pytest.approx(observed)
+            assert (
+                native.diagnostics.nucleotide_box_bounds_pt[feature_id]
+                != native.diagnostics.feature_bounds_pt[feature_id]
+            )
+    finally:
+        plt.close(figure)

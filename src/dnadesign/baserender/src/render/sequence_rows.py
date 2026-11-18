@@ -33,6 +33,8 @@ from .effects.anchored_illustration import anchored_illustration_occupied_boxes,
 from .effects.motif_logo import MotifLogoGeometry, compute_motif_logo_geometry
 from .effects.registry import draw_effect, validate_effect
 from .layout import LayoutContext, comp, compute_layout, measure_text_width_px
+from .nucleotide_geometry import displayed_nucleotides, nucleotide_box, nucleotide_font_size
+from .nucleotide_geometry import glyph_path as _mono_text_path
 from .palette import Palette
 from .sequence_rows_metadata import terminal_label_visibility, validate_sequence_rows_metadata
 
@@ -359,9 +361,7 @@ class SequenceRowsRenderer:
             feature = record.features[placement.feature_index]
             tag = str(feature.attrs.get("style_token", "")) or (feature.tags[0] if feature.tags else feature.kind)
             color = palette.color_for(tag)
-            label = feature.label or ""
-            if not placement.above and feature.kind != "interval_annotation":
-                label = label[::-1]
+            label = displayed_nucleotides(feature)
             placement_box = (
                 placement.x - feature_box_pad,
                 placement.y - placement.h / 2.0,
@@ -455,12 +455,6 @@ class SequenceRowsRenderer:
         ax.set_xlim(0, layout.width)
         ax.set_ylim(0, layout.height)
         return fig, layout
-
-
-@lru_cache(maxsize=2048)
-def _mono_text_path(char: str, font_family: str, size_pt: int, weight: str = "normal") -> TextPath:
-    prop = FontProperties(family=font_family, size=size_pt, weight=weight)
-    return TextPath((0, 0), char, prop=prop, usetex=False)
 
 
 @lru_cache(maxsize=128)
@@ -787,12 +781,6 @@ def _interval_annotation_fill_font_size(style: Style) -> float:
     if bool(style.uniform_display_font_size):
         return float(max(style.display_font_size(), style.display_font_size() * 1.15))
     return float(max(10, style.font_size_label, style.legend_font_size))
-
-
-def _feature_label_font_size(style: Style) -> int:
-    if style.font_size_feature_label is not None:
-        return int(style.font_size_feature_label)
-    return int(style.font_size_seq)
 
 
 def _span_link_label_font_size(style: Style) -> int:
@@ -2098,6 +2086,7 @@ def _draw_mono_glyph(
     gid: str | None = None,
     font_size: float | None = None,
     cell_width: float | None = None,
+    vertical_midpoint_px: float | None = None,
 ) -> None:
     """Draw one sequence-aligned glyph through the canonical monospace path."""
 
@@ -2107,7 +2096,11 @@ def _draw_mono_glyph(
     if cell_width is not None:
         bounds = tp.get_extents()
         x += (cell_width - (bounds.x0 + bounds.x1) * px_per_pt) / 2
-    y_mid_px = _mono_ag_mid_px(style.font_mono, size, style.dpi, weight)
+    y_mid_px = (
+        _mono_ag_mid_px(style.font_mono, size, style.dpi, weight)
+        if vertical_midpoint_px is None
+        else vertical_midpoint_px
+    )
     trans = Affine2D().scale(px_per_pt).translate(x, y_center - y_mid_px) + ax.transData
     patch = PathPatch(
         tp,
@@ -2258,15 +2251,16 @@ def _draw_feature_box(
     draw_label: bool = True,
 ) -> None:
     r = style.kmer.round_px
-    pad_x = float(style.kmer.pad_x_px)
     edge_color = _darken_rgb(facecolor, factor=0.78)
+    geometry = nucleotide_box(label, style, x=x, y=y, width=w, height=h, cell_width=cw, cell_height=ch)
+    left, bottom, right, top = geometry.paint_bounds
 
     _add_fixed_layout_patch(
         ax,
         FancyBboxPatch(
-            (x - pad_x, y - h / 2),
-            w + 2 * pad_x,
-            h,
+            (left, bottom),
+            right - left,
+            top - bottom,
             boxstyle=f"round,pad=0.0,rounding_size={r}",
             linewidth=style.kmer.edge_width,
             facecolor=facecolor,
@@ -2281,7 +2275,7 @@ def _draw_feature_box(
         return
 
     y_text_center = y + float(style.kmer.text_y_nudge_cells) * ch
-    font_size = _feature_label_font_size(style)
+    font_size = nucleotide_font_size(style)
     for idx, char in enumerate(label):
         if char.isspace():
             continue
@@ -2295,6 +2289,7 @@ def _draw_feature_box(
             zorder=4,
             font_size=font_size,
             cell_width=cw,
+            vertical_midpoint_px=geometry.glyph_midpoint_y_px,
         )
 
 
