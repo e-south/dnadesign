@@ -48,6 +48,7 @@ if TYPE_CHECKING:
         SvgRenderDiagnostics,
         SvgRenderResult,
         SvgSpanLinkPlacement,
+        TextMeasurement,
     )
     from dnadesign.baserender.src.public import (  # noqa: F401
         BASERENDER_SEQUENCE_PANEL_CONTRACT_ID,
@@ -81,6 +82,7 @@ if TYPE_CHECKING:
         validate_job,
         validate_render_job,
     )
+    from dnadesign.baserender.src.public.typography import measure_text  # noqa: F401
     from dnadesign.baserender.src.public.vector_output import rasterize_svg, render_record_svg  # noqa: F401
     from dnadesign.baserender.src.render.layout import compute_layout  # noqa: F401
     from dnadesign.baserender.src.render.palette import Palette  # noqa: F401
@@ -88,6 +90,8 @@ if TYPE_CHECKING:
     from dnadesign.baserender.src.runtime import initialize_runtime  # noqa: F401
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
+    "measure_text": ("dnadesign.baserender.src.public.typography", "measure_text"),
+    "TextMeasurement": ("dnadesign.baserender.src.core.vector", "TextMeasurement"),
     "SequenceLayout": ("dnadesign.baserender.src.config.sequence_layout", "SequenceLayout"),
     "ResolvedFont": ("dnadesign.baserender.src.core.vector", "ResolvedFont"),
     "SvgSpanLinkPlacement": ("dnadesign.baserender.src.core.vector", "SvgSpanLinkPlacement"),

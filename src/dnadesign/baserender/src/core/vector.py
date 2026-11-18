@@ -48,6 +48,13 @@ def finite_tuple(value, length, name, *, positive=False):
             raise RenderingError(f"{name} must contain positive numbers")
 
 
+def validate_literal_text(text, *, field_name="text", allow_blank=False):
+    if not isinstance(text, str) or (not allow_blank and not text.strip()):
+        raise RenderingError(f"{field_name} must be {'a string' if allow_blank else 'a non-empty string'}")
+    if any(unicodedata.category(char) in {"Cc", "Zl", "Zp"} for char in text):
+        raise RenderingError(f"{field_name} must be single-line literal text without control characters")
+
+
 @dataclass(frozen=True)
 class SvgArtwork:
     path: Path
@@ -101,10 +108,7 @@ class IllustrationCaption:
     visible: bool = True
 
     def validate(self):
-        if not isinstance(self.text, str) or not self.text.strip():
-            raise RenderingError("caption.text must be a non-empty string")
-        if any(unicodedata.category(char) in {"Cc", "Zl", "Zp"} for char in self.text):
-            raise RenderingError("caption.text must be single-line literal text without control characters")
+        validate_literal_text(self.text, field_name="caption.text")
         if not isinstance(self.family, str) or not self.family.strip():
             raise RenderingError("caption.family must name a font")
         finite_tuple((self.size_pt,), 1, "caption.size_pt", positive=True)
@@ -144,6 +148,31 @@ class ResolvedFont:
     style: str
     path: str
     sha256: str
+
+
+@dataclass(frozen=True)
+class TextMeasurement:
+    """Literal ink bounds relative to the text origin/baseline, in points (y up)."""
+
+    text: str
+    font: ResolvedFont
+    size_pt: float
+    advance_pt: float
+    ink_bounds_pt: tuple[float, float, float, float]
+
+    @property
+    def ink_width_pt(self) -> float:
+        return self.ink_bounds_pt[2] - self.ink_bounds_pt[0]
+
+    @property
+    def ink_height_pt(self) -> float:
+        return self.ink_bounds_pt[3] - self.ink_bounds_pt[1]
+
+    def to_mapping(self, *, portable=False):
+        payload = _plain(self)
+        if portable:
+            payload["font"].pop("path")
+        return payload
 
 
 @dataclass(frozen=True)

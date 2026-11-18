@@ -375,6 +375,25 @@ measured benefit comes from existing per-batch backend reuse and unchanged
 frame holds. Further caching would add invalidation state for little measured
 preparation benefit, so none was added. F consumer qualification remains open.
 
+F's preparatory API slice adds public `measure_text`/`TextMeasurement` using the
+same literal font geometry as native captions. It reports requested point size,
+resolved font identity, advance and baseline-relative ink bounds without drawing.
+This removes the need for consumers to import Matplotlib just to check projected
+lettering. Caption and measurement admission share single-line literal rules;
+blank strings have zero ink and finite advance. Missing fonts/glyphs, bad units
+and overflow (including space-only advance) fail explicitly. Imports stay lazy.
+
+All 873 package tests pass, including 20 new measurement/import/negative tests.
+The documentation inventory now admits the focused performance procedure. The
+four retained SVGs remain byte-identical. Evidence is in
+`outputs/text-measurement-20261118-01/` under BaseRender. A read-only real-data
+probe produced new, unselected SVGs under the talk build owner: 100/60-base
+records admit native vector output, but the old requested 18-point feature role
+increases width and can change natural height. F must qualify explicit shared
+layout and actual saved lettering minima per placement rather than silently
+fitting or declaring that probe a migrated consumer. No selected recipe, saved
+artwork, manuscript or scientific input changed.
+
 F must also pin the producer source revision alongside its distribution version:
 the current talk preparer checks `dnadesign-tools` version alone, which cannot
 distinguish changes within an editable checkout. Keep the existing v2 comparison
@@ -496,10 +515,10 @@ actual selected records, full teaching-row width, font minima, actual spacer
 coordinates, transparent composition and protected neighboring artwork.
 
 The consumer currently measures fonts with Matplotlib and inspects artist IDs to
-infer strand baselines. Use producer diagnostics for placement. If the consumer
-still needs a reusable text-ink measurement primitive, add it to BaseRender with
-shared font/glyph admission and a public contract rather than duplicating its
-geometry in the talk. Qualify producer changes before selecting their revision.
+infer strand baselines. Replace those with `measure_text` and producer placement
+diagnostics. The public text primitive is qualified below; select its committed
+producer revision before updating a consumer recipe. Keep requested font roles
+explicit and compare actual projected ink with the saved exemplar minima.
 
 Keep data translation, scientific provenance, page placement and timing in the
 consumer. Do not write to saved author SVGs, manuscripts or upstream data. After

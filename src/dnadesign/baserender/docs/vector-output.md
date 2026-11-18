@@ -127,6 +127,21 @@ with explicit layout remains rejected because its compositor applies fitting.
 
 ### Nucleotide rectangles
 
+`measure_text(text, family=..., size_pt=...)` returns the same literal font
+geometry used for native captions without allocating a figure. Import it and
+`TextMeasurement` from `dnadesign.baserender`. The result contains the resolved
+font identity, requested point size, advance, `ink_bounds_pt`, `ink_width_pt`
+and `ink_height_pt`. Bounds are left/bottom/right/top relative to the text
+origin and baseline, with positive y upward; they are local text measurements,
+not top-left canvas coordinates. For example, measuring `"ACGT"` provides the
+visible capital height for a consumer's explicit projection scale.
+
+Empty and space-only strings have zero ink while retaining their measured
+advance. Text is literal, single-line and checked for glyph coverage. Invalid
+units or control characters fail before font loading. `to_mapping(portable=True)`
+omits the local font path. This API lets consumers enforce lettering minima
+without using Matplotlib internals or interpreting generated artist IDs.
+
 Layout and drawing share nucleotide ink measurements. Letters stay aligned to
 the sequence's column grid; the colored rectangle is optically centered around
 the visible run. Capitals use their own ink bounds rather than a descender-based

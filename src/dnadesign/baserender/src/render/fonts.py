@@ -20,7 +20,7 @@ from matplotlib.path import Path as GlyphPath
 from matplotlib.textpath import TextToPath
 
 from ..core import RenderingError
-from ..core.vector import ResolvedFont
+from ..core.vector import ResolvedFont, finite_tuple
 
 
 def resolve_font(family: str) -> ResolvedFont:
@@ -54,6 +54,11 @@ def measure_literal_text(text: str, font: ResolvedFont, size_pt: float) -> Liter
     converter = TextToPath()
     advance, _height, _descent = converter.get_text_width_height_descent(text, prop, ismath=False)
     vertices, codes = converter.get_text_path(prop, text, ismath=False)
-    bounds = GlyphPath(vertices, codes).get_extents()
-    scale = size_pt / converter.FONT_SCALE
-    return LiteralTextMetrics(advance, bounds.x0 * scale, bounds.y0 * scale, bounds.x1 * scale, bounds.y1 * scale)
+    if len(vertices) == 0:
+        values = (float(advance), 0.0, 0.0, 0.0, 0.0)
+    else:
+        bounds = GlyphPath(vertices, codes).get_extents()
+        scale = size_pt / converter.FONT_SCALE
+        values = (float(advance), *(float(value) * scale for value in (bounds.x0, bounds.y0, bounds.x1, bounds.y1)))
+    finite_tuple(values, 5, "text measurement")
+    return LiteralTextMetrics(*values)
