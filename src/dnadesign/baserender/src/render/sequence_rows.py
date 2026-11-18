@@ -32,7 +32,7 @@ from ..core import Record, RenderingError
 from .effects.anchored_illustration import anchored_illustration_occupied_boxes, draw_anchored_illustration
 from .effects.motif_logo import MotifLogoGeometry, compute_motif_logo_geometry
 from .effects.registry import draw_effect, validate_effect
-from .layout import LayoutContext, comp, compute_layout, measure_text_width_px
+from .layout import LayoutContext, comp, compute_layout, measure_annotation_label, measure_text_width_px
 from .nucleotide_geometry import displayed_nucleotides, nucleotide_box, nucleotide_font_size
 from .nucleotide_geometry import glyph_path as _mono_text_path
 from .palette import Palette
@@ -45,23 +45,9 @@ def _add_fixed_layout_patch(ax, patch):
     return patch
 
 
-_NEAR_FEATURE_ANNOTATION_SOURCES = frozenset(
-    {
-        "densegen_promoter",
-        "usr_genbank",
-        "usr_genbank_promoter",
-    }
-)
-
-
-def _feature_source(feature) -> str:
-    return str(feature.attrs.get("source", "")).strip().lower()
-
-
 def _uses_near_feature_annotation_label(feature) -> bool:
-    if _feature_source(feature) not in _NEAR_FEATURE_ANNOTATION_SOURCES:
-        return False
-    return str(feature.attrs.get("display_label", "")).strip() != ""
+    annotation = feature.render.get("annotation_label")
+    return annotation is not None and annotation["placement"] == "near_feature"
 
 
 @dataclass(frozen=True)
@@ -757,24 +743,6 @@ def _sequence_strand_occupied_boxes(layout: LayoutContext, style: Style) -> list
     return boxes
 
 
-def _compact_fixed_element_annotation_label(raw_label: str) -> str:
-    text = str(raw_label).strip()
-    lowered = text.lower()
-    for token in ("-35 site", "-10 site"):
-        idx = lowered.find(token)
-        if idx >= 0:
-            return text[idx:].strip()
-    return text
-
-
-def _fixed_element_annotation_font_size(style: Style) -> float:
-    if style.font_size_annotation_label is not None:
-        return float(style.font_size_annotation_label)
-    if bool(style.uniform_display_font_size):
-        return style.display_font_size()
-    return float(max(6, style.font_size_label, style.font_size_seq))
-
-
 def _interval_annotation_fill_font_size(style: Style) -> float:
     if style.font_size_annotation_label is not None:
         return float(style.font_size_annotation_label)
@@ -793,14 +761,13 @@ def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, p
     if not layout.placements:
         return
 
-    labels = dict(record.display.tag_labels)
     margin = max(float(style.legend_inline_margin_cells) * layout.cw, float(style.kmer.pad_x_px) + 4.0)
     x_min = float(style.padding_x)
     x_max = float(layout.width - style.padding_x)
 
     feature_box_pad = float(style.kmer.pad_x_px)
     coordinate_scale = max(1.0e-6, float(style.figure_scale))
-    annotation_font_height_px = (_fixed_element_annotation_font_size(style) / 72.0) * float(style.dpi)
+    annotation_font_height_px = measure_annotation_label("", style).height_px * coordinate_scale
     feature_label_clearance = max(
         max(0.0, margin - feature_box_pad),
         max(8.0, annotation_font_height_px * 0.2) / coordinate_scale,
@@ -868,19 +835,11 @@ def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, p
         feature = record.features[placement.feature_index]
         if not _uses_near_feature_annotation_label(feature):
             return None
-        tag = feature.tags[0] if feature.tags else feature.kind
-        fallback = tag.split(":")[-1] if ":" in tag else tag
-        feature_display_label = feature.attrs.get("display_label")
-        raw_label = str(feature_display_label or labels.get(tag, fallback))
-        text = _compact_fixed_element_annotation_label(raw_label)
-        if not text:
-            return None
-        text_size = _fixed_element_annotation_font_size(style)
-        coordinate_scale = max(1.0e-6, float(style.figure_scale))
-        text_w = _text_px_width(text, style.font_label, text_size, style.dpi) / coordinate_scale
-        text_h = max(8.0, (float(text_size) / 72.0) * float(style.dpi)) / coordinate_scale
+        text = feature.render["annotation_label"]["text"]
+        metrics = measure_annotation_label(text, style)
+        text_size, text_w, text_h = metrics.size_pt, metrics.width_px, metrics.height_px
         center_x = placement.x + placement.w / 2.0
-        label_gap = max(4.0, feature_box_pad + text_h * 0.25)
+        label_gap = metrics.gap_px
         if placement.above:
             away_y = placement.y + placement.h / 2.0 + label_gap + text_h / 2.0
         else:
@@ -986,7 +945,10 @@ def _draw_fixed_element_annotations(ax, record: Record, layout: LayoutContext, p
             break
 
         if selected is None:
-            continue
+            raise RenderingError(
+                f"Feature {feature.id!r} annotation cannot fit in the {layout.width:g} x {layout.height:g} px canvas; "
+                "increase the canvas or label clearance, or revise the declared annotation"
+            )
 
         x_anchor, y_anchor, ha, bbox = selected
         annotation_color_raw = feature.attrs.get("annotation_color")
@@ -1102,13 +1064,13 @@ def _draw_inline_feature_labels(ax, record: Record, layout: LayoutContext, palet
 
     for placement in layout.placements:
         feature = record.features[placement.feature_index]
-        source = str(feature.attrs.get("source", "")).strip().lower()
-        if source == "densegen_promoter":
+        if _uses_near_feature_annotation_label(feature):
             continue
         tag = feature.tags[0] if feature.tags else feature.kind
         fallback = tag.split(":")[-1] if ":" in tag else tag
-        raw_label = str(labels.get(tag, fallback))
-        text = _capitalize_first(raw_label)
+        annotation = feature.render.get("annotation_label")
+        raw_label = annotation["text"] if annotation is not None else str(labels.get(tag, fallback))
+        text = raw_label if annotation is not None else _capitalize_first(raw_label)
         if not text:
             continue
 
@@ -1148,6 +1110,11 @@ def _draw_inline_feature_labels(ax, record: Record, layout: LayoutContext, palet
             selected = (x_anchor, y_anchor, ha, bbox)
             break
         if selected is None:
+            if annotation is not None:
+                raise RenderingError(
+                    f"Feature {feature.id!r} inline annotation cannot fit in the "
+                    f"{layout.width:g} x {layout.height:g} px canvas"
+                )
             continue
         x_text, y_text, ha, bbox = selected
 

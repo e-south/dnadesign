@@ -31,7 +31,7 @@ or remote publication. Rasterization remains an explicit final output operation.
 - [x] (2026-11-18 02:06Z) Capture the proposal, known source findings, focused baseline and next-executor contract; implementation has not started.
 - [x] (2026-11-18 02:34Z) A — Baseline package suite, catalog, demo admission and public usage reviewed; prioritized findings below retain open work.
 - [x] (2026-11-18 02:34Z) B — Native SVG artwork and independent vector captions proved through the public API on 60/100-base examples.
-- [ ] (2026-11-18 03:17Z) C — In progress: shared nucleotide ink/box geometry and painted bounds; typed canvas/font policy and neutral labels remain.
+- [ ] (2026-11-18 04:10Z) C — In progress: shared nucleotide geometry, painted bounds, shared style admission and neutral annotations; typed canvas/font policy remain.
 - [ ] (2026-11-18 02:06Z) D — Qualify shared geometry through SVG, PNG, representative frames and CLI/job admission.
 - [ ] (2026-11-18 02:06Z) E — Measure and improve batch preparation against fidelity-preserving baselines.
 - [ ] (2026-11-18 02:06Z) F — Migrate the two real sequence uses in separate verified batches.
@@ -64,7 +64,7 @@ SVG feature has been exhaustively audited.
 | --- | --- | --- |
 | P1: vector requests preserve actual geometry | [Illustration loader](../../../src/dnadesign/baserender/src/render/effects/anchored_illustration.py) selected pixels; the new native API reads pinned SVG selections without decoding PNG. Closed for the native API; legacy APIs remain explicit raster paths. | B |
 | P1: fixed typography and transparent composition | [Fitted panel](../../../src/dnadesign/baserender/src/public/api.py) forces white and rescales. Native SVG avoids that route; fixed-canvas admission and PNG/frame parity are still open. | C/D |
-| P2: neutral placement policy | [Sequence labels](../../../src/dnadesign/baserender/src/render/sequence_rows.py) still branch on producer names. Replace through explicit declarations and integration migration. | C |
+| P2: neutral placement policy | [Sequence labels](../../../src/dnadesign/baserender/src/render/sequence_rows.py) now use explicit feature annotation declarations. DenseGen/GenBank adapters supply the policy; provenance attributes no longer control placement. | C, closed |
 | P2: exact placement is observable | [Illustration geometry](../../../src/dnadesign/baserender/src/render/effects/anchored_illustration.py) still clamps horizontal placement. Native diagnostics expose actual bounds; explicit anchor/overflow policy remains open. | C |
 | P2: viewer font identity | Chrome used a serif fallback for a Matplotlib-bundled font. Explicit Arial proofs render correctly in Chrome and Inkscape; referenced-font portability is not solved by Python font resolution. | C/D |
 | P2: repeated illustrations have unique IDs | A two-instance test exposed colliding footprint IDs. Unique footprint IDs and definition namespaces now pass structural tests. | B, closed |
@@ -136,7 +136,7 @@ DNA case and ambiguity-code variants. Chrome and Inkscape inspection agree.
 Twenty-seven additional tests cover centering, both strands/fonts, preserved
 glyph scale and columns, invalid spacing units, tight-pitch rejection and
 diagnostic-to-painted-bound agreement. The package suite now passes 686 tests.
-Typed canvas/anchor controls, neutral annotation routing and portable font policy
+Typed canvas/anchor controls and portable font policy
 remain open in C; this is not completion of C–G or real consumer qualification.
 
 The CLI/API admission review found that `job validate` accepted negative glyph
@@ -146,6 +146,16 @@ Seven failing public-path/mapping/CLI checks reproduced the gap; all eight new
 admission tests now pass, including valid explicit geometry with no published
 bundle. The complete package suite passes 694 tests. Preset lookup and rendering
 remain owned by the existing style module; no duplicate validator was added.
+
+C now also admits `Feature.render.annotation_label` with explicit text and
+`near_feature`/`inline` placement. DenseGen/GenBank adapters translate their labels
+into that neutral declaration; the renderer no longer branches on producer
+names or trims scientific prefixes. Invalid nested fields fail at record
+admission. Declared annotations retain exact text and font size; insufficient
+space raises instead of silently omitting them. Shared label measurements now
+reserve vertical room in layout. This exposed and fixed an older 24-point example
+that silently lost both site labels. Nine new public contract checks plus the
+adapter regression pass; the complete package suite passes 703 tests.
 
 F must also pin the producer source revision alongside its distribution version:
 the current talk preparer checks `dnadesign-tools` version alone, which cannot
@@ -260,8 +270,8 @@ The next executor updates this plan rather than creating a competing roadmap.
 #### Next executor contract — C
 
 Expose typed layout settings with units, preserve-type bounds and explicit
-overflow behavior, replacing temporary layout metadata and producer-name label
-triggers. Reuse existing geometry and report resolved font/placement identities.
+overflow behavior, replacing temporary layout metadata. Preserve the new neutral
+annotation contract. Reuse existing geometry and report resolved font/placement identities.
 Carry the demonstrated viewer-font mismatch into an explicit output policy;
 do not claim portability from Matplotlib font lookup alone. Add negative tests
 for invalid settings and insufficient bounds, plus crowded and reverse-strand

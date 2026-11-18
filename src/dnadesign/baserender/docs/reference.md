@@ -151,6 +151,22 @@ Feature and effect registries reject unknown kinds. Their payload contracts
 reject unknown fields and invalid coordinates. Adapters should retain
 provenance in meta without placing producer logic in the neutral model.
 
+Feature annotations use an explicit declaration, separate from the nucleotide
+string in `Feature.label`:
+
+```python
+render={"annotation_label": {"text": "Binding site", "placement": "near_feature"}}
+```
+
+`annotation_label` requires exactly `text` and `placement`. Placement is
+`near_feature` or `inline`; inline labels follow `legend=True` and
+`legend_mode="inline"`. A near-feature annotation replaces that feature's inline
+tag label. Its text is preserved exactly, its font is not shrunk, and insufficient
+space fails with feature/bounds context. Layout reserves room for declared near
+labels. Producer adapters supply the declaration; `attrs.source` and
+`attrs.display_label` remain descriptive metadata and no longer trigger placement.
+Callers that construct neutral records directly must declare their annotations.
+
 Each `span_link` effect can set `params.color` and `params.label_color` to
 override its line and label colors. Without those fields, the style supplies
 both colors. An `anchored_illustration` can set `params.image_tint` to draw its

@@ -253,7 +253,10 @@ class UsrGenbankAnnotationsV1Adapter:
                 label=_feature_sequence(sequence, span),
                 tags=("promoter:sigma70_core:upstream",),
                 attrs=attrs,
-                render={"priority": priority},
+                render={
+                    "priority": priority,
+                    "annotation_label": {"text": "-35 site", "placement": "near_feature"},
+                },
             )
         if role_hint == "sigma70_minus10" or label == "-10":
             attrs.update(
@@ -271,7 +274,10 @@ class UsrGenbankAnnotationsV1Adapter:
                 label=_feature_sequence(sequence, span),
                 tags=("promoter:sigma70_core:downstream",),
                 attrs=attrs,
-                render={"priority": priority},
+                render={
+                    "priority": priority,
+                    "annotation_label": {"text": "-10 site", "placement": "near_feature"},
+                },
             )
         if role_hint == "TFBS" or _looks_like_tfbs_label(label):
             regulator = _tf_regulator_from_label(label)
@@ -283,7 +289,10 @@ class UsrGenbankAnnotationsV1Adapter:
                 label=_feature_sequence(sequence, span),
                 tags=(f"tf:{regulator}",),
                 attrs=attrs,
-                render={"priority": 10},
+                render={
+                    "priority": 10,
+                    "annotation_label": {"text": _tf_display_label(regulator), "placement": "near_feature"},
+                },
             )
 
         if not bool(self.policies["include_untyped_features"]):

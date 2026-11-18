@@ -99,8 +99,9 @@ the existing raster figure path.
 SVG references font families; fonts are not embedded. A Matplotlib-resolved font
 can still be unavailable to another viewer. Select a font installed in the
 target viewer and inspect the intended output. The first proof uses explicit
-Arial in Chrome and Inkscape. Portable font policy, explicit canvas admission,
-neutral label placement, PNG/frame output and CLI/job integration remain in the
+Arial in Chrome and Inkscape. Feature annotations now use the explicit neutral
+declaration in the [record contract](reference.md#neutral-record). Portable font
+policy, explicit canvas admission, PNG/frame output and native SVG CLI/job integration remain in the
 [execution plan](../../../../docs/exec-plans/active/baserender-vector-api.md).
 Native PowerPoint behavior and real consumer migration are not qualified by this
 neutral proof.

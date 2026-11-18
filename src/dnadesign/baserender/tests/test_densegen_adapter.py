@@ -990,6 +990,9 @@ def test_densegen_span_link_label_matches_default_sequence_typography() -> None:
     try:
         span_label = next(text for text in fig.axes[0].texts if text.get_text() == "18 bp")
         assert float(span_label.get_fontsize()) == pytest.approx(float(style.font_size_seq))
+        annotations = [text for text in fig.axes[0].texts if text.get_text() in {"-35 site (a)", "-10 site (H)"}]
+        assert len(annotations) == 2
+        assert all(text.get_fontsize() == 24 for text in annotations)
     finally:
         plt.close(fig)
 

@@ -20,7 +20,7 @@ from matplotlib.font_manager import FontProperties
 from matplotlib.textpath import TextPath
 
 from ..config import Style
-from ..core import BoundsError, Effect, Feature, Record
+from ..core import BoundsError, Effect, Feature, LayoutError, Record
 from .nucleotide_geometry import nucleotide_layout_requirements
 
 _DNA_COMP = str.maketrans(
@@ -60,6 +60,31 @@ def span_to_x(layout: LayoutContext, start: int, end: int) -> tuple[float, float
 class CharCell:
     width: float
     height: float
+
+
+@dataclass(frozen=True)
+class AnnotationLabelMetrics:
+    size_pt: float
+    width_px: float
+    height_px: float
+    gap_px: float
+
+
+def measure_annotation_label(text: str, style: Style) -> AnnotationLabelMetrics:
+    if style.font_size_annotation_label is not None:
+        size = float(style.font_size_annotation_label)
+    elif style.uniform_display_font_size:
+        size = style.display_font_size()
+    else:
+        size = float(max(6, style.font_size_label, style.font_size_seq))
+    scale = float(style.figure_scale)
+    height = max(8.0, size / 72.0 * style.dpi) / scale
+    return AnnotationLabelMetrics(
+        size,
+        measure_text_width_px(text, style.font_label, size, style.dpi) / scale,
+        height,
+        max(4.0, float(style.kmer.pad_x_px) + height * 0.25),
+    )
 
 
 @dataclass(frozen=True)
@@ -650,6 +675,21 @@ def compute_layout(
     for y0 in motif_logo_y0_by_effect.values():
         y_mins.append(y0)
         y_maxs.append(y0 + motif_logo_height)
+    for placement in placements:
+        annotation = record.features[placement.feature_index].render.get("annotation_label")
+        if annotation is None or annotation["placement"] != "near_feature":
+            continue
+        metrics = measure_annotation_label(annotation["text"], style)
+        if metrics.width_px > width - 2 * style.padding_x:
+            raise LayoutError(
+                f"Feature {placement.feature_id!r} annotation cannot fit: "
+                f"text needs {metrics.width_px:g} px; canvas allows {width - 2 * style.padding_x:g} px"
+            )
+        clearance = metrics.gap_px + metrics.height_px
+        if placement.above:
+            y_maxs.append(placement.y + placement.h / 2.0 + clearance)
+        else:
+            y_mins.append(placement.y - placement.h / 2.0 - clearance)
 
     raw_content_bottom = min(y_mins)
     raw_content_top = max(y_maxs)
