@@ -11,15 +11,15 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from functools import lru_cache
 from math import isfinite
 from pathlib import Path
 from typing import Any, Mapping
 
-import yaml
-
 from ..core import SchemaError, ensure
+from .yaml_io import parse_unique_yaml
 
 
 @dataclass(frozen=True)
@@ -495,16 +495,20 @@ def _styles_v1_root() -> Path:
 
 
 @lru_cache(maxsize=64)
-def _load_yaml_mapping(path: Path) -> dict[str, Any]:
-    try:
-        raw = yaml.safe_load(path.read_text())
-    except Exception as exc:
-        raise SchemaError(f"Could not parse style YAML: {path}") from exc
+def _parse_style_yaml(text: str) -> dict[str, Any]:
+    raw = parse_unique_yaml(text)
     if raw is None:
         raw = {}
     if not isinstance(raw, Mapping):
-        raise SchemaError(f"style YAML must be a mapping/dict: {path}")
+        raise SchemaError("style YAML must be a mapping/dict")
     return dict(raw)
+
+
+def _load_yaml_mapping(path: Path) -> dict[str, Any]:
+    try:
+        return deepcopy(_parse_style_yaml(path.read_text()))
+    except (OSError, SchemaError) as exc:
+        raise SchemaError(f"Could not parse style YAML: {path}: {exc}") from exc
 
 
 def list_style_presets() -> list[str]:

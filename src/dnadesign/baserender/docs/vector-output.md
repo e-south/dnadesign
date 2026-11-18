@@ -361,6 +361,13 @@ failure aborts the entire new bundle, including static fallbacks.
 
 ## Admission and current qualification
 
+Job and style YAML reject duplicate explicit keys, including nested duplicates.
+Intentional YAML merge overrides remain supported. Style files are reread on
+resolution; the bounded parse cache is keyed by content and returns detached
+values, so saved edits take effect within the same process. Parsed jobs and
+already-typed jobs share video timing and sizing checks before dependency probes
+or input capture.
+
 For stage-separated measurements, repeat commands and local regression budgets,
 see [native output performance](native-performance.md).
 

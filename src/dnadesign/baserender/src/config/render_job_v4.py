@@ -16,8 +16,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
-import yaml
-
 from dnadesign.artifacts import portable_path_identity
 
 from ..core import (
@@ -47,6 +45,8 @@ from .job_contracts import (
 )
 from .native_svg import NativeSvgCfg, validate_native_outputs
 from .style_v1 import resolve_style
+from .video import validate_video_settings
+from .yaml_io import parse_unique_yaml
 
 _RESERVED_BUNDLE_METADATA_NAMES = frozenset({"manifest.json", ".dnadesign-publication-owner.json"})
 
@@ -807,10 +807,8 @@ def _parse_outputs(
         ensure(fmt == "mp4", f"outputs[{i}].fmt must be 'mp4'", SchemaError)
 
         fps = _parse_int(data.get("fps", 2), field=f"outputs[{i}].fps")
-        ensure(fps >= 1, f"outputs[{i}].fps must be >= 1", SchemaError)
 
         frames_per_record = _parse_int(data.get("frames_per_record", 1), field=f"outputs[{i}].frames_per_record")
-        ensure(frames_per_record >= 1, f"outputs[{i}].frames_per_record must be >= 1", SchemaError)
 
         pauses_raw = data.get("pauses", {})
         if pauses_raw is None:
@@ -821,23 +819,11 @@ def _parse_outputs(
 
         width_raw = data.get("width_px")
         width_px = None if width_raw is None else _parse_int(width_raw, field=f"outputs[{i}].width_px")
-        if width_px is not None:
-            ensure(width_px >= 1, f"outputs[{i}].width_px must be >= 1", SchemaError)
 
         height_raw = data.get("height_px")
         height_px = None if height_raw is None else _parse_int(height_raw, field=f"outputs[{i}].height_px")
-        if height_px is not None:
-            ensure(height_px >= 1, f"outputs[{i}].height_px must be >= 1", SchemaError)
 
         aspect_ratio = _parse_aspect(data.get("aspect"))
-        if aspect_ratio is not None:
-            ensure(aspect_ratio > 0, f"outputs[{i}].aspect must be > 0", SchemaError)
-        if width_px is not None and height_px is not None and aspect_ratio is not None:
-            declared_ratio = float(width_px) / float(height_px)
-            if abs(declared_ratio - float(aspect_ratio)) > 1.0e-6:
-                raise SchemaError(
-                    f"outputs[{i}].aspect conflicts with width_px/height_px ({aspect_ratio!r} != {declared_ratio:.6g})"
-                )
 
         total_duration_raw = data.get("total_duration")
         total_duration = (
@@ -845,15 +831,8 @@ def _parse_outputs(
             if total_duration_raw is None
             else _parse_float(total_duration_raw, field=f"outputs[{i}].total_duration")
         )
-        if total_duration is not None:
-            ensure(total_duration > 0, f"outputs[{i}].total_duration must be > 0", SchemaError)
 
         content_fit = str(data.get("content_fit", "native")).strip().lower()
-        require_one_of(
-            content_fit,
-            {"native", "fill_width", "fill_width_per_frame"},
-            f"outputs[{i}].content_fit",
-        )
 
         title_text_raw = data.get("title_text")
         title_text = None if title_text_raw is None else str(title_text_raw).strip()
@@ -866,11 +845,8 @@ def _parse_outputs(
             if title_font_size_raw is None
             else _parse_int(title_font_size_raw, field=f"outputs[{i}].title_font_size")
         )
-        if title_font_size is not None:
-            ensure(title_font_size >= 6, f"outputs[{i}].title_font_size must be >= 6", SchemaError)
 
         title_align = str(data.get("title_align", "center")).strip().lower()
-        require_one_of(title_align, {"left", "center", "right"}, f"outputs[{i}].title_align")
         background = data.get("background")
         encode_timeout_raw = data.get("encode_timeout_s")
         encode_timeout_s = (
@@ -878,8 +854,6 @@ def _parse_outputs(
             if encode_timeout_raw is None
             else _parse_float(encode_timeout_raw, field=f"outputs[{i}].encode_timeout_s")
         )
-        if encode_timeout_s is not None:
-            ensure(encode_timeout_s > 0, f"outputs[{i}].encode_timeout_s must be > 0", SchemaError)
 
         raw_path = data.get("path")
         out_path = _resolve_output_file(
@@ -954,6 +928,7 @@ def validate_output_configuration(bundle_root: Path, outputs: tuple[OutputCfg, .
         elif isinstance(output, VideoOutputCfg):
             ensure(output.kind == "video", f"outputs[{index}].kind must be 'video'", SchemaError)
             ensure(output.fmt == "mp4", f"outputs[{index}].fmt must be 'mp4'", SchemaError)
+            validate_video_settings(output, field=f"outputs[{index}]")
         else:
             raise SchemaError(f"outputs[{index}] must be an images or video output configuration")
 
@@ -1109,9 +1084,9 @@ def load_render_job(path: str | Path, *, caller_root: str | Path | None = None) 
         else:
             caller_scope = Path(caller_root).expanduser().resolve()
         try:
-            raw = yaml.safe_load(job_path.read_text())
-        except Exception as exc:
-            raise SchemaError(f"Could not parse job YAML: {job_path}") from exc
+            raw = parse_unique_yaml(job_path.read_text())
+        except (OSError, SchemaError) as exc:
+            raise SchemaError(f"Could not parse job YAML: {job_path}: {exc}") from exc
         return _parse_sequence_rows_job_mapping(raw, job_path=job_path, caller_scope=caller_scope)
     except ContractError as exc:
         raise SchemaError(str(exc)) from exc
