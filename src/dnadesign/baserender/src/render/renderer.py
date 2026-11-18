@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Callable, Mapping, Protocol
 
 from ..config import Style
+from ..config.sequence_layout import normalize_sequence_renderer_options
 from ..core import ContractError, Record, RenderingError, SchemaError, validate_record_kinds
 from ..integrations import validate_record_renderer_compatibility
 from .palette import Palette
@@ -57,6 +58,7 @@ class RendererDescriptor:
 class _RegisteredRenderer:
     descriptor: RendererDescriptor
     factory: RendererFactory
+    options_normalizer: Callable[[Mapping[str, object]], dict[str, object]] | None = None
 
 
 def _build_sequence_rows_renderer() -> Renderer:
@@ -122,8 +124,10 @@ _REGISTRY = _RendererRegistry(
                 required_record_features=(),
                 optional_record_features=("interval_annotation", "boundary_marker"),
                 docs_slug="sequence-rows",
+                option_keys=("layout",),
             ),
             factory=_build_sequence_rows_renderer,
+            options_normalizer=normalize_sequence_renderer_options,
         ),
         "nucleotide_evidence_map": _RegisteredRenderer(
             descriptor=RendererDescriptor(
@@ -140,8 +144,10 @@ _REGISTRY = _RendererRegistry(
                 required_record_features=(),
                 optional_record_features=("interval_annotation", "boundary_marker", "span_link"),
                 docs_slug="nucleotide-evidence-map",
+                option_keys=("layout",),
             ),
             factory=_build_nucleotide_evidence_map_renderer,
+            options_normalizer=normalize_sequence_renderer_options,
         ),
         "hairpin_cartoon": _RegisteredRenderer(
             descriptor=RendererDescriptor(
@@ -207,6 +213,23 @@ def get_renderer_descriptor(name: str) -> RendererDescriptor:
     return _REGISTRY.descriptor(name)
 
 
+def normalize_renderer_options(name: str, value: Mapping[str, object] | None) -> dict[str, object]:
+    """Admit options using registered metadata, without constructing a renderer."""
+    descriptor = get_renderer_descriptor(name)
+    if value is not None and not isinstance(value, Mapping):
+        raise SchemaError(f"renderer {name!r} options must be a mapping")
+    options = dict(value or {})
+    if any(not isinstance(key, str) for key in options):
+        raise SchemaError(f"renderer {name!r} option keys must be strings")
+    unknown = sorted(set(options) - set(descriptor.option_keys))
+    if unknown:
+        raise SchemaError(
+            f"renderer {name!r} received unknown options: {unknown}; allowed options: {sorted(descriptor.option_keys)}"
+        )
+    normalizer = _REGISTRY.renderers[name].options_normalizer
+    return options if normalizer is None else normalizer(options)
+
+
 def validate_records_for_rendering(
     records: tuple[Record, ...] | list[Record],
     *,
@@ -223,17 +246,7 @@ def validate_records_for_rendering(
     """
 
     try:
-        descriptor = get_renderer_descriptor(renderer_name)
-        options = dict(renderer_options or {})
-        non_string_option_keys = [key for key in options if not isinstance(key, str)]
-        if non_string_option_keys:
-            raise SchemaError(f"renderer {renderer_name!r} option keys must be strings")
-        unknown_options = sorted(set(options) - set(descriptor.option_keys))
-        if unknown_options:
-            raise SchemaError(
-                f"renderer {renderer_name!r} received unknown options: {unknown_options}; "
-                f"allowed options: {sorted(descriptor.option_keys)}"
-            )
+        options = normalize_renderer_options(renderer_name, renderer_options)
         validated_records: list[Record] = []
         for record in records:
             validated = record.validate()
@@ -270,7 +283,7 @@ def render_record(
     )[0]
 
     renderer = get_renderer(renderer_name)
-    options = dict(renderer_options or {})
+    options = normalize_renderer_options(renderer_name, renderer_options)
     if options:
         return renderer.render(validated, style, palette, options)
     return renderer.render(validated, style, palette)

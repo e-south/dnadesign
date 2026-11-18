@@ -44,6 +44,7 @@ from .jobs.base_render_v4 import (
     validate_output_configuration,
     validate_render_job,
 )
+from .sequence_layout import SequenceLayout
 from .style_v1 import (
     GlyphStyle,
     LayoutStyle,
@@ -58,6 +59,7 @@ from .style_v1 import (
 )
 
 __all__ = [
+    "SequenceLayout",
     "GlyphStyle",
     "LayoutStyle",
     "SequenceStyle",

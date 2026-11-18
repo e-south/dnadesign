@@ -31,7 +31,7 @@ or remote publication. Rasterization remains an explicit final output operation.
 - [x] (2026-11-18 02:06Z) Capture the proposal, known source findings, focused baseline and next-executor contract; implementation has not started.
 - [x] (2026-11-18 02:34Z) A — Baseline package suite, catalog, demo admission and public usage reviewed; prioritized findings below retain open work.
 - [x] (2026-11-18 02:34Z) B — Native SVG artwork and independent vector captions proved through the public API on 60/100-base examples.
-- [ ] (2026-11-18 04:10Z) C — In progress: shared nucleotide geometry, painted bounds, shared style admission and neutral annotations; typed canvas/font policy remain.
+- [ ] (2026-11-18 04:29Z) C — In progress: shared glyph/label geometry, neutral annotations and typed physical canvas across API/image jobs; illustration overflow and font policy remain.
 - [ ] (2026-11-18 02:06Z) D — Qualify shared geometry through SVG, PNG, representative frames and CLI/job admission.
 - [ ] (2026-11-18 02:06Z) E — Measure and improve batch preparation against fidelity-preserving baselines.
 - [ ] (2026-11-18 02:06Z) F — Migrate the two real sequence uses in separate verified batches.
@@ -68,6 +68,7 @@ SVG feature has been exhaustively audited.
 | P2: exact placement is observable | [Illustration geometry](../../../src/dnadesign/baserender/src/render/effects/anchored_illustration.py) still clamps horizontal placement. Native diagnostics expose actual bounds; explicit anchor/overflow policy remains open. | C |
 | P2: viewer font identity | Chrome used a serif fallback for a Matplotlib-bundled font. Explicit Arial proofs render correctly in Chrome and Inkscape; referenced-font portability is not solved by Python font resolution. | C/D |
 | P2: repeated illustrations have unique IDs | A two-instance test exposed colliding footprint IDs. Unique footprint IDs and definition namespaces now pass structural tests. | B, closed |
+| P2: video honors admitted layout | [Legacy video](../../../src/dnadesign/baserender/src/outputs/video.py) receives no renderer options, mutates layout metadata and applies its own fitting (including a 0.96 content scale). Explicit layout with video now fails at admission. D must qualify a shared native frame path before enabling it. | D, open |
 
 ### Decision Log
 
@@ -136,8 +137,9 @@ DNA case and ambiguity-code variants. Chrome and Inkscape inspection agree.
 Twenty-seven additional tests cover centering, both strands/fonts, preserved
 glyph scale and columns, invalid spacing units, tight-pitch rejection and
 diagnostic-to-painted-bound agreement. The package suite now passes 686 tests.
-Typed canvas/anchor controls and portable font policy
-remain open in C; this is not completion of C–G or real consumer qualification.
+Illustration overflow and portable font policy remain open in C; the physical
+canvas controls are qualified below. This is not completion of C–G or real
+consumer qualification.
 
 The CLI/API admission review found that `job validate` accepted negative glyph
 spacing, unknown style fields and nonexistent presets that rendering rejected.
@@ -169,6 +171,27 @@ The package suite passes 705 tests. A 60/100-base forward/reverse proof at
 `src/dnadesign/baserender/outputs/annotation-contract-20261118-02/index.html`
 preserves 14-point sequence text and 24-point annotations in Chrome. Its natural
 point-sized view scrolls for the longer sequence rather than shrinking type.
+
+`SequenceLayout` now owns explicit point-based pitch, canvas, forward grid origin,
+minimum content extents and footer clearance. Strict mapping admission and frozen
+values live in configuration; measured canvas placement lives in
+[`render/layout_frame.py`](../../../src/dnadesign/baserender/src/render/layout_frame.py).
+Both reuse the existing layout engine. Native SVG, figure rendering and image
+jobs share the contract; registered option normalization also serves CLI job
+validation without constructing a renderer or loading NumPy/Matplotlib. Conflicting
+legacy metadata, bad units, insufficient pitch/canvas and non-finite arithmetic
+fail before allocation. No fitting or font reduction is introduced by this path.
+
+The neutral review at `src/dnadesign/baserender/outputs/layout-contract-20261118-01/`
+contains public-API 60/100-base SVGs and a real CLI image job. Both CLI outputs
+have exact `0 0 1200 400` viewBoxes; the API examples pin the same (80, 200)-point
+grid origin and 10-point pitch. Browser inspection preserves the requested type.
+Twenty-nine new tests exercise both public surfaces, 72/144-dpi geometry,
+mapping isolation, empty/small-feature glyph cases and negative admission.
+Image jobs still use the existing figure-based illustration output; D must
+integrate native SVG composition and qualify raster/frame parity. Video layout
+is explicitly rejected until that work passes; forwarding options into the
+current compositor alone would still trigger competing metadata and hidden fit.
 
 F must also pin the producer source revision alongside its distribution version:
 the current talk preparer checks `dnadesign-tools` version alone, which cannot
@@ -283,9 +306,10 @@ The next executor updates this plan rather than creating a competing roadmap.
 
 #### Next executor contract — C
 
-Expose typed layout settings with units, preserve-type bounds and explicit
-overflow behavior, replacing temporary layout metadata. Preserve the new neutral
-annotation contract. Reuse existing geometry and report resolved font/placement identities.
+Qualify illustration/caption overflow and explicit font policy. Preserve the
+typed layout contract and neutral annotations. Reuse existing geometry and
+report resolved font/placement identities. Move the checked-in neutral example
+from legacy extent metadata to `SequenceLayout` after its artwork bounds qualify.
 Carry the demonstrated viewer-font mismatch into an explicit output policy;
 do not claim portability from Matplotlib font lookup alone. Add negative tests
 for invalid settings and insufficient bounds, plus crowded and reverse-strand

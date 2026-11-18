@@ -17,6 +17,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Mapping
 
+from ..config.sequence_layout import SequenceLayout
 from ..core import Record, RenderingError
 from ..core.vector import (
     IllustrationCaption,
@@ -72,6 +73,7 @@ def render_record_svg(
     style_overrides: Mapping[str, object] | None = None,
     illustrations: Mapping[str, SvgIllustration] | None = None,
     captions: Mapping[str, IllustrationCaption] | None = None,
+    layout: SequenceLayout | None = None,
 ) -> SvgRenderResult:
     """Return native SVG plus geometry in points, with no source writes or fitting.
 
@@ -169,7 +171,9 @@ def render_record_svg(
 
     figure = None
     try:
-        figure, layout = SequenceRowsRenderer().render_with_layout(bound, style, palette, illustration_drawer=draw_body)
+        figure, layout = SequenceRowsRenderer().render_with_layout(
+            bound, style, palette, illustration_drawer=draw_body, layout_request=layout
+        )
 
         def box_pt(box):
             x0, y0, x1, y1 = box
@@ -199,6 +203,7 @@ def render_record_svg(
             record.id,
             layout.cw * scale,
             ((layout.height - layout.y_forward) * scale, (layout.height - layout.y_reverse) * scale),
+            (layout.x_left * scale, (layout.height - layout.y_forward) * scale),
             MappingProxyType({key: box_pt(box) for key, box in layout.feature_boxes.items()}),
             MappingProxyType(nucleotide_boxes),
             tuple(

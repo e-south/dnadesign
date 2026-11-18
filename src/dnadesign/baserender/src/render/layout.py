@@ -19,9 +19,9 @@ from typing import Mapping, Sequence
 from matplotlib.font_manager import FontProperties
 from matplotlib.textpath import TextPath
 
-from ..config import Style
+from ..config import SequenceLayout, Style
 from ..core import BoundsError, Effect, Feature, LayoutError, Record
-from .nucleotide_geometry import nucleotide_layout_requirements
+from .nucleotide_geometry import minimum_sequence_pitch_px, nucleotide_layout_requirements
 
 _DNA_COMP = str.maketrans(
     "ACGTRYSWKMBDHVNacgtryswkmbdhvn",  # pragma: allowlist secret
@@ -495,6 +495,7 @@ def compute_layout(
     fixed_content_bottom_extent_px: float | None = None,
     fixed_content_radius_px: float | None = None,
     extra_bottom_padding_px: float = 0.0,
+    base_pitch_pt: float | None = None,
 ) -> LayoutContext:
     cell = measure_char_cell(style.font_mono, style.font_size_seq, style.dpi)
     cw, ch = cell.width, cell.height
@@ -502,10 +503,22 @@ def compute_layout(
     if not math.isfinite(scale) or scale <= 0.0:
         raise BoundsError("cell_width_scale must be finite and > 0")
     cw *= scale
+    if base_pitch_pt is not None:
+        SequenceLayout(base_pitch_pt=base_pitch_pt)
+        if scale != 1:
+            raise LayoutError("base_pitch_pt and cell_width_scale cannot both declare sequence pitch")
+        cw = base_pitch_pt * style.dpi / 72.0
     nucleotide_requirements = nucleotide_layout_requirements(
         record.features, style, cell_width=cw, cell_height=ch, alphabet=record.alphabet
     )
     minimum_pitch = nucleotide_requirements.minimum_pitch_px
+    if base_pitch_pt is not None:
+        minimum_pitch = max(minimum_pitch, minimum_sequence_pitch_px(style, record.alphabet))
+        if cw + 1e-9 < minimum_pitch:
+            raise LayoutError(
+                f"layout.base_pitch_pt gives pitch {base_pitch_pt:g} pt, but sequence/feature glyphs need at least "
+                f"{minimum_pitch * 72 / style.dpi:g} pt; increase pitch or explicitly choose another font size"
+            )
     if scale != 1.0 and cw < minimum_pitch:
         raise BoundsError(
             f"cell_width_scale gives pitch {cw:g}px, but nucleotide labels need at least {minimum_pitch:g}px; "
@@ -550,6 +563,8 @@ def compute_layout(
     right_gutter = terminal_label_dx + terminal_label_width
     x_left = style.padding_x + left_gutter
     width = x_left + n * cw + style.padding_x + right_gutter
+    if base_pitch_pt is not None and not math.isfinite(width):
+        raise LayoutError("layout.base_pitch_pt produced non-finite sequence bounds; choose a smaller pitch")
 
     up_indices = [i for i, feat in enumerate(record.features) if feat.span.strand == "fwd"]
     dn_indices = [i for i, feat in enumerate(record.features) if feat.span.strand == "rev"]

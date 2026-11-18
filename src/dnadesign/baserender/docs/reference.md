@@ -200,6 +200,34 @@ exporting producer-named helpers. Sequence-panel helpers require an explicit
 style_profile, so a generic API call cannot silently select a domain-specific
 presentation.
 
+### Physical sequence layout
+
+`sequence_rows` and `nucleotide_evidence_map` accept `render.options.layout`:
+
+```yaml
+render:
+  renderer: sequence_rows
+  style:
+    overrides:
+      figure_scale: 1
+      legend: false
+  options:
+    layout:
+      base_pitch_pt: 10
+      canvas_size_pt: [1200, 400]
+      sequence_origin_pt: [80, 200]
+```
+
+This is the serialized `SequenceLayout` Python contract. Job validation checks
+the registered renderer's option keys and nested layout units without loading
+plotting libraries. Image execution uses the same measurements as the figure
+and native SVG APIs. Explicit layout and legacy metadata declarations cannot
+compete. See [physical canvas and grid](vector-output.md#physical-canvas-and-grid)
+for origin, clearances and bounds semantics. Native SVG illustration composition
+remains a separate API route; choosing SVG as an image-job format retains the
+existing figure-based illustration behavior. Explicit layout with video outputs
+fails at admission until the legacy compositor's fitting is replaced or qualified.
+
 ## Public Python API
 
 Import from dnadesign.baserender. Imports from dnadesign.baserender.src.* are
@@ -223,6 +251,7 @@ Record and figure helpers:
 - adapt_record, adapt_records
 - load_record_from_parquet, load_records_from_parquet
 - render_record_figure, render_record_grid_figure
+- SequenceLayout, render_record_svg
 - render_parquet_record_figure
 - render_sequence_panel_image, sequence_panel_config_for_adapter
 

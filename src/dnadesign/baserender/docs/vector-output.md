@@ -36,7 +36,7 @@ content to a box. The example is responsible for publishing its new review files
 Import from `dnadesign.baserender`:
 
 - `render_record_svg(record, style_preset=..., style_overrides=...,
-  illustrations=..., captions=...)` supports sequence-row records.
+  illustrations=..., captions=..., layout=...)` supports sequence-row records.
 - `SvgArtwork(path, sha256, element_ids, view_box, anchors)` selects caller-owned
   geometry. `path` is a `Path`; the hash pins exact bytes; IDs are a distinct
   tuple. `view_box` is `(x, y, width, height)` in source SVG coordinates. Named
@@ -63,6 +63,46 @@ and illustration anchors/bounds in points, with origin at the canvas top left.
 Bounds are `(x0, y0, x1, y1)`. Illustration diagnostics include source SHA-256
 and the font file resolved for the caption. Native output requires
 `figure_scale=1`; explicit font sizes keep their physical size.
+
+### Physical canvas and grid
+
+`SequenceLayout` declares physical units independently of output DPI:
+
+```python
+from dnadesign.baserender import SequenceLayout, render_record_svg
+
+layout = SequenceLayout(
+    base_pitch_pt=10,
+    canvas_size_pt=(1200, 400),
+    sequence_origin_pt=(80, 200),
+)
+result = render_record_svg(record, style_overrides={"legend": False}, layout=layout)
+```
+
+The origin is the left edge of base column zero on the forward strand's grid
+reference line, measured rightward/downward from the top left. It is independent
+of a particular glyph's ink or baseline. Diagnostics return `sequence_origin_pt`
+in that same frame. Without a new origin, expanding the canvas preserves the
+existing top-left grid position. Features, nucleotide rectangles and motif lanes
+move with the grid; type and pitch are not fitted to the new canvas.
+
+`top_extent_pt` and `bottom_extent_pt` reserve minimum space about the midpoint
+between the two strand-reference lines (or the single line).
+`extra_bottom_padding_pt` reserves additional footer space. These values preserve
+the measured content rather than cropping it. The canvas must contain the
+natural surface, including its configured margins. Insufficient pitch or bounds,
+invalid units, arithmetic overflow and unknown mapping fields fail before figure
+allocation. `SequenceLayout.from_mapping(...)` admits JSON/YAML-shaped settings;
+`to_mapping()` returns a detached, serializable mapping.
+
+The figure API uses the same settings through
+`renderer_options={"layout": layout}`. Image jobs use `render.options.layout`;
+see the [job syntax](reference.md#physical-sequence-layout). Existing metadata
+keys for cell scale, fixed extents/radius and video padding remain supported when
+no typed layout is supplied. Declaring both authorities fails with the conflicting
+keys instead of choosing one. Explicit layout requires `figure_scale=1`.
+Video jobs with layout are currently rejected because the legacy video compositor
+does not preserve this contract; native frame parity remains in the execution plan.
 
 ### Nucleotide rectangles
 
@@ -101,7 +141,7 @@ can still be unavailable to another viewer. Select a font installed in the
 target viewer and inspect the intended output. The first proof uses explicit
 Arial in Chrome and Inkscape. Feature annotations now use the explicit neutral
 declaration in the [record contract](reference.md#neutral-record). Portable font
-policy, explicit canvas admission, PNG/frame output and native SVG CLI/job integration remain in the
+policy, illustration overflow admission, PNG/frame output and native SVG CLI/job integration remain in the
 [execution plan](../../../../docs/exec-plans/active/baserender-vector-api.md).
 Native PowerPoint behavior and real consumer migration are not qualified by this
 neutral proof.

@@ -37,6 +37,16 @@ def nucleotide_font_size(style: Style) -> float:
     return float(style.font_size_feature_label if style.font_size_feature_label is not None else style.font_size_seq)
 
 
+def minimum_sequence_pitch_px(style: Style, alphabet: str) -> float:
+    if alphabet not in _ALPHABET_REFERENCES:
+        raise BoundsError(f"cannot reserve sequence geometry for unsupported alphabet {alphabet!r}")
+    width = max(
+        glyph_path(char, style.font_mono, style.font_size_seq).get_extents().width
+        for char in _ALPHABET_REFERENCES[alphabet]
+    )
+    return width * style.dpi / 72.0 + style.kmer.min_glyph_gap_px
+
+
 def displayed_nucleotides(feature: Feature) -> str:
     label = feature.label or ""
     return label[::-1] if feature.span.strand == "rev" and feature.kind != "interval_annotation" else label

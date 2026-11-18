@@ -27,7 +27,8 @@ from matplotlib.textpath import TextPath
 from matplotlib.ticker import FuncFormatter, MaxNLocator
 from matplotlib.transforms import Affine2D
 
-from ..config import Style
+from ..config import SequenceLayout, Style
+from ..config.sequence_layout import sequence_layout_from_options
 from ..core import Record, RenderingError
 from .effects.anchored_illustration import draw_anchored_illustration
 from .effects.motif_logo import MotifLogoGeometry, compute_motif_logo_geometry
@@ -39,7 +40,8 @@ from .feature_labels import (
     plan_feature_labels,
     uses_near_feature_annotation_label,
 )
-from .layout import LayoutContext, comp, compute_layout, measure_text_width_px
+from .layout import LayoutContext, comp, measure_text_width_px
+from .layout_frame import prepare_sequence_layout
 from .nucleotide_geometry import displayed_nucleotides, nucleotide_box, nucleotide_font_size
 from .nucleotide_geometry import glyph_path as _mono_text_path
 from .palette import Palette, darken_rgb
@@ -80,43 +82,11 @@ def _without_redundant_full_span_overlay(record: Record) -> Record:
     return replace(record, display=replace(record.display, overlay_text=None))
 
 
-def _optional_meta_float(record: Record, key: str) -> float | None:
-    if not isinstance(record.meta, Mapping):
-        return None
-    raw = record.meta.get(key)
-    if raw is None:
-        return None
-    try:
-        return float(raw)
-    except (TypeError, ValueError, OverflowError) as exc:
-        raise RenderingError(f"record.meta.{key} must be numeric when set") from exc
-
-
-def _preflight_sequence_rows(record: Record, style: Style, palette: Palette) -> _SequenceRowsInput:
+def _preflight_sequence_rows(
+    record: Record, style: Style, palette: Palette, layout_request: SequenceLayout | None = None
+) -> _SequenceRowsInput:
     validate_sequence_rows_metadata(record, style)
-    fixed_content_top_extent_px = _optional_meta_float(record, "fixed_content_top_extent_px")
-    fixed_content_bottom_extent_px = _optional_meta_float(record, "fixed_content_bottom_extent_px")
-    fixed_content_radius_px = _optional_meta_float(record, "fixed_content_radius_px")
-    cell_width_scale = _optional_meta_float(record, "cell_width_scale")
-    if cell_width_scale is None:
-        cell_width_scale = 1.0
-    if not math.isfinite(cell_width_scale) or cell_width_scale <= 0.0:
-        raise RenderingError("record.meta.cell_width_scale must be finite and > 0")
-    extra_bottom_padding_px = _optional_meta_float(record, "video_extra_bottom_padding_px")
-    if extra_bottom_padding_px is None:
-        extra_bottom_padding_px = 0.0
-    if not math.isfinite(extra_bottom_padding_px) or extra_bottom_padding_px < 0.0:
-        raise RenderingError("record.meta.video_extra_bottom_padding_px must be finite and >= 0")
-
-    layout = compute_layout(
-        record,
-        style,
-        cell_width_scale=cell_width_scale,
-        fixed_content_top_extent_px=fixed_content_top_extent_px,
-        fixed_content_bottom_extent_px=fixed_content_bottom_extent_px,
-        fixed_content_radius_px=fixed_content_radius_px,
-        extra_bottom_padding_px=extra_bottom_padding_px,
-    )
+    layout = prepare_sequence_layout(record, style, layout_request)
     motif_geometries = tuple(
         compute_motif_logo_geometry(
             record=record,
@@ -173,18 +143,32 @@ def _preflight_sequence_rows(record: Record, style: Style, palette: Palette) -> 
 
 @dataclass(frozen=True)
 class SequenceRowsRenderer:
-    def preflight(self, record: Record, style: Style, palette: Palette) -> None:
+    def preflight(
+        self, record: Record, style: Style, palette: Palette, options: Mapping[str, object] | None = None
+    ) -> None:
         if any("svg_asset" in effect.params for effect in record.effects):
             raise RenderingError("SVG artwork requires render_record_svg; no raster substitution is permitted")
-        _preflight_sequence_rows(_without_redundant_full_span_overlay(record), style, palette)
+        _preflight_sequence_rows(
+            _without_redundant_full_span_overlay(record), style, palette, sequence_layout_from_options(options)
+        )
 
-    def render(self, record: Record, style: Style, palette: Palette):
-        figure, _layout = self.render_with_layout(record, style, palette)
+    def render(self, record: Record, style: Style, palette: Palette, options: Mapping[str, object] | None = None):
+        figure, _layout = self.render_with_layout(
+            record, style, palette, layout_request=sequence_layout_from_options(options)
+        )
         return figure
 
-    def render_with_layout(self, record: Record, style: Style, palette: Palette, *, illustration_drawer=None):
+    def render_with_layout(
+        self,
+        record: Record,
+        style: Style,
+        palette: Palette,
+        *,
+        illustration_drawer=None,
+        layout_request: SequenceLayout | None = None,
+    ):
         record = _without_redundant_full_span_overlay(record.validate())
-        prepared = _preflight_sequence_rows(record, style, palette)
+        prepared = _preflight_sequence_rows(record, style, palette, layout_request)
         show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
         layout = prepared.layout
         motif_geometries = list(prepared.motif_geometries)

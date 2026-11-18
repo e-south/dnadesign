@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from dnadesign.baserender.src.config import (  # noqa: F401
         RenderContractDescriptor,
         RenderJobV4,
+        SequenceLayout,
         Style,
         list_style_presets,
         resolve_preset_path,
@@ -82,6 +83,7 @@ if TYPE_CHECKING:
     from dnadesign.baserender.src.runtime import initialize_runtime  # noqa: F401
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
+    "SequenceLayout": ("dnadesign.baserender.src.config.sequence_layout", "SequenceLayout"),
     "render_record_svg": ("dnadesign.baserender.src.public.vector_output", "render_record_svg"),
     "IllustrationCaption": ("dnadesign.baserender.src.core.vector", "IllustrationCaption"),
     "SvgArtwork": ("dnadesign.baserender.src.core.vector", "SvgArtwork"),

@@ -636,12 +636,15 @@ def _parse_render(raw: Any) -> RenderCfg:
         options_raw = {}
     if not isinstance(options_raw, Mapping):
         raise SchemaError("render.options must be a mapping")
+    from ..render.renderer import normalize_renderer_options
+
+    options = normalize_renderer_options(renderer, options_raw)
 
     return RenderCfg(
         renderer=renderer,
         style_preset=style_preset,
         style_overrides=dict(overrides_raw),
-        options=dict(options_raw),
+        options=options,
     )
 
 
@@ -1031,6 +1034,11 @@ def _parse_sequence_rows_job_mapping(
     validate_render_contract_renderer(contract_cfg.kind, render_cfg.renderer, field="contract.kind")
     validate_adapter_renderer_compatibility(input_cfg, render_cfg)
     outputs_cfg = _parse_outputs(job_path, bundle_cfg.path, data.get("outputs"))
+    if "layout" in render_cfg.options and any(isinstance(output, VideoOutputCfg) for output in outputs_cfg):
+        raise SchemaError(
+            "explicit layout is not yet supported for video outputs; "
+            "use image outputs until native frame parity is qualified"
+        )
     validate_adapter_output_compatibility(input_cfg.adapter.kind, outputs_cfg)
     run_cfg = _parse_run(data.get("run"))
 
