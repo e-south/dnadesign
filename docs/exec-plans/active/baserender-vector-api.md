@@ -139,6 +139,14 @@ diagnostic-to-painted-bound agreement. The package suite now passes 686 tests.
 Typed canvas/anchor controls, neutral annotation routing and portable font policy
 remain open in C; this is not completion of C–G or real consumer qualification.
 
+The CLI/API admission review found that `job validate` accepted negative glyph
+spacing, unknown style fields and nonexistent presets that rendering rejected.
+Job parsing now resolves the existing style contract before returning a job.
+Seven failing public-path/mapping/CLI checks reproduced the gap; all eight new
+admission tests now pass, including valid explicit geometry with no published
+bundle. The complete package suite passes 694 tests. Preset lookup and rendering
+remain owned by the existing style module; no duplicate validator was added.
+
 F must also pin the producer source revision alongside its distribution version:
 the current talk preparer checks `dnadesign-tools` version alone, which cannot
 distinguish changes within an editable checkout. Keep the existing v2 comparison

@@ -44,6 +44,7 @@ from .job_contracts import (
     render_contract_renderer_kinds,
     validate_render_contract_renderer,
 )
+from .style_v1 import resolve_style
 
 _RESERVED_BUNDLE_METADATA_NAMES = frozenset({"manifest.json", ".dnadesign-publication-owner.json"})
 
@@ -625,6 +626,10 @@ def _parse_render(raw: Any) -> RenderCfg:
         overrides_raw = {}
     if not isinstance(overrides_raw, Mapping):
         raise SchemaError("render.style.overrides must be a mapping")
+
+    # Admission and execution share the same style schema, including preset
+    # resolution. Validation must not defer bad geometry until rendering.
+    resolve_style(preset=style_preset, overrides=overrides_raw)
 
     options_raw = data.get("options", {})
     if options_raw is None:

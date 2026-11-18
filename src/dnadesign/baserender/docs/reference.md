@@ -3,7 +3,7 @@ doc_id: baserender-reference
 title: BaseRender reference
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-09-13
+last_verified: 2026-11-17
 ---
 
 # BaseRender reference
@@ -43,9 +43,10 @@ plugin protocol before an independently packaged integration needs one.
     uv run baserender job validate path/to/job.yaml
     uv run baserender job run path/to/job.yaml
 
-Validation resolves required paths and rejects unknown keys, incompatible
-adapters and renderers, unsupported parameters, and unsafe output paths before
-rendering. A run stages every declared artifact, writes manifest.json last,
+Validation resolves required paths and style presets and rejects unknown keys,
+invalid style values, incompatible adapters and renderers, unsupported parameters,
+and unsafe output paths before rendering. CLI and API job validation use the same
+style schema as rendering and do not publish outputs. A run stages every declared artifact, writes manifest.json last,
 and publishes the complete directory with one atomic, create-only rename.
 Existing bundle paths fail.
 
