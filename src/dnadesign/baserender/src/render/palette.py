@@ -110,3 +110,11 @@ class Palette:
 
         idx = _stable_index(str(tag), len(_PRIMARY_PASTEL_HEX))
         return _hex_to_rgb(_PRIMARY_PASTEL_HEX[idx])
+
+
+def darken_rgb(color: object, *, factor: float) -> tuple[float, float, float]:
+    from matplotlib.colors import to_rgb
+
+    r, g, b = to_rgb(color)
+    scale = min(1.0, max(0.0, float(factor)))
+    return (r * scale, g * scale, b * scale)

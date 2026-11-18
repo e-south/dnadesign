@@ -163,7 +163,8 @@ render={"annotation_label": {"text": "Binding site", "placement": "near_feature"
 `legend_mode="inline"`. A near-feature annotation replaces that feature's inline
 tag label. Its text is preserved exactly, its font is not shrunk, and insufficient
 space fails with feature/bounds context. Layout reserves room for declared near
-labels. Producer adapters supply the declaration; `attrs.source` and
+labels. Label positions, collisions and colors are resolved before allocating a
+figure. Producer adapters supply the declaration; `attrs.source` and
 `attrs.display_label` remain descriptive metadata and no longer trigger placement.
 Callers that construct neutral records directly must declare their annotations.
 

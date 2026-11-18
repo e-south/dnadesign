@@ -20,8 +20,9 @@ from dnadesign.baserender.src.config import resolve_style
 from dnadesign.baserender.src.core import SchemaError
 from dnadesign.baserender.src.integrations.densegen.adapter import DensegenTfbsAdapter
 from dnadesign.baserender.src.render import Palette, legend_entries_for_record, render_record
+from dnadesign.baserender.src.render.feature_labels import _span_link_label_boxes
 from dnadesign.baserender.src.render.layout import compute_layout
-from dnadesign.baserender.src.render.sequence_rows import _span_link_label_boxes, _text_px_width
+from dnadesign.baserender.src.render.sequence_rows import _text_px_width
 from dnadesign.baserender.src.runtime import initialize_runtime
 
 

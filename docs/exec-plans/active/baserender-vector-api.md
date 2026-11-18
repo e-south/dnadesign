@@ -157,6 +157,19 @@ reserve vertical room in layout. This exposed and fixed an older 24-point exampl
 that silently lost both site labels. Nine new public contract checks plus the
 adapter regression pass; the complete package suite passes 703 tests.
 
+The label responsibilities are now separated into
+[`render/feature_labels.py`](../../../src/dnadesign/baserender/src/render/feature_labels.py).
+It produces immutable label placements before figure allocation; the sequence
+renderer only paints that plan. Both label modes account for reserved overlay
+space, and inline labels also avoid already planned near-feature labels. This
+removes about 500 lines from the sequence-row orchestrator without adding a
+public controller or wrapper. Two negative tests exposed allocation leaks from
+bad annotation colors and unfittable inline text; both now fail before allocation.
+The package suite passes 705 tests. A 60/100-base forward/reverse proof at
+`src/dnadesign/baserender/outputs/annotation-contract-20261118-02/index.html`
+preserves 14-point sequence text and 24-point annotations in Chrome. Its natural
+point-sized view scrolls for the longer sequence rather than shrinking type.
+
 F must also pin the producer source revision alongside its distribution version:
 the current talk preparer checks `dnadesign-tools` version alone, which cannot
 distinguish changes within an editable checkout. Keep the existing v2 comparison
@@ -181,6 +194,7 @@ exists in an installed distribution.
 | `src/public/api.py`, `sequence_panel.py` | Small public entrypoints, explicit sizing and artifact/diagnostic results; preserve lazy imports. |
 | `src/config/`, `src/core/` | Boundary parsing, versioned asset/layout/label records, units, supported fields and failures. |
 | `src/render/layout.py` | One authority for pitch, strands, feature boxes, caption/illustration bounds. |
+| `src/render/feature_labels.py` | Producer-neutral annotation planning, collision checks and painting of admitted placements. |
 | `src/render/effects/anchored_illustration.py`, `assets/overlays/` | Separate source resolution, geometry and format-specific emission; preserve SVG definitions and painter order. |
 | `src/render/sequence_rows.py` | Neutral label placement and focused drawing helpers; remove producer-name policy from core after adapter migration. |
 | `src/outputs/images.py`, `video.py` | Shared placement, final conversion, deterministic output and create-only publication. |

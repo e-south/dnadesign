@@ -15,7 +15,7 @@ from xml.etree import ElementTree as ET
 import matplotlib.pyplot as plt
 import pytest
 
-from dnadesign.baserender import ContractError, Feature, LayoutError, Record, Span, render_record_svg
+from dnadesign.baserender import ContractError, Feature, LayoutError, Record, RenderingError, Span, render_record_svg
 
 
 def _record(annotation, *, source="caller"):
@@ -64,12 +64,31 @@ def test_invalid_annotation_declarations_fail_at_record_admission(annotation):
         _record(annotation).validate()
 
 
-def test_required_annotation_cannot_silently_disappear():
-    record = _record({"text": "unfittable " * 200, "placement": "near_feature"})
+@pytest.mark.parametrize("placement", ["near_feature", "inline"])
+def test_required_annotation_cannot_silently_disappear(placement):
+    record = _record({"text": "unfittable " * 200, "placement": placement})
     before = plt.get_fignums()
-    with pytest.raises(LayoutError, match="site.*annotation.*fit"):
-        render_record_svg(record, style_overrides={"legend": False})
-    assert plt.get_fignums() == before
+    try:
+        with pytest.raises(LayoutError, match="site.*annotation.*fit"):
+            render_record_svg(record, style_overrides={"legend": True, "legend_mode": "inline"})
+        assert plt.get_fignums() == before
+    finally:
+        for number in set(plt.get_fignums()) - set(before):
+            plt.close(number)
+
+
+def test_bad_annotation_color_is_rejected_before_figure_allocation():
+    record = _record({"text": "Selected part", "placement": "near_feature"})
+    feature = record.features[0]
+    record = replace(record, features=(replace(feature, attrs={**feature.attrs, "annotation_color": "invalid"}),))
+    before = plt.get_fignums()
+    try:
+        with pytest.raises(RenderingError, match="site.*annotation_color"):
+            render_record_svg(record)
+        assert plt.get_fignums() == before
+    finally:
+        for number in set(plt.get_fignums()) - set(before):
+            plt.close(number)
 
 
 def test_source_metadata_alone_does_not_request_an_annotation():
