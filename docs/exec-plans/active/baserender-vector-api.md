@@ -193,6 +193,14 @@ integrate native SVG composition and qualify raster/frame parity. Video layout
 is explicitly rejected until that work passes; forwarding options into the
 current compositor alone would still trigger competing metadata and hidden fit.
 
+Sequence rows now separate `prepare` from `draw_prepared` internally. The
+prepared value binds the admitted record, style, palette and measured geometry;
+native output can inspect that plan before allocating a figure. The previous
+private `render_with_layout` tuple route is removed. Four 60/100-base SVGs with
+12/18-point captions remain byte-identical across this preparatory refactor;
+their comparison is retained in `outputs/vector-placement-20261118-01/` under
+BaseRender. All 734 package tests still pass.
+
 F must also pin the producer source revision alongside its distribution version:
 the current talk preparer checks `dnadesign-tools` version alone, which cannot
 distinguish changes within an editable checkout. Keep the existing v2 comparison

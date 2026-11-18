@@ -144,8 +144,8 @@ def render_record_svg(
     from ..render.sequence_rows import SequenceRowsRenderer
 
     palette = Palette(style.palette)
-    # render_with_layout performs the native-compatible sequence preflight
-    # immediately before allocating its figure; neutral admission stays shared.
+    # Neutral admission and measured preparation precede figure allocation.
+    # Native composition can qualify its own text/artwork bounds on this plan.
     validate_records_for_rendering(
         (bound,), renderer_name="sequence_rows", style=style, palette=palette, preflight_renderer=False
     )
@@ -155,6 +155,9 @@ def render_record_svg(
             for binding in effect.target["bindings"]:
                 if binding["feature_id"] not in feature_ids:
                     raise RenderingError(f"missing illustration feature binding: {binding['feature_id']!r}")
+    renderer = SequenceRowsRenderer()
+    prepared = renderer.prepare(bound, style, palette, layout_request=layout)
+    layout = prepared.layout
     placements = []
     diagnostics = []
     scale = 72.0 / style.dpi
@@ -171,9 +174,7 @@ def render_record_svg(
 
     figure = None
     try:
-        figure, layout = SequenceRowsRenderer().render_with_layout(
-            bound, style, palette, illustration_drawer=draw_body, layout_request=layout
-        )
+        figure = renderer.draw_prepared(prepared, illustration_drawer=draw_body)
 
         def box_pt(box):
             x0, y0, x1, y1 = box

@@ -55,7 +55,10 @@ def _add_fixed_layout_patch(ax, patch):
 
 
 @dataclass(frozen=True)
-class _SequenceRowsInput:
+class PreparedSequenceRows:
+    record: Record
+    style: Style
+    palette: Palette
     layout: LayoutContext
     motif_geometries: tuple[MotifLogoGeometry, ...]
     tone_fwd: tuple[float, ...] | None
@@ -84,7 +87,7 @@ def _without_redundant_full_span_overlay(record: Record) -> Record:
 
 def _preflight_sequence_rows(
     record: Record, style: Style, palette: Palette, layout_request: SequenceLayout | None = None
-) -> _SequenceRowsInput:
+) -> PreparedSequenceRows:
     validate_sequence_rows_metadata(record, style)
     layout = prepare_sequence_layout(record, style, layout_request)
     motif_geometries = tuple(
@@ -131,7 +134,10 @@ def _preflight_sequence_rows(
         reserved_boxes = (_overlay_layout(layout, style, record.display.overlay_text)[-1],)
     labels = plan_feature_labels(record, layout, palette, style, reserved_boxes=reserved_boxes)
 
-    return _SequenceRowsInput(
+    return PreparedSequenceRows(
+        record=record,
+        style=style,
+        palette=palette,
         layout=layout,
         motif_geometries=motif_geometries,
         tone_fwd=tone_fwd,
@@ -148,27 +154,22 @@ class SequenceRowsRenderer:
     ) -> None:
         if any("svg_asset" in effect.params for effect in record.effects):
             raise RenderingError("SVG artwork requires render_record_svg; no raster substitution is permitted")
-        _preflight_sequence_rows(
-            _without_redundant_full_span_overlay(record), style, palette, sequence_layout_from_options(options)
-        )
+        self.prepare(record, style, palette, layout_request=sequence_layout_from_options(options))
 
     def render(self, record: Record, style: Style, palette: Palette, options: Mapping[str, object] | None = None):
-        figure, _layout = self.render_with_layout(
-            record, style, palette, layout_request=sequence_layout_from_options(options)
-        )
-        return figure
+        prepared = self.prepare(record, style, palette, layout_request=sequence_layout_from_options(options))
+        return self.draw_prepared(prepared)
 
-    def render_with_layout(
-        self,
-        record: Record,
-        style: Style,
-        palette: Palette,
-        *,
-        illustration_drawer=None,
-        layout_request: SequenceLayout | None = None,
-    ):
+    def prepare(
+        self, record: Record, style: Style, palette: Palette, *, layout_request: SequenceLayout | None = None
+    ) -> PreparedSequenceRows:
         record = _without_redundant_full_span_overlay(record.validate())
-        prepared = _preflight_sequence_rows(record, style, palette, layout_request)
+        return _preflight_sequence_rows(record, style, palette, layout_request)
+
+    def draw_prepared(self, prepared: PreparedSequenceRows, *, illustration_drawer=None):
+        record, style, palette = prepared.record, prepared.style, prepared.palette
+        if illustration_drawer is None and any("svg_asset" in effect.params for effect in record.effects):
+            raise RenderingError("SVG artwork requires render_record_svg; no raster substitution is permitted")
         show_two = bool(style.show_reverse_complement and record.alphabet in {"DNA", "IUPAC_DNA"})
         layout = prepared.layout
         motif_geometries = list(prepared.motif_geometries)
@@ -431,7 +432,7 @@ class SequenceRowsRenderer:
 
         ax.set_xlim(0, layout.width)
         ax.set_ylim(0, layout.height)
-        return fig, layout
+        return fig
 
 
 @lru_cache(maxsize=128)
