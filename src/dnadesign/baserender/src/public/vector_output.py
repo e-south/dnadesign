@@ -26,6 +26,7 @@ from ..core.vector import (
     SvgIllustrationPlacement,
     SvgRenderDiagnostics,
     SvgRenderResult,
+    SvgSpanLinkPlacement,
 )
 
 
@@ -151,7 +152,7 @@ def render_record_svg(
                 if binding["feature_id"] not in feature_ids:
                     raise RenderingError(f"missing illustration feature binding: {binding['feature_id']!r}")
     renderer = SequenceRowsRenderer()
-    prepared = renderer.prepare(bound, style, palette, layout_request=layout)
+    prepared = renderer.prepare(bound, style, palette, layout_request=layout, preserve_type=True)
     layout = prepared.layout
     scale = 72.0 / style.dpi
 
@@ -227,6 +228,19 @@ def render_record_svg(
             illustrations=tuple(diagnostics),
             text_font_policy="reference",
             fonts=MappingProxyType(fonts),
+            span_links=tuple(
+                SvgSpanLinkPlacement(
+                    effect_index=index,
+                    label=geometry.label,
+                    font_size_pt=geometry.font_size_pt,
+                    endpoints_pt=(
+                        (geometry.x1 * scale, (layout.height - geometry.y) * scale),
+                        (geometry.x2 * scale, (layout.height - geometry.y) * scale),
+                    ),
+                    label_bounds_pt=None if geometry.label_bounds is None else box_pt(geometry.label_bounds),
+                )
+                for index, geometry in prepared.span_link_geometries.items()
+            ),
         )
         return SvgRenderResult(svg, layout.width * scale, layout.height * scale, result_diagnostics)
     finally:

@@ -101,7 +101,7 @@ class Style:
     font_size_label: int = 12
     font_size_feature_label: int | None = None
     font_size_annotation_label: int | None = None
-    font_size_span_link_label: int | None = None
+    font_size_span_link_label: float | None = None
 
     padding_x: float = 24.0
     padding_y: float = 20.0

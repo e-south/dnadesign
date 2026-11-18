@@ -13,13 +13,14 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Mapping, Sequence
 
 import matplotlib.colors as mcolors
 
 from ..config import Style
 from ..core import Feature, LayoutError, Record, RenderingError
 from .effects.anchored_illustration import anchored_illustration_occupied_boxes
+from .effects.span_link import SpanLinkGeometry, compute_span_link_geometry
 from .layout import LayoutContext, measure_annotation_label, measure_text_width_px
 from .palette import Palette, darken_rgb
 
@@ -42,8 +43,11 @@ def plan_feature_labels(
     style: Style,
     *,
     reserved_boxes: Sequence[tuple[float, float, float, float]] = (),
+    span_link_geometries: Mapping[int, SpanLinkGeometry] | None = None,
 ) -> tuple[PlannedLabel, ...]:
     """Resolve required labels and collisions before any figure is allocated."""
+    span_boxes = _span_link_label_boxes(record, layout, style, geometries=span_link_geometries)
+    reserved_boxes = (*reserved_boxes, *span_boxes)
     near = _plan_near_feature_labels(record, layout, palette, style, reserved_boxes=reserved_boxes)
     if style.legend and str(style.legend_mode).lower() == "inline":
         inline = _plan_inline_feature_labels(
@@ -92,102 +96,20 @@ def boxes_overlap(a: tuple[float, float, float, float], b: tuple[float, float, f
     return max(ax0, bx0) < min(ax1, bx1) and max(ay0, by0) < min(ay1, by1)
 
 
-def _span_link_label_font_size(style: Style) -> int:
-    if style.font_size_span_link_label is not None:
-        return int(style.font_size_span_link_label)
-    return max(6, int(style.font_size_seq))
-
-
 def _span_link_label_boxes(
-    record: Record, layout: LayoutContext, style: Style
+    record: Record,
+    layout: LayoutContext,
+    style: Style,
+    *,
+    geometries: Mapping[int, SpanLinkGeometry] | None = None,
 ) -> list[tuple[float, float, float, float]]:
-    boxes: list[tuple[float, float, float, float]] = []
-    feature_boxes = layout.feature_boxes
-    for effect in record.effects:
-        if effect.kind != "span_link":
-            continue
-
-        target = effect.target
-        if "from_feature_id" in target and "to_feature_id" in target:
-            left = feature_boxes.get(str(target["from_feature_id"]))
-            right = feature_boxes.get(str(target["to_feature_id"]))
-            if left is None or right is None:
-                continue
-            x1 = float(left[2])
-            x2 = float(right[0])
-            if x1 > x2:
-                x1, x2 = x2, x1
-        elif "from_span" in target and "to_span" in target:
-            from_raw = target["from_span"]
-            to_raw = target["to_span"]
-            if not isinstance(from_raw, dict) or not isinstance(to_raw, dict):
-                continue
-            x1 = layout.x_left + ((int(from_raw["start"]) + int(from_raw["end"])) / 2.0) * layout.cw
-            x2 = layout.x_left + ((int(to_raw["start"]) + int(to_raw["end"])) / 2.0) * layout.cw
-            if x1 > x2:
-                x1, x2 = x2, x1
-        else:
-            continue
-
-        lane = str(effect.params.get("lane", "top")).lower()
-        if lane not in {"top", "bottom"}:
-            continue
-        try:
-            track = int(effect.render.get("track", 0))
-        except Exception:
-            continue
-        if lane == "top":
-            y = layout.y_forward + layout.feature_track_base_offset_up + track * layout.feature_track_step
-        else:
-            y = layout.y_reverse - layout.feature_track_base_offset_down - track * layout.feature_track_step
-
-        inner_margin_bp = effect.params.get("inner_margin_bp", style.span_link_inner_margin_bp)
-        try:
-            inner_margin_bp = float(inner_margin_bp)
-        except Exception:
-            inner_margin_bp = float(style.span_link_inner_margin_bp)
-        if inner_margin_bp < 0:
-            inner_margin_bp = 0.0
-        inner_margin_px = inner_margin_bp * layout.cw
-        x1 = x1 + inner_margin_px
-        x2 = x2 - inner_margin_px
-        if x2 <= x1:
-            continue
-
-        base_fs = _span_link_label_font_size(style)
-        avail = max(4.0, x2 - x1)
-        label = str(effect.params.get("label", "")).strip()
-        shrink_to_fit = effect.params.get("shrink_label_to_fit", True)
-        fs = base_fs
-        text_h = max(8.0, (float(fs) / 72.0) * float(style.dpi))
-        line_half_h = max(2.0, text_h * 0.33)
-        tick_half_h = 4.0
-        tick_half_w = 1.2
-        if label == "":
-            boxes.append((x1, y - line_half_h, x2, y + line_half_h))
-            boxes.append((x1 - tick_half_w, y - tick_half_h, x1 + tick_half_w, y + tick_half_h))
-            boxes.append((x2 - tick_half_w, y - tick_half_h, x2 + tick_half_w, y + tick_half_h))
-            continue
-
-        label_w = measure_text_width_px(label, style.font_label, fs, style.dpi)
-        if shrink_to_fit and label_w + 12.0 > 0.85 * avail:
-            scale = (0.85 * avail) / max(1.0, label_w)
-            fs = max(6, int(base_fs * min(1.0, scale)))
-            label_w = measure_text_width_px(label, style.font_label, fs, style.dpi)
-            text_h = max(8.0, (float(fs) / 72.0) * float(style.dpi))
-            line_half_h = max(2.0, text_h * 0.33)
-        gap = min(avail * 0.9, label_w + 12.0)
-        mid = (x1 + x2) / 2.0
-        left_end = mid - gap / 2.0
-        right_start = mid + gap / 2.0
-        if left_end > x1:
-            boxes.append((x1, y - line_half_h, left_end, y + line_half_h))
-        if x2 > right_start:
-            boxes.append((right_start, y - line_half_h, x2, y + line_half_h))
-        boxes.append((x1 - tick_half_w, y - tick_half_h, x1 + tick_half_w, y + tick_half_h))
-        boxes.append((x2 - tick_half_w, y - tick_half_h, x2 + tick_half_w, y + tick_half_h))
-        boxes.append((mid - gap / 2.0, y - text_h / 2.0, mid + gap / 2.0, y + text_h / 2.0))
-    return boxes
+    if geometries is None:
+        geometries = {
+            index: compute_span_link_geometry(effect, layout, style, layout.feature_boxes)
+            for index, effect in enumerate(record.effects)
+            if effect.kind == "span_link"
+        }
+    return [box for geometry in geometries.values() for box in geometry.occupied_boxes]
 
 
 def _sequence_strand_occupied_boxes(layout: LayoutContext, style: Style) -> list[tuple[float, float, float, float]]:
@@ -242,7 +164,6 @@ def _plan_near_feature_labels(
             )
         )
     occupied_boxes.extend(_sequence_strand_occupied_boxes(layout, style))
-    occupied_boxes.extend(_span_link_label_boxes(record, layout, style))
     for effect in record.effects:
         if effect.kind == "anchored_illustration":
             occupied_boxes.extend(
@@ -444,7 +365,6 @@ def _plan_inline_feature_labels(
                 placement.y + placement.h / 2.0,
             )
         )
-    occupied_boxes.extend(_span_link_label_boxes(record, layout, style))
     sequence_x0 = float(layout.x_left)
     sequence_x1 = float(layout.x_left + len(record.sequence) * layout.cw)
     occupied_boxes.append(

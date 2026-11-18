@@ -126,6 +126,15 @@ class ResolvedFont:
 
 
 @dataclass(frozen=True)
+class SvgSpanLinkPlacement:
+    effect_index: int
+    label: str
+    font_size_pt: float | None
+    endpoints_pt: tuple[tuple[float, float], tuple[float, float]]
+    label_bounds_pt: tuple[float, float, float, float] | None
+
+
+@dataclass(frozen=True)
 class SvgRenderDiagnostics:
     record_id: str
     base_pitch_pt: float
@@ -136,6 +145,7 @@ class SvgRenderDiagnostics:
     illustrations: tuple[SvgIllustrationPlacement, ...]
     text_font_policy: str
     fonts: Mapping[str, ResolvedFont]
+    span_links: tuple[SvgSpanLinkPlacement, ...]
 
 
 @dataclass(frozen=True)

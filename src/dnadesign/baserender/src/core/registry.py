@@ -17,6 +17,7 @@ from typing import Mapping, Protocol
 from .contracts import ensure, reject_unknown_keys
 from .errors import ContractError
 from .record import Effect, Feature, Record
+from .types import Span
 
 
 class FeatureKindContract(Protocol):
@@ -137,6 +138,18 @@ class _SpanLinkEffectContract:
                 reject_unknown_keys(span_obj, {"start", "end", "strand"}, f"span_link.target.{key}")
                 for req in ("start", "end"):
                     ensure(req in span_obj, f"span_link {key} missing '{req}'", ContractError)
+                try:
+                    for coordinate in ("start", "end"):
+                        ensure(
+                            isinstance(span_obj[coordinate], int) and not isinstance(span_obj[coordinate], bool),
+                            f"{coordinate} must be int",
+                            ContractError,
+                        )
+                    Span(span_obj["start"], span_obj["end"], span_obj.get("strand")).validate_within(
+                        len(record.sequence), record.alphabet
+                    )
+                except ContractError as exc:
+                    raise ContractError(f"span_link.{key}: {exc}") from exc
 
         params = effect.params
         reject_unknown_keys(

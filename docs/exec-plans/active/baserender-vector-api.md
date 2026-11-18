@@ -31,7 +31,7 @@ or remote publication. Rasterization remains an explicit final output operation.
 - [x] (2026-11-18 02:06Z) Capture the proposal, known source findings, focused baseline and next-executor contract; implementation has not started.
 - [x] (2026-11-18 02:34Z) A — Baseline package suite, catalog, demo admission and public usage reviewed; prioritized findings below retain open work.
 - [x] (2026-11-18 02:34Z) B — Native SVG artwork and independent vector captions proved through the public API on 60/100-base examples.
-- [ ] (2026-11-18 04:55Z) C — In progress: native artwork/caption bounds and referenced-font identities now admitted; strict spacer/legend type fitting remains before C closes.
+- [ ] (2026-11-18 05:15Z) C — In progress: spacer drawing/collision geometry now unified with native preserve-type checks; bottom-legend fitting remains before C closes.
 - [ ] (2026-11-18 02:06Z) D — Qualify shared geometry through SVG, PNG, representative frames and CLI/job admission.
 - [ ] (2026-11-18 02:06Z) E — Measure and improve batch preparation against fidelity-preserving baselines.
 - [ ] (2026-11-18 02:06Z) F — Migrate the two real sequence uses in separate verified batches.
@@ -69,7 +69,7 @@ SVG feature has been exhaustively audited.
 | P2: viewer font identity | Native diagnostics declare referenced text and hash the resolved declared fonts. Captions reject missing glyphs and use resolved family names. Arial proofs render in Chrome/Inkscape; target font availability still needs consumer qualification. | C policy closed; D/F qualification |
 | P2: repeated illustrations have unique IDs | A two-instance test exposed colliding footprint IDs. Unique footprint IDs and definition namespaces now pass structural tests. | B, closed |
 | P2: video honors admitted layout | [Legacy video](../../../src/dnadesign/baserender/src/outputs/video.py) receives no renderer options, mutates layout metadata and applies its own fitting (including a 0.96 content scale). Explicit layout with video now fails at admission. D must qualify a shared native frame path before enabling it. | D, open |
-| P2: native labels preserve requested type | Spacer labels still default to shrink-to-fit; nonuniform bottom legends may also reduce fonts. Native output must choose explicit preserve-type failure behavior through shared measured geometry, retaining legitimate legacy fitting. | C, open |
+| P2: native labels preserve requested type | Spacers now use one plan and preserve fractional native sizes or fail. Nonuniform bottom legends still need explicit preserve-type admission; ordinary fitting remains supported. | C, bottom legend open |
 
 ### Decision Log
 
@@ -138,7 +138,7 @@ DNA case and ambiguity-code variants. Chrome and Inkscape inspection agree.
 Twenty-seven additional tests cover centering, both strands/fonts, preserved
 glyph scale and columns, invalid spacing units, tight-pitch rejection and
 diagnostic-to-painted-bound agreement. The package suite now passes 686 tests.
-Strict spacer/legend fitting remains open in C; artwork/caption overflow and the
+Strict bottom-legend fitting remains open in C; spacer, artwork/caption overflow and the
 referenced-font policy are qualified below. This is not completion of C–G or real
 consumer qualification.
 
@@ -220,6 +220,24 @@ larger typed canvas. The full package suite passes 752 tests. The browser review
 resets per-card horizontal scroll before comparing caption sizes; automatic
 `scrollIntoView` had panned one review card by 16 CSS pixels, while its SVG bounds
 were unchanged. The aligned screenshot records the actual common frame.
+
+Spacer geometry now owns font selection, gap and occupied bounds once. Drawing
+and annotation collision checks consume that plan, removing about 100 lines of
+duplicated calculation. Native/explicit-layout preparation preserves fractional
+point sizes, rejects conflicting shrink requests and fails on insufficient span
+or canvas bounds, including unlabelled brackets. Ordinary figure fitting stays
+supported. Native diagnostics report spacer placement by source effect index.
+The contract review also found that accepted read-only span mappings failed in
+the drawer and that explicit spans bypassed coordinate admission; both are fixed.
+Fifteen new tests cover those cases and actual drawn-text containment on both
+lanes. A valid Yiu diagram exposed a natural-canvas omission for explicit-span
+links; natural measurement now includes all spacer extents, reusing the same
+primitive geometry. Both output routes expand naturally, while a fixed canvas
+rejects content that cannot fit. An initial high-track test mistook valid natural
+expansion for clipping; that hypothesis was corrected before qualification.
+All 767 package tests pass, including the Yiu job. Evidence and the matched-font
+native SVG regression comparison live in
+`outputs/span-type-contract-20261118-01/` under BaseRender.
 
 F must also pin the producer source revision alongside its distribution version:
 the current talk preparer checks `dnadesign-tools` version alone, which cannot
@@ -334,11 +352,10 @@ The next executor updates this plan rather than creating a competing roadmap.
 
 #### Next executor contract — C
 
-Remove implicit native spacer/legend font shrinking through shared measured
-plans and explicit insufficient-space errors. Consolidate duplicated spacer
-measurements between effect drawing and label collision planning. Preserve the
-new caption, layout and neutral annotation contracts, the A/B proofs and supported
-legacy raster fitting. Qualify crowded/reverse-strand cases and keep font-policy
+Remove implicit native bottom-legend font shrinking through a measured plan and
+explicit insufficient-space errors. Preserve the new spacer, caption, layout and
+neutral annotation contracts, the A/B proofs and supported legacy raster fitting.
+Qualify crowded/reverse-strand cases and keep font-policy
 claims limited to declared referenced fonts; consumer viewers need their own
 inspection. Then audit C against its original criteria before starting D.
 

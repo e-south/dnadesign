@@ -12,11 +12,10 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import math
-from dataclasses import replace
 
 from ..config import SequenceLayout, Style
 from ..core import LayoutError, Record, RenderingError
-from .layout import LayoutContext, compute_layout
+from .layout import LayoutContext, compute_layout, translate_layout
 
 _LEGACY_KEYS = (
     "cell_width_scale",
@@ -100,20 +99,4 @@ def _place_canvas(natural: LayoutContext, request: SequenceLayout, *, unit: floa
             f"{tuple(round(value / unit, 4) for value in bounds)} pt at the requested sequence origin; "
             "increase the canvas or move the origin; type and pitch will not be shrunk"
         )
-    return replace(
-        natural,
-        width=width,
-        height=height,
-        x_left=natural.x_left + dx,
-        y_forward=natural.y_forward + dy,
-        y_reverse=natural.y_reverse + dy,
-        placements=tuple(
-            replace(placement, x=placement.x + dx, y=placement.y + dy) for placement in natural.placements
-        ),
-        feature_boxes={
-            key: (x0 + dx, y0 + dy, x1 + dx, y1 + dy) for key, (x0, y0, x1, y1) in natural.feature_boxes.items()
-        },
-        motif_logo_y0_by_effect={key: value + dy for key, value in natural.motif_logo_y0_by_effect.items()},
-        content_top=natural.content_top + dy,
-        content_bottom=natural.content_bottom + dy,
-    )
+    return translate_layout(natural, dx=dx, dy=dy, width=width, height=height)

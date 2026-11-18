@@ -12,7 +12,7 @@ Module Author(s): Eric J. South
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from typing import Mapping, Sequence
 
@@ -787,7 +787,7 @@ def compute_layout(
             overlay_space += (overlay_lines - 1) * max(label_height * 1.05, ch * 0.5)
     height = content_top + style.padding_y + outer_pad + header_margin + overlay_space + legend_space
 
-    return LayoutContext(
+    layout = LayoutContext(
         cw=cw,
         ch=ch,
         width=width,
@@ -818,4 +818,64 @@ def compute_layout(
         motif_logo_lanes_down=motif_lanes_down,
         content_top=content_top,
         content_bottom=content_bottom,
+    )
+
+    return _include_span_link_bounds(record, style, layout)
+
+
+def translate_layout(layout: LayoutContext, *, dx: float, dy: float, width: float, height: float) -> LayoutContext:
+    """Translate one measured layout without changing typography or pitch."""
+    return replace(
+        layout,
+        width=width,
+        height=height,
+        x_left=layout.x_left + dx,
+        y_forward=layout.y_forward + dy,
+        y_reverse=layout.y_reverse + dy,
+        placements=tuple(replace(item, x=item.x + dx, y=item.y + dy) for item in layout.placements),
+        feature_boxes={
+            key: (x0 + dx, y0 + dy, x1 + dx, y1 + dy) for key, (x0, y0, x1, y1) in layout.feature_boxes.items()
+        },
+        motif_logo_y0_by_effect={key: value + dy for key, value in layout.motif_logo_y0_by_effect.items()},
+        content_top=layout.content_top + dy,
+        content_bottom=layout.content_bottom + dy,
+    )
+
+
+def _include_span_link_bounds(record: Record, style: Style, layout: LayoutContext) -> LayoutContext:
+    # Endpoint/label placement stays owned by the span primitive. Natural layout
+    # admits its complete extent before a caller's fixed canvas is applied.
+    from .effects.span_link import compute_span_link_geometry
+
+    bounds = [
+        box
+        for effect in record.effects
+        if effect.kind == "span_link"
+        for box in compute_span_link_geometry(
+            effect, layout, style, layout.feature_boxes, enforce_bounds=False
+        ).occupied_boxes
+    ]
+    if not bounds:
+        return layout
+    left = min(0.0, min(box[0] for box in bounds))
+    bottom = min(0.0, min(box[1] for box in bounds))
+    right = max(layout.width, max(box[2] for box in bounds))
+    top = max(layout.height, max(box[3] for box in bounds))
+    if (left, bottom, right, top) == (0.0, 0.0, layout.width, layout.height):
+        return layout
+    if not all(math.isfinite(value) for value in (left, bottom, right, top)):
+        raise LayoutError("span_link produced non-finite natural canvas bounds")
+    if left < 0:
+        left -= style.padding_x
+    if bottom < 0:
+        bottom -= style.padding_y
+    if right > layout.width:
+        right += style.padding_x
+    if top > layout.height:
+        top += style.padding_y
+    expanded = translate_layout(layout, dx=-left, dy=-bottom, width=right - left, height=top - bottom)
+    return replace(
+        expanded,
+        content_top=max(layout.content_top, max(box[3] for box in bounds)) - bottom,
+        content_bottom=min(layout.content_bottom, min(box[1] for box in bounds)) - bottom,
     )

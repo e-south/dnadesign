@@ -38,6 +38,7 @@ from .effects.anchored_illustration import (
 )
 from .effects.motif_logo import MotifLogoGeometry, compute_motif_logo_geometry
 from .effects.registry import draw_effect, validate_effect
+from .effects.span_link import SpanLinkGeometry, compute_span_link_geometry, draw_span_link
 from .feature_labels import (
     PlannedLabel,
     boxes_overlap,
@@ -71,6 +72,7 @@ class PreparedSequenceRows:
     explicit_complement_sequence: str | None
     labels: tuple[PlannedLabel, ...]
     illustration_geometries: Mapping[int, AnchoredIllustrationGeometry]
+    span_link_geometries: Mapping[int, SpanLinkGeometry]
 
 
 def _without_redundant_full_span_overlay(record: Record) -> Record:
@@ -92,7 +94,12 @@ def _without_redundant_full_span_overlay(record: Record) -> Record:
 
 
 def _preflight_sequence_rows(
-    record: Record, style: Style, palette: Palette, layout_request: SequenceLayout | None = None
+    record: Record,
+    style: Style,
+    palette: Palette,
+    layout_request: SequenceLayout | None = None,
+    *,
+    preserve_type: bool = False,
 ) -> PreparedSequenceRows:
     validate_sequence_rows_metadata(record, style)
     layout = prepare_sequence_layout(record, style, layout_request)
@@ -138,7 +145,14 @@ def _preflight_sequence_rows(
     reserved_boxes = ()
     if record.display.overlay_text:
         reserved_boxes = (_overlay_layout(layout, style, record.display.overlay_text)[-1],)
-    labels = plan_feature_labels(record, layout, palette, style, reserved_boxes=reserved_boxes)
+    span_link_geometries = {
+        index: compute_span_link_geometry(effect, layout, style, layout.feature_boxes, preserve_type=preserve_type)
+        for index, effect in enumerate(record.effects)
+        if effect.kind == "span_link"
+    }
+    labels = plan_feature_labels(
+        record, layout, palette, style, reserved_boxes=reserved_boxes, span_link_geometries=span_link_geometries
+    )
     illustration_geometries = {
         index: compute_anchored_illustration_geometry(effect, record, layout, style)[1]
         for index, effect in enumerate(record.effects)
@@ -156,6 +170,7 @@ def _preflight_sequence_rows(
         explicit_complement_sequence=explicit_complement_sequence,
         labels=labels,
         illustration_geometries=MappingProxyType(illustration_geometries),
+        span_link_geometries=MappingProxyType(span_link_geometries),
     )
 
 
@@ -173,10 +188,18 @@ class SequenceRowsRenderer:
         return self.draw_prepared(prepared)
 
     def prepare(
-        self, record: Record, style: Style, palette: Palette, *, layout_request: SequenceLayout | None = None
+        self,
+        record: Record,
+        style: Style,
+        palette: Palette,
+        *,
+        layout_request: SequenceLayout | None = None,
+        preserve_type: bool = False,
     ) -> PreparedSequenceRows:
         record = _without_redundant_full_span_overlay(record.validate())
-        return _preflight_sequence_rows(record, style, palette, layout_request)
+        return _preflight_sequence_rows(
+            record, style, palette, layout_request, preserve_type=preserve_type or layout_request is not None
+        )
 
     def draw_prepared(self, prepared: PreparedSequenceRows, *, illustration_drawer=None):
         record, style, palette = prepared.record, prepared.style, prepared.palette
@@ -429,6 +452,17 @@ class SequenceRowsRenderer:
                     feature_boxes,
                     body_drawer=partial(illustration_drawer, effect_index=effect_index),
                     geometry=prepared.illustration_geometries[effect_index],
+                )
+            elif effect.kind == "span_link":
+                draw_span_link(
+                    ax,
+                    effect,
+                    record,
+                    layout,
+                    style,
+                    palette,
+                    feature_boxes,
+                    geometry=prepared.span_link_geometries[effect_index],
                 )
             else:
                 draw_effect(ax, effect, record, layout, style, palette, feature_boxes)

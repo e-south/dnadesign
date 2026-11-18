@@ -3,7 +3,7 @@ doc_id: baserender-native-vector-output
 title: Native SVG sequence output
 owner: dnadesign-maintainers
 status: experimental
-last_verified: 2026-11-17
+last_verified: 2026-11-18
 ---
 
 # Native SVG sequence output
@@ -103,7 +103,9 @@ reference line, measured rightward/downward from the top left. It is independent
 of a particular glyph's ink or baseline. Diagnostics return `sequence_origin_pt`
 in that same frame. Without a new origin, expanding the canvas preserves the
 existing top-left grid position. Features, nucleotide rectangles and motif lanes
-move with the grid; type and pitch are not fitted to the new canvas.
+move with the grid; type and pitch are not fitted to the new canvas. Natural
+canvas sizing also includes spacer lines and labels, for both feature references
+and explicit spans.
 
 `top_extent_pt` and `bottom_extent_pt` reserve minimum space about the midpoint
 between the two strand-reference lines (or the single line).
@@ -145,6 +147,22 @@ For a 12-point sequence with 18-point feature lettering, repeat the example with
 `--sequence-font-size 12 --feature-font-size 18 --font-family Arial`. The review
 uses point-sized viewports and scrolling, not per-record fitting.
 
+### Spacer labels
+
+Native output and explicit `SequenceLayout` rendering preserve spacer-label
+sizes, including fractional points. A label that cannot fit its declared span
+fails before allocation instead of shrinking. Explicit
+`shrink_label_to_fit=True` conflicts with that contract; remove the flag or set
+it to `False`, then choose the size/pitch/clearance explicitly. The existing
+ordinary figure route retains its fitting behavior.
+
+Spacer drawing and feature-label collision checks consume one measured plan.
+`diagnostics.span_links` returns `SvgSpanLinkPlacement` values with the source
+effect index, rendered text, point size, endpoint coordinates and reserved label
+bounds (including clearance). Unlabelled spacers return no font or label bounds;
+their line/tick bounds still undergo canvas admission. Span targets accept
+read-only mappings and reject fractional, boolean or out-of-range base coordinates.
+
 ## Admission and current qualification
 
 Source hashes, selections, definitions and fonts are checked before allocating
@@ -168,7 +186,7 @@ does not claim portable text rendering from Matplotlib lookup alone. The example
 uses explicit Arial for editable labels in Chrome and Inkscape and records font
 identities alongside the SVGs. Feature annotations use the explicit neutral
 declaration in the [record contract](reference.md#neutral-record). Portable font
-qualification, strict spacer/legend type fitting, PNG/frame output and native SVG CLI/job integration remain in the
+qualification, strict bottom-legend type fitting, PNG/frame output and native SVG CLI/job integration remain in the
 [execution plan](../../../../docs/exec-plans/active/baserender-vector-api.md).
 Native PowerPoint behavior and real consumer migration are not qualified by this
 neutral proof.

@@ -3,7 +3,7 @@ doc_id: baserender-reference
 title: BaseRender reference
 owner: dnadesign-maintainers
 status: active
-last_verified: 2026-11-17
+last_verified: 2026-11-18
 ---
 
 # BaseRender reference
@@ -170,7 +170,11 @@ Callers that construct neutral records directly must declare their annotations.
 
 Each `span_link` effect can set `params.color` and `params.label_color` to
 override its line and label colors. Without those fields, the style supplies
-both colors. An `anchored_illustration` can set `params.image_tint` to draw its
+both colors. `font_size_span_link_label` accepts fractional points. Ordinary
+figure rendering may fit text by default; native SVG and explicit layout preserve
+type and fail when it cannot fit. Their explicit shrinking requests are rejected.
+The [spacer contract](vector-output.md#spacer-labels) describes diagnostics and
+admission. An `anchored_illustration` can set `params.image_tint` to draw its
 image in one color while preserving the source alpha mask. Omit the tint to
 keep the image's original colors. Invalid colors fail before a figure is
 allocated.
