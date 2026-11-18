@@ -14,11 +14,23 @@ from __future__ import annotations
 import math
 import re
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, is_dataclass
 from pathlib import Path
 from typing import Mapping
 
 from .errors import RenderingError
+
+
+def _plain(value):
+    if isinstance(value, Path):
+        return str(value)
+    if is_dataclass(value):
+        return {item.name: _plain(getattr(value, item.name)) for item in fields(value)}
+    if isinstance(value, Mapping):
+        return {key: _plain(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_plain(item) for item in value]
+    return value
 
 
 def finite_tuple(value, length, name, *, positive=False):
@@ -43,6 +55,12 @@ class SvgArtwork:
     element_ids: tuple[str, ...]
     view_box: tuple[float, float, float, float]
     anchors: Mapping[str, tuple[float, float]]
+
+    def to_mapping(self, *, portable: bool = False):
+        payload = _plain(self)
+        if portable:
+            payload.pop("path")
+        return payload
 
     def validate(self):
         if not isinstance(self.path, Path):
@@ -104,6 +122,9 @@ class SvgIllustration:
     artwork: SvgArtwork
     caption: IllustrationCaption | None = None
 
+    def to_mapping(self, *, portable: bool = False):
+        return {"artwork": self.artwork.to_mapping(portable=portable), "caption": _plain(self.caption)}
+
 
 @dataclass(frozen=True)
 class SvgIllustrationPlacement:
@@ -158,6 +179,16 @@ class SvgRenderDiagnostics:
     span_links: tuple[SvgSpanLinkPlacement, ...]
     bottom_legend: tuple[SvgLegendEntryPlacement, ...]
 
+    def to_mapping(self, *, portable: bool = False):
+        """Return detached JSON-shaped diagnostics, optionally without local font paths."""
+        payload = _plain(self)
+        if portable:
+            for font in payload["fonts"].values():
+                font.pop("path")
+            for illustration in payload["illustrations"]:
+                illustration.pop("caption_font_path")
+        return payload
+
 
 @dataclass(frozen=True)
 class SvgRenderResult:
@@ -172,6 +203,12 @@ class RasterizerInfo:
     executable: str
     executable_sha256: str
     version: str
+
+    def to_mapping(self, *, portable: bool = False):
+        payload = _plain(self)
+        if portable:
+            payload["executable"] = Path(self.executable).name
+        return payload
 
 
 @dataclass(frozen=True)

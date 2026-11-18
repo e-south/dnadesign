@@ -1,0 +1,124 @@
+[
+  {
+    "id": "native-60",
+    "sequence": "ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT",
+    "features": [
+      {
+        "id": "left",
+        "kind": "kmer",
+        "span": {
+          "start": 4,
+          "end": 10,
+          "strand": "fwd"
+        },
+        "label": "ACGTAC"
+      },
+      {
+        "id": "right",
+        "kind": "kmer",
+        "span": {
+          "start": 28,
+          "end": 34,
+          "strand": "fwd"
+        },
+        "label": "ACGTAC"
+      }
+    ],
+    "effects": [
+      {
+        "kind": "anchored_illustration",
+        "target": {
+          "bindings": [
+            {
+              "anchor_id": "upstream",
+              "feature_id": "left",
+              "start": 4,
+              "end": 10
+            },
+            {
+              "anchor_id": "downstream",
+              "feature_id": "right",
+              "start": 28,
+              "end": 34
+            }
+          ]
+        },
+        "params": {
+          "asset_id": "rnap_sigma70",
+          "width_px": 300
+        }
+      },
+      {
+        "kind": "span_link",
+        "target": {
+          "from_feature_id": "left",
+          "to_feature_id": "right"
+        },
+        "params": {
+          "label": "18 bp"
+        }
+      }
+    ]
+  },
+  {
+    "id": "native-100",
+    "sequence": "ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT",
+    "features": [
+      {
+        "id": "left",
+        "kind": "kmer",
+        "span": {
+          "start": 4,
+          "end": 10,
+          "strand": "fwd"
+        },
+        "label": "ACGTAC"
+      },
+      {
+        "id": "right",
+        "kind": "kmer",
+        "span": {
+          "start": 28,
+          "end": 34,
+          "strand": "fwd"
+        },
+        "label": "ACGTAC"
+      }
+    ],
+    "effects": [
+      {
+        "kind": "anchored_illustration",
+        "target": {
+          "bindings": [
+            {
+              "anchor_id": "upstream",
+              "feature_id": "left",
+              "start": 4,
+              "end": 10
+            },
+            {
+              "anchor_id": "downstream",
+              "feature_id": "right",
+              "start": 28,
+              "end": 34
+            }
+          ]
+        },
+        "params": {
+          "asset_id": "rnap_sigma70",
+          "width_px": 300
+        }
+      },
+      {
+        "kind": "span_link",
+        "target": {
+          "from_feature_id": "left",
+          "to_feature_id": "right"
+        },
+        "params": {
+          "label": "18 bp"
+        }
+      }
+    ]
+  }
+]

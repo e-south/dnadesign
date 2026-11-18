@@ -110,6 +110,7 @@ def _job_to_mapping(parsed: RenderJobV4) -> dict[str, Any]:
         },
         "render": {
             "renderer": parsed.render.renderer,
+            **({"native_svg": parsed.render.native_svg.to_mapping()} if parsed.render.native_svg is not None else {}),
             "options": dict(parsed.render.options),
             "style": {
                 "preset": parsed.render.style_preset,

@@ -32,7 +32,7 @@ or remote publication. Rasterization remains an explicit final output operation.
 - [x] (2026-11-18 02:34Z) A — Baseline package suite, catalog, demo admission and public usage reviewed; prioritized findings below retain open work.
 - [x] (2026-11-18 02:34Z) B — Native SVG artwork and independent vector captions proved through the public API on 60/100-base examples.
 - [x] (2026-11-18 05:54Z) C — Layout, font identity, neutral label, spacer and bottom-legend contracts are implemented; native/explicit-layout overflow fails before drawing.
-- [ ] (2026-11-18 06:21Z) D — In progress: native SVG-to-PNG conversion is implemented; image-job and frame integration remain required.
+- [ ] (2026-11-18 06:21Z) D — In progress: native API and image-job SVG/PNG paths are implemented; shared frame/video qualification remains.
 - [ ] (2026-11-18 02:06Z) E — Measure and improve batch preparation against fidelity-preserving baselines.
 - [ ] (2026-11-18 02:06Z) F — Migrate the two real sequence uses in separate verified batches.
 - [ ] (2026-11-18 02:06Z) G — Remove displaced consumer logic and close the bounded package hardening review.
@@ -298,6 +298,27 @@ primitive, not native CLI job selection or video layout. D must still connect th
 qualify shared native frames, then E measures cold/warm/batch costs before
 optimizing repeated font/backend work.
 
+Native image jobs now declare `render.native_svg`, with strict source/caption
+settings in [`config/native_svg.py`](../../../src/dnadesign/baserender/src/config/native_svg.py).
+Raster options/defaults are shared with the public API in
+[`config/raster.py`](../../../src/dnadesign/baserender/src/config/raster.py).
+Layout continues through the existing renderer options. Native preparation and
+drawing are separated so complete batches are admitted before the first figure;
+`outputs/native_images.py` publishes through the existing bundle stage. A missing
+PNG dependency fails before input capture, and used SVG sources are rechecked
+before publication. Native video/PDF and implicit raster grids are rejected.
+
+Native manifests include requested settings, resolved vector/caption selections,
+per-record geometry and raster identities, omitting known machine-local paths.
+The public models expose detached `to_mapping` receipts. Actual SVG/PNG CLI runs,
+API-byte parity, mixed records, malformed settings, changed artwork and late
+failure rollback pass. The first 100-base Arial fixture correctly failed a
+1200-point canvas; the qualified fixture uses 1300 points without reducing type.
+Current evidence is in `outputs/native-job-20261118-01/` under BaseRender. The
+835-test regression baseline passes; final source/static evidence is bound to
+the commit in that directory. No native frame or performance claim follows from
+these image-job results.
+
 F must also pin the producer source revision alongside its distribution version:
 the current talk preparer checks `dnadesign-tools` version alone, which cannot
 distinguish changes within an editable checkout. Keep the existing v2 comparison
@@ -409,27 +430,22 @@ revise that bounded approach; do not substitute a raster or rewrite the renderer
 hashes, SVG plus preview, measurements and a short list of unresolved findings.
 The next executor updates this plan rather than creating a competing roadmap.
 
-#### Next executor contract — D image jobs and frames
+#### Next executor contract — D shared frames
 
-Connect native composition and the qualified rasterizer to the existing image-job
-surface. Make the native choice explicit: an `images` output with `fmt: svg`
-currently retains legacy illustration behavior, so format alone must not imply a
-representation upgrade. Admit native source/caption settings and raster options
-through shared API/config contracts, with strict path resolution and unknown-field
-errors. Avoid a second job DSL, renderer registry or duplicated validator.
+Qualify representative frames using the same native preparation/composition and
+rasterization on a common physical canvas. Keep frame geometry and type fixed
+without legacy metadata mutation, white-border trimming or hidden 0.96 fitting.
+The existing video layout guard stays until the native frame path is proved.
+Do not forward settings into the old compositor and call that parity.
 
-Use `outputs/native_svg.py` as the composition authority. Images must retain SVG
-artwork, independent captions and transparency through the existing staged bundle
-publication. Check dependency failures before unnecessary batch work. Qualify
-actual CLI SVG/PNG outputs and failure-before-publication paths, keeping the
-ordinary figure/PDF behavior explicit. Do not silently route unsupported native
-formats or multi-record grids through a raster compositor.
-
-Then qualify representative frames using that same geometry on a common canvas.
-Legacy video layout remains rejected until the native frame contract passes;
-forwarding options into its metadata-driven crop/fit path is insufficient. Stage
-E measures preparation/drawing/serialization/raster costs before changing caches
-or batch behavior. Consumers, source artwork and package releases remain outside D.
+Use the current native image-job contract and shared raster options rather than
+another frame DSL. Prove frame dimensions, anchors, type, alpha/static fallback
+and source identities, then integrate the existing encoder with explicit
+background/timing choices as needed. Preserve the supported ordinary video path
+and qualify both success and failure-before-publication. Stage E then measures
+cold/warm/batch preparation, drawing, serialization, rasterization and memory
+before changing caches or repeated-state behavior. Consumers, source artwork
+and package releases remain outside D.
 
 ### Validation and Acceptance
 

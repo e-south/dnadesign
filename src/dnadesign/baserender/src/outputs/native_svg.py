@@ -11,9 +11,9 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from types import MappingProxyType
-from typing import Mapping
+from typing import TYPE_CHECKING, Mapping
 
 from ..config import SequenceLayout, Style
 from ..core import Record, RenderingError
@@ -31,16 +31,36 @@ from ..render.fonts import resolve_font
 from ..render.svg_assets import load_packaged_svg_illustration, load_svg_selection
 from ..render.svg_caption import measure_caption
 
+if TYPE_CHECKING:
+    from ..core.vector import ResolvedFont
+    from ..render.sequence_rows import PreparedSequenceRows
+    from .svg import SvgPlacement
 
-def render_svg_sequence(
+
+@dataclass(frozen=True)
+class PreparedNativeSvg:
+    rows: PreparedSequenceRows
+    placements: tuple[SvgPlacement, ...]
+    illustrations: tuple[SvgIllustrationPlacement, ...]
+    fonts: Mapping[str, ResolvedFont]
+    slots: Mapping[int, str]
+    px_to_pt: float
+
+
+def _box_pt(box, layout, scale):
+    x0, y0, x1, y1 = box
+    return (x0 * scale, (layout.height - y1) * scale, x1 * scale, (layout.height - y0) * scale)
+
+
+def prepare_native_svg(
     record: Record,
     *,
     style: Style,
     illustrations: Mapping[str, SvgIllustration] | None = None,
     captions: Mapping[str, IllustrationCaption] | None = None,
     layout: SequenceLayout | None = None,
-) -> SvgRenderResult:
-    """One composition authority for public API and output execution."""
+) -> PreparedNativeSvg:
+    """Bind assets, fonts and geometry before allocating a figure."""
     if not isinstance(record, Record):
         raise RenderingError("record must be a Record")
     if style.figure_scale != 1:
@@ -93,11 +113,10 @@ def render_svg_sequence(
             effect = replace(effect, params={**effect.params, "svg_asset": source})
         bound_effects.append(effect)
     bound = replace(record, effects=tuple(bound_effects))
-    from ..render.nucleotide_geometry import displayed_nucleotides, nucleotide_box
     from ..render.palette import Palette
     from ..render.renderer import validate_records_for_rendering
     from ..render.sequence_rows import SequenceRowsRenderer
-    from .svg import SvgPlacement, SvgSlot, compose_svg
+    from .svg import SvgPlacement
 
     palette = Palette(style.palette)
     # Neutral admission and measured preparation precede figure allocation.
@@ -116,10 +135,6 @@ def render_svg_sequence(
     layout = prepared.layout
     scale = 72.0 / style.dpi
 
-    def box_pt(box):
-        x0, y0, x1, y1 = box
-        return (x0 * scale, (layout.height - y1) * scale, x1 * scale, (layout.height - y0) * scale)
-
     pending = []
     diagnostics = []
     slot_by_effect = {}
@@ -128,7 +143,7 @@ def render_svg_sequence(
         asset_id = effect.params["asset_id"]
         source, fragment, caption, font = selections[asset_id]
         slot = f"br-vector-{len(pending)}"
-        bounds = box_pt(geometry.box)
+        bounds = _box_pt(geometry.box, layout, scale)
         caption_geometry = measure_caption(
             caption,
             font,
@@ -153,8 +168,24 @@ def render_svg_sequence(
             )
         )
 
+    return PreparedNativeSvg(
+        prepared, tuple(pending), tuple(diagnostics), MappingProxyType(fonts), MappingProxyType(slot_by_effect), scale
+    )
+
+
+def draw_native_svg(source: PreparedNativeSvg) -> SvgRenderResult:
+    from ..render.nucleotide_geometry import displayed_nucleotides, nucleotide_box
+    from ..render.sequence_rows import SequenceRowsRenderer
+    from .svg import SvgSlot, compose_svg
+
+    prepared = source.rows
+    record = bound = prepared.record
+    layout, style, scale = prepared.layout, prepared.style, source.px_to_pt
+    renderer = SequenceRowsRenderer()
+    pending = source.placements
+
     def draw_body(axis, effect, geometry, *, effect_index):
-        axis.add_artist(SvgSlot(slot_by_effect[effect_index]))
+        axis.add_artist(SvgSlot(source.slots[effect_index]))
 
     import matplotlib.pyplot as plt
 
@@ -177,25 +208,27 @@ def render_svg_sequence(
                     cell_width=layout.cw,
                     cell_height=layout.ch,
                 )
-                nucleotide_boxes[placement.feature_id] = box_pt(shape.paint_bounds)
+                nucleotide_boxes[placement.feature_id] = _box_pt(shape.paint_bounds, layout, scale)
         result_diagnostics = SvgRenderDiagnostics(
             record_id=record.id,
             base_pitch_pt=layout.cw * scale,
             strand_anchors_pt=((layout.height - layout.y_forward) * scale, (layout.height - layout.y_reverse) * scale),
             sequence_origin_pt=(layout.x_left * scale, (layout.height - layout.y_forward) * scale),
-            feature_bounds_pt=MappingProxyType({key: box_pt(box) for key, box in layout.feature_boxes.items()}),
+            feature_bounds_pt=MappingProxyType(
+                {key: _box_pt(box, layout, scale) for key, box in layout.feature_boxes.items()}
+            ),
             nucleotide_box_bounds_pt=MappingProxyType(nucleotide_boxes),
-            illustrations=tuple(diagnostics),
+            illustrations=source.illustrations,
             text_font_policy="reference",
-            fonts=MappingProxyType(fonts),
+            fonts=source.fonts,
             bottom_legend=tuple(
                 SvgLegendEntryPlacement(
                     tag=entry.tag,
                     label=entry.label,
                     font_size_pt=entry.font_size_pt,
-                    patch_bounds_pt=box_pt(entry.patch_bounds),
+                    patch_bounds_pt=_box_pt(entry.patch_bounds, layout, scale),
                     text_origin_pt=(entry.text_origin[0] * scale, (layout.height - entry.text_origin[1]) * scale),
-                    bounds_pt=box_pt(entry.bounds),
+                    bounds_pt=_box_pt(entry.bounds, layout, scale),
                 )
                 for entry in prepared.bottom_legend
             ),
@@ -208,7 +241,9 @@ def render_svg_sequence(
                         (geometry.x1 * scale, (layout.height - geometry.y) * scale),
                         (geometry.x2 * scale, (layout.height - geometry.y) * scale),
                     ),
-                    label_bounds_pt=None if geometry.label_bounds is None else box_pt(geometry.label_bounds),
+                    label_bounds_pt=None
+                    if geometry.label_bounds is None
+                    else _box_pt(geometry.label_bounds, layout, scale),
                 )
                 for index, geometry in prepared.span_link_geometries.items()
             ),
@@ -217,3 +252,16 @@ def render_svg_sequence(
     finally:
         if figure is not None:
             plt.close(figure)
+
+
+def render_svg_sequence(
+    record: Record,
+    *,
+    style: Style,
+    illustrations: Mapping[str, SvgIllustration] | None = None,
+    captions: Mapping[str, IllustrationCaption] | None = None,
+    layout: SequenceLayout | None = None,
+) -> SvgRenderResult:
+    return draw_native_svg(
+        prepare_native_svg(record, style=style, illustrations=illustrations, captions=captions, layout=layout)
+    )

@@ -79,7 +79,7 @@ Optional keys:
 | input | Declares the source, alphabet, and adapter | src/config/, src/io/, src/integrations/ |
 | selection | Selects and orders records | src/pipeline/selection.py |
 | pipeline | Applies declared transforms | src/pipeline/, src/integrations/ |
-| render | Chooses a renderer and style | src/render/, src/config/style_v1.py |
+| render | Chooses renderer, style and optional native composition | src/render/, src/config/ |
 | outputs | Declares bundle-relative images or video | src/outputs/ |
 | run | Controls strict skip behavior | src/execution/ |
 
@@ -124,6 +124,14 @@ diagnostic as generic rendering.
 Render contracts constrain compatible renderers and may apply resource or
 sensitivity policies. Use list_render_contracts() or the CLI catalog instead
 of maintaining a separate hard-coded list in clients.
+
+`render.native_svg: {}` explicitly selects native sequence-row composition for
+SVG/PNG image jobs. Its optional `illustrations`, `captions` and `rasterization`
+settings share the public API contracts. Layout remains `render.options.layout`.
+See [native image jobs](vector-output.md#native-image-jobs) for the runnable
+example, strict source settings and supported output modes. Merely selecting
+`fmt: svg` retains the ordinary figure representation unless native composition
+is declared.
 
 ### Outputs
 

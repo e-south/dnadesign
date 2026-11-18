@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Mapping
 
+from ..config.raster import RasterOptions
 from ..config.sequence_layout import SequenceLayout
 from ..core import Record
 from ..core.vector import IllustrationCaption, PngRenderResult, SvgIllustration, SvgRenderResult
@@ -46,10 +47,10 @@ def render_record_svg(
 def rasterize_svg(
     source: SvgRenderResult,
     *,
-    dpi: float = 180,
-    inkscape: str | Path = "inkscape",
-    timeout_s: float = 30,
-    max_pixels: int = 64_000_000,
+    dpi: float = RasterOptions.dpi,
+    inkscape: str | Path = RasterOptions.inkscape,
+    timeout_s: float = RasterOptions.timeout_s,
+    max_pixels: int = RasterOptions.max_pixels,
 ) -> PngRenderResult:
     """Rasterize an existing native SVG at the requested output resolution.
 
@@ -58,4 +59,6 @@ def rasterize_svg(
     """
     from ..outputs.raster import rasterize_svg as convert
 
-    return convert(source, dpi=dpi, inkscape=inkscape, timeout_s=timeout_s, max_pixels=max_pixels)
+    return convert(
+        source, options=RasterOptions(dpi=dpi, inkscape=inkscape, timeout_s=timeout_s, max_pixels=max_pixels)
+    )

@@ -23,6 +23,7 @@ from dnadesign.artifacts import portable_path_identity
 from ..core import (
     Alphabet,
     ContractError,
+    RenderingError,
     SchemaError,
     ensure,
     reject_unknown_keys,
@@ -44,6 +45,7 @@ from .job_contracts import (
     render_contract_renderer_kinds,
     validate_render_contract_renderer,
 )
+from .native_svg import NativeSvgCfg, validate_native_outputs
 from .style_v1 import resolve_style
 
 _RESERVED_BUNDLE_METADATA_NAMES = frozenset({"manifest.json", ".dnadesign-publication-owner.json"})
@@ -100,6 +102,7 @@ class RenderCfg:
     style_preset: str | Path | None
     style_overrides: Mapping[str, Any]
     options: Mapping[str, Any]
+    native_svg: NativeSvgCfg | None = None
 
 
 @dataclass(frozen=True)
@@ -275,6 +278,14 @@ def _inline_mapping_allowed_roots(
                     continue
                 for value in declared_transform_path_values(name, params):
                     _append_if_absolute(value)
+
+    render_data = mapping.get("render")
+    if isinstance(render_data, Mapping) and isinstance(render_data.get("native_svg"), Mapping):
+        illustrations = render_data["native_svg"].get("illustrations")
+        if isinstance(illustrations, Mapping):
+            for spec in illustrations.values():
+                if isinstance(spec, Mapping) and isinstance(spec.get("artwork"), Mapping):
+                    _append_if_absolute(spec["artwork"].get("path"))
 
     return tuple(roots)
 
@@ -601,9 +612,9 @@ def _parse_selection(job_path: Path, raw: Any, *, allowed_roots: tuple[Path, ...
     )
 
 
-def _parse_render(raw: Any) -> RenderCfg:
+def _parse_render(raw: Any, *, job_path: Path, allowed_roots: tuple[Path, ...]) -> RenderCfg:
     data = require_mapping(raw, "render")
-    reject_unknown_keys(data, {"renderer", "style", "options"}, "render")
+    reject_unknown_keys(data, {"renderer", "style", "options", "native_svg"}, "render")
 
     renderer = str(data.get("renderer", "")).strip()
     require_one_of(
@@ -629,7 +640,7 @@ def _parse_render(raw: Any) -> RenderCfg:
 
     # Admission and execution share the same style schema, including preset
     # resolution. Validation must not defer bad geometry until rendering.
-    resolve_style(preset=style_preset, overrides=overrides_raw)
+    style = resolve_style(preset=style_preset, overrides=overrides_raw)
 
     options_raw = data.get("options", {})
     if options_raw is None:
@@ -639,12 +650,24 @@ def _parse_render(raw: Any) -> RenderCfg:
     from ..render.renderer import normalize_renderer_options
 
     options = normalize_renderer_options(renderer, options_raw)
+    native = None
+    if "native_svg" in data:
+        try:
+            native = NativeSvgCfg.from_mapping(
+                data["native_svg"],
+                resolve_path=lambda raw, field: _resolve_path(job_path, raw, field=field, allowed_roots=allowed_roots),
+            )
+        except (ContractError, RenderingError) as exc:
+            raise SchemaError(f"render.native_svg: {exc}") from exc
+        if style.figure_scale != 1:
+            raise SchemaError("render.native_svg requires style.figure_scale=1")
 
     return RenderCfg(
         renderer=renderer,
         style_preset=style_preset,
         style_overrides=dict(overrides_raw),
         options=options,
+        native_svg=native,
     )
 
 
@@ -1030,10 +1053,11 @@ def _parse_sequence_rows_job_mapping(
         plugins=_parse_plugin_specs(job_path, pipeline_raw.get("plugins"), allowed_roots=allowed_roots)
     )
 
-    render_cfg = _parse_render(data.get("render"))
+    render_cfg = _parse_render(data.get("render"), job_path=job_path, allowed_roots=allowed_roots)
     validate_render_contract_renderer(contract_cfg.kind, render_cfg.renderer, field="contract.kind")
     validate_adapter_renderer_compatibility(input_cfg, render_cfg)
     outputs_cfg = _parse_outputs(job_path, bundle_cfg.path, data.get("outputs"))
+    validate_native_outputs(render_cfg, outputs_cfg)
     if "layout" in render_cfg.options and any(isinstance(output, VideoOutputCfg) for output in outputs_cfg):
         raise SchemaError(
             "explicit layout is not yet supported for video outputs; "

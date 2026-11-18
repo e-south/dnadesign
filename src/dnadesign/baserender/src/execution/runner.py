@@ -34,6 +34,8 @@ from ..config import (
     validate_output_configuration,
     validate_render_contract_renderer,
 )
+from ..config.native_svg import validate_native_outputs
+from ..config.sequence_layout import sequence_layout_from_options
 from ..core import Record, SchemaError, SkipRecord
 from ..integrations import adapter_contract, build_adapter, finalize_adapter, required_source_columns
 from ..io import iter_json_rows, iter_jsonl_rows, iter_parquet_rows
@@ -57,6 +59,9 @@ def _render_spec(job: RenderJobV4, style) -> dict[str, object]:
         "renderer": job.render.renderer,
         "options": dict(job.render.options),
         "style_sha256": hashlib.sha256(style_bytes).hexdigest(),
+        **(
+            {"native_svg": job.render.native_svg.to_mapping(portable=True)} if job.render.native_svg is not None else {}
+        ),
     }
 
 
@@ -208,6 +213,14 @@ def run_render_job(
     validate_render_contract_renderer(job.contract.kind, job.render.renderer, field="contract.kind")
     validate_output_configuration(job.bundle.path, job.outputs)
     validate_adapter_output_compatibility(job.input.adapter.kind, job.outputs)
+    validate_native_outputs(job.render, job.outputs)
+    native_writer = None
+    if job.render.native_svg is not None:
+        from ..outputs.native_images import NativeImagesWriter
+
+        image_output = output_kind(job, "images")
+        assert isinstance(image_output, ImagesOutputCfg)
+        native_writer = NativeImagesWriter.resolve(job.render.native_svg, fmt=image_output.fmt)
     descriptor = render_contract_descriptor(job.contract.kind)
     adapter_descriptor = adapter_contract(job.input.adapter.kind)
     report = RunReport(
@@ -321,7 +334,15 @@ def run_render_job(
             }
             if job.render.options:
                 image_kwargs["renderer_options"] = job.render.options
-            write_images(materialized, **image_kwargs)
+            if native_writer is None:
+                write_images(materialized, **image_kwargs)
+            else:
+                report.output_metrics["images"] = native_writer.write(
+                    materialized,
+                    output=img_output,
+                    style=style,
+                    layout=sequence_layout_from_options(job.render.options),
+                )
             report.yielded_records = len(materialized)
             original_images = output_kind(original_job, "images")
             assert isinstance(original_images, ImagesOutputCfg)

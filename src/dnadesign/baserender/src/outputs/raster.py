@@ -21,19 +21,11 @@ from typing import Mapping
 
 from PIL import Image, UnidentifiedImageError
 
+from ..config.raster import RasterOptions, positive_number
 from ..core import RenderingError
 from ..core.vector import PngRenderResult, RasterizerInfo, ResolvedFont, SvgRenderDiagnostics, SvgRenderResult
 from ..render.fonts import resolve_font
 from ..render.svg_assets import admit_composed_svg
-
-
-def _positive_number(value, name):
-    try:
-        valid = not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value) and value > 0
-    except OverflowError:
-        valid = False
-    if not valid:
-        raise RenderingError(f"{name} must be a positive finite number")
 
 
 def _run(command, *, timeout_s, payload=None):
@@ -49,23 +41,40 @@ def _run(command, *, timeout_s, payload=None):
     return result.stdout
 
 
+def resolve_rasterizer(options: RasterOptions) -> RasterizerInfo:
+    """Resolve one declared backend before a batch consumes its data."""
+    if not isinstance(options, RasterOptions):
+        raise RenderingError("raster options must be RasterOptions")
+    executable = shutil.which(str(options.inkscape))
+    if executable is None:
+        raise RenderingError(
+            "Inkscape is unavailable; make its CLI available on PATH or pass inkscape=<executable path>"
+        )
+    path = Path(executable).resolve()
+    try:
+        digest = sha256(path.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise RenderingError("Inkscape executable cannot be read for identity") from exc
+    version = _run([str(path), "--version"], timeout_s=options.timeout_s).decode("utf-8", errors="replace").strip()
+    if not version.startswith("Inkscape "):
+        raise RenderingError("selected executable did not report an Inkscape version")
+    return RasterizerInfo(str(path), digest, version)
+
+
 def rasterize_svg(
     source: SvgRenderResult,
     *,
-    dpi: float = 180,
-    inkscape: str | Path = "inkscape",
-    timeout_s: float = 30,
-    max_pixels: int = 64_000_000,
+    options: RasterOptions,
+    rasterizer: RasterizerInfo | None = None,
 ) -> PngRenderResult:
     """Convert the existing composition to RGBA PNG, without layout or fitting."""
     if not isinstance(source, SvgRenderResult) or not isinstance(source.diagnostics, SvgRenderDiagnostics):
         raise RenderingError("rasterize_svg requires a measured SvgRenderResult")
-    _positive_number(dpi, "dpi")
-    _positive_number(timeout_s, "timeout_s")
-    _positive_number(source.width_pt, "source.width_pt")
-    _positive_number(source.height_pt, "source.height_pt")
-    if not isinstance(max_pixels, int) or isinstance(max_pixels, bool) or max_pixels <= 0:
-        raise RenderingError("max_pixels must be a positive integer pixel budget")
+    if not isinstance(options, RasterOptions):
+        raise RenderingError("raster options must be RasterOptions")
+    dpi, timeout_s, max_pixels = options.dpi, options.timeout_s, options.max_pixels
+    positive_number(source.width_pt, "source.width_pt")
+    positive_number(source.height_pt, "source.height_pt")
     document = admit_composed_svg(source.svg, width_pt=source.width_pt, height_pt=source.height_pt)
     # The serialized page is the conversion authority. Its six-decimal point
     # dimensions can differ slightly from the unrounded layout diagnostics.
@@ -86,21 +95,15 @@ def rasterize_svg(
         current = resolve_font(declared.requested_family)
         if current != declared:
             raise RenderingError(f"declared font {role!r} changed since SVG preparation; regenerate explicitly")
-    if not isinstance(inkscape, (str, Path)) or not str(inkscape).strip():
-        raise RenderingError("inkscape must name an executable or an explicit executable path")
-    executable = shutil.which(str(inkscape))
-    if executable is None:
-        raise RenderingError(
-            "Inkscape is unavailable; make its CLI available on PATH or pass inkscape=<executable path>"
-        )
-    path = Path(executable).resolve()
+    backend = resolve_rasterizer(options) if rasterizer is None else rasterizer
+    if not isinstance(backend, RasterizerInfo):
+        raise RenderingError("native rasterization requires an admitted rasterizer identity")
+    path = Path(backend.executable)
     try:
-        digest = sha256(path.read_bytes()).hexdigest()
+        if sha256(path.read_bytes()).hexdigest() != backend.executable_sha256:
+            raise RenderingError("Inkscape executable changed since backend admission")
     except OSError as exc:
-        raise RenderingError("Inkscape executable cannot be read for identity") from exc
-    version = _run([str(path), "--version"], timeout_s=timeout_s).decode("utf-8", errors="replace").strip()
-    if not version.startswith("Inkscape "):
-        raise RenderingError("selected executable did not report an Inkscape version")
+        raise RenderingError("Inkscape executable became unavailable") from exc
     png = _run(
         [
             str(path),
@@ -134,5 +137,5 @@ def rasterize_svg(
         float(dpi),
         sha256(source.svg.encode("utf-8")).hexdigest(),
         source.diagnostics,
-        RasterizerInfo(str(path), digest, version),
+        backend,
     )

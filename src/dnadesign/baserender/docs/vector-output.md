@@ -226,8 +226,71 @@ backend. Use a common canvas with integral pixel dimensions for a frame series.
 Invalid units/budgets, incomplete or changed font identities, unsafe SVG content,
 missing tools, process failures/timeouts and corrupt or wrongly sized PNGs fail
 with `RenderingError`. No partial PNG result is returned. The caller owns file
-publication; jobs retain their existing staged-publication boundary. Native
-image-job selection and frame integration are not yet connected to this API.
+publication; native image jobs use the staged-publication boundary described
+below. Native frame/video integration remains unqualified.
+
+## Native image jobs
+
+From the repository root, with Arial installed:
+
+```sh
+uv run --locked baserender job validate native_svg_job
+uv run --locked baserender job run native_svg_job
+```
+
+The [example job](examples/native_svg_job.yaml) renders two neutral 60/100-base
+records from [curated example data](examples/data/native_svg_rows.json). They are
+illustration fixtures, not a scientific promoter selection. The create-only
+bundle is `docs/examples/results/native-svg-example-v1/` under BaseRender.
+Use a fresh bundle name for another run. To produce PNG, change the example's
+`outputs[0].fmt` to `png` and choose a fresh bundle path; PNG requires Inkscape.
+
+The explicit choice is `render.native_svg`. An empty mapping activates native
+composition with packaged illustration selections. Omit the field for the
+existing figure path; `null` and booleans are not valid native settings. Current
+native jobs require `renderer: sequence_rows` and SVG/PNG image outputs. Native
+PDF, video and implicit multi-record grids are rejected. A single image path
+requires one selected record; a directory writes one artifact per record.
+
+```yaml
+render:
+  renderer: sequence_rows
+  options:
+    layout:
+      canvas_size_pt: [1300, 400]
+      sequence_origin_pt: [60, 280]
+      top_extent_pt: 104
+  native_svg:
+    captions:
+      rnap_sigma70:
+        text: RNAP
+        family: Arial
+        size_pt: 18
+        anchor_fraction: [0.83827, 0.55688]
+    rasterization:
+      dpi: 144
+```
+
+`native_svg.illustrations` maps each effect's asset ID to an `artwork` mapping
+and optional `caption`. Artwork has the same `path`, `sha256`, `element_ids`,
+`view_box` and fractional `anchors` as `SvgArtwork`. Paths follow the existing
+job-owned input rules. `native_svg.captions` overrides captions by asset ID and
+uses the `IllustrationCaption` fields. Explicit overrides must be used somewhere
+in the batch; records without that asset do not receive them. Unknown keys and
+invalid units fail during shared job admission.
+
+`native_svg.rasterization` uses the same settings and defaults as
+`rasterize_svg`: `dpi`, `inkscape`, `timeout_s` and `max_pixels`. PNG jobs resolve
+Inkscape before capturing input data. All records, assets, captions and fonts
+are prepared before any figure is drawn. Used SVG inputs are rechecked before
+publication; an input change or late rendering failure aborts the bundle.
+
+The manifest records the requested native settings, per-record point geometry,
+resolved illustration selections/captions, SVG hashes and PNG/backend identities.
+Known local artwork, font and executable paths are omitted from portable metadata.
+The API's `diagnostics.to_mapping(portable=True)` supplies the same detached
+JSON-shaped geometry. `SvgArtwork`, `SvgIllustration` and `RasterizerInfo` also
+provide `to_mapping` for input/source receipts.
 
 ## Admission and current qualification
 
@@ -252,7 +315,7 @@ does not claim portable text rendering from Matplotlib lookup alone. The example
 uses explicit Arial for editable labels in Chrome and Inkscape and records font
 identities alongside the SVGs. Feature annotations use the explicit neutral
 declaration in the [record contract](reference.md#neutral-record). Portable font
-qualification, native frames and native SVG CLI/job integration remain in the
+qualification, native frames and consumer migration remain in the
 [execution plan](../../../../docs/exec-plans/active/baserender-vector-api.md).
 Native PowerPoint behavior and real consumer migration are not qualified by this
 neutral proof.
