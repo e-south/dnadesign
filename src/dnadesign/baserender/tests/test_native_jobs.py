@@ -90,12 +90,15 @@ def _payload(tmp_path, *, fmt="svg"):
         },
         "render": {
             "renderer": "sequence_rows",
-            "style": {"preset": None, "overrides": {"legend": False, "font_mono": "Arial", "font_label": "Arial"}},
+            "style": {
+                "preset": None,
+                "overrides": {"legend": False, "font_mono": "DejaVu Sans", "font_label": "DejaVu Sans"},
+            },
             "options": {
                 "layout": {"canvas_size_pt": [1300, 400], "sequence_origin_pt": [60, 280], "top_extent_pt": 104}
             },
             "native_svg": {
-                "captions": {"rnap_sigma70": {"text": "RNAP", "family": "Arial", "size_pt": 18}},
+                "captions": {"rnap_sigma70": {"text": "RNAP", "family": "DejaVu Sans", "size_pt": 18}},
                 "rasterization": {"dpi": 144},
             },
         },
@@ -116,7 +119,7 @@ def test_native_svg_job_matches_the_public_api_and_records_portable_geometry(tmp
             record,
             style_overrides=payload["render"]["style"]["overrides"],
             layout=SequenceLayout.from_mapping(payload["render"]["options"]["layout"]),
-            captions={"rnap_sigma70": IllustrationCaption("RNAP", family="Arial", size_pt=18)},
+            captions={"rnap_sigma70": IllustrationCaption("RNAP", family="DejaVu Sans", size_pt=18)},
         )
         target = bundle / "images" / f"{row['id']}.svg"
         assert target.read_text() == expected.svg

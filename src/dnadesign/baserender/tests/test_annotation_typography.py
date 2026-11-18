@@ -139,7 +139,7 @@ def test_job_and_public_api_share_annotation_typography_and_receipts(tmp_path):
             ),
             style_overrides=payload["render"]["style"]["overrides"],
             layout=br.SequenceLayout.from_mapping(payload["render"]["options"]["layout"]),
-            captions={"rnap_sigma70": br.IllustrationCaption("RNAP", family="Arial", size_pt=18)},
+            captions={"rnap_sigma70": br.IllustrationCaption("RNAP", family="DejaVu Sans", size_pt=18)},
             annotation_typography=br.AnnotationTypography(sequence_scale=1.25),
         )
         assert (tmp_path / "bundle/images" / f"{row['id']}.svg").read_text() == expected.svg

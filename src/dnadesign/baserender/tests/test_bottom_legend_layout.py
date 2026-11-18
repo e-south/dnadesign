@@ -46,13 +46,13 @@ def _record(labels=("Binding sites",)):
 
 def test_native_bottom_legend_preserves_fractional_type_and_reports_placement():
     result = render_record_svg(
-        _record(), style_overrides={"legend_font_size": 12.5, "legend_height_px": 60, "font_label": "Arial"}
+        _record(), style_overrides={"legend_font_size": 12.5, "legend_height_px": 60, "font_label": "DejaVu Sans"}
     )
     node = next(
         node for node in ET.fromstring(result.svg).iter() if node.tag.endswith("}text") and node.text == "Binding sites"
     )
     assert "font-size: 12.5px" in node.get("style", "")
-    assert "font-family: 'Arial';" in node.get("style", "")
+    assert "font-family: 'DejaVu Sans';" in node.get("style", "")
     entry = result.diagnostics.bottom_legend[0]
     assert entry.tag == "tag0"
     assert entry.label == "Binding sites"
