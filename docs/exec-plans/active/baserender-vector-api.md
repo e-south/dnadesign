@@ -32,7 +32,7 @@ or remote publication. Rasterization remains an explicit final output operation.
 - [x] (2026-11-18 02:34Z) A — Baseline package suite, catalog, demo admission and public usage reviewed; prioritized findings below retain open work.
 - [x] (2026-11-18 02:34Z) B — Native SVG artwork and independent vector captions proved through the public API on 60/100-base examples.
 - [x] (2026-11-18 05:54Z) C — Layout, font identity, neutral label, spacer and bottom-legend contracts are implemented; native/explicit-layout overflow fails before drawing.
-- [ ] (2026-11-18 06:21Z) D — In progress: native API and image-job SVG/PNG paths are implemented; shared frame/video qualification remains.
+- [x] (2026-11-18 07:39Z) D — Native SVG/PNG and fixed native MP4 share preparation, composition and rasterization; exact held-frame order and static fallbacks qualify.
 - [ ] (2026-11-18 02:06Z) E — Measure and improve batch preparation against fidelity-preserving baselines.
 - [ ] (2026-11-18 02:06Z) F — Migrate the two real sequence uses in separate verified batches.
 - [ ] (2026-11-18 02:06Z) G — Remove displaced consumer logic and close the bounded package hardening review.
@@ -63,12 +63,12 @@ SVG feature has been exhaustively audited.
 | Priority / criterion | Evidence and status | Owning slice |
 | --- | --- | --- |
 | P1: vector requests preserve actual geometry | [Illustration loader](../../../src/dnadesign/baserender/src/render/effects/anchored_illustration.py) selected pixels; the new native API reads pinned SVG selections without decoding PNG. Closed for the native API; legacy APIs remain explicit raster paths. | B |
-| P1: fixed typography and transparent composition | [Fitted panel](../../../src/dnadesign/baserender/src/public/api.py) forces white and rescales. Native SVG and its derived PNG preserve admitted point geometry and alpha; native image-job/frame integration remains open. | C/D |
+| P1: fixed typography and transparent composition | [Fitted panel](../../../src/dnadesign/baserender/src/public/api.py) forces white and rescales. Native SVG/PNG preserve admitted point geometry and alpha; fixed native MP4 flattens those same frames onto an explicit background. | C/D |
 | P2: neutral placement policy | [Sequence labels](../../../src/dnadesign/baserender/src/render/sequence_rows.py) now use explicit feature annotation declarations. DenseGen/GenBank adapters supply the policy; provenance attributes no longer control placement. | C, closed |
 | P2: exact placement is observable | Native illustration frames now fail on overflow instead of clamping; captions share admitted origins with serialization and report ink bounds. Existing raster behavior stays explicit. | C, closed |
 | P2: viewer font identity | Native diagnostics declare referenced text and hash the resolved declared fonts. Captions reject missing glyphs and use resolved family names. Arial proofs render in Chrome/Inkscape; target font availability still needs consumer qualification. | C policy closed; D/F qualification |
 | P2: repeated illustrations have unique IDs | A two-instance test exposed colliding footprint IDs. Unique footprint IDs and definition namespaces now pass structural tests. | B, closed |
-| P2: video honors admitted layout | [Legacy video](../../../src/dnadesign/baserender/src/outputs/video.py) receives no renderer options, mutates layout metadata and applies its own fitting (including a 0.96 content scale). Explicit layout with video now fails at admission. D must qualify a shared native frame path before enabling it. | D, open |
+| P2: video honors admitted layout | [Legacy video](../../../src/dnadesign/baserender/src/outputs/video.py) receives no renderer options, mutates layout metadata and applies its own fitting (including a 0.96 content scale). Ordinary video with explicit layout fails at admission. The qualified native route uses fixed shared geometry without that compositor. | D, closed |
 | P2: native labels preserve requested type | Spacers now use one plan and preserve fractional native sizes or fail. Bottom legends also have a measured preserve-type plan; ordinary fitting remains supported without overflow. | C, closed |
 
 ### Decision Log
@@ -306,7 +306,8 @@ Layout continues through the existing renderer options. Native preparation and
 drawing are separated so complete batches are admitted before the first figure;
 `outputs/native_images.py` publishes through the existing bundle stage. A missing
 PNG dependency fails before input capture, and used SVG sources are rechecked
-before publication. Native video/PDF and implicit raster grids are rejected.
+before publication. That image-only checkpoint rejected native video/PDF and
+implicit raster grids; the following batch enables fixed native video.
 
 Native manifests include requested settings, resolved vector/caption selections,
 per-record geometry and raster identities, omitting known machine-local paths.
@@ -318,6 +319,41 @@ Current evidence is in `outputs/native-job-20261118-01/` under BaseRender. The
 835-test regression baseline passes; final source/static evidence is bound to
 the commit in that directory. No native frame or performance claim follows from
 these image-job results.
+
+D now qualifies fixed native MP4 through the same image-job contract. The
+shared [`native_batch.py`](../../../src/dnadesign/baserender/src/outputs/native_batch.py)
+prepares all records and sources before drawing. Image and video writers consume
+that plan. Record holds/pauses moved unchanged into
+[`video_timing.py`](../../../src/dnadesign/baserender/src/outputs/video_timing.py),
+separating timing from the legacy compositor. The native writer uses the existing
+FFmpeg CLI directly; it never invokes legacy fitting, border trimming, extra
+legend repainting or metadata mutation. Fonts, pitch, origin and physical canvas
+remain the admitted image geometry.
+
+Native video requires a static SVG/PNG output, fixed canvas/origin, even sampled
+pixel dimensions and an explicit opaque background. Conflicting sizes and
+unsupported fitting/title overlays fail. PNG fallbacks retain alpha; MP4 flattens
+the same positions before H.264 encoding. Dependencies are probed before input
+capture; sources are rechecked across encoding and the existing publication
+stage rolls back failed clips and fallbacks together. No system dependency,
+package release, scientific source or consumer artwork changed.
+
+Decoded-frame inspection found a defect missed by the first total-count test:
+FFmpeg output-rate synchronization held a nominal 30-frame image for only 29
+frames. Two red tests reproduced that shift at 5/30 FPS. Explicit FPS filtering
+now preserves each exact hold, verified by decoding every frame. The initial
+failed movie and input timestamp evidence are retained. Qualified proof:
+`outputs/native-video-20261118-01/video-bundle-v2/` under BaseRender, with
+`frame-checks.json`, CLI repeat input, browser screenshots and decoded boundary
+frames. Its two 30-frame compositions retain 2600×800 pixels, the same origin
+and typography; both transparent fallbacks are pixel-identical to D2.
+
+All 853 package tests pass, including 18 new native-video checks, 5/30 FPS exact
+holds, SVG/PNG fallbacks, missing prerequisites, malformed geometry before drawing
+and atomic rollback. Ordinary video tests remain green. Ruff, architecture and
+documentation gates pass. This qualifies the neutral output primitive, not real
+talk placements, native PowerPoint playback, throughput or broad font portability.
+E/F/G remain required.
 
 F must also pin the producer source revision alongside its distribution version:
 the current talk preparer checks `dnadesign-tools` version alone, which cannot
@@ -430,22 +466,21 @@ revise that bounded approach; do not substitute a raster or rewrite the renderer
 hashes, SVG plus preview, measurements and a short list of unresolved findings.
 The next executor updates this plan rather than creating a competing roadmap.
 
-#### Next executor contract — D shared frames
+#### Next executor contract — E measured batch costs
 
-Qualify representative frames using the same native preparation/composition and
-rasterization on a common physical canvas. Keep frame geometry and type fixed
-without legacy metadata mutation, white-border trimming or hidden 0.96 fitting.
-The existing video layout guard stays until the native frame path is proved.
-Do not forward settings into the old compositor and call that parity.
+Measure cold/warm and batch preparation, drawing, serialization and final
+rasterization separately, with source/style/font/output identities and peak
+memory. Compare the qualified batch route with repeated individual calls before
+adding caches. Record median/tail observations and numeric regression budgets
+from the tracer. Any optimization must preserve source invalidation, exact SVG
+and PNG output, fixed geometry and error-before-publication behavior. No
+unbounded cache or new execution framework is authorized by this step.
 
-Use the current native image-job contract and shared raster options rather than
-another frame DSL. Prove frame dimensions, anchors, type, alpha/static fallback
-and source identities, then integrate the existing encoder with explicit
-background/timing choices as needed. Preserve the supported ordinary video path
-and qualify both success and failure-before-publication. Stage E then measures
-cold/warm/batch preparation, drawing, serialization, rasterization and memory
-before changing caches or repeated-state behavior. Consumers, source artwork
-and package releases remain outside D.
+After E, qualify both real sequence consumers independently, pinning the producer
+source revision as well as its editable distribution version. Keep existing
+qualified assets and consumer helpers until both F migrations pass. G removes
+only the resulting proven replacements. Author artwork and upstream scientific
+sources remain protected.
 
 ### Validation and Acceptance
 

@@ -261,11 +261,11 @@ def test_native_job_pins_custom_vector_artwork_without_local_paths_in_manifest(t
 
 
 def test_artwork_change_during_native_render_aborts_publication(tmp_path, monkeypatch):
-    from dnadesign.baserender.src.outputs import native_images
+    from dnadesign.baserender.src.outputs import native_batch
 
     payload = _payload(tmp_path)
     path, _digest = _custom_art(payload, tmp_path)
-    real_draw = native_images.draw_native_svg
+    real_draw = native_batch.draw_native_svg
     count = 0
 
     def draw(plan):
@@ -275,17 +275,17 @@ def test_artwork_change_during_native_render_aborts_publication(tmp_path, monkey
             path.write_text("new author revision")
         return real_draw(plan)
 
-    monkeypatch.setattr(native_images, "draw_native_svg", draw)
+    monkeypatch.setattr(native_batch, "draw_native_svg", draw)
     with pytest.raises(RenderingError, match="SHA-256"):
         run_job(payload, caller_root=tmp_path)
     assert count == 2 and not (tmp_path / "bundle").exists()
 
 
 def test_late_native_draw_failure_leaves_no_partial_bundle(tmp_path, monkeypatch):
-    from dnadesign.baserender.src.outputs import native_images
+    from dnadesign.baserender.src.outputs import native_batch
 
     payload = _payload(tmp_path)
-    real_draw = native_images.draw_native_svg
+    real_draw = native_batch.draw_native_svg
     count = 0
 
     def draw(plan):
@@ -295,7 +295,7 @@ def test_late_native_draw_failure_leaves_no_partial_bundle(tmp_path, monkeypatch
             raise RenderingError("intentional late native failure")
         return real_draw(plan)
 
-    monkeypatch.setattr(native_images, "draw_native_svg", draw)
+    monkeypatch.setattr(native_batch, "draw_native_svg", draw)
     with pytest.raises(RenderingError, match="intentional late"):
         run_job(payload, caller_root=tmp_path)
     assert count == 2 and not (tmp_path / "bundle").exists()

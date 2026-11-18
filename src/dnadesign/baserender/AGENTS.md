@@ -18,7 +18,8 @@ Use this file with the repository-level `AGENTS.md`.
 - Generated outputs: workspace `outputs/`, job-local `results/`, or explicitly configured paths
 
 ### System dependencies
-Video export requires **ffmpeg**. Native PNG output through
+Video export requires **ffmpeg**. Native video also uses Inkscape and an explicit
+physical canvas/background, as described in the native output guide. Native PNG output through
 `rasterize_svg` or `render.native_svg` jobs requires an existing **Inkscape CLI**; the ordinary figure PNG
 path does not. See `docs/vector-output.md` for that contract and current limits.
 Don’t attempt to install system deps unless asked.

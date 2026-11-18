@@ -122,8 +122,8 @@ see the [job syntax](reference.md#physical-sequence-layout). Existing metadata
 keys for cell scale, fixed extents/radius and video padding remain supported when
 no typed layout is supplied. Declaring both authorities fails with the conflicting
 keys instead of choosing one. Explicit layout requires `figure_scale=1`.
-Video jobs with layout are currently rejected because the legacy video compositor
-does not preserve this contract; native frame parity remains in the execution plan.
+Native video uses the fixed canvas contract described below. Ordinary figure video
+with explicit layout remains rejected because its compositor applies fitting.
 
 ### Nucleotide rectangles
 
@@ -227,7 +227,7 @@ Invalid units/budgets, incomplete or changed font identities, unsafe SVG content
 missing tools, process failures/timeouts and corrupt or wrongly sized PNGs fail
 with `RenderingError`. No partial PNG result is returned. The caller owns file
 publication; native image jobs use the staged-publication boundary described
-below. Native frame/video integration remains unqualified.
+below. Native MP4 uses these same compositions and sampled dimensions.
 
 ## Native image jobs
 
@@ -248,8 +248,8 @@ Use a fresh bundle name for another run. To produce PNG, change the example's
 The explicit choice is `render.native_svg`. An empty mapping activates native
 composition with packaged illustration selections. Omit the field for the
 existing figure path; `null` and booleans are not valid native settings. Current
-native jobs require `renderer: sequence_rows` and SVG/PNG image outputs. Native
-PDF, video and implicit multi-record grids are rejected. A single image path
+native jobs require `renderer: sequence_rows` and SVG/PNG image outputs, with
+optional fixed-layout MP4. Native PDF and implicit multi-record grids are rejected. A single image path
 requires one selected record; a directory writes one artifact per record.
 
 ```yaml
@@ -292,6 +292,58 @@ The API's `diagnostics.to_mapping(portable=True)` supplies the same detached
 JSON-shaped geometry. `SvgArtwork`, `SvgIllustration` and `RasterizerInfo` also
 provide `to_mapping` for input/source receipts.
 
+## Fixed native video
+
+Start from the same example job, retain its SVG or PNG image output, choose a
+fresh bundle name, and append this output:
+
+```yaml
+outputs:
+  - kind: images
+    fmt: png
+  - kind: video
+    path: sequence.mp4
+    fps: 30
+    frames_per_record: 30
+    pauses: {native-60: 0.5}
+    background: "#ffffff"
+    encode_timeout_s: 120
+```
+
+Native MP4 requires existing Inkscape and FFmpeg CLIs with `libx264`. Both are
+admitted before input capture; dependencies are never installed. The image
+output supplies a static fallback. Every record is prepared before drawing and
+is composed/rasterized once; held frames reuse that result. Images and frames
+share source IDs, caption/font identities, canvas, sequence origin and pitch.
+
+`render.options.layout` must declare `canvas_size_pt` and `sequence_origin_pt`.
+The selected DPI must sample that canvas to even pixel dimensions for H.264.
+Optional `width_px`, `height_px` and `aspect` must agree with those dimensions;
+they never trigger resizing. All frames must share the same measured canvas,
+grid origin and pitch. Insufficient bounds, a different pitch or conflicting
+size fail before drawing. There is no border trimming, metadata mutation,
+text overlay, automatic scaling or per-frame centering.
+
+PNG fallbacks retain alpha; MP4 flattens those exact pixel positions onto the
+required opaque `#RRGGBB` background. Encoding uses H.264, CRF 18, yuv420p and
+square pixels. It is lossy and does not preserve alpha. A transparent composition
+is available from the corresponding SVG/PNG, rather than from the MP4.
+`encode_timeout_s` bounds encoding (default 120 seconds), independently of each
+rasterizer invocation's `timeout_s`. These two output fields currently require
+native composition; ordinary video cannot silently ignore them.
+
+Timing follows the existing job semantics: `frames_per_record` sets the base hold,
+`pauses` adds rounded frame counts by record ID, and `total_duration`, when set,
+derives a common hold after subtracting pauses. Integer division can produce a
+shorter clip than the requested duration. The manifest reports actual planned
+frame repeats, FPS, dimensions, background and encoder/rasterizer identities.
+Looping is a presentation playback choice, not an embedded MP4 instruction.
+
+Only `content_fit: native` is supported. Video-specific title and subtitle
+overlays are rejected; use a normal record display title if needed. Ordinary
+figure video retains its established compositor. Encoding or source-verification
+failure aborts the entire new bundle, including static fallbacks.
+
 ## Admission and current qualification
 
 Source hashes, selections, definitions and fonts are checked before allocating
@@ -315,7 +367,7 @@ does not claim portable text rendering from Matplotlib lookup alone. The example
 uses explicit Arial for editable labels in Chrome and Inkscape and records font
 identities alongside the SVGs. Feature annotations use the explicit neutral
 declaration in the [record contract](reference.md#neutral-record). Portable font
-qualification, native frames and consumer migration remain in the
+qualification, performance and consumer migration remain in the
 [execution plan](../../../../docs/exec-plans/active/baserender-vector-api.md).
 Native PowerPoint behavior and real consumer migration are not qualified by this
 neutral proof.

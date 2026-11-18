@@ -141,6 +141,8 @@ def _job_to_mapping(parsed: RenderJobV4) -> dict[str, Any]:
                     "title_text": cfg.title_text,
                     "title_font_size": cfg.title_font_size,
                     "title_align": cfg.title_align,
+                    **({"background": cfg.background} if cfg.background is not None else {}),
+                    **({"encode_timeout_s": cfg.encode_timeout_s} if cfg.encode_timeout_s is not None else {}),
                 }
             )
             for cfg in parsed.outputs

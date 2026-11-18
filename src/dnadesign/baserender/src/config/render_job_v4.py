@@ -134,6 +134,8 @@ class VideoOutputCfg:
     title_text: str | None = None
     title_font_size: int | None = None
     title_align: str = "center"
+    background: str | None = None
+    encode_timeout_s: float | None = None
 
 
 OutputCfg = ImagesOutputCfg | VideoOutputCfg
@@ -796,6 +798,8 @@ def _parse_outputs(
                 "title_text",
                 "title_font_size",
                 "title_align",
+                "background",
+                "encode_timeout_s",
             },
             f"outputs[{i}]",
         )
@@ -867,6 +871,15 @@ def _parse_outputs(
 
         title_align = str(data.get("title_align", "center")).strip().lower()
         require_one_of(title_align, {"left", "center", "right"}, f"outputs[{i}].title_align")
+        background = data.get("background")
+        encode_timeout_raw = data.get("encode_timeout_s")
+        encode_timeout_s = (
+            None
+            if encode_timeout_raw is None
+            else _parse_float(encode_timeout_raw, field=f"outputs[{i}].encode_timeout_s")
+        )
+        if encode_timeout_s is not None:
+            ensure(encode_timeout_s > 0, f"outputs[{i}].encode_timeout_s must be > 0", SchemaError)
 
         raw_path = data.get("path")
         out_path = _resolve_output_file(
@@ -892,6 +905,8 @@ def _parse_outputs(
                 title_text=title_text,
                 title_font_size=title_font_size,
                 title_align=title_align,
+                background=background,
+                encode_timeout_s=encode_timeout_s,
             )
         )
 
@@ -1058,10 +1073,14 @@ def _parse_sequence_rows_job_mapping(
     validate_adapter_renderer_compatibility(input_cfg, render_cfg)
     outputs_cfg = _parse_outputs(job_path, bundle_cfg.path, data.get("outputs"))
     validate_native_outputs(render_cfg, outputs_cfg)
-    if "layout" in render_cfg.options and any(isinstance(output, VideoOutputCfg) for output in outputs_cfg):
+    if (
+        render_cfg.native_svg is None
+        and "layout" in render_cfg.options
+        and any(isinstance(output, VideoOutputCfg) for output in outputs_cfg)
+    ):
         raise SchemaError(
-            "explicit layout is not yet supported for video outputs; "
-            "use image outputs until native frame parity is qualified"
+            "explicit layout requires native video composition; "
+            "use render.native_svg with a fixed canvas/background, or use image outputs"
         )
     validate_adapter_output_compatibility(input_cfg.adapter.kind, outputs_cfg)
     run_cfg = _parse_run(data.get("run"))

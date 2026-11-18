@@ -215,12 +215,18 @@ def run_render_job(
     validate_adapter_output_compatibility(job.input.adapter.kind, job.outputs)
     validate_native_outputs(job.render, job.outputs)
     native_writer = None
+    native_video_writer = None
     if job.render.native_svg is not None:
-        from ..outputs.native_images import NativeImagesWriter
+        if output_kind(job, "video") is not None:
+            from ..outputs.native_video import NativeVideoWriter
 
-        image_output = output_kind(job, "images")
-        assert isinstance(image_output, ImagesOutputCfg)
-        native_writer = NativeImagesWriter.resolve(job.render.native_svg, fmt=image_output.fmt)
+            native_video_writer = NativeVideoWriter.resolve(job.render.native_svg)
+        else:
+            from ..outputs.native_images import NativeImagesWriter
+
+            image_output = output_kind(job, "images")
+            assert isinstance(image_output, ImagesOutputCfg)
+            native_writer = NativeImagesWriter.resolve(job.render.native_svg, fmt=image_output.fmt)
     descriptor = render_contract_descriptor(job.contract.kind)
     adapter_descriptor = adapter_contract(job.input.adapter.kind)
     report = RunReport(
@@ -280,7 +286,23 @@ def run_render_job(
         raise
 
     try:
-        if isinstance(vid_output, VideoOutputCfg):
+        if native_video_writer is not None:
+            report.output_metrics.update(
+                native_video_writer.write(
+                    records,
+                    output=vid_output,
+                    images=img_output,
+                    style=style,
+                    layout=sequence_layout_from_options(job.render.options),
+                )
+            )
+            report.yielded_records = len(records)
+            original_images, original_video = output_kind(original_job, "images"), output_kind(original_job, "video")
+            report.outputs["images_path" if original_images.path is not None else "images_dir"] = str(
+                _output_destination(original_images).resolve()
+            )
+            report.outputs["video_path"] = str(original_video.path.resolve())
+        elif isinstance(vid_output, VideoOutputCfg):
             from ..outputs import (
                 effective_video_frames_per_record,
                 planned_video_frame_count,

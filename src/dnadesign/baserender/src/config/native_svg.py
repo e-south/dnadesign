@@ -11,6 +11,7 @@ Module Author(s): Eric J. South
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from types import MappingProxyType
@@ -19,6 +20,7 @@ from typing import Callable, Mapping
 from ..core import RenderingError, SchemaError, reject_unknown_keys, require_mapping
 from ..core.vector import IllustrationCaption, SvgArtwork, SvgIllustration
 from .raster import RasterOptions
+from .sequence_layout import sequence_layout_from_options
 
 
 def _caption(raw, context):
@@ -108,12 +110,44 @@ class NativeSvgCfg:
 
 def validate_native_outputs(render, outputs):
     if render.native_svg is None:
+        if any(
+            getattr(output, "background", None) is not None or getattr(output, "encode_timeout_s", None) is not None
+            for output in outputs
+        ):
+            raise SchemaError("video background and encode_timeout_s currently require render.native_svg")
         return
     if not isinstance(render.native_svg, NativeSvgCfg):
         raise SchemaError("render.native_svg must be NativeSvgCfg in a typed job")
     if render.renderer != "sequence_rows":
         raise SchemaError("render.native_svg currently requires renderer sequence_rows")
-    if any(output.kind != "images" or output.fmt not in {"svg", "png"} for output in outputs):
-        raise SchemaError(
-            "render.native_svg currently supports SVG/PNG image outputs; native video is not yet qualified"
-        )
+    if any(
+        output.kind not in {"images", "video"} or (output.kind == "images" and output.fmt not in {"svg", "png"})
+        for output in outputs
+    ):
+        raise SchemaError("render.native_svg supports SVG/PNG images and fixed-layout MP4 video")
+    for output in outputs:
+        if output.kind != "video":
+            continue
+        if not any(item.kind == "images" for item in outputs):
+            raise SchemaError("render.native_svg video requires SVG/PNG images as a static fallback")
+        layout = sequence_layout_from_options(render.options)
+        for name in ("canvas_size_pt", "sequence_origin_pt"):
+            if layout is None or getattr(layout, name) is None:
+                raise SchemaError(f"native video requires explicit layout.{name}")
+        if not isinstance(output.background, str) or re.fullmatch(r"#[0-9a-fA-F]{6}", output.background) is None:
+            raise SchemaError("native video background must be an explicit opaque #RRGGBB color")
+        if output.content_fit != "native":
+            raise SchemaError(
+                "native video content_fit must be 'native'; change the point canvas or raster DPI instead"
+            )
+        if output.title_text is not None or output.title_font_size is not None or output.title_align != "center":
+            raise SchemaError(
+                "native video output title settings are unsupported; use the record's normal display title"
+            )
+        if output.encode_timeout_s is not None:
+            from .raster import positive_number
+
+            try:
+                positive_number(output.encode_timeout_s, "encode_timeout_s")
+            except RenderingError as exc:
+                raise SchemaError(str(exc)) from exc

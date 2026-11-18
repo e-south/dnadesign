@@ -126,7 +126,7 @@ sensitivity policies. Use list_render_contracts() or the CLI catalog instead
 of maintaining a separate hard-coded list in clients.
 
 `render.native_svg: {}` explicitly selects native sequence-row composition for
-SVG/PNG image jobs. Its optional `illustrations`, `captions` and `rasterization`
+SVG/PNG image jobs and fixed-layout MP4. Its optional `illustrations`, `captions` and `rasterization`
 settings share the public API contracts. Layout remains `render.options.layout`.
 See [native image jobs](vector-output.md#native-image-jobs) for the runnable
 example, strict source settings and supported output modes. Merely selecting
@@ -243,9 +243,11 @@ plotting libraries. Image execution uses the same measurements as the figure
 and native SVG APIs. Explicit layout and legacy metadata declarations cannot
 compete. See [physical canvas and grid](vector-output.md#physical-canvas-and-grid)
 for origin, clearances and bounds semantics. Native SVG illustration composition
-remains a separate API route; choosing SVG as an image-job format retains the
-existing figure-based illustration behavior. Explicit layout with video outputs
-fails at admission until the legacy compositor's fitting is replaced or qualified.
+requires explicit `render.native_svg`; choosing SVG as an image-job format alone
+retains the existing figure-based illustration behavior. Explicit layout with
+ordinary video still fails at admission. Native video uses the same measured
+composition with a fixed canvas and an explicit background; see
+[fixed native video](vector-output.md#fixed-native-video).
 
 ## Public Python API
 
