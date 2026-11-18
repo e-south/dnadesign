@@ -17,8 +17,11 @@ Use this file with the repository-level `AGENTS.md`.
 - Tests: `src/dnadesign/baserender/tests/`
 - Generated outputs: workspace `outputs/`, job-local `results/`, or explicitly configured paths
 
-### System dependency (video)
-Video export requires **ffmpeg**. Don’t attempt to install system deps unless asked.
+### System dependencies
+Video export requires **ffmpeg**. Native SVG-to-PNG conversion through
+`rasterize_svg` requires an existing **Inkscape CLI**; the ordinary figure PNG
+path does not. See `docs/vector-output.md` for that contract and current limits.
+Don’t attempt to install system deps unless asked.
 
 ### Ownership boundary
 

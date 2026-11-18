@@ -32,7 +32,7 @@ or remote publication. Rasterization remains an explicit final output operation.
 - [x] (2026-11-18 02:34Z) A — Baseline package suite, catalog, demo admission and public usage reviewed; prioritized findings below retain open work.
 - [x] (2026-11-18 02:34Z) B — Native SVG artwork and independent vector captions proved through the public API on 60/100-base examples.
 - [x] (2026-11-18 05:54Z) C — Layout, font identity, neutral label, spacer and bottom-legend contracts are implemented; native/explicit-layout overflow fails before drawing.
-- [ ] (2026-11-18 02:06Z) D — Qualify shared geometry through SVG, PNG, representative frames and CLI/job admission.
+- [ ] (2026-11-18 06:21Z) D — In progress: native SVG-to-PNG conversion is implemented; image-job and frame integration remain required.
 - [ ] (2026-11-18 02:06Z) E — Measure and improve batch preparation against fidelity-preserving baselines.
 - [ ] (2026-11-18 02:06Z) F — Migrate the two real sequence uses in separate verified batches.
 - [ ] (2026-11-18 02:06Z) G — Remove displaced consumer logic and close the bounded package hardening review.
@@ -63,7 +63,7 @@ SVG feature has been exhaustively audited.
 | Priority / criterion | Evidence and status | Owning slice |
 | --- | --- | --- |
 | P1: vector requests preserve actual geometry | [Illustration loader](../../../src/dnadesign/baserender/src/render/effects/anchored_illustration.py) selected pixels; the new native API reads pinned SVG selections without decoding PNG. Closed for the native API; legacy APIs remain explicit raster paths. | B |
-| P1: fixed typography and transparent composition | [Fitted panel](../../../src/dnadesign/baserender/src/public/api.py) forces white and rescales. Native SVG avoids that route; fixed-canvas admission and PNG/frame parity are still open. | C/D |
+| P1: fixed typography and transparent composition | [Fitted panel](../../../src/dnadesign/baserender/src/public/api.py) forces white and rescales. Native SVG and its derived PNG preserve admitted point geometry and alpha; native image-job/frame integration remains open. | C/D |
 | P2: neutral placement policy | [Sequence labels](../../../src/dnadesign/baserender/src/render/sequence_rows.py) now use explicit feature annotation declarations. DenseGen/GenBank adapters supply the policy; provenance attributes no longer control placement. | C, closed |
 | P2: exact placement is observable | Native illustration frames now fail on overflow instead of clamping; captions share admitted origins with serialization and report ink bounds. Existing raster behavior stays explicit. | C, closed |
 | P2: viewer font identity | Native diagnostics declare referenced text and hash the resolved declared fonts. Captions reject missing glyphs and use resolved family names. Arial proofs render in Chrome/Inkscape; target font availability still needs consumer qualification. | C policy closed; D/F qualification |
@@ -269,6 +269,35 @@ with the proof. C is complete for the supported native/explicit-layout
 surface; D/E output integration/performance and both consumer migrations remain
 required.
 
+D's first batch separates format composition from the public entrypoint.
+[`outputs/native_svg.py`](../../../src/dnadesign/baserender/src/outputs/native_svg.py)
+owns native record preparation and composition, while the public API resolves
+its settings. Jobs can call that same implementation without importing public
+API internals. Packaged SVG resolution stays with the existing asset loader.
+The four C proofs remain byte-identical across this preparatory refactor.
+
+`rasterize_svg` converts a previously admitted `SvgRenderResult` to a
+`PngRenderResult`, retaining the same point diagnostics rather than preparing or
+fitting the record again. The existing Inkscape CLI is the explicit rasterizer;
+no Python package/system installation or silent alternate renderer is introduced.
+Its version and selected executable SHA-256 are reported. The implementation
+uses piped SVG and RGBA PNG, a transparent background, bounded pixels and a
+process timeout. Fonts are rechecked, the complete SVG document is admitted
+before process execution, and returned PNG dimensions/content are checked before
+an artifact is returned. Metadata is omitted from the conversion transport;
+rendered SVG geometry and its source hash remain authoritative. Pixel dimensions
+are nearest-integer samples of the serialized page at the requested DPI.
+
+The public example accepts `--raster-dpi` to create both formats from each
+composition. Current proof: `outputs/native-output-20261118-01/raster-proof/`
+under BaseRender. All 814 package tests pass (including four live Inkscape cases and a lazy-import
+regression), along with Ruff, architecture, docs, catalog and demo admission.
+The conversion transport and unchanged source SVG yield identical pixels; all
+four PNGs retain alpha and source hashes. This qualifies the conversion
+primitive, not native CLI job selection or video layout. D must still connect the image-job contract and
+qualify shared native frames, then E measures cold/warm/batch costs before
+optimizing repeated font/backend work.
+
 F must also pin the producer source revision alongside its distribution version:
 the current talk preparer checks `dnadesign-tools` version alone, which cannot
 distinguish changes within an editable checkout. Keep the existing v2 comparison
@@ -380,23 +409,27 @@ revise that bounded approach; do not substitute a raster or rewrite the renderer
 hashes, SVG plus preview, measurements and a short list of unresolved findings.
 The next executor updates this plan rather than creating a competing roadmap.
 
-#### Next executor contract — D
+#### Next executor contract — D image jobs and frames
 
-Qualify native composition at the final raster boundary, then connect it to the
-existing image-job/CLI surface. First inspect available dependencies and current
-output contracts; choose one explicit conversion route that preserves SVG
-geometry, referenced fonts, alpha, point size and pixel dimensions. Avoid
-reintroducing illustration decoding, white canvas patches or fitted-panel scale.
-Keep native/raster asset selection explicit and validate job settings through
-the same public admission. No additional general scene DSL or silent fallback.
+Connect native composition and the qualified rasterizer to the existing image-job
+surface. Make the native choice explicit: an `images` output with `fmt: svg`
+currently retains legacy illustration behavior, so format alone must not imply a
+representation upgrade. Admit native source/caption settings and raster options
+through shared API/config contracts, with strict path resolution and unknown-field
+errors. Avoid a second job DSL, renderer registry or duplicated validator.
 
-Prove the 60/100-base outputs and a crowded/reverse-strand case through SVG and
-PNG, with exact dimensions/anchor/type comparisons and failure-before-publication
-checks. Only then qualify representative frames using the same prepared geometry.
-Legacy video layout remains rejected until the frame contract passes; forwarding
-options into its metadata-driven crop/fit path is insufficient. Stage E measures
-preparation/drawing/serialization/raster costs before changing caches or batch
-behavior. Consumers, source artwork and package releases remain outside D.
+Use `outputs/native_svg.py` as the composition authority. Images must retain SVG
+artwork, independent captions and transparency through the existing staged bundle
+publication. Check dependency failures before unnecessary batch work. Qualify
+actual CLI SVG/PNG outputs and failure-before-publication paths, keeping the
+ordinary figure/PDF behavior explicit. Do not silently route unsupported native
+formats or multi-record grids through a raster compositor.
+
+Then qualify representative frames using that same geometry on a common canvas.
+Legacy video layout remains rejected until the native frame contract passes;
+forwarding options into its metadata-driven crop/fit path is insufficient. Stage
+E measures preparation/drawing/serialization/raster costs before changing caches
+or batch behavior. Consumers, source artwork and package releases remain outside D.
 
 ### Validation and Acceptance
 

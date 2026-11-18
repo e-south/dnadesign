@@ -189,6 +189,46 @@ The default presentation preset now reserves 40 px instead of 16 px so its
 11-point legend fits at 180 dpi. This intentionally increases the natural height
 of figures using that bottom legend; figures without it are unchanged.
 
+## Final raster output
+
+Keep the SVG result as the composition and rasterize only when an output needs
+pixels. This reuses its measured point geometry without repeating record layout:
+
+```python
+from pathlib import Path
+from dnadesign.baserender import rasterize_svg
+
+png = rasterize_svg(result, dpi=144)
+output = Path("src/dnadesign/baserender/outputs/native-png/sequence.png")
+output.parent.mkdir(parents=True, exist_ok=True)
+with output.open("xb") as handle:
+    handle.write(png.png)
+```
+
+This native conversion requires an **existing Inkscape CLI** on `PATH`, or an
+explicit `inkscape=Path(...)`. It does not install a dependency or try another
+renderer. The ordinary Matplotlib figure API remains independent of Inkscape.
+Repeat the first-use example with `--raster-dpi 144` to generate SVG and PNG
+pairs; `--inkscape` selects an explicit executable for that example.
+
+`PngRenderResult` reports `png`, `width_px`, `height_px`, `dpi`,
+`source_svg_sha256`, the same `diagnostics` object and a `RasterizerInfo` value.
+The latter records the resolved executable path, that file's SHA-256 and the
+reported Inkscape version. An executable can be a platform wrapper; its digest
+identifies the selected file, not every library used by the application.
+
+The converter exports the page at the selected DPI, preserving alpha. It does
+not crop, fit, recolor, or regenerate the artwork. Pixel dimensions are nearest
+integer samples of the serialized point page; half-pixel ties depend on the
+backend. Use a common canvas with integral pixel dimensions for a frame series.
+
+`timeout_s` defaults to 30 per external invocation and `max_pixels` to 64 million.
+Invalid units/budgets, incomplete or changed font identities, unsafe SVG content,
+missing tools, process failures/timeouts and corrupt or wrongly sized PNGs fail
+with `RenderingError`. No partial PNG result is returned. The caller owns file
+publication; jobs retain their existing staged-publication boundary. Native
+image-job selection and frame integration are not yet connected to this API.
+
 ## Admission and current qualification
 
 Source hashes, selections, definitions and fonts are checked before allocating
@@ -212,7 +252,7 @@ does not claim portable text rendering from Matplotlib lookup alone. The example
 uses explicit Arial for editable labels in Chrome and Inkscape and records font
 identities alongside the SVGs. Feature annotations use the explicit neutral
 declaration in the [record contract](reference.md#neutral-record). Portable font
-qualification, PNG/frame output and native SVG CLI/job integration remain in the
+qualification, native frames and native SVG CLI/job integration remain in the
 [execution plan](../../../../docs/exec-plans/active/baserender-vector-api.md).
 Native PowerPoint behavior and real consumer migration are not qualified by this
 neutral proof.

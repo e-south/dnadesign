@@ -3,7 +3,7 @@
 dnadesign
 src/dnadesign/baserender/src/core/vector.py
 
-Explicit source, caption and measured-result contracts for native SVG output.
+Native vector sources, caption geometry and derived raster-result contracts.
 
 Module Author(s): Eric J. South
 --------------------------------------------------------------------------------
@@ -14,7 +14,7 @@ from __future__ import annotations
 import math
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping
 
@@ -165,3 +165,21 @@ class SvgRenderResult:
     width_pt: float
     height_pt: float
     diagnostics: SvgRenderDiagnostics
+
+
+@dataclass(frozen=True)
+class RasterizerInfo:
+    executable: str
+    executable_sha256: str
+    version: str
+
+
+@dataclass(frozen=True)
+class PngRenderResult:
+    png: bytes = field(repr=False)
+    width_px: int
+    height_px: int
+    dpi: float
+    source_svg_sha256: str
+    diagnostics: SvgRenderDiagnostics
+    rasterizer: RasterizerInfo

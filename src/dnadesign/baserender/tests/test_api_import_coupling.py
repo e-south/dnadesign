@@ -101,6 +101,21 @@ def test_package_root_import_does_not_preload_render_stack() -> None:
     assert proc.stdout.splitlines() == ["False", "False", "False", "False"]
 
 
+def test_native_output_api_access_does_not_preload_render_stack() -> None:
+    code = "\n".join(
+        [
+            "import sys",
+            "from dnadesign.baserender import PngRenderResult, RasterizerInfo, rasterize_svg, render_record_svg",
+            "print(callable(rasterize_svg) and callable(render_record_svg))",
+            "print('matplotlib' in sys.modules)",
+            "print('PIL' in sys.modules)",
+            "print('numpy' in sys.modules)",
+        ]
+    )
+    proc = subprocess.run([sys.executable, "-c", code], check=True, capture_output=True, text=True)
+    assert proc.stdout.splitlines() == ["True", "False", "False", "False"]
+
+
 def test_catalog_access_does_not_preload_adapters_or_numpy() -> None:
     code = "\n".join(
         [

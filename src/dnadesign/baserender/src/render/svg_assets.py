@@ -13,11 +13,15 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import json
+import math
 import re
+from dataclasses import dataclass
+from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from ..core.errors import RenderingError
-from ..core.vector import SvgArtwork
+from ..core.vector import IllustrationCaption, SvgArtwork, SvgIllustration
 
 SVG_NS = "http://www.w3.org/2000/svg"
 SVG = f"{{{SVG_NS}}}"
@@ -26,8 +30,12 @@ _BLOCKED = {"image", "script", "foreignObject", "style", "animate", "animateMoti
 _MAX_BYTES = 64 * 1024 * 1024
 
 
-def _references(node):
-    if not isinstance(node.tag, str) or not node.tag.startswith(SVG) or node.tag[len(SVG) :] in _BLOCKED:
+def _references(node, *, allow_stylesheet=False):
+    if (
+        not isinstance(node.tag, str)
+        or not node.tag.startswith(SVG)
+        or (node.tag[len(SVG) :] in _BLOCKED and not (allow_stylesheet and node.tag == f"{SVG}style"))
+    ):
         raise RenderingError(f"unsupported element in vector selection: {node.tag!r}")
     refs = set()
     for key, value in node.attrib.items():
@@ -50,6 +58,93 @@ def _references(node):
                 raise RenderingError("SVG artwork url() references must be local fragment IDs")
             refs.add(target[1:])
     return refs
+
+
+@dataclass(frozen=True)
+class AdmittedSvgDocument:
+    payload: bytes
+    width_pt: float
+    height_pt: float
+
+
+def admit_composed_svg(payload: str, *, width_pt: float, height_pt: float) -> AdmittedSvgDocument:
+    """Admit a complete native output before handing it to an external renderer.
+
+    Transport omits non-rendering metadata. Only the fixed Matplotlib stroke
+    stylesheet is admitted; source artwork still requires inline declarations.
+    """
+    if not isinstance(payload, str):
+        raise RenderingError("native SVG payload must be text")
+    try:
+        raw = payload.encode("utf-8")
+    except UnicodeError as exc:
+        raise RenderingError("native SVG payload must be valid UTF-8 text") from exc
+    if len(raw) > _MAX_BYTES or b"<!DOCTYPE" in raw.upper() or b"<!ENTITY" in raw.upper():
+        raise RenderingError("native SVG exceeds its source limit or contains a DTD/entity declaration")
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError as exc:
+        raise RenderingError("malformed native SVG payload") from exc
+    if root.tag != f"{SVG}svg":
+        raise RenderingError("native SVG must have an SVG-namespace svg root")
+    try:
+        dimensions = tuple(float(root.attrib[key].removesuffix("pt")) for key in ("width", "height"))
+        view_box = tuple(float(value) for value in root.attrib["viewBox"].split())
+        valid = all(root.attrib[key].endswith("pt") for key in ("width", "height")) and all(
+            math.isfinite(value) and value > 0 for value in dimensions
+        )
+        valid = (
+            valid
+            and len(view_box) == 4
+            and all(
+                math.isclose(actual, expected, rel_tol=1e-9, abs_tol=1e-5)
+                for actual, expected in zip(
+                    (*dimensions, *view_box), (width_pt, height_pt, 0, 0, width_pt, height_pt), strict=True
+                )
+            )
+        )
+    except (KeyError, ValueError, TypeError, OverflowError) as exc:
+        raise RenderingError("native SVG has invalid point dimensions/viewBox") from exc
+    if not valid:
+        raise RenderingError("native SVG dimensions/viewBox disagree with its measured result")
+    # Metadata can contain RDF namespaces, URLs and unused declarations. It has
+    # no visual role and must not reach the rendering process as an escape hatch.
+    for parent in tuple(root.iter()):
+        for child in tuple(parent):
+            if child.tag == f"{SVG}metadata":
+                parent.remove(child)
+    by_id, references = {}, {}
+    for node in root.iter():
+        if node.tag == f"{SVG}style":
+            if re.sub(r"\s+", "", node.text or "") != "*{stroke-linejoin:round;stroke-linecap:butt}":
+                raise RenderingError("unsupported stylesheet in native SVG output")
+        try:
+            references[node] = _references(node, allow_stylesheet=True)
+        except RenderingError as exc:
+            raise RenderingError(f"native SVG rejected: {exc}") from exc
+        if key := node.get("id"):
+            if key in by_id:
+                raise RenderingError(f"duplicate native SVG ID: {key!r}")
+            by_id[key] = node
+    visited, visiting = set(), set()
+
+    def visit(node, depth=0):
+        if depth > 256 or node in visiting:
+            raise RenderingError("native SVG exceeds composition nesting limits or has cyclic references")
+        if node in visited:
+            return
+        visiting.add(node)
+        for key in references[node]:
+            if key not in by_id:
+                raise RenderingError(f"missing native SVG definition: {key!r}")
+            visit(by_id[key], depth + 1)
+        for child in node:
+            visit(child, depth + 1)
+        visiting.remove(node)
+        visited.add(node)
+
+    visit(root)
+    return AdmittedSvgDocument(ET.tostring(root, encoding="utf-8"), *dimensions)
 
 
 def load_svg_selection(artwork: SvgArtwork):
@@ -158,3 +253,31 @@ def namespace_selection(fragment, prefix):
             elif "url(" in value.lower():
                 node.set(key, _URL.sub(lambda match: f"url(#{ids[match.group(2).strip()[1:]]})", value))
     return result
+
+
+def load_packaged_svg_illustration(asset_id):
+    root = Path(__file__).resolve().parents[2] / "assets" / "overlays"
+    if not isinstance(asset_id, str) or Path(asset_id).name != asset_id:
+        raise RenderingError("illustration asset IDs must not contain paths")
+    try:
+        payload = json.loads((root / f"{asset_id}.json").read_text())
+        if payload.get("schema") != "baserender.anchored_illustration_asset.v1" or payload.get("asset_id") != asset_id:
+            raise RenderingError("packaged illustration manifest schema or asset_id mismatch")
+        vector = payload["vector"]
+        filename = payload["source_svg"]
+        if not isinstance(filename, str) or Path(filename).name != filename:
+            raise RenderingError("packaged SVG source must be a file name")
+        return SvgIllustration(
+            SvgArtwork(
+                root / filename,
+                vector["sha256"],
+                tuple(vector["element_ids"]),
+                tuple(vector["view_box"]),
+                {key: (point["x_fraction"], point["y_fraction_from_top"]) for key, point in payload["anchors"].items()},
+            ),
+            IllustrationCaption(**payload["caption"]),
+        )
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise RenderingError(
+            f"asset {asset_id!r} has no valid packaged vector selection; supply SvgIllustration"
+        ) from exc

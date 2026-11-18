@@ -38,6 +38,8 @@ if TYPE_CHECKING:
     )
     from dnadesign.baserender.src.core.vector import (  # noqa: F401
         IllustrationCaption,
+        PngRenderResult,
+        RasterizerInfo,
         ResolvedFont,
         SvgArtwork,
         SvgIllustration,
@@ -79,7 +81,7 @@ if TYPE_CHECKING:
         validate_job,
         validate_render_job,
     )
-    from dnadesign.baserender.src.public.vector_output import render_record_svg  # noqa: F401
+    from dnadesign.baserender.src.public.vector_output import rasterize_svg, render_record_svg  # noqa: F401
     from dnadesign.baserender.src.render.layout import compute_layout  # noqa: F401
     from dnadesign.baserender.src.render.palette import Palette  # noqa: F401
     from dnadesign.baserender.src.render.renderer import render_record  # noqa: F401
@@ -96,6 +98,9 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "SvgIllustration": ("dnadesign.baserender.src.core.vector", "SvgIllustration"),
     "SvgIllustrationPlacement": ("dnadesign.baserender.src.core.vector", "SvgIllustrationPlacement"),
     "SvgRenderDiagnostics": ("dnadesign.baserender.src.core.vector", "SvgRenderDiagnostics"),
+    "PngRenderResult": ("dnadesign.baserender.src.core.vector", "PngRenderResult"),
+    "RasterizerInfo": ("dnadesign.baserender.src.core.vector", "RasterizerInfo"),
+    "rasterize_svg": ("dnadesign.baserender.src.public.vector_output", "rasterize_svg"),
     "SvgRenderResult": ("dnadesign.baserender.src.core.vector", "SvgRenderResult"),
     "initialize_runtime": ("dnadesign.baserender.src.runtime", "initialize_runtime"),
     "compute_layout": ("dnadesign.baserender.src.render.layout", "compute_layout"),

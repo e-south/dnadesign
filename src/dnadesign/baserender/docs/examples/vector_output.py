@@ -26,6 +26,7 @@ from dnadesign.baserender import (
     Record,
     SequenceLayout,
     Span,
+    rasterize_svg,
     render_record_svg,
 )
 
@@ -64,8 +65,11 @@ def main():
     parser.add_argument("--font-family", default="DejaVu Sans Mono")
     parser.add_argument("--legend-font-size", type=float, default=None)
     parser.add_argument("--legend-height-px", type=float, default=60)
+    parser.add_argument("--raster-dpi", type=float, default=None)
+    parser.add_argument("--inkscape", default="inkscape")
     args = parser.parse_args()
     rendered = {}
+    rasterized = {}
     records = []
     for length in (60, 100):
         for size in (12, 18):
@@ -99,6 +103,19 @@ def main():
             )
             root = ET.fromstring(result.svg)
             rendered[name] = result.svg
+            raster_receipt = None
+            if args.raster_dpi is not None:
+                png = rasterize_svg(result, dpi=args.raster_dpi, inkscape=args.inkscape)
+                png_name = name.removesuffix(".svg") + ".png"
+                rasterized[png_name] = png.png
+                raster_receipt = {
+                    "file": png_name,
+                    "width_px": png.width_px,
+                    "height_px": png.height_px,
+                    "dpi": png.dpi,
+                    "source_svg_sha256": png.source_svg_sha256,
+                    "rasterizer": asdict(png.rasterizer),
+                }
             records.append(
                 {
                     "file": name,
@@ -117,16 +134,26 @@ def main():
                     "text_font_policy": result.diagnostics.text_font_policy,
                     "fonts": {role: asdict(font) for role, font in result.diagnostics.fonts.items()},
                     "bottom_legend": [asdict(entry) for entry in result.diagnostics.bottom_legend],
+                    "raster": raster_receipt,
                 }
             )
     args.output_dir.mkdir(parents=True, exist_ok=False)
     for name, payload in rendered.items():
         (args.output_dir / name).write_text(payload)
+    for name, payload in rasterized.items():
+        (args.output_dir / name).write_bytes(payload)
     (args.output_dir / "receipt.json").write_text(json.dumps(records, indent=2) + "\n")
     cards = "".join(
         f'<article><h2>{item["file"]}</h2><object type="image/svg+xml" data="{item["file"]}" '
         f'style="width:{item["width_pt"]}pt;height:{item["height_pt"]}pt"></object>'
-        f'<p><a href="{item["file"]}">SVG source</a></p></article>'
+        f'<p><a href="{item["file"]}">SVG source</a></p>'
+        + (
+            f'<p>Final PNG, {item["raster"]["dpi"]:g} dpi</p><img src="{item["raster"]["file"]}" '
+            f'style="display:block;width:{item["width_pt"]}pt;height:{item["height_pt"]}pt">'
+            if item["raster"]
+            else ""
+        )
+        + "</article>"
         for item in records
     )
     (args.output_dir / "index.html").write_text(
