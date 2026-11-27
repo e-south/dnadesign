@@ -855,7 +855,7 @@ ci-docs = [
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-cov" },
     { name = "pyyaml" },
-    { name = "ruff", specifier = ">=0.4" },
+    { name = "ruff", specifier = ">=0.14.14,<0.15" },
     { name = "upa-url", specifier = ">=1.1.0,<2" },
 ]
 dev = [
@@ -866,12 +866,12 @@ dev = [
     { name = "pre-commit", specifier = ">=3.7" },
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-cov" },
-    { name = "ruff", specifier = ">=0.4" },
+    { name = "ruff", specifier = ">=0.14.14,<0.15" },
     { name = "upa-url", specifier = ">=1.1.0,<2" },
 ]
 lint = [
     { name = "pre-commit", specifier = ">=3.7" },
-    { name = "ruff", specifier = ">=0.4" },
+    { name = "ruff", specifier = ">=0.14.14,<0.15" },
 ]
 test = [
     { name = "filelock", specifier = ">=4.2.4,<5" },
