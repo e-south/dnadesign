@@ -31,7 +31,7 @@ dnadesign-storage = "dnadesign.contracts.storage_objects.cli:main"
 
 [project.optional-dependencies]
 seqledger = [
-  "biopython>=1.87", "duckdb>=1.5.5,<2", "pandas", "pyarrow>=23.0.1",
+  "biopython>=1.87", "duckdb>=1.5.5,<3", "pandas", "pyarrow>=23.0.1",
   "pydantic>=2.12.5,<3", "pyyaml", "rich", "typer", "psutil>=7.2.1",
 ]
 infer = ["dnadesign-tools[seqledger]", "tqdm"]
@@ -42,7 +42,7 @@ construct = ["dnadesign-tools[seqledger,folding]", "vl-convert-python>=1.9.0"]
 baserender = ["pydantic>=2.12.5,<3", "pyyaml", "typer", "pyarrow>=23.0.1", "matplotlib", "pillow>=13.0.0", "psutil>=7.2.1"]
 junction = ["pydantic>=2.12.5,<3", "pyyaml", "typer", "matplotlib", "psutil>=7.2.1"]
 cluster = [
-  "dnadesign-tools[seqledger]", "scanpy==1.10.3", "igraph", "leidenalg",
+  "dnadesign-tools[seqledger]", "scanpy==1.12.6", "igraph", "leidenalg",
   "scikit-learn>=1.8,<2", "scipy>=1.17.0", "seaborn", "matplotlib",
   "umap-learn>=0.5.11", "python-levenshtein", "click>=8.3.3",
 ]
@@ -131,7 +131,7 @@ test = ["pytest>=9.0.3", "pytest-cov", "hypothesis>=6.100", "filelock>=4.2.4,<5"
 lint = ["ruff>=0.4", "pre-commit>=3.7"]
 dev = [
   { include-group = "test" }, { include-group = "lint" },
-  "html5lib>=1.1,<2", "markdown-it-py>=4.0.0,<5", "upa-url>=1.1.0,<2",
+  "html5lib>=1.1,<2", "markdown-it-py>=4.0.0,<5", "upa-url>=1.1.0,<3",
 ]
 ci-docs = [
   { include-group = "dev" },
