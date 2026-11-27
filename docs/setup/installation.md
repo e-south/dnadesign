@@ -52,7 +52,7 @@ Reason:
 ### Required versions
 
 - Python: `>=3.12,<3.13` (`pyproject.toml` `[project] requires-python`)
-- uv: `>=0.12.3,<0.13` (`pyproject.toml` `[tool.uv] required-version`)
+- uv: `>=0.12.3,<0.14` (`pyproject.toml` `[tool.uv] required-version`)
 
 ### Install and verify
 Run this full block in order:
