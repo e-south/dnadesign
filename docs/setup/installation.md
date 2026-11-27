@@ -1,7 +1,7 @@
 ## Installation
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-28
+**Last verified:** 2026-11-27
 
 Choose the runtime for the tools you need. Combine profiles by repeating `--extra`.
 Add `--group dev` when running tests or lint checks.

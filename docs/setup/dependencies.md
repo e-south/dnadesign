@@ -1,7 +1,7 @@
 ## Dependency maintenance
 
 **Owner:** dnadesign-maintainers
-**Last verified:** 2026-10-29
+**Last verified:** 2026-11-27
 
 This document is the canonical home for dependency management, including Python packages (`uv`) and system binaries (`pixi`).
 
