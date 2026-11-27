@@ -369,7 +369,7 @@ select = ["E", "F", "I"]
 known-first-party = ["dnadesign"]
 
 [tool.uv]
-required-version = ">=0.12.3,<0.13"
+required-version = ">=0.12.3,<0.14"
 default-groups = ["tools"]
 environments = [
   "sys_platform == 'darwin'",
